@@ -1,11 +1,11 @@
 /* 반사 시험판 — 손맛만 확인하는 작은 경기장 하나
-   위에서 내려다본 뷰를 옆으로 눕힘: 나는 왼쪽, 보스는 오른쪽. 화면 위쪽 = -Z, 오른쪽 = +X, 바닥 평면 XZ.
-   · 보스 정면은 막(방패)이 덮고 있어 정면으로 받아친 빛은 튕겨 나간다. 결정 기둥에 꺾어 옆구리를 노린다.
-   · 기본탄도 쏘기 버튼을 누른 채 끌면 그쪽으로 기체가 고개를 돌려 쏜다.
-   · 보스는 쏘기 직전에 빛을 모으고 몸을 움츠린다(신호). 판이 흐를수록 신호가 짧아진다.
+   위에서 내려다본 뷰. 화면 위쪽 = -Z, 오른쪽 = +X, 바닥 평면 XZ. 경기장 어디든 다닐 수 있다.
+   · 보스는 쏘기 직전에 빛을 모으고 몸을 움츠린다(신호). 판이 흐를수록 신호가 짧아진다. 보스는 늘 나를 향해 몸을 돌린다.
    · 반사: 누른 채 끌면 방패가 그쪽으로 돈다. 방패는 앞쪽 1/3만 막는다.
-     닿기 직전에 막 누르면 완벽 반사(빛이 갈라지며 엄지를 민 쪽으로 곧게), 미리 들고 있었으면 둥근 막에 맞아 약하게 튕길 뿐.
-   · 거울 기둥(육각 결정)은 빛을 면의 각도대로 꺾는다. 꺾일 때마다 빛이 더 갈라지고 세진다 = 콤보. */
+     닿기 직전에 막 누르면 완벽 반사, 미리 들고 있었으면 약하게 튕길 뿐. 보스 쪽으로 대충 밀어도 보스를 향해 날아간다.
+   · 완벽 반사를 연달아 성공할수록 받아친 빛이 더 갈라지고 세진다 = 콤보. 놓치거나 맞으면 끊긴다.
+   · 보스에게 가까울수록 탄이 빨리 닿아 위험하지만, 받아친 빛도 세게 박힌다.
+   · 기본탄: 누른 채 끌면 그쪽으로 고개를 돌려 쏜다. 쏘는 동안은 반동 때문에 이동과 고개 돌리기가 느려진다. */
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
@@ -20,6 +20,7 @@ const M = new URL('../../assets/models/', import.meta.url).href;
 const $ = s => document.querySelector(s);
 const hueRGB = h => { const f = n => { const k = (n + h * 6) % 6; return Math.max(0, Math.min(1, Math.abs(k - 3) - 1)); }; return [f(0), f(4), f(2)]; };
 const clamp = THREE.MathUtils.clamp, lerp = THREE.MathUtils.lerp;
+const angD = a => THREE.MathUtils.euclideanModulo(a + Math.PI, Math.PI * 2) - Math.PI;   /* 가장 짧게 도는 각 */
 
 /* ───── 손맛 숫자 (여기만 바꿔 가며 맞춘다) ───── */
 const T = {
@@ -30,14 +31,17 @@ const T = {
   win: .18,                      /* 완벽 반사로 쳐 주는 시간 (누른 뒤) */
   whiff: .38,                    /* 헛치면 이만큼 완벽 반사가 안 된다 */
   shieldR: 1.35, arcCos: .5,     /* 방패 반지름, 앞쪽 120도 */
-  lightSp: 28, lightDmg: 14, bounceK: 1.5, maxBounce: 4,
+  lightSp: 28, lightDmg: 14,
+  chainK: .25, chainMax: 6,      /* 연속 완벽 반사 1번마다 +25%, 6번까지 */
+  nearK: .6, nearIn: 3.5, nearOut: 11,   /* 보스와 3.5 안이면 +60%, 11 밖이면 그대로 */
+  assist: .5,                    /* 보스 쪽에서 이만큼(라디안, 약 30도) 안으로 밀면 보스를 향해 곧게 */
   weakK: .6, weakDmg: 2,
   bossHp: 320, hitHp: .2,
-  turn: 14,                      /* 기체가 고개를 돌리는 빠르기 */
-  frontK: .2, frontCos: .57      /* 보스 정면 막: 피해 20%만, 창끝 쪽 ±55도 */
+  turn: 14, turnFire: 4.5,        /* 고개 돌리는 빠르기: 평소 / 쏘는 동안 */
+  fireMove: .6                   /* 쏘는 동안 이동 속도 */
 };
-const FIELD = { x: 10.6, top: -6.4, bottom: 5.4 };
-const BX = 6.4, BZ = -.5;          /* 보스가 머무는 자리 (오른쪽 가운데) */
+const FIELD = { x: 12.6, top: -7.6, bottom: 6.4 };  /* 카메라를 조금 멀리 뺀 만큼 넓어진 경기장 */
+const BX = 5.6, BZ = -.6;          /* 보스가 머무는 자리 (오른쪽 가운데) */
 const FOE_C = [1, .22, .12];
 let foeK = 1;                    /* 화면 위 막대로 바꾸는 적 탄 빠르기 (시험용) */
 
@@ -46,7 +50,7 @@ export async function start(canvas, onProgress = () => {}) {
   renderer.toneMapping = THREE.NoToneMapping; renderer.autoClear = false; renderer.setClearColor(0, 1);
   const scene = new THREE.Scene();
   const camera = new THREE.PerspectiveCamera(40, 1, .5, 400);
-  const CAM = new THREE.Vector3(0, 25, 6.2), LOOK = new THREE.Vector3(0, 0, -.35);
+  const CAM = new THREE.Vector3(0, 29.5, 7.3), LOOK = new THREE.Vector3(0, 0, -.45);
   const bloom = makeBloom(renderer);
 
   { const pm = new THREE.PMREMGenerator(renderer); scene.environment = pm.fromScene(new RoomEnvironment(), .04).texture; scene.environmentIntensity = .55; pm.dispose(); }
@@ -88,23 +92,12 @@ export async function start(canvas, onProgress = () => {}) {
   { const m = bossG.scene, b = new THREE.Box3().setFromObject(m), c = b.getCenter(new THREE.Vector3()), s = b.getSize(new THREE.Vector3());
     m.position.sub(c); const h = new THREE.Group(); h.add(m); const k = BOSS_LEN / Math.max(s.x, s.z); h.scale.setScalar(k); h.rotation.y = Math.PI; bossBody.add(h);   /* 창끝(앞)이 나를 향하게 */
     BOSS_R = Math.max(s.x, s.z) * k * .42; HL = s.z * k / 2; HW = s.x * k / 2 + .3; }   /* 날개 끝까지 맞는 자리로 */
-  /* 보스 정면 막: 앞쪽만 덮는 얇은 막 (평소엔 희미하게, 맞으면 물결) */
-  const bshMat = filmMaterial(); bshMat.uniforms.uArc.value = .45;
-  const bsh = new THREE.Mesh(new THREE.SphereGeometry(1, 48, 24), bshMat); bsh.renderOrder = 11; bsh.rotation.y = Math.PI; boss.add(bsh);
-  let SH_R = 1.7, SH_OFF = 1.2; const bshHits = bshMat.uniforms.uHit.value; let bshSlot = 0, bshI = 0;
   const bossMats = []; bossBody.traverse(o => { if (o.isMesh) { o.material = o.material.clone(); o.material.emissive = new THREE.Color(0); bossMats.push(o.material); } });
 
   /* 방패: 얇은 막 반구, 앞쪽 1/3만 */
-  SH_OFF = HL * .45; SH_R = HL * .66; bsh.scale.set(SH_R, SH_R * .5, SH_R); bsh.position.set(0, .25, SH_OFF);   /* 창끝 쪽만 덮는 작은 막 — 옆구리는 열려 있다 */
   const shieldMat = filmMaterial(); shieldMat.uniforms.uArc.value = .4;
   const shield = new THREE.Mesh(new THREE.SphereGeometry(1, 48, 24), shieldMat); shield.renderOrder = 11; scene.add(shield);
 
-  /* 거울 기둥: 육각 결정. 면마다 각도가 있어 빛이 그 면대로 꺾인다 */
-  const PILLARS = [{ x: .6, z: -4.1, rot: -Math.PI / 6 }, { x: .6, z: 3.1, rot: -Math.PI / 6 }]   /* 나와 보스 사이 위아래. 평평한 면이 가운데를 본다 */.map(p => {
-    const R = .95, geo = new THREE.CylinderGeometry(R, R * 1.08, 2.2, 6, 1);
-    const mat = crystalMaterial(); mat.emissive = new THREE.Color(.25, .32, .55); mat.emissiveIntensity = .3;
-    const mesh = new THREE.Mesh(geo, mat); mesh.position.set(p.x, .4, p.z); mesh.rotation.y = p.rot; scene.add(mesh);
-    return { ...p, R, ap: R * Math.cos(Math.PI / 6), mesh, mat, pulse: 0 }; });
 
   /* 깨져 나가는 파편 (진짜 조각) */
   const DEB = []; { const g = new THREE.TetrahedronGeometry(.13);
@@ -123,7 +116,7 @@ export async function start(canvas, onProgress = () => {}) {
     stick: { on: false, id: -1, ox: 0, oy: 0, x: 0, y: 0 },
     fire: { on: false, id: -1, cd: 0, ox: 0, oy: 0, ax: 1, az: 0 },
     sh: { on: false, id: -1, ox: 0, oy: 0, fx: 1, fz: 0, pressT: -9, fresh: false, used: false, lock: 0, I: 0, hot: 0 },
-    fb: [], mb: [], lb: [], parts: [], rings: [], hits: 0
+    fb: [], mb: [], lb: [], parts: [], rings: [], hits: 0, chain: 0
   };
   const shieldHits = shieldMat.uniforms.uHit.value; let hitSlot = 0;
 
@@ -144,30 +137,16 @@ export async function start(canvas, onProgress = () => {}) {
   function tag(x, z, text, cls = '') { pv.set(x, .5, z).project(camera); const el = document.createElement('div'); el.className = 'tag ' + cls; el.textContent = text;
     el.style.left = ((pv.x * .5 + .5) * innerWidth) + 'px'; el.style.top = ((-pv.y * .5 + .5) * innerHeight) + 'px'; tagBox.appendChild(el); setTimeout(() => el.remove(), 1100); }
 
-  /* ───── 육각 기둥 충돌: 겹치면 그 면의 바깥 방향을 돌려준다 ───── */
-  function hexHit(p, x, z, r) {
-    const dx = x - p.x, dz = z - p.z; if (dx * dx + dz * dz > (p.R + r + .2) ** 2) return null;
-    let best = -1e9, bn = null;
-    for (let i = 0; i < 6; i++) { const a = p.rot + Math.PI / 6 + i * Math.PI / 3, nx = Math.sin(a), nz = Math.cos(a), d = dx * nx + dz * nz; if (d > best) { best = d; bn = [nx, nz]; } }
-    return best < p.ap + r ? { nx: bn[0], nz: bn[1], pen: p.ap + r - best } : null;
-  }
-  const mirror = (b, n) => { const d = b.vx * n.nx + b.vz * n.nz; if (d >= 0) return false; b.vx -= 2 * d * n.nx; b.vz -= 2 * d * n.nz; b.x += n.nx * n.pen; b.z += n.nz * n.pen; return true; };
-
-  /* ───── 보스에 닿았나: 정면 막('shield') 또는 몸('body') ───── */
+  /* ───── 보스 몸에 닿았나 (길쭉한 몸을 타원으로) ───── */
   function bossTest(x, z, r) {
     const B = S.boss; if (B.dead) return null;
     const fx = Math.sin(B.yaw), fz = Math.cos(B.yaw), dx = x - B.x, dz = z - B.z;
-    const cx = dx - fx * SH_OFF, cz = dz - fz * SH_OFF, d = Math.hypot(cx, cz) || 1e-4;           /* 막의 중심은 몸보다 앞 */
     const u = dx * fx + dz * fz, w = dx * fz - dz * fx;
-    if (d < SH_R + r && (cx * fx + cz * fz) / d > T.frontCos) return { k: 'shield', nx: cx / d, nz: cz / d, cx: B.x + fx * SH_OFF, cz: B.z + fz * SH_OFF };
-    if ((u / (HL + r)) ** 2 + (w / (HW + r)) ** 2 < 1) return { k: 'body' };
-    return null;
+    return (u / (HL + r)) ** 2 + (w / (HW + r)) ** 2 < 1 ? { u, w, fx, fz } : null;
   }
-  /* 막에 맞음: 맞은 자리에서 물결이 퍼지고 막이 잠깐 밝아진다 */
-  function bshRipple(nx, nz, k = 1) { const a = S.boss.yaw, lx = nx * Math.cos(a) - nz * Math.sin(a), lz = nx * Math.sin(a) + nz * Math.cos(a);
-    bshHits[bshSlot++ % 6].set(-lx, 0, -lz, S.t); bshI = Math.max(bshI, k); }
 
   /* ───── 보스 ───── */
+  const bossDir = (x, z) => { const B = S.boss, dx = B.x - x, dz = B.z - z, l = Math.hypot(dx, dz) || 1; return B.dead ? [1, 0] : [dx / l, dz / l]; };
   const muzzle = (off = 0) => { const b = S.boss, a = b.yaw, f = BOSS_LEN * .44;
     return [b.x + Math.sin(a) * f + Math.cos(a) * off, b.z + Math.cos(a) * f - Math.sin(a) * off]; };
 
@@ -204,8 +183,8 @@ export async function start(canvas, onProgress = () => {}) {
     const hold = b.phase === 'charge' ? .15 : 1;
     b.drift = (b.drift || 0) + dt * hold; const tz = BZ + Math.sin(b.drift * .42) * 2.7;
     const oz = b.z; b.z += (tz - b.z) * Math.min(1, dt * 1.8);
-    const want = Math.atan2(S.me.x - b.x, S.me.z - b.z), rel = clamp(THREE.MathUtils.euclideanModulo(want + Math.PI / 2 + Math.PI, Math.PI * 2) - Math.PI, -.6, .6);
-    b.yaw += (-Math.PI / 2 + rel - b.yaw) * Math.min(1, dt * (b.phase === 'charge' ? 6 : 2.5));
+    const want = Math.atan2(S.me.x - b.x, S.me.z - b.z), dYaw = angD(want - b.yaw);
+    b.yaw += clamp(dYaw * Math.min(1, dt * (b.phase === 'charge' ? 5 : 2.2)), -dt * 2.6, dt * 2.6);   /* 큰 몸이라 천천히 돈다 */
     b.kx *= Math.pow(.02, dt); b.kz *= Math.pow(.02, dt); b.bank *= Math.pow(.03, dt); b.pitch *= Math.pow(.03, dt); b.recoil *= Math.pow(.008, dt);
     b.flash *= Math.pow(.0006, dt);
     const vz = (b.z - oz) / Math.max(dt, 1e-4), lean = clamp(vz * Math.sin(b.yaw) * .05, -.25, .25);   /* 옆으로 미끄러질 때 몸이 기운다 */
@@ -238,7 +217,7 @@ export async function start(canvas, onProgress = () => {}) {
   function fireBoss(offs) {
     const b = S.boss;
     for (const off of offs) { const [mx, mz] = muzzle(off); const a = Math.atan2(S.me.z - mz, S.me.x - mx) + off * .12;
-      S.fb.push({ x: mx, z: mz, vx: Math.cos(a) * T.foeSp * foeK, vz: Math.sin(a) * T.foeSp * foeK, r: .28, age: 0, bn: 0 });
+      S.fb.push({ x: mx, z: mz, vx: Math.cos(a) * T.foeSp * foeK, vz: Math.sin(a) * T.foeSp * foeK, r: .28, age: 0 });
       flash(mx, mz, .9, [1.6, .6, .3], .1); spark(mx, mz, Math.cos(a), Math.sin(a), [1, .5, .2], 6, 9, .9); }
     b.recoil = .55; b.crouch = 0; b.warm = .4; shake(.06);
   }
@@ -256,22 +235,35 @@ export async function start(canvas, onProgress = () => {}) {
     const px = m.x + nx * T.shieldR, pz = m.z + nz * T.shieldR;
     if (perfect) {
       sh.used = true; sh.hot = 1;
-      S.lb.push({ x: px, z: pz, vx: sh.fx * T.lightSp, vz: sh.fz * T.lightSp, r: .3, dmg: T.lightDmg, bn: 0, age: 0, weak: false, tr: 0 });
+      /* 너그러운 방향: 보스 쪽으로 대충 밀었으면 보스를 향해 곧게 */
+      let ox = sh.fx, oz = sh.fz; const B = S.boss;
+      if (!B.dead) { const ba = Math.atan2(B.z - pz, B.x - px), da = angD(ba - Math.atan2(oz, ox)); if (Math.abs(da) < T.assist) { ox = Math.cos(ba); oz = Math.sin(ba); } }
+      S.chain = Math.min(S.chain + 1, 99);
+      const ch = Math.min(S.chain, T.chainMax), dB = Math.hypot(B.x - m.x, B.z - m.z), near = clamp((T.nearOut - dB) / (T.nearOut - T.nearIn), 0, 1);
+      const mul = (1 + (ch - 1) * T.chainK) * (1 + near * T.nearK);
+      S.lb.push({ x: px, z: pz, vx: ox * T.lightSp, vz: oz * T.lightSp, r: .3 + ch * .02, dmg: T.lightDmg * mul, mul, ch, near, age: 0, weak: false, tr: 0 });
+      chainUI();
       flash(px, pz, .6, [1.3, 1.3, 1.45], .1);
       spark(px, pz, sh.fx, sh.fz, [1, 1, 1], 12, 14, 1.1);
       ring(px, pz, { r0: .2, r1: 2.4, dur: .32, w: .14, spec: true, I: 1.1 });       /* 내 스킬이 터지는 순간에만 무지개 고리 */
       m.kx -= sh.fx * .7; m.kz -= sh.fz * .7;                                   /* 받아친 힘에 기체가 살짝 밀린다 */
-      shake(.16); hitStop(.085, .05); tag(px - sh.fx * .2, pz - 1.3, '완벽 반사', 'ok');
+      shake(.16 + ch * .015); hitStop(.085, .05); tag(px - sh.fx * .2, pz - 1.3, S.chain > 1 ? `완벽 반사 ${S.chain}연속` : '완벽 반사', 'ok');
     } else {
       /* 미리 들고 있던 막: 둥근 면에 맞아 힘없이 튕긴다 (방향은 맞은 자리의 각도대로) */
       const dd = bl.vx * nx + bl.vz * nz; let vx = bl.vx - 2 * dd * nx, vz = bl.vz - 2 * dd * nz;
       vx *= T.weakK; vz *= T.weakK;
-      S.lb.push({ x: px, z: pz, vx, vz, r: .24, dmg: T.weakDmg, bn: 0, age: 0, weak: true, tr: 0 });
+      S.lb.push({ x: px, z: pz, vx, vz, r: .24, dmg: T.weakDmg, age: 0, weak: true, tr: 0 });
+      breakChain();
       spark(px, pz, nx, nz, [.7, .75, .9], 5, 6); flash(px, pz, .45, [.6, .65, .8], .08);
       shake(.04); tag(px, pz, '약하게 튕김', 'meh');
     }
     return true;
   }
+
+  /* 연속 완벽 반사: 화면 가운데 위에 숫자, 끊기면 흩어지듯 사라진다 */
+  const chainEl = $('#chain'), chainB = $('#chain b');
+  function chainUI() { chainB.textContent = S.chain; chainEl.classList.toggle('on', S.chain >= 2); chainEl.classList.remove('pop', 'broke'); void chainEl.offsetWidth; chainEl.classList.add('pop'); }
+  function breakChain() { if (S.chain >= 2) { chainEl.classList.remove('pop'); void chainEl.offsetWidth; chainEl.classList.add('broke'); setTimeout(() => chainEl.classList.remove('on', 'broke'), 600); } S.chain = 0; }
 
   /* ───── 한 걸음 ───── */
   const v = new THREE.Vector3();
@@ -282,15 +274,17 @@ export async function start(canvas, onProgress = () => {}) {
 
     /* 이동: 왼손 막대만큼 원하는 속도, 관성은 남는다 */
     if (!S.over) {
-      const st = S.stick, tvx = st.on ? st.x * T.move : 0, tvz = st.on ? st.y * T.move : 0;
+      const slow = S.fire.on && !sh.on ? T.fireMove : 1, st = S.stick, tvx = st.on ? st.x * T.move * slow : 0, tvz = st.on ? st.y * T.move * slow : 0;
       m.vx += (tvx - m.vx) * Math.min(1, dt * 11); m.vz += (tvz - m.vz) * Math.min(1, dt * 11);
       m.kx *= Math.pow(.004, dt); m.kz *= Math.pow(.004, dt);
-      m.x = clamp(m.x + (m.vx + m.kx * 6) * dt, -FIELD.x + 1, -1.6); m.z = clamp(m.z + (m.vz + m.kz * 6) * dt, FIELD.top + .9, FIELD.bottom - .7);
+      m.x = clamp(m.x + (m.vx + m.kx * 6) * dt, -FIELD.x + 1, FIELD.x - 1); m.z = clamp(m.z + (m.vz + m.kz * 6) * dt, FIELD.top + .9, FIELD.bottom - .7);
+      const bt = bossTest(m.x, m.z, .7); if (bt) { const k = 1 / Math.sqrt((bt.u / (HL + .7)) ** 2 + (bt.w / (HW + .7)) ** 2);   /* 보스 몸 안으로는 못 들어간다 */
+        const u = bt.u * k, w = bt.w * k; m.x = S.boss.x + bt.fx * u + bt.fz * w; m.z = S.boss.z + bt.fz * u - bt.fx * w; }
     }
     /* 고개: 쏘는 동안은 끈 쪽, 아니면 보스 쪽(오른쪽). 빠르지만 부드럽게 돈다 */
-    const F = S.fire, aim = F.on && !sh.on ? [F.ax, F.az] : [1, 0];
-    const wantY = Math.atan2(-aim[0], -aim[1]), dY = THREE.MathUtils.euclideanModulo(wantY - m.yaw + Math.PI, Math.PI * 2) - Math.PI;
-    const turn = dY * Math.min(1, dt * T.turn); m.yaw += turn;
+    const F = S.fire, firing = F.on && !sh.on, toB = bossDir(m.x, m.z), aim = firing ? [F.ax, F.az] : toB;
+    const wantY = Math.atan2(-aim[0], -aim[1]), dY = angD(wantY - m.yaw);
+    const turn = dY * Math.min(1, dt * (firing ? T.turnFire : T.turn)); m.yaw += turn;
     const hx = -Math.sin(m.yaw), hz = -Math.cos(m.yaw), rx = -hz, rz = hx;                 /* 기체 앞, 기체 오른쪽 */
     m.hx = hx; m.hz = hz;
     const side = m.vx * rx + m.vz * rz, back = -(m.vx * hx + m.vz * hz);
@@ -305,10 +299,11 @@ export async function start(canvas, onProgress = () => {}) {
     if (S.fire.on && !sh.on && S.fire.cd <= 0 && m.hp > 0 && !S.over) { S.fire.cd = T.fireEvery;
       const hx = m.hx, hz = m.hz, rx = -hz, rz = hx;
       for (const gx of [-.36, .36]) { const x = m.x + hx * .85 + rx * gx, z = m.z + hz * .85 + rz * gx;
-        S.mb.push({ x, z, vx: hx * T.shotSp, vz: hz * T.shotSp, age: 0 }); P3(x, .35, z, hx * 2, 0, hz * 2, .06, .3, 3, [.8, 1, 1.4], { drag: 0, grow: 2 }); } }
+        S.mb.push({ x, z, vx: hx * T.shotSp, vz: hz * T.shotSp, age: 0 }); P3(x, .35, z, hx * 2, 0, hz * 2, .06, .3, 3, [.8, 1, 1.4], { drag: 0, grow: 2 }); }
+      m.kx -= hx * .025; m.kz -= hz * .025; }                                           /* 반동이 기체를 살짝 뒤로 민다 */
 
     /* 방패 상태: 막 눌렀을 때 가장 밝고, 들고 있을수록 식는다 */
-    if (sh.on && !sh.used && sh.fresh && t - sh.pressT > T.win) { sh.fresh = false; sh.lock = t + T.whiff; }   /* 헛침 */
+    if (sh.on && !sh.used && sh.fresh && t - sh.pressT > T.win) { sh.fresh = false; sh.lock = t + T.whiff; breakChain(); }   /* 헛침 */
     const ageS = t - sh.pressT, freshNow = sh.on && sh.fresh && !sh.used && ageS <= T.win;
     sh.I += ((sh.on ? (freshNow ? 1.5 : .42) : 0) - sh.I) * Math.min(1, dt * (sh.on ? 30 : 12));
     sh.hot *= Math.pow(.002, dt); if (freshNow) sh.hot = Math.max(sh.hot, 1 - ageS / T.win);
@@ -323,7 +318,6 @@ export async function start(canvas, onProgress = () => {}) {
     for (let i = S.fb.length - 1; i >= 0; i--) { const b = S.fb[i]; b.age += dt; let gone = false;
       for (let s = 0; s < 2 && !gone; s++) { b.x += b.vx * dt / 2; b.z += b.vz * dt / 2;
         if (tryShield(b)) { gone = true; break; }
-        for (const p of PILLARS) { const h = hexHit(p, b.x, b.z, b.r); if (h && mirror(b, h)) { b.bn++; p.pulse = .6; spark(b.x, b.z, h.nx, h.nz, [1, .5, .25], 5, 6); } }
         if (m.hp > 0 && m.inv < t && Math.hypot(b.x - m.x, (b.z - m.z) * 1.15) < .5 + b.r) { playerHit(b); gone = true; } }
       if (gone || b.age > 3 || Math.abs(b.x) > FIELD.x + 3 || b.z > FIELD.bottom + 3 || b.z < FIELD.top - 3) { S.fb.splice(i, 1); continue; }
       const sp = Math.hypot(b.vx, b.vz), tl = .55;
@@ -332,57 +326,28 @@ export async function start(canvas, onProgress = () => {}) {
 
     /* 기본탄 */
     for (let i = S.mb.length - 1; i >= 0; i--) { const b = S.mb[i]; b.age += dt; b.x += b.vx * dt; b.z += b.vz * dt; let gone = false;
-      for (const p of PILLARS) if (hexHit(p, b.x, b.z, .06)) { spark(b.x, b.z, 0, 1, [.7, .85, 1.2], 3, 5); gone = true; }
-      if (!gone) { const h = bossTest(b.x, b.z, .06);
-        if (h && h.k === 'shield') { bossHit(T.shotDmg * T.frontK, b.x, b.z, b.vx, b.vz, false); bshRipple(h.nx, h.nz, .5); spark(b.x, b.z, h.nx, h.nz, [.7, .8, 1], 3, 6); gone = true; }
-        else if (h) { bossHit(T.shotDmg, b.x, b.z, b.vx, b.vz, false); gone = true; } }
+      if (bossTest(b.x, b.z, .06)) { bossHit(T.shotDmg, b.x, b.z, b.vx, b.vz, false); gone = true; }
       if (gone || b.age > 1.4 || Math.abs(b.x) > FIELD.x + 2 || b.z < FIELD.top - 2 || b.z > FIELD.bottom + 2) { S.mb.splice(i, 1); continue; }
       glow.add(b.x, .33, b.z, -b.vx * .024, 0, -b.vz * .024, .08, 2, [.55, .75, 1.3], 1, i); }
 
-    /* 받아친 빛: 기둥 면에서 꺾이고, 꺾일 때마다 더 갈라지고 세진다 */
+    /* 받아친 빛: 연속 완벽 반사가 길수록 더 갈라지고 굵다 */
     for (let i = S.lb.length - 1; i >= 0; i--) { const b = S.lb[i]; b.age += dt; let gone = false;
       for (let s = 0; s < 4 && !gone; s++) { b.x += b.vx * dt / 4; b.z += b.vz * dt / 4;
-        for (const p of PILLARS) { const h = hexHit(p, b.x, b.z, b.r); if (h && mirror(b, h)) {
-            if (b.bn < T.maxBounce) { b.bn++; if (!b.weak) { b.dmg *= T.bounceK; b.vx *= 1.06; b.vz *= 1.06; } }
-            p.pulse = 1;
-            flash(b.x, b.z, b.weak ? .35 : .55, b.weak ? [.5, .55, .7] : [1.3, 1.3, 1.45], .09);
-            /* 결정에 부딪힌 빛이 색마다 다른 각도로 흩어진다 */
-            const a0 = Math.atan2(b.vz, b.vx);
-            if (!b.weak) for (let j = 0; j < 14; j++) { const f = j / 13, a = a0 + (f - .5) * .9, s2 = 7 + Math.random() * 6;
-              P3(b.x, .4, b.z, Math.cos(a) * s2, Math.random() * 2, Math.sin(a) * s2, .3 + Math.random() * .15, .055, 2, hueRGB(f * .83), { drag: 5, tail: .05 }); }
-            shake(b.weak ? .03 : .09);
-            if (!b.weak) tag(b.x, b.z - 1.1, '꺾임 ' + b.bn, 'bn'); } }
-        const h = bossTest(b.x, b.z, b.r);
-        if (h && h.k === 'shield') {            /* 정면 막에 튕겨 나간다: 조금만 박히고 빛은 살아서 다시 날아간다 */
-          const d = b.vx * h.nx + b.vz * h.nz;
-          if (d < 0) { b.vx -= 2 * d * h.nx; b.vz -= 2 * d * h.nz; b.x = h.cx + h.nx * (SH_R + b.r + .05); b.z = h.cz + h.nz * (SH_R + b.r + .05);
-            bossHit(b.dmg * T.frontK, b.x, b.z, -b.vx, -b.vz, false); bshRipple(h.nx, h.nz, b.weak ? .5 : 1.3);
-            spark(b.x, b.z, h.nx, h.nz, [.8, .85, 1], b.weak ? 4 : 10, 9); flash(b.x, b.z, .45, [.9, 1, 1.3], .08); shake(.06);
-            if (!b.weak) tag(b.x, b.z - 1, '정면은 막혀요', 'meh'); } }
-        else if (h) {
+        if (bossTest(b.x, b.z, b.r)) {
           bossHit(b.dmg, b.x, b.z, b.vx, b.vz, !b.weak);
-          if (!b.weak) tag(b.x, b.z - .9, b.bn > 0 ? `옆구리 · 꺾임 ${b.bn}번 · 피해 ×${(T.bounceK ** b.bn).toFixed(1)}` : '옆구리', 'big');
+          if (!b.weak && b.mul > 1.05) tag(b.x, b.z - .9, `피해 ×${b.mul.toFixed(1)}` + (b.near > .3 ? ' · 가까이' : ''), 'big');
           gone = true; } }
       if (gone || b.age > 3 || Math.abs(b.x) > FIELD.x + 3 || b.z > FIELD.bottom + 3 || b.z < FIELD.top - 3) { S.lb.splice(i, 1); continue; }
-      const sp = Math.hypot(b.vx, b.vz), split = Math.min(1, b.bn / 2);
+      const sp = Math.hypot(b.vx, b.vz), split = Math.min(1, (b.ch - 1 || 0) / (T.chainMax - 1));
       if (b.weak) glow.add(b.x, .35, b.z, -b.vx / sp * .4, 0, -b.vz / sp * .4, b.r, 0, [.5, .6, .9], .8, i);
       else {
-        const tl = 1.5 + split * .8;
+        const tl = 1.5 + split * .9;
         glow.add(b.x, .38, b.z, -b.vx / sp * tl, 0, -b.vz / sp * tl, b.r * (1 + split * .35), 1 + split * .4, [.8, .9, 1.1], 1, i);
         glow.add(b.x, .38, b.z, 0, 0, 0, b.r * (3 + split * 2), 3, [.6, .7, 1], .3 + split * .25);
         /* 지나간 자리에 갈라진 빛이 잠깐 남는다 */
-        b.tr += dt; if (b.tr > .016) { b.tr = 0; P3(b.x, .38, b.z, 0, 0, 0, .18 + split * .12, b.r * .7, 1 + split * .4, [.7, .8, 1], { drag: 0, grow: -.6, a: .5 }); }
+        b.tr += dt; if (b.tr > .016) { b.tr = 0; P3(b.x, .38, b.z, 0, 0, 0, .18 + split * .14, b.r * .7, 1 + split * .4, [.7, .8, 1], { drag: 0, grow: -.6, a: .5 }); }
       } }
 
-    /* 보스 정면 막: 평소엔 희미하게 숨 쉬고, 맞으면 밝아졌다 식는다 */
-    bshI *= Math.pow(.03, dt); bsh.visible = !S.boss.dead;
-    bshMat.uniforms.uI.value = .2 + .05 * Math.sin(t * 2.2) + bshI; bshMat.uniforms.uT.value = t; bshMat.uniforms.uHot.value = bshI * .25;
-
-    /* 반사를 누르고 있는 동안: 받아친 빛이 갈 길을 흐리게 미리 보여 준다 (기둥에서 꺾이는 것까지) */
-    if (sh.on && m.hp > 0) aimLine(m.x + sh.fx * T.shieldR, m.z + sh.fz * T.shieldR, sh.fx, sh.fz, freshNow ? .75 : .4);
-
-    /* 기둥: 맞으면 안쪽에서 빛이 번진다 */
-    for (const p of PILLARS) { p.pulse *= Math.pow(.02, dt); p.mat.emissiveIntensity = .3 + p.pulse * 2.4; p.mesh.position.y = .4 + Math.sin(t * .8 + p.x) * .04; }
 
     /* 파편: 돌면서 날아가고 식는다 */
     for (const d of DEB) { if (!d.o.visible) continue; d.age += dt; if (d.age > d.life) { d.o.visible = false; continue; }
@@ -413,20 +378,8 @@ export async function start(canvas, onProgress = () => {}) {
     for (const s of STARS) { s[2] += dt * (1 + s[3]); if (s[2] > 60) s[2] -= 120; glow.add(s[0], s[1], s[2], 0, 0, 0, .06 + s[3] * .1, 3, [.7, .75, .9], .35 + s[3] * .4); }
   }
 
-  function aimLine(x, z, vx, vz, A) {
-    const st = .12, L = 24; let dist = 0, next = .2, bn = 0;
-    while (dist < L) { x += vx * st; z += vz * st; dist += st;
-      for (const p of PILLARS) { const h = hexHit(p, x, z, .05); if (h) { const d = vx * h.nx + vz * h.nz; if (d < 0) { vx -= 2 * d * h.nx; vz -= 2 * d * h.nz; x += h.nx * h.pen; z += h.nz * h.pen; bn++;
-            glow.add(x, .32, z, 0, 0, 0, .16, 3, [.9, .95, 1.1], A * .9); } } }
-      const h = bossTest(x, z, .05);
-      if (h) { const c = h.k === 'shield' ? [1, .35, .2] : [.7, 1, .3];          /* 막히는 곳은 붉게, 박히는 곳은 연두로 */
-        glow.add(x, .34, z, 0, 0, 0, .22, 3, c, A * 1.3); glow.add(x, .34, z, 0, 0, 0, .07, 2, c, A * 1.5); break; }
-      if (Math.abs(x) > FIELD.x + 1 || z < FIELD.top - 1 || z > FIELD.bottom + 1) break;
-      if (dist >= next) { next += .42; const k = 1 - dist / L; glow.add(x, .3, z, 0, 0, 0, .045 + bn * .01, 3, [.8, .87, 1], A * k * (bn ? 1 : .8)); } }
-  }
-
   function playerHit(b) {
-    const m = S.me; m.hp = Math.max(0, m.hp - T.hitHp); m.hitT = S.t; m.inv = S.t + .9;
+    const m = S.me; m.hp = Math.max(0, m.hp - T.hitHp); m.hitT = S.t; m.inv = S.t + .9; breakChain();
     spark(b.x, b.z, -b.vx, -b.vz, [1, .4, .2], 12, 8); flash(b.x, b.z, .8, [1.6, .5, .2], .12); shake(.25); hitStop(.05, .1);
     const vg = $('#hurt'); vg.classList.remove('on'); void vg.offsetWidth; vg.classList.add('on');
     if (m.hp <= 0) { const x = m.x, z = m.z; flash(x, z, 2.2, [2, 1.5, 1.2], .2);
@@ -454,8 +407,8 @@ export async function start(canvas, onProgress = () => {}) {
   function drawArc() { arc.style.transform = `rotate(${Math.atan2(S.sh.fx, -S.sh.fz)}rad)`; }
   addEventListener('pointerdown', e => {
     if (!S.run || S.over || e.target.closest('#speed')) return;
-    if (e.target.closest('#fire')) { Object.assign(S.fire, { on: true, id: e.pointerId, ox: e.clientX, oy: e.clientY, ax: 1, az: 0 }); fireB.classList.add('on'); fireAim(e); e.preventDefault(); return; }
-    if (e.target.closest('#reflect')) { const sh = S.sh; Object.assign(sh, { on: true, id: e.pointerId, ox: e.clientX, oy: e.clientY, fx: 1, fz: 0, pressT: S.t, fresh: S.t >= sh.lock, used: false });
+    if (e.target.closest('#fire')) { const d0 = bossDir(S.me.x, S.me.z); Object.assign(S.fire, { on: true, id: e.pointerId, ox: e.clientX, oy: e.clientY, ax: d0[0], az: d0[1] }); fireB.classList.add('on'); fireAim(e); e.preventDefault(); return; }
+    if (e.target.closest('#reflect')) { const sh = S.sh; const d0 = bossDir(S.me.x, S.me.z); Object.assign(sh, { on: true, id: e.pointerId, ox: e.clientX, oy: e.clientY, fx: d0[0], fz: d0[1], pressT: S.t, fresh: S.t >= sh.lock, used: false });
       refB.classList.add('on'); refB.classList.toggle('stale', !sh.fresh); shieldDir(e); drawArc();
       /* 이미 방패 범위 안에 들어온 탄이 있으면 바로 받아친다 */
       for (let i = S.fb.length - 1; i >= 0; i--) if (tryShield(S.fb[i])) S.fb.splice(i, 1);
@@ -472,7 +425,7 @@ export async function start(canvas, onProgress = () => {}) {
   const up = e => {
     if (e.pointerId === S.stick.id) { S.stick.on = false; S.stick.id = -1; stickEl.classList.remove('on'); }
     if (e.pointerId === S.fire.id) { S.fire.on = false; S.fire.id = -1; fireB.classList.remove('on'); fireKnob.style.transform = ''; fireDir.style.transform = 'rotate(90deg)'; }
-    if (e.pointerId === S.sh.id) { const sh = S.sh; if (sh.fresh && !sh.used && S.t - sh.pressT <= T.win) sh.lock = S.t + T.whiff;   /* 아무것도 못 받고 뗌 = 헛침 */
+    if (e.pointerId === S.sh.id) { const sh = S.sh; if (sh.fresh && !sh.used && S.t - sh.pressT <= T.win) { sh.lock = S.t + T.whiff; breakChain(); }   /* 아무것도 못 받고 뗌 = 헛침 */
       sh.on = false; sh.id = -1; refB.classList.remove('on', 'stale'); refKnob.style.transform = ''; }
   };
   addEventListener('pointerup', up); addEventListener('pointercancel', up);
@@ -488,7 +441,7 @@ export async function start(canvas, onProgress = () => {}) {
     Object.assign(S, { t: 0, ts: 1, stopT: 0, slowT: 0, shakeA: 0, over: false });
     Object.assign(S.me, { x: -6.5, z: BZ, vx: 0, vz: 0, roll: 0, pitch: 0, hp: 1, inv: 0, hitT: -9, kx: 0, kz: 0, yaw: -Math.PI / 2, hx: 1, hz: 0 });
     Object.assign(S.boss, { x: BX, z: BZ, hp: T.bossHp, flash: 0, warm: 0, phase: 'idle', pt: 0, wait: 1.6, sig: T.sig0, twin: false, kx: 0, kz: 0, bank: 0, pitch: 0, recoil: 0, crouch: 0, yaw: -Math.PI / 2, dead: false, drift: 0 });
-    Object.assign(S.sh, { on: false, id: -1, pressT: -9, fresh: false, used: false, lock: 0, I: 0, hot: 0, fx: 1, fz: 0 }); bshI = 0;
+    Object.assign(S.sh, { on: false, id: -1, pressT: -9, fresh: false, used: false, lock: 0, I: 0, hot: 0, fx: 1, fz: 0 }); S.chain = 0; chainEl.classList.remove('on', 'pop', 'broke');
     Object.assign(S.fire, { on: false, ax: 1, az: 0 }); S.stick.on = false; S.fb.length = 0; S.mb.length = 0; S.lb.length = 0; S.parts.length = 0;
     for (const e of S.rings) { scene.remove(e.mesh); e.m.dispose(); } S.rings.length = 0;
     for (const d of DEB) d.o.visible = false;
@@ -517,7 +470,7 @@ export async function start(canvas, onProgress = () => {}) {
     glow.uT.value = S.t;
     S.shakeA *= Math.pow(.004, real * .6);
     const sh = S.shakeA, sx = (Math.random() - .5) * sh, sz = (Math.random() - .5) * sh;
-    camera.position.set(CAM.x + (S.me.x + 4) * .05 + sx, CAM.y, CAM.z + S.me.z * .05 + sz); camera.lookAt(LOOK.x + (S.me.x + 4) * .05 + sx * .5, 0, LOOK.z + S.me.z * .05 + sz * .5);
+    camera.position.set(CAM.x + S.me.x * .05 + sx, CAM.y, CAM.z + S.me.z * .05 + sz); camera.lookAt(LOOK.x + S.me.x * .05 + sx * .5, 0, LOOK.z + S.me.z * .05 + sz * .5);
     skyMat.uniforms.uT.value = S.t; skyMat.uniforms.uYaw.value = S.t * P.spin + P.yaw0;
     if ((frame++ & 1) === 0) { renderer.setRenderTarget(skyRT); renderer.render(skyScene, bgCam); }
     renderer.setRenderTarget(bloom.scene); renderer.clear(); renderer.render(bgScene, bgCam); renderer.clearDepth();

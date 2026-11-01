@@ -63,6 +63,15 @@ button{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:poin
 #reflect.on .arc{opacity:1} #reflect.on .knob{opacity:1}
 #reflect.stale,#reflect.locked{border-color:rgba(200,220,255,.2);box-shadow:none}
 #reflect.stale .arc,#reflect.locked .arc{opacity:.2}
+/* 연속 완벽 반사: 이어질수록 숫자가 튀어 오르고, 끊기면 흩어진다 */
+#chain{position:fixed;top:calc(env(safe-area-inset-top,0px) + 62px);left:50%;transform:translateX(-50%);display:flex;flex-direction:column;align-items:center;pointer-events:none;opacity:0;transition:opacity .2s}
+#chain b{font-family:var(--en);font-weight:400;font-size:30px;line-height:1;color:#fff;text-shadow:0 0 14px rgba(var(--gr),.8),0 0 2px #000}
+#chain span{font-size:10.5px;letter-spacing:.1em;color:rgba(var(--gr),.85);text-shadow:0 1px 6px #000}
+#chain.on{opacity:1}
+#chain.pop b{animation:cpop .35s cubic-bezier(.2,1.6,.4,1)}
+@keyframes cpop{0%{transform:scale(1.6)}100%{transform:scale(1)}}
+#chain.broke{animation:cbreak .55s ease-out forwards}
+@keyframes cbreak{0%{opacity:1;filter:blur(0)}100%{opacity:0;filter:blur(6px);transform:translateX(-50%) scale(1.3)}}
 /* 받아친 순간 글자 */
 #tags{position:fixed;inset:0;pointer-events:none;overflow:hidden}
 .tag{position:absolute;transform:translate(-50%,-50%);white-space:nowrap;font-size:13px;font-weight:600;letter-spacing:.06em;text-shadow:0 1px 8px #000,0 0 2px #000;animation:tag 1.1s cubic-bezier(.2,.9,.3,1) forwards}
@@ -105,6 +114,7 @@ button{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:poin
   <div class="hp" id="hpBoss"><span>스피어 기함</span><div class="bar"><i></i></div><div id="sig">쏘기 전 신호<b>0.90초</b></div></div>
 </header>
 <label id="speed"><span>적 탄 속도<b>100%</b></span><input type="range" min="50" max="200" step="5" value="100" aria-label="적 탄 속도"></label>
+<div id="chain"><b>0</b><span>연속 완벽 반사</span></div>
 <div id="tags"></div>
 <div id="hurt"></div>
 <div id="stick"><i></i></div>
@@ -113,11 +123,11 @@ button{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:poin
 <section class="card" id="how"><div>
   <span class="en">REFLECT TEST</span><h2>반사 시험판</h2>
   <div class="how">
-    <div><b>왼손 · 이동</b><p>화면 왼쪽 아무 데나 대고 끌면 그쪽으로 움직여요.</p></div>
-    <div><b>쏘기</b><p>누르고 있으면 계속 나가요. 누른 채 끌면 기체가 그쪽으로 돌아서 쏴요. 약해요.</p></div>
-    <div><b>반사</b><p>누른 채 끌면 방패가 그쪽으로 돌아요. 탄도 끈 쪽으로 날아가요.</p></div>
+    <div><b>왼손 · 이동</b><p>화면 왼쪽 아무 데나 대고 끌면 그쪽으로 움직여요. 경기장 어디든 갈 수 있어요.</p></div>
+    <div><b>쏘기</b><p>누른 채 끌면 그쪽으로 돌아서 쏴요. 쏘는 동안은 반동 때문에 느려져요. 약해요.</p></div>
+    <div><b>반사</b><p>누른 채 끌면 방패가 그쪽으로 돌아요. 보스 쪽으로 대충 밀어도 보스에게 날아가요.</p></div>
   </div>
-  <p class="tip">보스 포구에 <em>빛이 모이면</em> 곧 쏴요. 탄이 닿기 직전에 막 눌러야 세게 받아쳐요. 미리 들고 있으면 약하게 튕기기만 해요.<br>보스 <em>정면은 막</em>이 덮고 있어요. 위아래 결정 기둥에 꺾어서 옆구리를 노리세요. 반사를 누르고 있으면 빛이 갈 길이 흐리게 보여요.</p>
+  <p class="tip">보스 포구에 <em>빛이 모이면</em> 곧 쏴요. 탄이 닿기 직전에 막 눌러야 세게 받아쳐요. 미리 들고 있으면 약하게 튕기기만 해요.<br><em>연달아</em> 완벽 반사할수록 빛이 더 갈라지고 세져요. 보스에게 <em>가까이</em> 붙을수록 위험하지만 더 세게 박혀요.</p>
   <button class="btn" id="go" type="button">시작</button>
 </div></section>
 <section class="card" id="end" hidden><div>
