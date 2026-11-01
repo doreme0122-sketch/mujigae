@@ -43,7 +43,12 @@ button{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:poin
 .pad{position:fixed;border-radius:50%;display:grid;place-items:center;touch-action:none}
 #fire{right:max(136px,calc(env(safe-area-inset-right,0px) + 126px));bottom:calc(env(safe-area-inset-bottom,0px) + 24px);width:108px;height:108px;
   border:1.5px solid rgba(var(--gr),.55);background:radial-gradient(circle,rgba(4,8,6,.35),rgba(4,8,6,.7));box-shadow:inset 0 0 24px rgba(var(--gr),.12)}
-#fire b{font-weight:500;font-size:15px;color:var(--g);letter-spacing:.08em}
+/* 쏘는 방향: 버튼 가장자리의 작은 화살촉이 그쪽을 가리킨다 */
+#fire .dir{position:absolute;inset:-9px;pointer-events:none;transform:rotate(90deg);transition:opacity .12s;opacity:.45}
+#fire .dir::before{content:"";position:absolute;left:50%;top:0;width:0;height:0;margin-left:-7px;border:7px solid transparent;border-bottom:10px solid var(--g);border-top:0;filter:drop-shadow(0 0 4px rgba(var(--gr),.7))}
+#fire .knob{position:absolute;left:50%;top:50%;width:30px;height:30px;margin:-15px 0 0 -15px;border-radius:50%;pointer-events:none;opacity:0;background:radial-gradient(circle,rgba(var(--gr),.7),rgba(var(--gr),.08) 70%)}
+#fire.on .dir{opacity:1} #fire.on .knob{opacity:1}
+#fire b{position:relative;z-index:2;pointer-events:none;font-weight:500;font-size:15px;color:var(--g);letter-spacing:.08em}
 #fire.on{background:radial-gradient(circle,rgba(var(--gr),.28),rgba(4,8,6,.6));box-shadow:0 0 24px rgba(var(--gr),.45),inset 0 0 24px rgba(var(--gr),.3);transform:scale(.96)}
 #reflect{right:max(22px,calc(env(safe-area-inset-right,0px) + 12px));bottom:calc(env(safe-area-inset-bottom,0px) + 30px);width:96px;height:96px;
   border:1.5px solid rgba(200,220,255,.5);background:radial-gradient(circle,rgba(6,8,16,.35),rgba(6,8,16,.72))}
@@ -104,15 +109,15 @@ button{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:poin
 <div id="hurt"></div>
 <div id="stick"><i></i></div>
 <button class="pad" id="reflect" type="button"><span class="arc"></span><span class="knob"></span><b>반사</b></button>
-<button class="pad" id="fire" type="button"><b>쏘기</b></button>
+<button class="pad" id="fire" type="button"><span class="dir"></span><span class="knob"></span><b>쏘기</b></button>
 <section class="card" id="how"><div>
   <span class="en">REFLECT TEST</span><h2>반사 시험판</h2>
   <div class="how">
     <div><b>왼손 · 이동</b><p>화면 왼쪽 아무 데나 대고 끌면 그쪽으로 움직여요.</p></div>
-    <div><b>쏘기</b><p>누르고 있으면 계속 나가요. 약해서 이것만으로는 오래 걸려요.</p></div>
+    <div><b>쏘기</b><p>누르고 있으면 계속 나가요. 누른 채 끌면 기체가 그쪽으로 돌아서 쏴요. 약해요.</p></div>
     <div><b>반사</b><p>누른 채 끌면 방패가 그쪽으로 돌아요. 탄도 끈 쪽으로 날아가요.</p></div>
   </div>
-  <p class="tip">보스 포구에 <em>빛이 모이면</em> 곧 쏴요. 탄이 닿기 직전에 막 눌러야 세게 받아쳐요. 미리 들고 있으면 약하게 튕기기만 해요.<br>양옆 결정 기둥에 맞히면 빛이 꺾이면서 더 갈라지고 세져요.</p>
+  <p class="tip">보스 포구에 <em>빛이 모이면</em> 곧 쏴요. 탄이 닿기 직전에 막 눌러야 세게 받아쳐요. 미리 들고 있으면 약하게 튕기기만 해요.<br>보스 <em>정면은 막</em>이 덮고 있어요. 위아래 결정 기둥에 꺾어서 옆구리를 노리세요. 반사를 누르고 있으면 빛이 갈 길이 흐리게 보여요.</p>
   <button class="btn" id="go" type="button">시작</button>
 </div></section>
 <section class="card" id="end" hidden><div>
