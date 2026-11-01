@@ -1,6 +1,6 @@
 {
   "name": "무지개반사 시험판",
-  "short_name": "반사 시험판",
+  "short_name": "무지개 시험판",
   "description": "무지개 반사 액션",
   "start_url": "./index.html",
   "scope": "./",
