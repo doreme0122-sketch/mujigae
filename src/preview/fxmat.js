@@ -31,16 +31,16 @@ export function filmMaterial() {
           vec3 o=vec3(h1(i+g),h1(i+g+5.3),h1(i+g+9.1)); vec3 r=g+o-f; float d=dot(r,r); if(d<a){b=a;a=d;}else if(d<b)b=d; }
         return vec2(sqrt(a),sqrt(b)-sqrt(a)); }
       void main(){
-        float ndv = abs(dot(normalize(vN), vV)), fr = pow(1. - ndv, 2.2);
+        float ndv = min(1., abs(dot(normalize(vN), vV))), fr = pow(max(1. - ndv, 0.), 2.2);
         float side = 1.;
         if (uArc > -1.) side = smoothstep(uArc, uArc + .18, -vO.z);           /* 방패: 앞쪽만, 가장자리는 부드럽게 */
         float wave = 0.;
         for (int i = 0; i < 6; i++) { float age = uT - uHit[i].w; if (age < 0. || age > 1.2) continue;
           float ang = acos(clamp(dot(vO, normalize(uHit[i].xyz)), -1., 1.));
-          float rr = age * 2.4; wave += exp(-pow((ang - rr) * 9., 2.)) * (1. - age / 1.2) * 1.6 + exp(-ang * 7.) * exp(-age * 9.) * 3.; }
+          float rr = age * 2.4; float q = (ang - rr) * 9.; wave += exp(-q * q) * (1. - age / 1.2) * 1.6 + exp(-ang * 7.) * exp(-age * 9.) * 3.; }
         float d = 260. + 420. * n3(vO * 3.8 + vec3(0., uT * .3, uT * .17)) + 120. * wave;
-        float ct = sqrt(1. - (1. - ndv * ndv) / (1.38 * 1.38));
-        vec3 c = film(d, ct) * (fr * 1.35 + .015) * 1.1 + vec3(.8, .9, 1.) * pow(fr, 4.) * .35;
+        float ct = sqrt(max(0., 1. - (1. - ndv * ndv) / (1.38 * 1.38)));
+        vec3 c = film(d, ct) * (fr * 1.35 + .015) * 1.1 + vec3(.8, .9, 1.) * (fr * fr * fr * fr) * .35;
         c += vec3(1.) * wave * .35 + film(d + 80., ct) * wave * .8;
         if (uCrack > 0.) { vec2 v = vor(vO * 3.4); float e = smoothstep(.07, 0., v.y) * uCrack;      /* 금 사이로 새는 빛 */
           c += (vec3(1.) * 1.3 + hue(fract(v.x * 1.7)) * .7) * e; }
