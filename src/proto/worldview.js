@@ -1,25 +1,21 @@
-/* 맵 만들기 ① — 맵 5안대로 바닥 · 지역 · 경계 능선 · 큰길 깔기
+/* 맵 만들기 ① — 맵 6안(10명 개인전 · 정사각형)대로 바닥 · 지역 · 경계 능선 · 큰길 · 샛길 깔기
    보기: 끌면 이동, 두 손가락(휠)로 확대. 지역 이름표는 화면 위 글자. 시작 기지 자리는 빛 고리로만 표시(다음 단계에서 진짜 기지) */
 import * as THREE from 'three';
-import { makeBloom } from '../core/hangar/bloom.js?v=11022234';
-import { makeMapFloor, MAP, toWorld } from './mapfloor.js?v=11022234';
-import { makePerf } from './perf.js?v=11022234';
+import { makeBloom } from '../core/hangar/bloom.js?v=11022316';
+import { makeMapFloor, MAP, toWorld } from './mapfloor.js?v=11022316';
+import { makePerf } from './perf.js?v=11022316';
 
 const $ = s => document.querySelector(s), clamp = THREE.MathUtils.clamp;
-/* 맵 5안의 지역 (반쪽) — 이름표 자리 */
-const REG = [[150, 140, '먼지 들판', 'Lv 1–3'], [150, 860, '먼지 들판', 'Lv 1–3'], [700, 110, '고철 언덕', 'Lv 1–3'], [250, 500, '떠도는 바위숲', 'Lv 3–5'], [500, 150, '유성 낙하지', 'Lv 3–5'],
-  [480, 880, '안개 늪', 'Lv 3–5'], [430, 310, '얼음 성운 지대', 'Lv 6–8'], [390, 690, '용암 균열대', 'Lv 6–8'], [480, 500, '블랙홀 협곡', 'Lv 5–7'], [665, 360, '결정 협곡', 'Lv 8–10'],
-  [640, 710, '함선 묘지', 'Lv 8–10'], [880, 215, '폭풍 고원', 'Lv 8–10']];
-const ALL = [...REG, ...REG.map(([x, y, n, l]) => [MAP.W - x, MAP.H - y, n, l]), [900, 500, '무너진 중심부', 'Lv 10+']];
-const SPAWN = [[150, 140], [150, 860], [700, 110]].flatMap(([x, y]) => [[x, y], [MAP.W - x, MAP.H - y]]);
-const VIEWS = [{ name: '게임 시점', h: 60, tilt: .3 }, { name: '지역 보기', h: 160, tilt: .25 }, { name: '맵 전체', h: 420, tilt: .02 }];
+const VIEWS = [{ name: '게임 시점', h: 60, tilt: .3 }, { name: '지역 보기', h: 180, tilt: .25 }, { name: '맵 전체', h: 560, tilt: .02 }];
 
 export async function start(canvas, onProgress = () => {}) {
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: false, powerPreference: 'high-performance' });
   renderer.toneMapping = THREE.NoToneMapping; renderer.autoClear = false; renderer.setClearColor(0, 1);
   const scene = new THREE.Scene(), camera = new THREE.PerspectiveCamera(40, 1, 1, 3000), bloom = makeBloom(renderer, { samples: 0 });
   onProgress(.2);
-  const floor = await makeMapFloor(renderer, './assets/map/v5.png?v=11022234');
+  const floor = await makeMapFloor(renderer, './assets/map/v6.png?v=11022316');
+  const J = await (await fetch('./assets/map/v6.json?v=11022316')).json();
+  const SPAWN = J.spawns, ALL = [...J.labels.map(o => [o.x, o.y, o.n, o.l]), [500, 500, '무너진 중심부', 'Lv 10+']];
   onProgress(.7);
   /* 시작 기지 자리: 빛 고리 (임시) */
   const ringM = new THREE.ShaderMaterial({ transparent: true, depthWrite: false, depthTest: false, blending: THREE.AdditiveBlending, uniforms: { uT: { value: 0 } },
@@ -31,17 +27,17 @@ export async function start(canvas, onProgress = () => {}) {
 
   /* 보기 */
   const [sx, sz] = toWorld(...SPAWN[0]);
-  const cam = { x: sx + 30, z: sz + 25, h: 160, H: 160, tilt: .25, T: .25, az: 0 }, tour = $('#tour');
+  const cam = { x: sx, z: sz + 40, h: 180, H: 180, tilt: .25, T: .25, az: 0 }, tour = $('#tour');
   VIEWS.forEach((v, i) => { const b = document.createElement('button'); b.type = 'button'; b.textContent = v.name; b.className = i === 1 ? 'on' : '';
     b.onclick = () => { cam.H = v.h; cam.T = v.tilt; if (i === 2) { cam.x = 0; cam.z = 0; } tour.querySelectorAll('button').forEach(x => x.classList.toggle('on', x === b)); }; tour.appendChild(b); });
   const ptr = new Map(); let pin = 0;
   addEventListener('pointerdown', e => { if (e.target.closest('#ui')) return; ptr.set(e.pointerId, [e.clientX, e.clientY]); if (ptr.size === 2) { const [a, c] = [...ptr.values()]; pin = Math.hypot(a[0] - c[0], a[1] - c[1]); } });
   addEventListener('pointermove', e => { if (!ptr.has(e.pointerId)) return; const o = ptr.get(e.pointerId);
-    if (ptr.size === 1) { const k = cam.h * .0018; cam.x -= (e.clientX - o[0]) * k; cam.z -= (e.clientY - o[1]) * k; cam.x = clamp(cam.x, -190, 190); cam.z = clamp(cam.z, -110, 110); }
+    if (ptr.size === 1) { const k = cam.h * .0018; cam.x -= (e.clientX - o[0]) * k; cam.z -= (e.clientY - o[1]) * k; cam.x = clamp(cam.x, -200, 200); cam.z = clamp(cam.z, -200, 200); }
     ptr.set(e.pointerId, [e.clientX, e.clientY]);
-    if (ptr.size === 2) { const [a, c] = [...ptr.values()], d = Math.hypot(a[0] - c[0], a[1] - c[1]); if (pin) cam.H = clamp(cam.H * pin / d, 20, 480); pin = d; } });
+    if (ptr.size === 2) { const [a, c] = [...ptr.values()], d = Math.hypot(a[0] - c[0], a[1] - c[1]); if (pin) cam.H = clamp(cam.H * pin / d, 20, 620); pin = d; } });
   const upF = e => { ptr.delete(e.pointerId); if (ptr.size < 2) pin = 0; }; addEventListener('pointerup', upF); addEventListener('pointercancel', upF);
-  addEventListener('wheel', e => { cam.H = clamp(cam.H * Math.exp(e.deltaY * .0012), 20, 480); }, { passive: true });
+  addEventListener('wheel', e => { cam.H = clamp(cam.H * Math.exp(e.deltaY * .0012), 20, 620); }, { passive: true });
 
   let Wd = 2, Hd = 2, cw = 1, ch = 1;
   const perf = makePerf(st => { bloom.setSamples(st.aa ? 4 : 0); size(); });

@@ -56,7 +56,7 @@ button{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:poin
 <canvas id="cv"></canvas>
 <div id="tags"></div>
 <div id="ui">
-  <div id="head"><b>맵 만들기 ① · 바닥과 지역</b><span>맵 5안대로 지역 바닥 · 경계 능선 · 큰길 · 끌어서 이동, 두 손가락으로 확대</span></div>
+  <div id="head"><b>맵 만들기 ① · 바닥과 지역</b><span>맵 6안(10명 개인전 · 정사각형) · 지역 바닥 · 능선 · 큰길 · 샛길 · 끌어서 이동, 두 손가락으로 확대</span></div>
   <div id="fps"></div>
   <div id="tip" hidden><b></b><span></span></div>
   <div id="tour"></div>
@@ -64,7 +64,7 @@ button{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:poin
 <div id="load"><p>맵을 깔고 있어요</p><div class="b"><i></i></div></div>
 <div id="rot">기기를 가로로 돌려 주세요</div>
 <script type="module">
-import { start } from './src/proto/worldview.js?v=11022234';
+import { start } from './src/proto/worldview.js?v=11022316';
 const bar = document.querySelector('#load i');
 start(document.querySelector('#cv'), p => { bar.style.transform = `scaleX(${p})`; })
   .then(() => setTimeout(() => document.querySelector('#load').classList.add('done'), 300))
