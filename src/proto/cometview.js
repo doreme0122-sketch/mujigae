@@ -9,11 +9,11 @@
    무게: 꼬리 가닥은 한 묶음으로 한 번에, 부스러기는 점 묶음 한 번 */
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
-import { makeBloom } from '../core/hangar/bloom.js?v=11022019';
-import { makePad } from '../core/hangar/pad.js?v=11022019';
-import { makeGoldStar } from './goldstar.js?v=11022019';
-import { gem } from './guardian.js?v=11022019';
-import { makePerf } from './perf.js?v=11022019';
+import { makeBloom } from '../core/hangar/bloom.js?v=1102201902';
+import { makePad } from '../core/hangar/pad.js?v=1102201902';
+import { makeGoldStar } from './goldstar.js?v=1102201902';
+import { gem } from './guardian.js?v=1102201902';
+import { makePerf } from './perf.js?v=1102201902';
 
 const $ = s => document.querySelector(s), clamp = THREE.MathUtils.clamp;
 const N = 700, FALL = .5, REST = 1.2, CYCLE = FALL + REST;
