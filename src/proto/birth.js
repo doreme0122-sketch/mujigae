@@ -10,8 +10,9 @@
    · 빛이 가장 밝을 때 기체가 나오고, 빛이 걷히면 기체가 서 있음
    무게: 태어날 때 2초 남짓만 그림. 꼬리·빛 가닥은 각각 한 덩어리, 부스러기·조각은 점 묶음 한 번씩 */
 import * as THREE from 'three';
+import { makeMeteor, METEOR } from './meteor.js?v=11022159';
 
-export const BIRTH = { PRE: .75, END: 2.0 };
+export const BIRTH = { PRE: METEOR.FALL, END: 2.0 };   /* 떨어지는 빛 = 유성 (meteor.js) */
 const TOP = 16;
 const AB = { transparent: true, depthWrite: false, blending: THREE.AdditiveBlending };
 const sm01 = x => { x = Math.min(1, Math.max(0, x)); return x * x * (3 - 2 * x); };
@@ -47,29 +48,8 @@ function points(n) {
 export function makeBirth(ship) {
   const G = new THREE.Group(), U = v => ({ value: v }), uT = U(0);
 
-  /* ── 꼬리: 머리에서 위로, 화면을 향해 서는 불꽃 띠 ── */
-  const tailM = new THREE.ShaderMaterial({ ...AB, side: THREE.DoubleSide, uniforms: { uT, uHead: U(new THREE.Vector3()), uLen: U(1), uI: U(0) },
-    vertexShader: `attribute float aU, aS; uniform vec3 uHead; uniform float uLen; varying float vU, vS;
-      void main(){ vU=aU; vS=aS;
-        vec3 a=(viewMatrix*vec4(uHead,1.)).xyz, b=(viewMatrix*vec4(uHead+vec3(0.,uLen,0.),1.)).xyz;
-        vec3 d=normalize(b-a+vec3(0.,1e-4,0.)), n=cross(d, normalize(-a)); n = dot(n,n) > 1e-8 ? normalize(n) : vec3(1.,0.,0.);   /* 똑바로 내려다볼 때 0으로 나누지 않게 */
-        float w=mix(.16,.95,pow(max(aU,0.),.7));                                                    /* 머리 쪽 가늘고 위로 넓어짐 */
-        gl_Position=projectionMatrix*vec4(mix(a,b,aU)+n*aS*w,1.); }`,
-    fragmentShader: `uniform float uT, uI, uLen; varying float vU, vS; ${NOISE}
-      void main(){ float y=vU*uLen;
-        vec2 q=vec2(vS*1.8, y*.9-uT*7.); q.x+=(fbm(q*.8+uT*.5)-.5)*1.2;                       /* 흔들리며 갈라지는 결 */
-        float f=fbm(q*1.6), f2=fbm(q*3.4+3.);
-        float body=smoothstep(.25+vU*.45, .9, f*(1.-abs(vS)*.9))*(1.-vU);                      /* 위로 갈수록 성기게 흩어짐 */
-        float spine=exp(-vS*vS*28.)*pow(max(1.-vU,0.),2.5)*1.6;                                       /* 머리 쪽 짙은 심 */
-        float k=(body*(.8+f2*.6)+spine)*smoothstep(0.,.03,vU);
-        vec3 c=mix(vec3(.95,.98,1.4),vec3(.3,.55,1.35),smoothstep(.0,.35,vU));
-        gl_FragColor=vec4(c*k*uI*1.5,1.); }` });
-  const tailG = (() => { const pos = [], au = [], as = [], N = 40; for (let i = 0; i <= N; i++) for (const s of [-1, 1]) { pos.push(0, 0, 0); au.push(i / N); as.push(s); }
-    const idx = []; for (let i = 0; i < N; i++) { const p = i * 2; idx.push(p, p + 1, p + 2, p + 1, p + 3, p + 2); }
-    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('aU', new THREE.Float32BufferAttribute(au, 1)); g.setAttribute('aS', new THREE.Float32BufferAttribute(as, 1)); g.setIndex(idx); return g; })();
-  const tail = new THREE.Mesh(tailG, tailM); tail.frustumCulled = false; tail.renderOrder = 8; G.add(tail);
-  const head = glowSprite([1, 1, 1.05], [.4, .65, 1.45], .45); G.add(head);
-  const trail = points(90), trS = Array.from({ length: 90 }, () => ({ life: 0, max: 1, p: new THREE.Vector3(), v: new THREE.Vector3() })); G.add(trail);
+  /* ── 떨어지는 빛: 유성 ── 하늘 저 끝(비스듬히)에서 판 가운데로 */
+  const C0 = new THREE.Vector3(0, .22, 0), met = makeMeteor(new THREE.Vector3(-14, 30, -9), C0); G.add(met);
   /* 땅이 미리 빛을 받음 (판 가운데 원) */
   const preM = new THREE.ShaderMaterial({ ...AB, uniforms: { uI: U(0), uT },
     vertexShader: 'varying vec2 vP; void main(){ vP=position.xy; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.); }',
@@ -113,23 +93,17 @@ export function makeBirth(ship) {
   const S = { punch: 0, burst: 0, impR: 0, impK: 0, warpR: 0, warpS: 0 };
   const reset = () => { S.warpS = 0; S.impK = 0; S.burst = 0; S.punch = 0; };
   G.visible = false; G.userData.S = S;
-  G.userData.start = t => { T0 = t; active = true; shown = false; G.visible = true; ship.visible = false; trS.forEach(q => q.life = 0); spS.forEach(q => q.life = 0); };
+  G.userData.start = t => { T0 = t; active = true; shown = false; G.visible = true; ship.visible = false; met.userData.reset(); spS.forEach(q => q.life = 0); };
   G.userData.stop = () => { active = false; G.visible = false; reset(); };
-  G.userData.setPx = px => { trail.material.uniforms.uPx.value = px; sparks.material.uniforms.uPx.value = px; };
+  G.userData.setPx = px => { met.userData.setPx(px); sparks.material.uniforms.uPx.value = px; };
   const emit = (arr, n, f) => { for (let j = 0, k = 0; j < arr.length && k < n; j++) if (arr[j].life <= 0) { f(arr[j]); k++; } };
   const flushPts = (pts, arr, col) => { const P = pts.geometry.attributes.position, A = pts.geometry.attributes.aA, Cc = pts.geometry.attributes.aC;
     arr.forEach((q, i) => { P.setXYZ(i, q.p.x, q.p.y, q.p.z); const k = Math.max(0, q.life / q.max); A.setX(i, q.life > 0 ? col(k, q) : 0); Cc.setX(i, 1 - k); }); P.needsUpdate = A.needsUpdate = Cc.needsUpdate = true; };
 
-  G.userData.update = (t, dt) => { if (!active) return; uT.value = t; head.material.uniforms.uT.value = t; flash.material.uniforms.uT.value = t;
+  G.userData.update = (t, dt) => { if (!active) return; uT.value = t; flash.material.uniforms.uT.value = t;
     const e = t - T0 - BIRTH.PRE;                                                                  /* 닿는 순간 0 */
-    /* 떨어짐: 점점 빨라지며 (y = TOP → 땅) */
-    const f = Math.min(1, (e + BIRTH.PRE) / BIRTH.PRE), y = THREE.MathUtils.lerp(TOP, C.y, f * f * f), falling = e < 0;
-    head.visible = tail.visible = falling;
-    head.position.set(C.x, y, C.z); head.scale.setScalar(1.5 + f * .6); head.material.uniforms.uI.value = 1.4;
-    tailM.uniforms.uHead.value.set(C.x, y, C.z); tailM.uniforms.uLen.value = Math.min(TOP - y + .5, 5.5); tailM.uniforms.uI.value = sm01(f * 4);
-    if (falling) emit(trS, 3, q => { q.max = q.life = .5 + Math.random() * .6; q.p.set(C.x + (Math.random() - .5) * .25, y + Math.random() * .5, C.z + (Math.random() - .5) * .25); q.v.set((Math.random() - .5) * .9, 1.5 + Math.random() * 2, (Math.random() - .5) * .9); });
-    trS.forEach(q => { if (q.life > 0) { q.life -= dt; q.p.addScaledVector(q.v, dt); q.v.multiplyScalar(Math.exp(-2 * dt)); } });
-    flushPts(trail, trS, (k, q) => k * (.6 + .4 * Math.sin(t * 40 + q.max * 50)) * 1.4);     /* 반짝이다 꺼짐 */
+    /* 떨어짐: 유성 (나타난 뒤 BIRTH.PRE 초에 꽂힘) */
+    const M = met.userData.update(e + BIRTH.PRE, t, dt), f = M.uH, falling = e < 0;
     preM.uniforms.uI.value = falling ? Math.pow(f, 4) * 1.2 : Math.max(0, 1.2 - e * 2);
     /* 터짐 */
     const hit = e >= 0;
