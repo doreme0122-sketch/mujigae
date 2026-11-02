@@ -90,9 +90,9 @@ export function makeGoldStar() {
   const lg = new THREE.BufferGeometry(); lg.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); lg.setAttribute('aT', new THREE.Float32BufferAttribute(tt, 1));
   const lines = new THREE.Mesh(lg, lineMat); lines.renderOrder = 2; G.add(lines);
   /* 기체가 올라올 때 한 번: 빛이 갈래 끝 → 고리로 흘러 들어가 고리에 불이 들어오고, 그 순간 판이 켜진다(ARRIVE초 뒤) */
-  let fireT = -99; const ARRIVE = .55;
+  let fireT = -99, ARRIVE = .55;
   G.userData.ARRIVE = ARRIVE;
-  G.userData.fire = t => { fireT = t; };
+  G.userData.fire = (t, arrive) => { fireT = t; if (arrive) ARRIVE = arrive; };   /* arrive: 끝 → 고리까지 걸리는 시간(바닥 빛 물결 속도에 맞춤) */
   G.userData.update = t => { const e = t - fireT;
     uFlow.value = e >= 0 && e < ARRIVE + .05 ? 1 - e / ARRIVE : -1;
     uRing.value = e >= ARRIVE - .05 ? .35 + Math.exp(-(e - ARRIVE + .05) * 2.6) * 1.1 : 0; };

@@ -7,8 +7,8 @@
    단위는 자기장 판과 같음. */
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { sweep, posNor } from './floatring.js?v=11021900';
-import { GUARD_ANG, GUARD, guardScale } from './guardian.js?v=11021900';
+import { sweep, posNor } from './floatring.js?v=11021909';
+import { GUARD_ANG, GUARD, guardScale } from './guardian.js?v=11021909';
 
 
 /* 건담처럼 장갑판을 조립한 느낌의 검은 판 선 — 면 위치로 바로 그림(텍스처 없음, 가벼움)
@@ -47,7 +47,8 @@ function panelLines(mat, cell = .55) {
   return mat;
 }
 
-export const SPEED = 5;   /* 켜지는 빛이 바깥에서 가운데로 오는 빠르기 (판 단위/초) */
+export const SPEED = 5;
+export const WAVE_R0 = 7.0 + .85 + .3;   /* 빛 물결이 출발하는 반지름 (맨 바깥 고리 바로 밖) */   /* 켜지는 빛이 바깥에서 가운데로 오는 빠르기 (판 단위/초) */
 export const ARENA = { floor: 4.3, t1: [4.3, 5.3, .34], t2: [5.3, 7.0, .95], skirt: .85, exitHalf: .34, ramp: .3 };
 
 export function makeArena() {

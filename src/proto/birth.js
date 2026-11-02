@@ -1,10 +1,10 @@
 /* 시작 기지 — 기체가 태어나는 효과
-   탑이 빛나고 → 빛이 판의 정가운데로 모이는 순간, 하늘에서 빛 한 줄기가 곧장 떨어져 판에 꽂히고
+   탑이 빛나고 → 빛이 판의 정가운데로 모이는 순간, 모인 빛이 가는 줄기로 하늘로 솟아 오르고(부름) → 하늘에서 빛 한 줄기가 곧장 떨어져 판에 꽂히고(응답)
    그 섬광 속에서 기체가 태어난다. 태어난 뒤엔 숨 쉬듯 한 번 밝아지고 판 위로 빛 고리가 퍼진다.
    기체 위치는 판(mag)이 정하고, 여기선 보이는 때와 빛만 정한다. */
 import * as THREE from 'three';
 
-export const BIRTH = { FALL: .38, END: 2.4 };
+export const BIRTH = { UP: .26, FALL: .38, END: 2.7 };
 
 function sprite(color, sx = 1, sy = 1) {
   const m = new THREE.ShaderMaterial({ uniforms: { uI: { value: 0 }, uC: { value: new THREE.Color(...color) }, uS: { value: new THREE.Vector2(sx, sy) } }, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
@@ -34,7 +34,16 @@ export function makeBirth(renderer, ship) {
   G.visible = false;
   G.userData.start = t => { T0 = t; active = true; hit = false; G.visible = true; ship.visible = false; };
   G.userData.stop = () => { active = false; G.visible = false; };
-  G.userData.update = (t, dt) => { if (!active) return; const e = t - T0, f = e / BIRTH.FALL;
+  const up = sprite([.7, .88, 1.45]); G.add(up);
+  const upM = trailM.clone(); const upL = new THREE.Mesh(trail.geometry, upM); upL.renderOrder = 8; upL.frustumCulled = false; G.add(upL);
+  { const t2 = new THREE.Mesh(trail.geometry, upM); t2.rotation.y = Math.PI / 2; t2.renderOrder = 8; t2.frustumCulled = false; upL.add(t2); }
+  G.userData.update = (t, dt) => { if (!active) return; const e0 = t - T0, e = e0 - BIRTH.UP, f = e / BIRTH.FALL;
+    /* 부름: 정중앙에 모인 빛이 한 점으로 확 밝아졌다가 가는 줄기로 하늘로 솟음 */
+    { const u = e0 / BIRTH.UP, top = THREE.MathUtils.lerp(cen.y || .9, 14, Math.min(1, u * u));
+      up.visible = upL.visible = u < 1.2; up.position.set(cen.x || 0, top, cen.z || 0); up.scale.setScalar(.5); up.material.uniforms.uI.value = u < 1 ? 1.6 : 0;
+      upL.position.set(cen.x || 0, cen.y || .9, cen.z || 0); upL.scale.set(.22, Math.max(.01, top - (cen.y || .9)), 1); upM.uniforms.uI.value = u < 1 ? 1 : Math.max(0, 1 - (u - 1) * 5);
+      if (e < 0) { flash.position.set(cen.x || 0, cen.y || .9, cen.z || 0); flash.scale.setScalar(1.2); flash.material.uniforms.uI.value = Math.exp(-e0 * 6) * 1.4; } }
+    if (e < 0) { head.visible = trail.visible = false; waveM.uniforms.uI.value = 0; ship.updateMatrixWorld(true); box.setFromObject(ship); box.getCenter(cen); box.getSize(size); return; }
     ship.updateMatrixWorld(true); box.setFromObject(ship); box.getCenter(cen); box.getSize(size);
     if (!isFinite(cen.y)) cen.set(0, .9, 0);
     /* 떨어짐: 점점 빨라지며 곧장 판 가운데로 */
