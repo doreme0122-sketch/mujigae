@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>기체 데이터 점검</title>
+<style>
+:root{--g:#b9ff4a;--gr:185,255,74;--void:#020305;--mute:#8a92aa;color-scheme:dark}
+html,body{margin:0;height:100%;background:var(--void);overflow:hidden;font-family:system-ui,sans-serif;color:var(--g)}
+#c{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:none}
+.hd{position:fixed;left:16px;top:14px;pointer-events:none;font-size:14px;letter-spacing:.3em}
+.hd i{display:block;font-style:normal;font-size:10px;letter-spacing:.1em;color:var(--mute);margin-top:6px}
+.q{position:fixed;right:16px;display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}
+.q button{font:inherit;font-size:12px;color:var(--g);background:rgba(10,16,4,.6);border:1px solid rgba(var(--gr),.35);border-radius:6px;padding:6px 10px;cursor:pointer}
+.q button.on{border-color:var(--g);box-shadow:0 0 10px rgba(var(--gr),.35)}
+.q.s{top:14px}.q.t{top:52px}.q.p{left:16px;right:16px;bottom:16px;justify-content:center}
+.ld{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);font-size:12px;color:var(--mute)}
+</style>
+<script type="importmap">{"imports":{"three":"../vendor/three.module.js","three/addons/":"../vendor/addons/"}}</script>
+</head><body>
+<canvas id="c"></canvas>
+<div class="hd"><span id="nm"></span><i id="fl"></i></div>
+<div class="q s" id="qs"></div><div class="q t" id="qt"></div><div class="q p" id="qp"></div>
+<div class="ld" id="ld">불러오는 중…</div>
+<script type="module">
+/* 게임용 기체 데이터가 맞게 조립되는지 보는 점검 화면 (게임에는 안 들어감) */
+import * as THREE from 'three';
+import { SHIPS, shipById } from '../src/data/ships.js';
+import { buildShip, UT } from '../src/core/ships/build.js';
+import { makeDiamondEnv, backMat, SHIP } from '../src/core/ships/diamond.js';
+const cv=document.getElementById('c');
+const R=new THREE.WebGLRenderer({canvas:cv,antialias:true}); R.setClearColor(0x020305,1); R.toneMapping=THREE.ACESFilmicToneMapping; R.toneMappingExposure=1.05;
+const scene=new THREE.Scene(), cam=new THREE.PerspectiveCamera(32,1,.05,100); cam.position.set(0,1.15,4.2); cam.lookAt(0,0,0);
+const env=makeDiamondEnv(R); { const pm=new THREE.PMREMGenerator(R); scene.environment=pm.fromCubemap(env).texture; pm.dispose(); }
+scene.add(new THREE.HemisphereLight(0x8aa0c8,0x0a0c10,.25)); const key=new THREE.DirectionalLight(0xffffff,1.4); key.position.set(2,4,3); scene.add(key);
+const back=new THREE.WebGLRenderTarget(2,2,{type:THREE.HalfFloatType}); const holder=new THREE.Group(); scene.add(holder); holder.rotation.y=2.3;
+let cur=null, sel={s:1,t:1,p:null}, tk=0;
+function btns(id,items,on,fn){ const el=document.getElementById(id); el.innerHTML=''; for(const [v,l] of items){ const b=document.createElement('button'); b.textContent=l; b.classList.toggle('on',v===on); b.onclick=()=>fn(v); el.appendChild(b); } }
+async function show(s,t=1,p){ const my=++tk, ship=shipById(s); if(!ship.paints.some(x=>x.id===p)) p=ship.paints[0].id; if(!ship.styles.some(x=>x.id===t)) t=ship.styles[0].id; sel={s,t,p};
+  btns('qs',SHIPS.map(x=>[x.id,String(x.id)]),s,v=>show(v,1)); btns('qt',ship.styles.map(x=>[x.id,x.name]),t,v=>show(s,v,p)); btns('qp',ship.paints.map(x=>[x.id,x.name]),p,v=>show(s,t,v));
+  document.getElementById('ld').style.display='';
+  const b=await buildShip(s,t,p,{env,back:back.texture,renderer:R}); if(my!==tk) return;
+  holder.clear(); holder.add(b.root); cur=b; size();
+  document.getElementById('nm').textContent=b.paint.name+' · '+b.ship.name+' · '+b.style.name; document.getElementById('fl').textContent=b.file;
+  document.getElementById('ld').style.display='none'; }
+function size(){ const W=innerWidth*Math.min(2,devicePixelRatio||1)|0, H=innerHeight*Math.min(2,devicePixelRatio||1)|0; R.setSize(W,H,false); cam.aspect=W/H; cam.updateProjectionMatrix(); back.setSize(W,H); if(cur) for(const m of cur.materials) m.uniforms.uRes.value.set(W,H); }
+addEventListener('resize',size); size();
+let yv=.004, drag=false, lx=0;
+cv.onpointerdown=e=>{ drag=true; lx=e.clientX; }; addEventListener('pointerup',()=>drag=false); cv.onpointermove=e=>{ if(!drag) return; yv=(e.clientX-lx)/innerWidth*4; lx=e.clientX; holder.rotation.y+=yv; };
+R.setAnimationLoop(now=>{ const t=now/1000; UT.value=t;
+  if(window.__fix) holder.rotation.set(window.__fix[1],window.__fix[0],0); else { if(!drag){ yv+=(.0035-yv)*.02; holder.rotation.y+=yv; } }
+  holder.updateMatrixWorld(); SHIP.value.copy(holder.matrixWorld).invert();
+  if(cur&&cur.isDiamond){ for(const m of cur.materials){ m.uniforms.uT.value=t; m.uniforms.uHi.value=1; m.uniforms.uMode.value=1; }
+    scene.overrideMaterial=backMat; R.setRenderTarget(back); R.setClearColor(0,0); R.clear(); R.render(scene,cam); scene.overrideMaterial=null; R.setRenderTarget(null); R.setClearColor(0x020305,1); }
+  R.clear(); R.render(scene,cam); });
+window.__show=show; show(1,1);
+</script></body></html>

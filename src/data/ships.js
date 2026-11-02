@@ -79,7 +79,12 @@ export const SHIPS = [
     id: 4, grade: 0, gems: 15, name: '04', en: 'FIGHTER 04',   /* 등급: 일반 (2026-10-31 확정) */
     model: { file: A + '04/neon-black.glb' },
     engines: { match: 'exhaust_exit_collar|recessed_inner_nozzle_frame' },                                   /* 몸통-날개 이음부 정리한 모델 (2026-10-31) */
-    styles: [ { id: 1, name: '스타일 A' } ],
+    /* 스타일마다 파일이 따로 있음 (2026-11-02 원작자 전체 전달본): 1 단일 몸통형(이음부 고친 모델) · 2 V컷 날개 3몸통형 · 3 원형 3몸통형 */
+    styles: [
+      { id: 1, name: '단일 몸통' },
+      { id: 2, name: 'V컷 날개', files: { 'neon-black': A + '04/B/neon-black.glb', 'racing-red': A + '04/B/racing-red.glb', 'royal-white': A + '04/B/royal-white.glb' } },
+      { id: 3, name: '원형 3몸통', files: { 'neon-black': A + '04/C/neon-black.glb', 'racing-red': A + '04/C/racing-red.glb', 'royal-white': A + '04/C/royal-white.glb' } }
+    ],
     paints: [
       { id: 'neon-black',  name: '네온 블랙',   kind: 'original' },
       { id: 'racing-red',  name: '레이싱 레드', kind: 'original', file: A + '04/racing-red.glb' },
