@@ -6,7 +6,7 @@ import { buildShip, engineSpots } from '../core/ships/build.js';
 import { makeGlow } from '../preview/glow.js';
 import { planetShader } from '../core/planet.js';
 import { planetFor } from '../data/planets.js';
-import { makeRidge, updateRidge, hitWall } from './rocks.js?v=11021211';
+import { makeRidge, updateRidge, hitWall } from './rocks.js?v=11021216';
 
 const $ = s => document.querySelector(s), clamp = THREE.MathUtils.clamp, rnd = (a, b) => a + Math.random() * (b - a);
 const VIEWS = [
@@ -61,7 +61,7 @@ export async function start(canvas, onProgress = () => {}) {
   function fire(tx, ty, tz) { me.updateMatrixWorld(true); nose.set(0, 0, -1.1).applyMatrix4(me.matrixWorld);
     const d = new THREE.Vector3(tx - nose.x, ty - nose.y, tz - nose.z).normalize(), side = new THREE.Vector3(-d.z, 0, d.x).normalize();
     for (const k of [-1, 1]) shots.push({ p: nose.clone().addScaledVector(side, .3 * k), v: d.clone().multiplyScalar(30), life: 1.6 }); }
-  let auto = 1.5, burst = 0, aim = null;
+  let auto = 1.5, burst = 0, aim = null, aimT = 0;
   /* 누르면: 누른 곳의 바위로 쏜다 / 끌면 카메라가 돈다 */
   const ray = new THREE.Raycaster(), ndc = new THREE.Vector2(), ptr = new Map(); let pin = 0, moved = 0;
   addEventListener('pointerdown', e => { if (e.target.closest('#ui')) return; ptr.set(e.pointerId, [e.clientX, e.clientY]); moved = 0; if (ptr.size === 2) { const [a, b] = [...ptr.values()]; pin = Math.hypot(a[0] - b[0], a[1] - b[1]); } });
@@ -70,7 +70,7 @@ export async function start(canvas, onProgress = () => {}) {
     ptr.set(e.pointerId, [e.clientX, e.clientY]);
     if (ptr.size === 2) { const [a, b] = [...ptr.values()], d = Math.hypot(a[0] - b[0], a[1] - b[1]); if (pin) cam.H = clamp(cam.H * pin / d, 8, 120); pin = d; } });
   const up = e => { if (ptr.has(e.pointerId) && ptr.size === 1 && moved < 8) { ndc.set(e.clientX / innerWidth * 2 - 1, -(e.clientY / innerHeight) * 2 + 1); ray.setFromCamera(ndc, camera);
-      const hit = ray.intersectObject(wall, true)[0]; if (hit) { aim = hit.point.clone(); burst = 4; auto = 2.5; } }
+      const hit = ray.intersectObject(wall, true)[0]; if (hit) { aim = hit.point.clone(); burst = 4; aimT = 0; auto = 2.5; } }
     ptr.delete(e.pointerId); if (ptr.size < 2) pin = 0; };
   addEventListener('pointerup', up); addEventListener('pointercancel', up);
   addEventListener('wheel', e => { cam.H = clamp(cam.H * Math.exp(e.deltaY * .0012), 8, 120); }, { passive: true });
@@ -82,7 +82,8 @@ export async function start(canvas, onProgress = () => {}) {
   addEventListener('resize', size); size();
 
   let last = performance.now(), t = 0, fr = 0, ft = 0, cd = 0; const v3 = new THREE.Vector3();
-  renderer.setAnimationLoop(now => {
+  renderer.setAnimationLoop(now => { try { frame(now); } catch (e) { console.error('[벽 보기]', e); } });   /* 한 번 틀려도 화면이 멈추지 않게 */
+  function frame(now) {
     const dt = clamp((now - last) / 1000, 0, .05); last = now; t += dt; UT.value = t;
     fr++; ft += dt; if (ft > .5) { $('#fps').textContent = Math.round(fr / ft) + ' fps'; fr = 0; ft = 0; }
     glow.begin();
@@ -91,8 +92,9 @@ export async function start(canvas, onProgress = () => {}) {
     const face = aim ? Math.atan2(-(aim.x - x), -(aim.z - z)) : (vx > 0 ? -Math.PI / 2 : Math.PI / 2);
     me.position.set(x, .6, z); me.rotation.order = 'YXZ'; me.rotation.y += THREE.MathUtils.euclideanModulo(face - me.rotation.y + Math.PI, Math.PI * 2) - Math.PI > 0 ? Math.min(dt * 5, THREE.MathUtils.euclideanModulo(face - me.rotation.y + Math.PI, Math.PI * 2) - Math.PI) : Math.max(-dt * 5, THREE.MathUtils.euclideanModulo(face - me.rotation.y + Math.PI, Math.PI * 2) - Math.PI);
     me.rotation.z = -vx * .03;
-    if ((auto -= dt) <= 0 && !burst) { const ts = targets().filter(o => Math.abs(o.x - x) < 10); const o = ts[Math.floor(Math.random() * ts.length)]; if (o) { aim = new THREE.Vector3(o.x, o.y, o.z); burst = 3; } auto = rnd(1.6, 2.8); }
-    if (burst && (cd -= dt) <= 0) { cd = .13; fire(aim.x, aim.y, aim.z); if (--burst === 0) setTimeout(() => { aim = null; }, 500); }
+    if ((auto -= dt) <= 0 && !burst) { aimT = 0; const ts = targets().filter(o => Math.abs(o.x - x) < 10); const o = ts[Math.floor(Math.random() * ts.length)]; if (o) { aim = new THREE.Vector3(o.x, o.y, o.z); burst = 3; } auto = rnd(1.6, 2.8); }
+    if (burst && aim && (cd -= dt) <= 0) { cd = .13; fire(aim.x, aim.y, aim.z); if (--burst === 0) aimT = .5; }   /* 다 쏘고 0.5초 뒤 고개를 돌림 */
+    if (aimT > 0 && (aimT -= dt) <= 0 && !burst) aim = null;
     me.updateMatrixWorld(true); const hx = -Math.sin(me.rotation.y), hz = -Math.cos(me.rotation.y);
     for (const p of ENG) { v3.copy(p).applyMatrix4(sm.matrixWorld); glow.add(v3.x, v3.y, v3.z, -hx * .9, 0, -hz * .9, .15, 1, [.4, .6, 1.4], .9); glow.add(v3.x - hx * .2, v3.y, v3.z - hz * .2, -hx * .6, 0, -hz * .6, .4, 3, [.25, .45, 1.3], .7); }
     updateRidge(wall, t, dt, glow);
@@ -120,7 +122,7 @@ export async function start(canvas, onProgress = () => {}) {
     renderer.setRenderTarget(skyRT); renderer.render(bgS, bgCam);
     renderer.setRenderTarget(bloom.scene); renderer.clear(); renderer.render(bgScene, bgCam); renderer.clearDepth(); renderer.render(scene, camera);
     bloom.render(Wd, Hd);
-  });
+  }
   onProgress(1);
   window.__rv = { cam, fire, shots };
 }
