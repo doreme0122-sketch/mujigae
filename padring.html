@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="ko"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>기지 부품: 금테 별</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#04060e">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@300;400;500;600&family=Audiowide&display=swap">
+<style>
+:root{color-scheme:dark;--g:#b9ff4a;--gr:185,255,74;--ink:#d3d9ea;--mute:#8d96ad;--void:#04060e;
+  --kr:'IBM Plex Sans KR','Noto Sans KR',system-ui,sans-serif;--en:'Audiowide',ui-sans-serif,sans-serif}
+*{box-sizing:border-box} [hidden]{display:none!important}
+html,body{margin:0;height:100%;background:var(--void);color:var(--ink);font-family:var(--kr);overflow:hidden;touch-action:none;-webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent;-webkit-touch-callout:none}
+button{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:pointer}
+#cv{position:fixed;inset:0;width:100%;height:100%;display:block}
+/* 곳마다 이름표: 연두 홀로그램 한 색 */
+#tags{position:fixed;inset:0;pointer-events:none}
+.tag{position:absolute;left:0;top:0;display:flex;flex-direction:column;align-items:center;gap:1px;transition:opacity .3s;white-space:nowrap;text-shadow:0 0 10px rgba(var(--gr),.45)}
+.tag b{font-weight:500;font-size:13px;color:var(--g);letter-spacing:.04em}
+.tag span{font-family:var(--en);font-size:8.5px;letter-spacing:.18em;color:rgba(var(--gr),.55)}
+.tag em{font-style:normal;font-size:10.5px;margin-top:3px;color:rgba(var(--gr),.8);letter-spacing:.04em}
+.tag em.warn{color:#ff9a6a;text-shadow:0 0 10px rgba(255,110,60,.6)}
+.tag.far b{font-size:15px} .tag.far span{font-size:9.5px}
+/* 안개 속에 숨었을 때 내 기체 위 표시 */
+#hide{position:absolute;left:0;top:0;pointer-events:none;opacity:0;transition:opacity .4s}
+#hide.on{opacity:1}
+#hide i{position:absolute;left:-17px;top:-17px;width:34px;height:34px;border-radius:50%;border:1px dashed rgba(var(--gr),.55);animation:spin 6s linear infinite}
+#hide b{position:absolute;left:0;top:-36px;transform:translateX(-50%);white-space:nowrap;font-weight:400;font-size:11px;color:rgba(var(--gr),.85);letter-spacing:.06em;text-shadow:0 0 8px rgba(var(--gr),.5)}
+@keyframes spin{to{transform:rotate(360deg)}}
+#ui{position:fixed;inset:0;pointer-events:none}
+#ui > *{pointer-events:auto}
+#head{position:absolute;top:calc(env(safe-area-inset-top,0px) + 12px);left:max(18px,env(safe-area-inset-left,0px));display:flex;flex-direction:column;gap:2px;pointer-events:none}
+#head b{font-weight:500;font-size:14px;color:var(--g);letter-spacing:.06em}
+#head span{font-size:10.5px;color:var(--mute);letter-spacing:.04em}
+#fps{position:absolute;top:calc(env(safe-area-inset-top,0px) + 12px);right:max(18px,env(safe-area-inset-right,0px));font-family:var(--en);font-size:10px;letter-spacing:.12em;color:rgba(var(--gr),.6);pointer-events:none}
+#follow{position:absolute;top:calc(env(safe-area-inset-top,0px) + 34px);right:max(18px,env(safe-area-inset-right,0px));font-size:11.5px;color:var(--g);border:1px solid rgba(var(--gr),.4);border-radius:14px;padding:5px 12px;background:rgba(4,8,6,.55)}
+/* 아래: 곳 고르기 */
+#tour{position:absolute;left:0;right:0;bottom:0;display:flex;justify-content:center;flex-wrap:wrap;gap:6px;
+  padding:0 max(16px,env(safe-area-inset-right,0px)) calc(env(safe-area-inset-bottom,0px) + 12px) max(16px,env(safe-area-inset-left,0px))}
+#tour button{font-size:12.5px;padding:7px 13px;border:1px solid rgba(var(--gr),.28);border-radius:16px;color:rgba(var(--gr),.75);background:rgba(4,8,6,.5);letter-spacing:.03em;transition:background .2s,border-color .2s,color .2s}
+#tour button.on{border-color:var(--g);color:#f2ffe2;background:rgba(var(--gr),.16);box-shadow:0 0 14px rgba(var(--gr),.25)}
+/* 지금 보는 곳 설명 */
+#tip{position:absolute;left:max(18px,env(safe-area-inset-left,0px));bottom:calc(env(safe-area-inset-bottom,0px) + 60px);max-width:min(330px,42vw);display:flex;flex-direction:column;gap:4px;
+  padding:10px 13px 11px;border-left:1.5px solid rgba(var(--gr),.6);background:linear-gradient(90deg,rgba(4,8,6,.72),rgba(4,8,6,0));pointer-events:none}
+#tip b{font-weight:500;font-size:13px;color:var(--g)} #tip span{font-size:12px;line-height:1.55;color:#c3cbb8;text-wrap:pretty}
+#load{position:fixed;inset:0;display:grid;place-content:center;gap:14px;background:var(--void);transition:opacity .6s .1s;z-index:9;text-align:center}
+#load.done{opacity:0;pointer-events:none}
+#load p{margin:0;font-size:12px;color:rgba(var(--gr),.7);letter-spacing:.1em}
+#load .b{width:180px;height:2px;background:rgba(var(--gr),.15);overflow:hidden}
+#load i{display:block;height:100%;background:var(--g);transform:scaleX(0);transform-origin:left;transition:transform .4s}
+#rot{display:none}
+@media (orientation:portrait){#rot{display:grid;place-content:center;position:fixed;inset:0;background:var(--void);z-index:20;color:var(--g);font-size:14px;letter-spacing:.06em;padding-inline:max(16px,env(safe-area-inset-left,0px)) max(16px,env(safe-area-inset-right,0px))}}
+</style>
+<script type="importmap">{"imports":{"three":"./vendor/three.module.js","three/addons/":"./vendor/addons/"}}</script>
+</head><body>
+<canvas id="cv"></canvas>
+<div id="ui">
+  <div id="head"><b>시작 기지 부품 ① · 금테 네 갈래 별</b><span>자기장 판(격납고 그대로)을 감싸는 금테 · 판이 깨어나기 직전 빛이 갈래를 타고 들어와요</span></div>
+  <div id="fps"></div>
+  <div id="tip" hidden><b></b><span></span></div>
+  <div id="tour"></div>
+</div>
+<div id="load"><p>판을 놓고 있어요</p><div class="b"><i></i></div></div>
+<div id="rot">기기를 가로로 돌려 주세요</div>
+<script type="module">
+import { start } from './src/proto/padringview.js?v=11021646';
+const bar = document.querySelector('#load i');
+start(document.querySelector('#cv'), p => { bar.style.transform = `scaleX(${p})`; })
+  .then(() => setTimeout(() => document.querySelector('#load').classList.add('done'), 300))
+  .catch(err => { document.querySelector('#load p').textContent = '불러오지 못했어요: ' + err.message; console.error(err); });
+</script>
+</body></html>
