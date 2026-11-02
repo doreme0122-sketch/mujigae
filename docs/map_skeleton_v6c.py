@@ -58,9 +58,9 @@ def opn(pts,wd):
 OPEN=[]
 col[inC]=np.array([.4,.13,.13])*(.75+.5*tex[inC])[...,None]
 ring=np.clip(1-np.abs(cen-1)/.1,0,1)
-for P in RADIAL+RING: opn(P,9)
-for P in SIDE: opn(P,5)
-for P in AGGRO: opn(P,5)
+for P in RADIAL+RING: opn(P,15)                                     # 문: 넓고 확실하게 뚫음
+for P in SIDE: opn(P,9)
+for P in AGGRO: opn(P,9)
 SNEAK=[]                                                            # 몰래 지나가는 좁은 틈 (지역마다 한두 개, 직접 놓음)
 for k in range(10):
     a=ANG[k]; m=MID[k]
@@ -68,8 +68,8 @@ for k in range(10):
     SNEAK.append([pol(392,m+.13),pol(440,m+.15)])                   # 앞마당 ↔ 보물 땅 (다른 쪽)
     SNEAK.append([pol(285,m-.02),pol(250,a+.42)])                   # 정글 ↔ 보스 구역 (샛길 말고 하나 더)
     SNEAK.append([pol(192,a-.2),pol(140,a-.17)])                    # 보스 구역 ↔ 중심부 (네 번째 입구)
-for P in SNEAK: opn(P,4)
-openM=np.asarray(op.filter(ImageFilter.GaussianBlur(1.2))).astype(np.float32)/255
+for P in SNEAK: opn(P,8)
+openM=np.asarray(op.filter(ImageFilter.GaussianBlur(1.4))).astype(np.float32)/255
 edge=edge*(1-np.clip(openM*1.8,0,1)); ring=ring*fill*(1-np.clip(openM*1.8,0,1))   # 중심부 둘레: 반쯤 막고 보스마다 입구 서너 개(큰길·보스 옆 샛길·좁은 틈)
 rock=np.maximum(edge,ring)
 debris=np.clip((np.hypot(X-CX,Y-CY)-478)/22,0,1)*(.6+.4*noise(23,.2))   # 모서리 = 소행성 잔해

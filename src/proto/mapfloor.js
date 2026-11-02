@@ -85,7 +85,7 @@ export async function makeMapFloor(renderer, url) {
         /* 지역 경계 = 짙은 바위 능선 (나중에 벽이 섬) */
         /* 바위 능선(벽 자리): 바닥보다 확 밝은 돌 띠 + 짙은 그림자 테두리 + 윗면 빛 → 멀리서도 '못 지나가는 곳'이 보이게 */
         float rk = smoothstep(.12,.42,ridge);
-        float rim = smoothstep(.05,.14,ridge)*(1.-smoothstep(.16,.3,ridge));                          /* 띠 바깥 그림자 */
+        float rim = smoothstep(.05,.14,ridge)*(1.-smoothstep(.16,.3,ridge))*(1.-smoothstep(.2,.45,road));   /* 띠 바깥 그림자 (길이 지나는 문에는 없음) */
         float tn = texture2D(uN,vW.xz*.06).b, tn2 = texture2D(uN,vW.xz*.18).r;
         vec3 rockC = vec3(.30,.31,.34)*(.65+.55*tn) + vec3(.14,.14,.15)*smoothstep(.55,.8,tn2);      /* 밝은 회색 돌, 군데군데 더 밝은 면 */
         rockC *= .75 + .45*smoothstep(.45,.9,ridge);                                                   /* 띠 가운데(등선)가 가장 밝음 */
