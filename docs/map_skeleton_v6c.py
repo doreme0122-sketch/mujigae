@@ -16,7 +16,7 @@ for k,a in enumerate(MID): x,y=pol(330,a); n,c=JUN[k%5]; seeds.append((x,y,n,'Lv
 for k,a in enumerate(ANG): x,y=pol(232,a); n,c,_=BOSS[k%5]; seeds.append((x,y,n,'Lv 8–10',c,'boss',k))
 for k,a in enumerate(MID): x,y=pol(436,a); n,c=TRE[k%5]; seeds.append((x,y,n,'보물 땅',c,'tre',k))
 def arcp(r,a0,a1,n=40): return [pol(r,a0+(a1-a0)*i/n) for i in range(n+1)]
-RADIAL=[[pol(372,a),pol(300,a),pol(232,a),pol(168,a)] for a in ANG]
+RADIAL=[[pol(372,a),pol(300,a),pol(232,a),pol(140,a)] for a in ANG]
 RING=[arcp(300,ANG[k]+.02,ANG[k]+2*math.pi/10-.02,12) for k in range(10)]
 SIDE=[]                                                             # 샛길: 이웃 앞마당끼리 · 앞마당→보물 땅 · 보물 땅→정글 · 정글→보스 옆구리 없음(보스는 막힘)
 for k in range(10):
@@ -24,7 +24,7 @@ for k in range(10):
     SIDE.append(arcp(405,a+.12,a2-.12,10))                          # 이웃 앞마당끼리 (보물 땅 앞을 지남)
     SIDE.append([pol(400,m),pol(430,m)])                            # 보물 땅 입구
     SIDE.append([pol(372,a+.16),pol(330,a+.3),pol(300,a+.36)])       # 앞마당 → 정글 (큰길 말고 굽은 샛길)
-AGGRO=[[pol(300,a+.2),pol(268,a+.17),pol(232,a+.16),pol(196,a+.15),pol(165,a+.12)] for a in ANG]   # 보스 옆 샛길: 보스가 알아채는 범위 안을 지남
+AGGRO=[[pol(300,a+.2),pol(268,a+.17),pol(232,a+.16),pol(196,a+.15),pol(140,a+.12)] for a in ANG]   # 보스 옆 샛길: 보스가 알아채는 범위 안을 지남
 sc=2; w=h=W//sc
 yy,xx=np.mgrid[0:h,0:w].astype(np.float32)*sc
 def noise(s,f):
@@ -49,7 +49,7 @@ nearC=np.hypot(X-CX,Y-CY)<205                                       # 중심부 
 fill=((noise(27,.05)*.7+noise(28,.14)*.3)>.2).astype(np.float32)     # 경계는 대부분(약 80%) 이어진 벽
 wallK=fill.copy()
 wallK=np.where(bossSide,frag.astype(np.float32),wallK)             # 보스 구역끼리 옆쪽은 덩어리만
-wallK=np.where(nearC,0.,wallK)
+wallK=np.where(np.hypot(X-CX,Y-CY)<182,0.,wallK)   # 중심부 안·둘레는 지역 경계 벽 없음 → 둘레 벽(ring)이 맡음
 edge=edge*wallK
 from PIL import ImageDraw
 op=Image.new('L',(w,h),0); od=ImageDraw.Draw(op)
@@ -67,9 +67,10 @@ for k in range(10):
     SNEAK.append([pol(335,a-.24),pol(395,a-.2)])                    # 앞마당 ↔ 정글 (큰길 반대쪽)
     SNEAK.append([pol(392,m+.13),pol(440,m+.15)])                   # 앞마당 ↔ 보물 땅 (다른 쪽)
     SNEAK.append([pol(285,m-.02),pol(250,a+.42)])                   # 정글 ↔ 보스 구역 (샛길 말고 하나 더)
+    SNEAK.append([pol(192,a-.2),pol(140,a-.17)])                    # 보스 구역 ↔ 중심부 (네 번째 입구)
 for P in SNEAK: opn(P,4)
 openM=np.asarray(op.filter(ImageFilter.GaussianBlur(1.2))).astype(np.float32)/255
-edge=edge*(1-np.clip(openM*1.8,0,1)); ring=ring*0                    # 중심부 둘레 벽 없음
+edge=edge*(1-np.clip(openM*1.8,0,1)); ring=ring*fill*(1-np.clip(openM*1.8,0,1))   # 중심부 둘레: 반쯤 막고 보스마다 입구 서너 개(큰길·보스 옆 샛길·좁은 틈)
 rock=np.maximum(edge,ring)
 debris=np.clip((np.hypot(X-CX,Y-CY)-478)/22,0,1)*(.6+.4*noise(23,.2))   # 모서리 = 소행성 잔해
 
@@ -174,7 +175,7 @@ for i,(k,n) in enumerate(items):
     T(X+42,y+5,n,13,'#d3d9ea',400,'start')
 y0=Y+len(items)*27+12
 T(X,y0,'고리 구조 (바깥 → 안)',14,'#b9ff4a',700,'start')
-for i,s in enumerate(['① 기지 앞마당 · 먼지 들판 Lv1–3 (기지마다 하나)','② 이웃 두 기지 사이 정글 Lv3–7 (이웃과 처음 부딪힘)','③ 중간 보스 10곳 Lv8–10 · 벽 반쯤 · 입구 서너 개','④ 무너진 중심부 Lv10+ · 벽 없이 넓게 · 잔해·수풀 사이 결판','⑤ 보물 땅 10곳 · 이웃 두 기지 사이 바깥 (양옆에 하나씩)']):
+for i,s in enumerate(['① 기지 앞마당 · 먼지 들판 Lv1–3 (기지마다 하나)','② 이웃 두 기지 사이 정글 Lv3–7 (이웃과 처음 부딪힘)','③ 중간 보스 10곳 Lv8–10 · 벽 반쯤 · 입구 서너 개','④ 무너진 중심부 Lv10+ · 넓게 · 둘레 반쯤 막힘(보스마다 입구 서너 개)','⑤ 보물 땅 10곳 · 이웃 두 기지 사이 바깥 (양옆에 하나씩)']):
     T(X,y0+22+i*21,s,12,'#d8e6c8',400,'start')
 y1=y0+22+5*21+16
 T(X,y1,'정글 5종류 × 2 / 중간 보스 5종류 × 2',13,'#ffd27a',600,'start')
