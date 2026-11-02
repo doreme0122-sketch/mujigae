@@ -6,11 +6,12 @@ import { buildShip, engineSpots } from '../core/ships/build.js';
 import { makeGlow } from '../preview/glow.js';
 import { planetShader } from '../core/planet.js';
 import { planetFor } from '../data/planets.js';
-import { makeIceRidge } from './ice.js?v=11021346';
-import { makeCrystalRidge } from './crystal.js?v=11021346';
-import { makeRuinRidge, updateRuins } from './ruins.js?v=11021346';
-import { makeCoralRidge } from './coral.js?v=11021346';
-import { makeRidge, updateRidge, hitWall } from './rocks.js?v=11021346';
+import { makeIceRidge } from './ice.js?v=11021352';
+import { makeCrystalRidge } from './crystal.js?v=11021352';
+import { makeRuinRidge, updateRuins } from './ruins.js?v=11021352';
+import { makeCoralRidge } from './coral.js?v=11021352';
+import { makeWalls } from './wallhit.js?v=11021352';
+import { makeRidge, updateRidge, hitWall } from './rocks.js?v=11021352';
 
 const $ = s => document.querySelector(s), clamp = THREE.MathUtils.clamp, rnd = (a, b) => a + Math.random() * (b - a);
 const VIEWS = [
@@ -54,6 +55,9 @@ export async function start(canvas, onProgress = () => {}) {
   const rui = makeRuinRidge(pts, { uT: UT, seed: 21 }); scene.add(rui); rui.visible = false;
   const cor = makeCoralRidge(pts, { uT: UT, seed: 41 }); scene.add(cor); cor.visible = false;
   const GR = { obsidian: null, ice, crystal: cry, ruins: rui, coral: cor };
+  /* 충돌은 보이는 벽과 따로: 벽마다 같은 길 위의 띠 (두께만 다름) */
+  const WB = makeWalls(), HW = { obsidian: 2.1, ice: 2.3, crystal: 1.7, ruins: 1.15, coral: 1.7 };
+  for (const id in HW) WB.add(pts, HW[id], { id });
   const items = obs.userData.items, fl = obs.userData.fl;
   let W = WALLS[0], wall = obs;
   const targets = () => GR[W.id] ? GR[W.id].userData.targets() : [...items.filter(i => !i.float && i.s > .6).map(i => ({ x: i.x, y: i.y + i.s * .15, z: i.z, r: i.s * .62 })), ...fl.map(f => ({ x: f.it.x, y: f.y ?? f.it.y + f.h, z: f.it.z, r: f.it.s * .5 }))];
@@ -120,15 +124,14 @@ export async function start(canvas, onProgress = () => {}) {
     if (obs.visible) updateRidge(obs, t, dt, glow);
     if (rui.visible) updateRuins(rui, t);
     /* 탄 */
-    const ts = targets();
     for (let i = shots.length - 1; i >= 0; i--) { const b = shots[i]; b.p.addScaledVector(b.v, dt); b.life -= dt; let hit = b.life <= 0;
-      if (!hit) for (const o of ts) { if (Math.hypot(b.p.x - o.x, b.p.y - o.y, b.p.z - o.z) < o.r) { hit = true;
-          const n = new THREE.Vector3(b.p.x - o.x, b.p.y - o.y, b.p.z - o.z).normalize(), hp = new THREE.Vector3(o.x, o.y, o.z).addScaledVector(n, o.r * .9);
+      if (!hit) { const h = WB.hit(b.p.x - b.v.x * dt, b.p.z - b.v.z * dt, b.p.x, b.p.z, W.id); if (h) { hit = true;     /* 이번에 지나온 선이 벽 띠에 닿았나 */
+          const [nx, nz] = WB.normal(h.x, h.z, h.s), n = new THREE.Vector3(nx, .25, nz).normalize(), hp = new THREE.Vector3(h.x, b.p.y - b.v.y * dt * (1 - h.t), h.z);
           hitWall(hp.x, hp.y, hp.z, t);
           parts.push({ p: hp.clone(), v: new THREE.Vector3(), life: .22, age: 0, r: 1.4, k: 3, c: W.flash, a: 1.3, grow: 1 });
           for (let k = 0; k < 9; k++) { const dv = n.clone().multiplyScalar(rnd(3, 8)).add(new THREE.Vector3(rnd(-4, 4), rnd(-2, 4), rnd(-4, 4))); parts.push({ p: hp.clone(), v: dv, life: rnd(.25, .55), age: 0, r: rnd(.04, .08), k: 2, c: W.spark, a: 1 }); }
           for (let k = 0; k < 2; k++) { const s = SH[shI++ % SH.length]; s.o.position.copy(hp); s.v.copy(n).multiplyScalar(rnd(2, 5)).add(new THREE.Vector3(rnd(-2, 2), rnd(0, 2), rnd(-2, 2))); s.w.set(rnd(-9, 9), rnd(-9, 9), rnd(-9, 9)); s.life = rnd(.8, 1.4); s.o.visible = true; s.o.scale.setScalar(rnd(.7, 1.6)); }
-          break; } }
+          } }
       if (hit) { shots.splice(i, 1); continue; }
       glow.add(b.p.x, b.p.y, b.p.z, -b.v.x * .024, -b.v.y * .024, -b.v.z * .024, .08, 2, [.55, .75, 1.3], 1, i); }
     for (let i = parts.length - 1; i >= 0; i--) { const p = parts[i]; p.age += dt; if (p.age > p.life) { parts.splice(i, 1); continue; } p.v.multiplyScalar(Math.exp(-2 * dt)); p.p.addScaledVector(p.v, dt);
