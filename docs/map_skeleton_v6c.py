@@ -41,8 +41,15 @@ edge=np.clip(1-(d2-d1)/16,0,1); inC=cen<1
 second=idx[1]; kinds=np.array([s[5] for s in seeds])
 bossB=(kinds[near]=='boss')|(kinds[second]=='boss')
 frag=(noise(21,.06)*.7+noise(22,.16)*.3)>.47                      # 능선 덩어리 (사이사이 틈)
-frag2=(noise(25,.07)*.7+noise(26,.18)*.3)>.36                    # 보스 지역은 반쯤 두른 벽 (입구 서너 개)
-edge=edge*np.where(bossB,frag2.astype(np.float32),frag.astype(np.float32))
+frag2=(noise(25,.07)*.7+noise(26,.18)*.3)>.47                    # 보스 지역 바깥(정글·앞마당 쪽)만 반쯤 두른 벽
+kn=kinds[near]; k2=kinds[second]
+bossOut=((kn=='boss')&(k2!='boss'))|((k2=='boss')&(kn!='boss'))    # 보스 ↔ 보스 아닌 곳
+bossSide=(kn=='boss')&(k2=='boss')                                  # 보스 구역끼리 옆쪽 → 다른 곳처럼 덩어리만
+nearC=np.hypot(X-CX,Y-CY)<205                                       # 중심부 쪽 경계 → 활짝
+wallK=np.where(bossOut,frag2.astype(np.float32),frag.astype(np.float32))
+wallK=np.where(bossSide,frag.astype(np.float32),wallK)
+wallK=np.where(nearC,0.,wallK)
+edge=edge*wallK
 from PIL import ImageDraw
 op=Image.new('L',(w,h),0); od=ImageDraw.Draw(op)
 def opn(pts,wd):
