@@ -10,7 +10,8 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
-import { makeBloom } from '../core/hangar/bloom.js';
+import { makeBloom } from '../core/hangar/bloom.js?v=11021548';
+import { makePerf } from './perf.js?v=11021548';
 import { buildShip, engineSpots } from '../core/ships/build.js';
 import { makeGlow } from '../preview/glow.js';
 import { planetShader } from '../core/planet.js';
@@ -63,7 +64,7 @@ export async function start(canvas, onProgress = () => {}) {
   renderer.toneMapping = THREE.NoToneMapping; renderer.autoClear = false; renderer.setClearColor(0, 1);
   const scene = new THREE.Scene();
   const camera = new THREE.PerspectiveCamera(40, 1, .5, 900);
-  const bloom = makeBloom(renderer);
+  const bloom = makeBloom(renderer, { samples: 0 });   /* 굴절 판이 덮어 쓰므로 여기선 매끄럽게 계산 안 함 */
   { const pm = new THREE.PMREMGenerator(renderer); scene.environment = pm.fromScene(new RoomEnvironment(), .04).texture; scene.environmentIntensity = .5; pm.dispose(); }
   const sun = new THREE.DirectionalLight(0xfff2e2, 2.8); sun.position.set(-8, 14, -5); scene.add(sun);
   const fill = new THREE.DirectionalLight(0x8fb0ff, .8); fill.position.set(7, 5, 9); scene.add(fill);
@@ -91,7 +92,7 @@ export async function start(canvas, onProgress = () => {}) {
   const bgScene = new THREE.Scene(); bgScene.add(new THREE.Mesh(new THREE.PlaneGeometry(2, 2), bgMat));
   const bgCam = new THREE.Camera();
   /* 화면 전체를 한 번 그린 뒤 공간 굴절을 입힌다 */
-  const rtA = new THREE.WebGLRenderTarget(2, 2, { type: THREE.HalfFloatType, samples: 4 });
+  const rtA = new THREE.WebGLRenderTarget(2, 2, { type: THREE.HalfFloatType, samples: 0 });
   const lensMat = lensMaterial(); lensMat.uniforms.tS.value = rtA.texture;
   const lensScene = new THREE.Scene(); lensScene.add(new THREE.Mesh(new THREE.PlaneGeometry(2, 2), lensMat));
   /* 웜홀 목 안쪽에 비칠 반대편 */
@@ -565,10 +566,11 @@ export async function start(canvas, onProgress = () => {}) {
 
   /* ───── 화면 크기 ───── */
   let Wd = 2, Hd = 2;
-  function size() { const r = canvas.getBoundingClientRect(), DPR = Math.min(1.75, devicePixelRatio || 1); Wd = Math.max(2, Math.round(r.width * DPR)); Hd = Math.max(2, Math.round(r.height * DPR));
+  const perf = makePerf(st => { const n = st.aa ? 4 : 0; if (rtA.samples !== n) { rtA.samples = n; rtA.dispose(); } size(); });
+  function size() { const r = canvas.getBoundingClientRect(); [Wd, Hd] = perf.size(r.width, r.height);
     renderer.setSize(Wd, Hd, false); bloom.size(Wd, Hd); rtA.setSize(Wd, Hd); skyRT.setSize(Wd >> 1, Hd >> 1); bgMat.uniforms.uPx.value.set(2 / Wd, 2 / Hd);
     camera.aspect = Wd / Hd; camera.updateProjectionMatrix(); glow.uRes.value.set(Wd, Hd); lensMat.uniforms.uAsp.value = Wd / Hd; }
-  addEventListener('resize', size); size();
+  addEventListener('resize', size); size(); if (perf.st.aa) { rtA.samples = 4; rtA.dispose(); }
 
   /* ───── 공간 굴절 자리 ───── */
   const right = new THREE.Vector3();
@@ -582,11 +584,10 @@ export async function start(canvas, onProgress = () => {}) {
     glow.uRes.value.set(PR, PR); renderer.render(scene, pc); glow.uRes.value.set(Wd, Hd); }
 
   /* ───── 그리기 ───── */
-  let last = performance.now(), fps = 60, fpsT = 0, frames = 0;
-  const fpsEl = $('#fps');
+  let last = performance.now(), pf = 0;
   renderer.setAnimationLoop(now => {
     const real = clamp((now - last) / 1000, 0, .05); last = now;
-    frames++; fpsT += real; if (fpsT > .5) { fps = frames / fpsT; frames = 0; fpsT = 0; fpsEl.textContent = Math.round(fps) + ' fps'; }
+    perf.tick(real);
     if (S.stopT > 0) S.stopT -= real; else if (S.slowT > 0) { S.slowT -= real; S.ts += (.3 - S.ts) * Math.min(1, real * 10); } else S.ts += (1 - S.ts) * Math.min(1, real * 6);
     const dt = S.stopT > 0 ? 0 : real * S.ts;
     glow.begin(); step(dt, real); glow.end(); glow.uT.value = S.t;
@@ -602,12 +603,12 @@ export async function start(canvas, onProgress = () => {}) {
     camera.position.set(cam.x + sx, cam.h, cam.z + cam.h * .26 + sz); camera.lookAt(cam.x + sx * .5, 0, cam.z - cam.h * .02 + sz * .5); camera.updateMatrixWorld();
     /* 굴절 자리 */
     const vb = lensAt(0, SP.bh, 1), va = lensAt(1, SP.whA, 2), vbb = lensAt(2, SP.whB, 3); lensMat.uniforms.uT.value = S.t;
-    if (va) portal(0, SP.whB); if (vbb) portal(1, SP.whA); void vb;
+    pf++; if (va && pf % 2 === 0) portal(0, SP.whB); if (vbb && pf % 2 === 1) portal(1, SP.whA); void vb;   /* 웜홀 속 반대편은 번갈아 한 장면 걸러 */
     const su = skyMat.uniforms; su.uRes.value.set(Wd >> 1, Hd >> 1); su.uCam.value.set(cam.x, cam.z); su.uSpan.value = cam.h * .73; su.uT.value = S.t; planetAt(cam.x, cam.z, cam.h, su.uRes.value);
-    renderer.setRenderTarget(skyRT); renderer.render(skyScene, bgCam);
-    renderer.setRenderTarget(rtA); renderer.clear(); renderer.render(bgScene, bgCam); renderer.clearDepth(); renderer.render(scene, camera);
+    if (perf.st.bg && pf % 2 === 0) { renderer.setRenderTarget(skyRT); renderer.render(skyScene, bgCam); }   /* 배경은 한 장면 걸러 */
+    renderer.setRenderTarget(rtA); renderer.clear(); if (perf.st.bg) renderer.render(bgScene, bgCam); renderer.clearDepth(); renderer.render(scene, camera);
     renderer.setRenderTarget(bloom.scene); renderer.render(lensScene, bgCam);
-    bloom.render(Wd, Hd);
+    bloom.render(Wd, Hd, !perf.st.bloom);
     tags();
   });
   onProgress(1);

@@ -1,17 +1,18 @@
 /* 벽 보기 (지금은 용암 흑요석) — 맵 미리보기와 같은 하늘(행성 위 궤도), 같은 위에서 본 카메라 */
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
-import { makeBloom } from '../core/hangar/bloom.js';
+import { makeBloom } from '../core/hangar/bloom.js?v=11021548';
+import { makePerf } from './perf.js?v=11021548';
 import { buildShip, engineSpots } from '../core/ships/build.js';
 import { makeGlow } from '../preview/glow.js';
 import { planetShader } from '../core/planet.js';
 import { planetFor } from '../data/planets.js';
-import { makeIceRidge } from './ice.js?v=11021352';
-import { makeCrystalRidge } from './crystal.js?v=11021352';
-import { makeRuinRidge, updateRuins } from './ruins.js?v=11021352';
-import { makeCoralRidge } from './coral.js?v=11021352';
-import { makeWalls } from './wallhit.js?v=11021352';
-import { makeRidge, updateRidge, hitWall } from './rocks.js?v=11021352';
+import { makeIceRidge } from './ice.js?v=11021548';
+import { makeCrystalRidge } from './crystal.js?v=11021548';
+import { makeRuinRidge, updateRuins } from './ruins.js?v=11021548';
+import { makeCoralRidge } from './coral.js?v=11021548';
+import { makeWalls } from './wallhit.js?v=11021548';
+import { makeRidge, updateRidge, hitWall } from './rocks.js?v=11021548';
 
 const $ = s => document.querySelector(s), clamp = THREE.MathUtils.clamp, rnd = (a, b) => a + Math.random() * (b - a);
 const VIEWS = [
@@ -27,7 +28,7 @@ const WALLS = [
 export async function start(canvas, onProgress = () => {}) {
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: false, powerPreference: 'high-performance' });
   renderer.toneMapping = THREE.NoToneMapping; renderer.autoClear = false; renderer.setClearColor(0, 1);
-  const scene = new THREE.Scene(), camera = new THREE.PerspectiveCamera(40, 1, .5, 600), bloom = makeBloom(renderer), U = v => ({ value: v }), UT = U(0);
+  const scene = new THREE.Scene(), camera = new THREE.PerspectiveCamera(40, 1, .5, 600), bloom = makeBloom(renderer, { samples: 0 }), U = v => ({ value: v }), UT = U(0);
   { const pm = new THREE.PMREMGenerator(renderer); scene.environment = pm.fromScene(new RoomEnvironment(), .04).texture; scene.environmentIntensity = .5; pm.dispose(); }
   const sun = new THREE.DirectionalLight(0xfff0dc, 3); sun.position.set(-8, 12, -6); scene.add(sun);
   const fill = new THREE.DirectionalLight(0x8fb0ff, .7); fill.position.set(7, 5, 9); scene.add(fill);
@@ -90,7 +91,7 @@ export async function start(canvas, onProgress = () => {}) {
   const ray = new THREE.Raycaster(), ndc = new THREE.Vector2(), ptr = new Map(); let pin = 0, moved = 0;
   addEventListener('pointerdown', e => { if (e.target.closest('#ui')) return; ptr.set(e.pointerId, [e.clientX, e.clientY]); moved = 0; if (ptr.size === 2) { const [a, b] = [...ptr.values()]; pin = Math.hypot(a[0] - b[0], a[1] - b[1]); } });
   addEventListener('pointermove', e => { if (!ptr.has(e.pointerId)) return; const o = ptr.get(e.pointerId); moved += Math.abs(e.clientX - o[0]) + Math.abs(e.clientY - o[1]);
-    if (ptr.size === 1 && moved > 8) { cam.az -= (e.clientX - o[0]) * .006; cam.T = cam.tilt = clamp(cam.tilt + (e.clientY - o[1]) * .004, .05, 1.1); }
+    if (ptr.size === 1 && moved > 8) { bgDirty = true; cam.az -= (e.clientX - o[0]) * .006; cam.T = cam.tilt = clamp(cam.tilt + (e.clientY - o[1]) * .004, .05, 1.1); }
     ptr.set(e.pointerId, [e.clientX, e.clientY]);
     if (ptr.size === 2) { const [a, b] = [...ptr.values()], d = Math.hypot(a[0] - b[0], a[1] - b[1]); if (pin) cam.H = clamp(cam.H * pin / d, 8, 120); pin = d; } });
   const up = e => { if (ptr.has(e.pointerId) && ptr.size === 1 && moved < 8) { ndc.set(e.clientX / innerWidth * 2 - 1, -(e.clientY / innerHeight) * 2 + 1); ray.setFromCamera(ndc, camera);
@@ -100,16 +101,17 @@ export async function start(canvas, onProgress = () => {}) {
   addEventListener('wheel', e => { cam.H = clamp(cam.H * Math.exp(e.deltaY * .0012), 8, 120); }, { passive: true });
 
   let Wd = 2, Hd = 2;
-  function size() { const r = canvas.getBoundingClientRect(), DPR = Math.min(1.75, devicePixelRatio || 1); Wd = Math.max(2, Math.round(r.width * DPR)); Hd = Math.max(2, Math.round(r.height * DPR));
+  const perf = makePerf(st => { bloom.setSamples(st.aa ? 4 : 0); size(); bgDirty = true; });
+  let bgDirty = true, bgN = 0;
+  function size() { const r = canvas.getBoundingClientRect(); [Wd, Hd] = perf.size(r.width, r.height); bgDirty = true;
     renderer.setSize(Wd, Hd, false); bloom.size(Wd, Hd); skyRT.setSize(Wd >> 1, Hd >> 1); bgMat.uniforms.uPx.value.set(2 / Wd, 2 / Hd); planetMat.uniforms.uRes.value.set(Wd >> 1, Hd >> 1);
     camera.aspect = Wd / Hd; camera.updateProjectionMatrix(); glow.uRes.value.set(Wd, Hd); }
-  addEventListener('resize', size); size();
+  addEventListener('resize', size); size(); bloom.setSamples(perf.st.aa ? 4 : 0);
 
   let last = performance.now(), t = 0, fr = 0, ft = 0, cd = 0; const v3 = new THREE.Vector3();
   renderer.setAnimationLoop(now => { try { frame(now); } catch (e) { console.error('[벽 보기]', e); } });   /* 한 번 틀려도 화면이 멈추지 않게 */
   function frame(now) {
     const dt = clamp((now - last) / 1000, 0, .05); last = now; t += dt; UT.value = t;
-    fr++; ft += dt; if (ft > .5) { $('#fps').textContent = Math.round(fr / ft) + ' fps'; fr = 0; ft = 0; }
     glow.begin();
     /* 기체: 벽 앞을 천천히 오가며, 이따금 벽을 쏜다 */
     const x = Math.sin(t * .16) * 24, vx = Math.cos(t * .16) * 24 * .16, z = 8.5 + Math.sin(t * .5) * .6;
@@ -143,9 +145,9 @@ export async function start(canvas, onProgress = () => {}) {
     const back = cam.h * Math.sin(cam.tilt), hh = cam.h * Math.cos(cam.tilt);
     camera.position.set(cam.x + Math.sin(cam.az) * back, hh, cam.z + Math.cos(cam.az) * back); camera.lookAt(cam.x, 0, cam.z);
     planetMat.uniforms.uR.value = 450 / (cam.h + 400); planetMat.uniforms.uT.value = t; planetMat.uniforms.uYaw.value = PL.yaw0 + t * .006 + cam.az * .3;
-    renderer.setRenderTarget(skyRT); renderer.render(bgS, bgCam);
-    renderer.setRenderTarget(bloom.scene); renderer.clear(); renderer.render(bgScene, bgCam); renderer.clearDepth(); renderer.render(scene, camera);
-    bloom.render(Wd, Hd);
+    if (perf.st.bg && (bgDirty || ++bgN % 20 === 0)) { renderer.setRenderTarget(skyRT); renderer.render(bgS, bgCam); bgDirty = false; }   /* 행성은 아주 느리게 돌아서 20장면에 한 번만 다시 그림 */
+    renderer.setRenderTarget(bloom.scene); renderer.clear(); if (perf.st.bg) renderer.render(bgScene, bgCam); renderer.clearDepth(); renderer.render(scene, camera);
+    bloom.render(Wd, Hd, !perf.st.bloom); perf.tick(dt);
   }
   onProgress(1);
   window.__rv = { cam, fire, shots, wall: id => [...document.querySelectorAll('#tour .wall')][WALLS.findIndex(w => w.id === id)].click() };

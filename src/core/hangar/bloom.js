@@ -1,9 +1,9 @@
 import * as THREE from 'three';
 /* 가벼운 글로우: 밝은 데만 뽑아서 1/4 크기로 두 번 번지게 하고 더한다 */
-export function makeBloom(renderer){
+export function makeBloom(renderer, bo = {}){
   const T=THREE.HalfFloatType;
   const opt={minFilter:THREE.LinearFilter,magFilter:THREE.LinearFilter,type:T,depthBuffer:false};
-  const rtS=new THREE.WebGLRenderTarget(1,1,{minFilter:THREE.LinearFilter,magFilter:THREE.LinearFilter,type:T,samples:4});
+  const rtS=new THREE.WebGLRenderTarget(1,1,{minFilter:THREE.LinearFilter,magFilter:THREE.LinearFilter,type:T,samples:bo.samples ?? 4});
   const a=new THREE.WebGLRenderTarget(1,1,opt), b=new THREE.WebGLRenderTarget(1,1,opt);
   const c=new THREE.WebGLRenderTarget(1,1,opt), d=new THREE.WebGLRenderTarget(1,1,opt);
   const cam=new THREE.OrthographicCamera(-1,1,1,-1,0,1), sc=new THREE.Scene();
@@ -34,7 +34,10 @@ export function makeBloom(renderer){
     scene:rtS,
     size(W,H){ rtS.setSize(W,H); const w=Math.max(2,W>>2),h=Math.max(2,H>>2);
       a.setSize(w,h);b.setSize(w,h); c.setSize(Math.max(2,W>>4),Math.max(2,H>>4));d.setSize(Math.max(2,W>>4),Math.max(2,H>>4)); },
-    render(W,H){
+    /* 모서리 매끄럽게 하는 계산 횟수 바꾸기 (0 = 끔) */
+    setSamples(n){ if(rtS.samples!==n){ rtS.samples=n; rtS.dispose(); } },
+    render(W,H,off){
+      if(off){ comp.uniforms.t.value=rtS.texture; comp.uniforms.b1.value=rtS.texture; comp.uniforms.b2.value=rtS.texture; const k=comp.uniforms.k.value; comp.uniforms.k.value=0; run(comp,null); comp.uniforms.k.value=k; return; }   /* 빛 번짐 끔: 밝기 정리만 */
       cut.uniforms.t.value=rtS.texture; run(cut,a);
       const w=Math.max(2,W>>2),h=Math.max(2,H>>2);
       blur.uniforms.t.value=a.texture; blur.uniforms.dir.value.set(1/w,0); run(blur,b);
