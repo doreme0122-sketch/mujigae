@@ -97,6 +97,10 @@ button{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:poin
 /* 안내·결과 */
 .card{position:fixed;inset:0;display:grid;place-items:center;background:rgba(3,5,10,.62);backdrop-filter:blur(3px);-webkit-backdrop-filter:blur(3px);z-index:5;
   padding:16px max(16px,env(safe-area-inset-right,0px)) 16px max(16px,env(safe-area-inset-left,0px))}
+/* 첫 화면 카드: 화면보다 길면 손가락으로 밀어 아래 메뉴를 봄 */
+#how{overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;touch-action:pan-y;place-items:start center}
+#how>div{margin:auto 0;padding-block:8px 24px}
+#how a,#how button{touch-action:pan-y}
 .card>div{width:min(560px,100%);display:flex;flex-direction:column;gap:14px;align-items:center;text-align:center}
 .card h2{margin:0;font-weight:500;font-size:22px;color:var(--g);letter-spacing:.08em;text-shadow:0 0 18px rgba(var(--gr),.35)}
 .card .en{font-family:var(--en);font-size:9.5px;letter-spacing:.26em;color:rgba(var(--gr),.55)}
@@ -145,12 +149,12 @@ button{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:poin
   <a class="sub" href="reflect.html">반사 시험판으로</a>
   <a class="sub" href="map.html?v=11021548">맵 미리보기</a>
   <a class="sub" href="tools/ships.html">기체·도색 보기</a>
-  <a class="sub" href="rocks.html?v=11022316">맵 벽 보기</a>
+  <a class="sub" href="rocks.html?v=11022324">맵 벽 보기</a>
   <a class="sub" href="floor.html?v=11021548">지역 바닥 보기</a>
-  <a class="sub" href="base.html?v=11022316">시작 기지 보기</a>
-  <a class="sub" href="padring.html?v=11022316">시작 기지: 태어나는 곳</a>
-  <a class="sub" href="fall.html?v=11022316">유성 시안</a>
-  <a class="sub" href="world.html?v=11022316">맵 만들기</a>
+  <a class="sub" href="base.html?v=11022324">시작 기지 보기</a>
+  <a class="sub" href="padring.html?v=11022324">시작 기지: 태어나는 곳</a>
+  <a class="sub" href="fall.html?v=11022324">유성 시안</a>
+  <a class="sub" href="world.html?v=11022324">맵 만들기</a>
 </div></section>
 <section class="card ask" id="lvup" hidden><div>
   <span class="en">LEVEL UP</span><h3 style="margin:0;font-weight:500;font-size:20px;color:var(--g)">레벨 2</h3>
@@ -178,5 +182,11 @@ const bar = document.querySelector('#load i');
 start(document.querySelector('#cv'), p => { bar.style.transform = `scaleX(${p})`; })
   .then(() => setTimeout(() => document.querySelector('#load').classList.add('done'), 200))
   .catch(err => { document.querySelector('#load p').textContent = '불러오지 못했어요: ' + err.message; console.error(err); });
+</script>
+<script>
+/* 홈 화면에 추가한 앱은 첫 화면을 최대 10분 동안 예전 것으로 기억함 → 메뉴 링크가 예전 버전을 열 수 있음.
+   그래서 열 때마다 최신 버전 번호(ver.json, 기억하지 않고 매번 새로 받음)를 받아 메뉴 링크 끝 번호를 바꿈 */
+fetch('ver.json?t=' + Date.now(), { cache: 'no-store' }).then(r => r.json()).then(j => {
+  for (const a of document.querySelectorAll('a.sub[href]')) { const [f] = a.getAttribute('href').split('?'); if (j[f]) a.setAttribute('href', f + '?v=' + j[f]); } }).catch(() => {});
 </script>
 </body></html>
