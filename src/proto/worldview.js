@@ -1,20 +1,20 @@
 /* 맵 만들기 ① — 맵 6안(10명 개인전 · 정사각형)대로 바닥 · 지역 · 경계 능선 · 큰길 · 샛길 깔기
    보기: 끌면 이동, 두 손가락(휠)로 확대. 지역 이름표는 화면 위 글자. 시작 기지 자리는 빛 고리로만 표시(다음 단계에서 진짜 기지) */
 import * as THREE from 'three';
-import { makeBloom } from '../core/hangar/bloom.js?v=11022348';
-import { makeMapFloor, MAP, toWorld } from './mapfloor.js?v=11022348';
-import { makePerf } from './perf.js?v=11022348';
+import { makeBloom } from '../core/hangar/bloom.js?v=11022353';
+import { makeMapFloor, MAP, toWorld } from './mapfloor.js?v=11022353';
+import { makePerf } from './perf.js?v=11022353';
 
 const $ = s => document.querySelector(s), clamp = THREE.MathUtils.clamp;
-const VIEWS = [{ name: '게임 시점', h: 60, tilt: .3 }, { name: '지역 보기', h: 180, tilt: .25 }, { name: '맵 전체', h: 560, tilt: .02 }];
+const VIEWS = [{ name: '게임 시점', h: 60, tilt: .3 }, { name: '지역 보기', h: 130, tilt: .25 }, { name: '맵 전체', h: 400, tilt: .02 }];
 
 export async function start(canvas, onProgress = () => {}) {
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: false, powerPreference: 'high-performance' });
   renderer.toneMapping = THREE.NoToneMapping; renderer.autoClear = false; renderer.setClearColor(0, 1);
   const scene = new THREE.Scene(), camera = new THREE.PerspectiveCamera(40, 1, 1, 3000), bloom = makeBloom(renderer, { samples: 0 });
   onProgress(.2);
-  const floor = await makeMapFloor(renderer, './assets/map/v6.png?v=11022348');
-  const J = await (await fetch('./assets/map/v6.json?v=11022348')).json();
+  const floor = await makeMapFloor(renderer, './assets/map/v6.png?v=11022353');
+  const J = await (await fetch('./assets/map/v6.json?v=11022353')).json();
   const SPAWN = J.spawns, ALL = [...J.labels.map(o => [o.x, o.y, o.n, o.l]), [500, 500, '무너진 중심부', 'Lv 10+']];
   onProgress(.7);
   /* 시작 기지 자리: 빛 고리 (임시) */
@@ -27,13 +27,13 @@ export async function start(canvas, onProgress = () => {}) {
 
   /* 보기 */
   const [sx, sz] = toWorld(...SPAWN[0]);
-  const cam = { x: sx, z: sz + 40, h: 180, H: 180, tilt: .25, T: .25, az: 0 }, tour = $('#tour');
+  const cam = { x: sx, z: sz + 30, h: 130, H: 130, tilt: .25, T: .25, az: 0 }, tour = $('#tour');
   VIEWS.forEach((v, i) => { const b = document.createElement('button'); b.type = 'button'; b.textContent = v.name; b.className = i === 1 ? 'on' : '';
     b.onclick = () => { cam.H = v.h; cam.T = v.tilt; if (i === 2) { cam.x = 0; cam.z = 0; } tour.querySelectorAll('button').forEach(x => x.classList.toggle('on', x === b)); }; tour.appendChild(b); });
   const ptr = new Map(); let pin = 0;
   addEventListener('pointerdown', e => { if (e.target.closest('#ui')) return; ptr.set(e.pointerId, [e.clientX, e.clientY]); if (ptr.size === 2) { const [a, c] = [...ptr.values()]; pin = Math.hypot(a[0] - c[0], a[1] - c[1]); } });
   addEventListener('pointermove', e => { if (!ptr.has(e.pointerId)) return; const o = ptr.get(e.pointerId);
-    if (ptr.size === 1) { const k = cam.h * .0018; cam.x -= (e.clientX - o[0]) * k; cam.z -= (e.clientY - o[1]) * k; cam.x = clamp(cam.x, -200, 200); cam.z = clamp(cam.z, -200, 200); }
+    if (ptr.size === 1) { const k = cam.h * .0018; cam.x -= (e.clientX - o[0]) * k; cam.z -= (e.clientY - o[1]) * k; cam.x = clamp(cam.x, -140, 140); cam.z = clamp(cam.z, -140, 140); }
     ptr.set(e.pointerId, [e.clientX, e.clientY]);
     if (ptr.size === 2) { const [a, c] = [...ptr.values()], d = Math.hypot(a[0] - c[0], a[1] - c[1]); if (pin) cam.H = clamp(cam.H * pin / d, 20, 620); pin = d; } });
   const upF = e => { ptr.delete(e.pointerId); if (ptr.size < 2) pin = 0; }; addEventListener('pointerup', upF); addEventListener('pointercancel', upF);
