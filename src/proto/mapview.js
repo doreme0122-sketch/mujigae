@@ -10,8 +10,8 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
-import { makeBloom } from '../core/hangar/bloom.js?v=11021548';
-import { makePerf } from './perf.js?v=11021548';
+import { makeBloom } from '../core/hangar/bloom.js?v=11021559';
+import { makePerf } from './perf.js?v=11021559';
 import { buildShip, engineSpots } from '../core/ships/build.js';
 import { makeGlow } from '../preview/glow.js';
 import { planetShader } from '../core/planet.js';

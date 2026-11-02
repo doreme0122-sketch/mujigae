@@ -8,7 +8,8 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
-import { makeBloom } from '../core/hangar/bloom.js';
+import { makeBloom } from '../core/hangar/bloom.js?v=11021559';
+import * as Q from '../core/quality.js?v=11021559';
 import { buildShip, engineSpots } from '../core/ships/build.js';
 import { planetShader } from '../core/planet.js';
 import { planetFor } from '../data/planets.js';
@@ -46,7 +47,7 @@ export async function start(canvas, onProgress = () => {}) {
   const scene = new THREE.Scene();
   const camera = new THREE.PerspectiveCamera(40, 1, .5, 400);
   const CAM = new THREE.Vector3(0, 29.5, 7.3), LOOK = new THREE.Vector3(0, 0, -.45), camT = new THREE.Vector3();
-  const bloom = makeBloom(renderer);
+  const bloom = makeBloom(renderer, { samples: Q.tier().aa });
 
   { const pm = new THREE.PMREMGenerator(renderer); scene.environment = pm.fromScene(new RoomEnvironment(), .04).texture; scene.environmentIntensity = .55; pm.dispose(); }
   const sun = new THREE.DirectionalLight(0xfff0dc, 3.2); sun.position.set(-6, 14, -4); scene.add(sun);
@@ -539,10 +540,10 @@ export async function start(canvas, onProgress = () => {}) {
 
   /* ───── 화면 크기 ───── */
   let Wd = 2, Hd = 2;
-  function size() { const r = canvas.getBoundingClientRect(), DPR = Math.min(1.75, devicePixelRatio || 1); Wd = Math.max(2, Math.round(r.width * DPR)); Hd = Math.max(2, Math.round(r.height * DPR));
+  function size() { const r = canvas.getBoundingClientRect(); [Wd, Hd] = Q.renderSize(r.width, r.height); bloom.setSamples(Q.tier().aa);
     renderer.setSize(Wd, Hd, false); bloom.size(Wd, Hd); skyRT.setSize(Wd >> 1, Hd >> 1); skyMat.uniforms.uRes.value.set(Wd >> 1, Hd >> 1);
     camera.aspect = Wd / Hd; camera.updateProjectionMatrix(); glow.uRes.value.set(Wd, Hd); }
-  addEventListener('resize', size); size();
+  addEventListener('resize', size); size(); Q.onChange(() => size()); Q.measure().then(() => size());   /* 품질 단계가 정해지거나 바뀌면 다시 맞춤 */
 
   /* ───── 손 ───── */
   const fireB = $('#fire'), refB = $('#reflect'), stickEl = $('#stick'), knob = $('#stick i'), refKnob = $('#reflect .knob'), arc = $('#reflect .arc'), fireDir = $('#fire .dir'), fireKnob = $('#fire .knob');

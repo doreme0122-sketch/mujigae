@@ -145,7 +145,7 @@ button{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:poin
   <a class="sub" href="reflect.html">반사 시험판으로</a>
   <a class="sub" href="map.html?v=11021548">맵 미리보기</a>
   <a class="sub" href="tools/ships.html">기체·도색 보기</a>
-  <a class="sub" href="rocks.html?v=11021548">맵 벽 보기</a>
+  <a class="sub" href="rocks.html?v=11021559">맵 벽 보기</a>
   <a class="sub" href="floor.html?v=11021548">지역 바닥 보기</a>
 </div></section>
 <section class="card ask" id="lvup" hidden><div>
@@ -169,7 +169,7 @@ button{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:poin
 <div id="load"><p>경기장을 준비하고 있어요</p><div class="b"><i></i></div></div>
 <div id="rot">기기를 가로로 돌려 주세요</div>
 <script type="module">
-import { start } from './src/proto/field.js';
+import { start } from './src/proto/field.js?v=11021559';
 const bar = document.querySelector('#load i');
 start(document.querySelector('#cv'), p => { bar.style.transform = `scaleX(${p})`; })
   .then(() => setTimeout(() => document.querySelector('#load').classList.add('done'), 200))
