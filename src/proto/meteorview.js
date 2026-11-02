@@ -9,13 +9,13 @@
    무게: 빛 가닥 700개는 한 묶음으로 한 번에(위치는 셰이더가 계산), 부스러기는 점 묶음 한 번 */
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
-import { makeBloom } from '../core/hangar/bloom.js?v=11022048';
-import { makePad } from '../core/hangar/pad.js?v=11022048';
-import { makeGoldStar } from './goldstar.js?v=11022048';
-import { makePerf } from './perf.js?v=11022048';
+import { makeBloom } from '../core/hangar/bloom.js?v=11022140';
+import { makePad } from '../core/hangar/pad.js?v=11022140';
+import { makeGoldStar } from './goldstar.js?v=11022140';
+import { makePerf } from './perf.js?v=11022140';
 
 const $ = s => document.querySelector(s), clamp = THREE.MathUtils.clamp;
-const N = 700, FALL = 1.1, LINGER = .8, REST = .7, CYCLE = REST + FALL + LINGER, EXP = 1.25;   /* 진행 u = (t/FALL)^EXP : 거의 일정, 끝에서 살짝 가속 */
+const N = 700, FALL = .8, LINGER = .8, REST = .7, CYCLE = REST + FALL + LINGER, EXP = 2.2;   /* 진행 u = (t/FALL)^EXP : 처음엔 보일 만큼 다가오고, 땅에 가까워질수록 확 빨라져 내리꽂힘(꼬리는 빨라진 만큼 저절로 길게 늘어남) */
 const S0 = new THREE.Vector3(-14, 30, -9), C = new THREE.Vector3(0, .3, 0);
 const AB = { transparent: true, depthWrite: false, blending: THREE.AdditiveBlending };
 const NOISE = `float h1(vec2 p){ return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453); }
