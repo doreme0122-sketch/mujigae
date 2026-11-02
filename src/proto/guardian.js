@@ -59,12 +59,12 @@ function baseParts() {
 export function makeGuardians() {
   const G = new THREE.Group(), { r: RR, y: Y0, DOWN } = GUARD;
   const gun = new THREE.MeshPhysicalMaterial({ color: 0x2a2e35, metalness: .9, roughness: .28, clearcoat: .5, clearcoatRoughness: .2, envMapIntensity: 1.05, side: THREE.DoubleSide });
-  const silver = new THREE.MeshPhysicalMaterial({ color: 0xb3bac6, metalness: 1, roughness: .26, clearcoat: .5, clearcoatRoughness: .15, envMapIntensity: 1.15, side: THREE.DoubleSide });
+  const silver = new THREE.MeshPhysicalMaterial({ color: 0xccd2db, metalness: .4, roughness: .38, clearcoat: .5, clearcoatRoughness: .15, envMapIntensity: 1.15, side: THREE.DoubleSide });
   const dark = new THREE.MeshStandardMaterial({ color: 0x0b0d12, metalness: .5, roughness: .45 });
   const uT = { value: 0 }, uOn = { value: 0 }, uFire = { value: -99 }, uGem = { value: .4 };
   /* 결정 겉: 반투명 유리 결정, 아래 짙은 파랑 → 위로 맑고 밝게(빛이 위에서 들어와 모임) */
   const gemOuter = new THREE.MeshPhysicalMaterial({ color: 0x8fb8ff, metalness: 0, roughness: .05, transparent: true, opacity: .62, clearcoat: 1, clearcoatRoughness: .03,
-    iridescence: .8, iridescenceIOR: 1.35, envMapIntensity: 1.7, emissive: 0x2a5cff, emissiveIntensity: .5, flatShading: true, depthWrite: false });
+    iridescence: .8, iridescenceIOR: 1.35, envMapIntensity: 1.7, emissive: 0x4f86ff, emissiveIntensity: 1, flatShading: true, depthWrite: false });
   gemOuter.onBeforeCompile = sh => { sh.uniforms.uGem = uGem;
     sh.vertexShader = 'varying float vGy;\n' + sh.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\n vGy = position.y;');
     sh.fragmentShader = 'uniform float uGem; varying float vGy;\n' + sh.fragmentShader.replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\n totalEmissiveRadiance *= mix(.35, 1.6, smoothstep(-.1, 1.2, vGy)) * uGem;\n diffuseColor.rgb *= mix(vec3(.25,.4,.9), vec3(1.), smoothstep(0., 1.1, vGy));'); };
@@ -77,7 +77,7 @@ export function makeGuardians() {
       void main(){ float e = uT - uFire, head = e / ${DOWN.toFixed(2)};
         float pour = exp(-pow((vS - head) * 5., 2.)) * step(0., e) * step(head, 1.3);
         float b = .25 + .1 * sin(uT * 1.3 - vS * 4.) + uOn * (.5 + .3 * sin(uT * 2. - vS * 7.)) + pour * 2.2;
-        gl_FragColor = vec4(mix(vec3(.28,.58,1.35), vec3(.85,.95,1.35), pour) * b, 1.); }` });
+        gl_FragColor = vec4(mix(vec3(.28,.58,1.35), vec3(.85,.95,1.35), pour) * b * 2.2, 1.); }` });
   const { P, slits, top } = baseParts();
   const merged = l => mergeGeometries(l.map(NI));
   const gunG = merged(P.gun), silverG = merged(P.silver), darkG = merged(P.dark);
@@ -97,6 +97,10 @@ export function makeGuardians() {
   cluster.forEach((c, i) => { const g = gem(11 + i * 7, c.w); g.scale(1, c.s, 1); g.rotateZ(c.tilt); g.rotateY(c.yaw); g.translate(Math.cos(c.yaw) * c.off, 0, -Math.sin(c.yaw) * c.off); outerList.push(g);
     const k = gem(11 + i * 7, c.w * .45); k.scale(1, c.s * .82, 1); k.translate(0, c.s * .05, 0); k.rotateZ(c.tilt); k.rotateY(c.yaw); k.translate(Math.cos(c.yaw) * c.off, 0, -Math.sin(c.yaw) * c.off); coreList.push(k); });
   const outerG = mergeGeometries(outerList.map(NI)), coreG = mergeGeometries(coreList.map(NI));
+  /* 결정 빛 번짐: 화면을 향한 부드러운 빛 덩이 + 세로로 긴 빛 기둥 (빛 번짐 효과가 꺼져 있어도 밝아 보이게) */
+  const flareMat = new THREE.ShaderMaterial({ uniforms: { uI: { value: 1 } }, transparent: true, depthWrite: false, depthTest: true, blending: THREE.AdditiveBlending,
+    vertexShader: 'varying vec2 vU; void main(){ vU=uv*2.-1.; vec4 c=modelViewMatrix*vec4(0.,0.,0.,1.); c.xy+=position.xy; gl_Position=projectionMatrix*c; }',
+    fragmentShader: 'uniform float uI; varying vec2 vU; void main(){ float r=length(vU*vec2(1.,.55)); float core=exp(-r*r*9.), soft=exp(-r*r*2.5)*.35, streak=exp(-vU.y*vU.y*60.)*exp(-abs(vU.x)*3.)*.4; float edge=1.-smoothstep(.55,1.,max(abs(vU.x),abs(vU.y))); gl_FragColor=vec4(vec3(.45,.7,1.35)*(core+soft+streak)*uI*edge,1.); }' });
   const units = [];
   for (let k = 0; k < 4; k++) { const a = Math.PI / 4 + k * Math.PI / 2, u = new THREE.Group(); u.position.set(Math.cos(a) * RR, Y0, Math.sin(a) * RR); u.rotation.y = -a;
     u.add(new THREE.Mesh(gunG, gun), new THREE.Mesh(silverG, silver), new THREE.Mesh(darkG, dark));
@@ -104,14 +108,16 @@ export function makeGuardians() {
     const cl = new THREE.Group(); cl.position.y = top + .02; u.add(cl);
     const core = new THREE.Mesh(coreG, gemCore); core.renderOrder = 4; cl.add(core);
     const outer = new THREE.Mesh(outerG, gemOuter); outer.renderOrder = 5; cl.add(outer);
+    const fl = new THREE.Mesh(new THREE.PlaneGeometry(1.9, 3.2), flareMat); fl.position.y = .85; fl.renderOrder = 6; fl.frustumCulled = false; cl.add(fl);
     /* 결정 둘레를 천천히 도는 작은 조각 셋 */
     const shards = []; for (let j = 0; j < 3; j++) { const sg = gem(90 + j, .05); sg.scale(1, .5, 1); const m = new THREE.Mesh(sg, gemOuter); m.renderOrder = 5; cl.add(m); shards.push(m); }
     G.add(u); units.push({ cl, shards, ph: k * 1.7 }); }
   G.userData.fire = t => { uFire.value = t; };
   G.userData.update = (t, on) => { uT.value = t; uOn.value += ((on ? 1 : 0) - uOn.value) * .05; const e = t - uFire.value, burst = e >= 0 && e < 1.6 ? Math.exp(-e * 2.4) : 0;
     const breathe = .5 + .5 * Math.sin(t * 1.1);
-    uGem.value = .45 + .25 * breathe + uOn.value * .35 + burst * 3;
-    const ci = .25 + .15 * breathe + uOn.value * .3 + burst * 2; gemCore.color.setRGB(.42 * ci, .63 * ci, 1.0 * ci);
+    uGem.value = 1.6 + .5 * breathe + uOn.value * .8 + burst * 4;
+    const ci = 1.6 + .5 * breathe + uOn.value * .9 + burst * 4; gemCore.color.setRGB(.55 * ci, .8 * ci, 1.3 * ci);
+    flareMat.uniforms.uI.value = .7 + .25 * breathe + uOn.value * .4 + burst * 2.5;
     for (const U of units) U.shards.forEach((m, j) => { const a = t * (.35 + j * .08) + j * 2.1 + U.ph, r = .55 + j * .06; m.position.set(Math.cos(a) * r, 1.0 + j * .35 + Math.sin(t * .8 + j) * .06, Math.sin(a) * r); m.rotation.set(t * .5 + j, t * .7, .4); }); };
   return G;
 }

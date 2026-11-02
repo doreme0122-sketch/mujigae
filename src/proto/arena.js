@@ -7,7 +7,7 @@
    단위는 자기장 판과 같음. */
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { sweep, posNor } from './floatring.js?v=11021757';
+import { sweep, posNor } from './floatring.js?v=11021802';
 
 
 /* 건담처럼 장갑판을 조립한 느낌의 검은 판 선 — 면 위치로 바로 그림(텍스처 없음, 가벼움)
@@ -51,8 +51,8 @@ export const ARENA = { floor: 4.3, t1: [4.3, 5.3, .34], t2: [5.3, 7.0, .95], ski
 export function makeArena() {
   const G = new THREE.Group(), { floor: RF, t1, t2, skirt: SK, exitHalf: EH, ramp: RS } = ARENA;
   /* 금은 판(금테 별)에만. 판 아래 바닥 = 검은 건메탈, 계단 윗면 = 은색 메탈, 세로면 = 건메탈 + 밝은 에너지 빛 */
-  const silver = panelLines(new THREE.MeshPhysicalMaterial({ color: 0xa3abb8, metalness: 1, roughness: .32, clearcoat: .3, clearcoatRoughness: .25, envMapIntensity: 1.05 }));
-  const silverHi = new THREE.MeshPhysicalMaterial({ color: 0xb9c0cc, metalness: 1, roughness: .24, clearcoat: .5, clearcoatRoughness: .15, envMapIntensity: 1.15 });
+  const silver = panelLines(new THREE.MeshPhysicalMaterial({ color: 0xc2c8d2, metalness: .45, roughness: .42, clearcoat: .6, clearcoatRoughness: .2, envMapIntensity: .9, sheen: .4, sheenColor: 0x9fc2ff }));
+  const silverHi = new THREE.MeshPhysicalMaterial({ color: 0xd4d9e1, metalness: .35, roughness: .36, clearcoat: .7, clearcoatRoughness: .15, envMapIntensity: .95, sheen: .4, sheenColor: 0x9fc2ff });
   const gun = new THREE.MeshPhysicalMaterial({ color: 0x2a2e35, metalness: .9, roughness: .3, clearcoat: .5, clearcoatRoughness: .2, envMapIntensity: 1 });
   const gunRib = new THREE.MeshPhysicalMaterial({ color: 0x3a3f48, metalness: .9, roughness: .26, clearcoat: .6, clearcoatRoughness: .15, envMapIntensity: 1.1 });
   const floorM = panelLines(new THREE.MeshPhysicalMaterial({ color: 0x1c1f25, metalness: .88, roughness: .3, clearcoat: .45, clearcoatRoughness: .2, envMapIntensity: .95 }), .62);   /* 검은 건메탈 + 판 선 */
@@ -160,8 +160,18 @@ export function makeArena() {
         else if (vS < -.5) { float a=atan(vW.z,vW.x); b = .35 + uOn*(1.+.3*sin(uT*1.4+a*4.+vK*2.)); c = mix(c, vec3(.7,.88,1.4), .35); }          /* 계단 세로면 에너지 빛 */
         else { float flow = fract(vS*6. + uT*.9);                                                           /* 바깥 → 안으로 흐르는 빛 덩어리 */
           float pk = smoothstep(.0,.15,flow)*smoothstep(.55,.15,flow);
-          b = .06 + uOn*(.35 + 1.4*pk); c = mix(c, vec3(.85,.95,1.3), pk*uOn*.6); }
-        gl_FragColor = vec4(c*b,1.); }` });
+          b = .12 + uOn*(.45 + 1.6*pk); c = mix(c, vec3(.85,.95,1.3), pk*uOn*.6); }
+        gl_FragColor = vec4(c*b*2.2,1.); }` });
+
+  /* 판 둘레 빛 웅덩이: 판·결정의 빛이 검은 바닥에 비쳐 번짐 (판이 기지와 한 세상이 되게) */
+  { const pm = new THREE.ShaderMaterial({ uniforms: { uOn, uT }, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
+      vertexShader: 'varying vec2 vP; void main(){ vP=position.xy; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.); }',
+      fragmentShader: `uniform float uOn,uT; varying vec2 vP; void main(){ float r=length(vP), a=atan(vP.y,vP.x);
+        float pool = exp(-pow((r-2.6)/1.3,2.))*.55 + exp(-pow((r-${RF.toFixed(1)})/.25,2.))*.5;      /* 판 바깥 + 1층 발치 */
+        float rays = pow(abs(cos(a*2.)),24.)*exp(-r*.35)*.6;                                           /* 대각선 빛길 쪽으로 뻗는 결 */
+        float b = (pool + rays) * (.35 + .65*uOn) * (.9+.1*sin(uT*1.5));
+        gl_FragColor = vec4(vec3(.25,.5,1.25)*b, 1.); }` });
+    const m = new THREE.Mesh(new THREE.RingGeometry(1.6, RF + .4, 128, 1), pm); m.rotation.x = -Math.PI / 2; m.position.y = .006; m.renderOrder = 2; G.add(m); }
   const gg = new THREE.BufferGeometry(); gg.setAttribute('position', new THREE.Float32BufferAttribute(glowPos, 3)); gg.setAttribute('aK', new THREE.Float32BufferAttribute(glowK, 1)); gg.setAttribute('aS', new THREE.Float32BufferAttribute(glowS, 1));
   const gm = new THREE.Mesh(gg, gMat); gm.renderOrder = 3; G.add(gm);
   G.userData.update = (t, on) => { uT.value = t; uOn.value += ((on ? 1 : 0) - uOn.value) * .05; const k = .25 + uOn.value * 1.1; blue.color.setRGB(.28 * k, .58 * k, 1.35 * k); };
