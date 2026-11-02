@@ -80,7 +80,7 @@ export function makeGuardians() {
     vertexShader: 'attribute float aS; varying float vS; varying float vY; void main(){ vS=aS; vec4 w=modelMatrix*vec4(position,1.); vY=w.y; gl_Position=projectionMatrix*viewMatrix*w; }',
     fragmentShader: `uniform float uT, uOn, uFire; varying float vS; varying float vY;
       void main(){ float e = uT - uFire, hy = ${(Y0 + .9).toFixed(3)} - e * ${(.9 / DOWN).toFixed(3)};   /* 빛 머리 높이: 모든 탑이 같은 높이·같은 속도로 */
-        float pour = exp(-pow((vY - hy) * 12., 2.)) * step(0., e) * step(${(Y0 - .1).toFixed(3)}, hy);
+        float pour = exp(-(((vY - hy) * 12.)*((vY - hy) * 12.))) * step(0., e) * step(${(Y0 - .1).toFixed(3)}, hy);
         float b = .25 + .1 * sin(uT * 1.3 - vS * 4.) + uOn * (.5 + .3 * sin(uT * 2. - vS * 7.)) + pour * 2.2;
         gl_FragColor = vec4(mix(vec3(.28,.58,1.35), vec3(.85,.95,1.35), pour) * b * 2.2, 1.); }` });
   const { P, slits, top } = baseParts();

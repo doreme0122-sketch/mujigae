@@ -52,7 +52,7 @@ export function makeBirth(ship) {
     vertexShader: `attribute float aU, aS; uniform vec3 uHead; uniform float uLen; varying float vU, vS;
       void main(){ vU=aU; vS=aS;
         vec3 a=(viewMatrix*vec4(uHead,1.)).xyz, b=(viewMatrix*vec4(uHead+vec3(0.,uLen,0.),1.)).xyz;
-        vec3 d=normalize(b-a), n=normalize(cross(d, normalize(-a)));
+        vec3 d=normalize(b-a+vec3(0.,1e-4,0.)), n=cross(d, normalize(-a)); n = dot(n,n) > 1e-8 ? normalize(n) : vec3(1.,0.,0.);   /* 똑바로 내려다볼 때 0으로 나누지 않게 */
         float w=mix(.16,.95,pow(aU,.7));                                                    /* 머리 쪽 가늘고 위로 넓어짐 */
         gl_Position=projectionMatrix*vec4(mix(a,b,aU)+n*aS*w,1.); }`,
     fragmentShader: `uniform float uT, uI, uLen; varying float vU, vS; ${NOISE}
@@ -84,7 +84,7 @@ export function makeBirth(ship) {
         float sp=aP.y, L=aP.x*(1.-exp(-max(uE,0.)*sp));                                      /* 빠르게 뻗었다 멈춤 */
         float fade=exp(-max(uE-aP.z,0.)*3.2)*step(0.,uE); vA=fade;
         vec3 a=(viewMatrix*vec4(uC,1.)).xyz, b=(viewMatrix*vec4(uC+aDir*L,1.)).xyz;
-        vec3 d=normalize(b-a+1e-5), n=normalize(cross(d, normalize(-a)));
+        vec3 d=normalize(b-a+vec3(1e-4)), n=cross(d, normalize(-a)); n = dot(n,n) > 1e-8 ? normalize(n) : vec3(1.,0.,0.);
         float w=.05*(1.-aU*.85)*(.6+aP.w*.8);
         gl_Position=projectionMatrix*vec4(mix(a,b,aU)+n*aS*w,1.); }`,
     fragmentShader: `uniform float uT; varying float vU, vS, vA, vSeed;
@@ -105,7 +105,7 @@ export function makeBirth(ship) {
     vertexShader: 'varying vec2 vP; void main(){ vP=position.xy; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.); }',
     fragmentShader: `uniform float uR, uI, uT; varying vec2 vP; ${NOISE}
       void main(){ float r=length(vP), a=atan(vP.y,vP.x); float br=.6+.6*fbm(vec2(a*6., r*2.-uT*4.));         /* 고리도 결이 있게 */
-        float k=(exp(-pow((r-uR)/.1,2.))*1.3+exp(-pow((r-uR*.8)/.25,2.))*.25)*br; gl_FragColor=vec4(vec3(.5,.75,1.45)*k*uI,1.); }` });
+        float k=(exp(-(((r-uR)/.1)*((r-uR)/.1)))*1.3+exp(-(((r-uR*.8)/.25)*((r-uR*.8)/.25)))*.25)*br; gl_FragColor=vec4(vec3(.5,.75,1.45)*k*uI,1.); }` });
   const ring = new THREE.Mesh(new THREE.CircleGeometry(5, 128), ringM); ring.rotation.x = -Math.PI / 2; ring.position.y = .24; ring.renderOrder = 7; G.add(ring);
 
   let T0 = -99, active = false, shown = false;

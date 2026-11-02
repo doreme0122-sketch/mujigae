@@ -1,16 +1,16 @@
 /* 시작 기지 부품 보기 ① — 자기장 판(격납고 그대로) + 금테 네 갈래 별 */
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
-import { makeBloom } from '../core/hangar/bloom.js?v=11021942';
-import { makePad } from '../core/hangar/pad.js?v=11021942';
-import { makeMag } from '../core/hangar/mag.js?v=11021942';
+import { makeBloom } from '../core/hangar/bloom.js?v=11021944';
+import { makePad } from '../core/hangar/pad.js?v=11021944';
+import { makeMag } from '../core/hangar/mag.js?v=11021944';
 import { buildShip, engineSpots } from '../core/ships/build.js';
-import { makeGoldStar } from './goldstar.js?v=11021942';
-import { makeArena, SPEED, WAVE_R0 } from './arena.js?v=11021942';
-import { makeGuardians, GUARD } from './guardian.js?v=11021942';
-import { makeFloor, FLOORS } from './floor.js?v=11021942';
-import { makePerf } from './perf.js?v=11021942';
-import { makeBirth, BIRTH } from './birth.js?v=11021942';
+import { makeGoldStar } from './goldstar.js?v=11021944';
+import { makeArena, SPEED, WAVE_R0 } from './arena.js?v=11021944';
+import { makeGuardians, GUARD } from './guardian.js?v=11021944';
+import { makeFloor, FLOORS } from './floor.js?v=11021944';
+import { makePerf } from './perf.js?v=11021944';
+import { makeBirth, BIRTH } from './birth.js?v=11021944';
 
 const $ = s => document.querySelector(s), clamp = THREE.MathUtils.clamp;
 const SHIPL = 2.9;     /* 기체 길이: 자기장 판(지름 3.2)보다 약간 작게 */

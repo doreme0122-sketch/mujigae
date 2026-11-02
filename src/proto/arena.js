@@ -7,8 +7,8 @@
    단위는 자기장 판과 같음. */
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { sweep, posNor } from './floatring.js?v=11021942';
-import { GUARD_ANG, GUARD, guardScale } from './guardian.js?v=11021942';
+import { sweep, posNor } from './floatring.js?v=11021944';
+import { GUARD_ANG, GUARD, guardScale } from './guardian.js?v=11021944';
 
 
 /* 건담처럼 장갑판을 조립한 느낌의 검은 판 선 — 면 위치로 바로 그림(텍스처 없음, 가벼움)
@@ -201,7 +201,7 @@ export function makeArena() {
   { const pm = new THREE.ShaderMaterial({ uniforms: { uOn, uT, uW }, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
       vertexShader: 'varying vec2 vP; void main(){ vP=position.xy; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.); }',
       fragmentShader: `uniform float uOn,uT,uW; varying vec2 vP; ${WAKE} void main(){ float r=length(vP), a=atan(vP.y,vP.x); float ON = onAt(r);
-        float pool = exp(-pow((r-2.6)/1.3,2.))*.55 + exp(-pow((r-${RF.toFixed(1)})/.25,2.))*.5;      /* 판 바깥 + 1층 발치 */
+        float pool = exp(-(((r-2.6)/1.3)*((r-2.6)/1.3)))*.55 + exp(-(((r-${RF.toFixed(1)})/.25)*((r-${RF.toFixed(1)})/.25)))*.5;      /* 판 바깥 + 1층 발치 */
         float rays = pow(abs(cos(a*4.)),40.)*exp(-r*.35)*.6*smoothstep(.15,.4,abs(a));                  /* 빛길 쪽으로 뻗는 결 (출구 쪽 빼고) */
         float b = (pool + rays) * (.35 + .65*ON) * (.9+.1*sin(uT*1.5));
         gl_FragColor = vec4(vec3(.25,.5,1.25)*b, 1.); }` });

@@ -72,9 +72,9 @@ export function makeGoldStar() {
   const lineMat = new THREE.ShaderMaterial({ transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, uniforms: { uFlow, uRing, uBurst },
     vertexShader: 'attribute float aT; varying float vT; void main(){ vT=aT; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.); }',
     fragmentShader: `uniform float uFlow, uRing, uBurst; varying float vT;
-      void main(){ float head = exp(-pow((vT-uFlow)*7., 2.)); float tail = step(uFlow, vT) * exp(-(vT-uFlow)*4.) * step(-.5, uFlow);
+      void main(){ float head = exp(-(((vT-uFlow)*7.)*((vT-uFlow)*7.))); float tail = step(uFlow, vT) * exp(-(vT-uFlow)*4.) * step(-.5, uFlow);
         float ring = vT < 0. ? uRing : 0.;
-        float b = vT < 0. ? ring + uBurst*1.5 : head*1.6 + tail*.35 + uBurst*exp(-pow(vT-(1.-uBurst),2.)*20.)*3. + uBurst*.6;   /* 빛이 꽂힌 순간: 고리에서 갈래 끝까지 번쩍 뻗음 */
+        float b = vT < 0. ? ring + uBurst*1.5 : head*1.6 + tail*.35 + uBurst*exp(-((vT-(1.-uBurst))*(vT-(1.-uBurst)))*20.)*3. + uBurst*.6;   /* 빛이 꽂힌 순간: 고리에서 갈래 끝까지 번쩍 뻗음 */
         vec3 c = mix(vec3(.25,.5,1.2), vec3(.85,.95,1.3), head);
         gl_FragColor = vec4(c*b, 1.); }` });
   const pos = [], tt = [];

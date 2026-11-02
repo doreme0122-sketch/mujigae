@@ -27,7 +27,7 @@ export function makeBloom(renderer, bo = {}){
     fragmentShader:`precision highp float;in vec2 vU;out vec4 o;uniform sampler2D t,b1,b2;uniform float k,asp;uniform vec4 warp;
       void main(){ vec2 uv=vU;
         if(warp.w>0.){ vec2 d=(vU-warp.xy)*vec2(asp,1.); float r=length(d)+1e-5, R=warp.z;      /* 공간이 일그러지는 파동: 센 첫 물결 + 뒤따르는 약한 물결 둘 */
-          float w=exp(-pow((r-R)/.035,2.))-exp(-pow((r-R+.05)/.035,2.))*.6+(exp(-pow((r-R*.72)/.03,2.))-exp(-pow((r-R*.72+.04)/.03,2.))*.6)*.45+(exp(-pow((r-R*.48)/.025,2.)))*.2;
+          float w=exp(-(((r-R)/.035)*((r-R)/.035)))-exp(-(((r-R+.05)/.035)*((r-R+.05)/.035)))*.6+(exp(-(((r-R*.72)/.03)*((r-R*.72)/.03)))-exp(-(((r-R*.72+.04)/.03)*((r-R*.72+.04)/.03)))*.6)*.45+(exp(-(((r-R*.48)/.025)*((r-R*.48)/.025))))*.2;
           uv-=d/r/vec2(asp,1.)*w*warp.w; }
         vec3 c=texture(t,uv).rgb + (texture(b1,uv).rgb*.45+texture(b2,uv).rgb*1.05)*k;
         c=c/(1.+c*.52);
