@@ -66,15 +66,15 @@ def opn(pts,wd):
 OPEN=[]
 col[inC]=np.array([.4,.13,.13])*(.75+.5*tex[inC])[...,None]
 ring=np.clip(1-np.abs(cen-1)/.1,0,1)
-for P in RADIAL+RING: opn(P,15)                                     # 문: 넓고 확실하게 뚫음
-for P in SIDE: opn(P,9)
+for P in RADIAL+RING: opn(P,12)                                     # 문: 넓고 확실하게 뚫음
+for P in SIDE: opn(P,7)
 for P in TDOOR: opn(P,10)
-for P in AGGRO: opn(P,9)
+for P in AGGRO: opn(P,7)
 SNEAK=[]                                                            # 몰래 지나가는 좁은 틈 (지역마다 한두 개, 직접 놓음)
 for k in range(10):
     a=ANG[k]; m=MID[k]
     SNEAK.append([pol(192,a-.2),pol(140,a-.17)])                    # 보스 구역 ↔ 중심부 (네 번째 입구)
-for P in SNEAK: opn(P,8)
+for P in SNEAK: opn(P,6)
 openM=np.asarray(op.filter(ImageFilter.GaussianBlur(1.4))).astype(np.float32)/255
 edge=edge*(1-np.clip(openM*1.8,0,1)); ring=ring*fill*(1-np.clip(openM*1.8,0,1))   # 중심부 둘레: 반쯤 막고 보스마다 입구 서너 개(큰길·보스 옆 샛길·좁은 틈)
 rock=np.maximum(edge,ring)
@@ -102,7 +102,7 @@ L=mergeFrag(L)
 bd=np.zeros_like(L,bool)
 bd[:,1:]|=L[:,1:]!=L[:,:-1]; bd[:,:-1]|=L[:,1:]!=L[:,:-1]; bd[1:,:]|=L[1:,:]!=L[:-1,:]; bd[:-1,:]|=L[1:,:]!=L[:-1,:]
 dist,(iy,ix)=ndi.distance_transform_edt(~bd,return_indices=True)
-WALLW=4                                                               # 벽 두께: 어디서나 같음 (반쪽 4칸 → 약 4.5m)
+WALLW=3                                                               # 벽 두께: 어디서나 같음 (맵 360m 기준 약 4.3m — 맵을 키워도 벽은 그대로, 늘어난 만큼 싸울 땅)
 band=dist<=WALLW
 La=L[iy,ix]                                                           # 가장 가까운 경계의 이쪽 땅
 Lb=La.copy()                                                          # 그 경계의 저쪽 땅
@@ -131,7 +131,7 @@ def door2(t,o):                                                        # 두 땅
     if c<0: nx_,ny_=-nx_,-ny_
     X0,Y0=float(qx*sc),float(qy*sc); return [(X0+nx_*30,Y0+ny_*30),(X0,Y0),(X0-nx_*30,Y0-ny_*30)]
 TDOOR=[door2(30+k,o) for k in range(10) for o in (k,(k+1)%10,10+k)]   # 보물 땅 문 셋: 양옆 앞마당 · 앞쪽 정글
-for P in TDOOR: opn(P,10)
+for P in TDOOR: opn(P,8)                                            # 문 폭은 맵을 키워도 그대로(약 5.8m) → 길목 싸움 유지
 OPB=np.asarray(op)>127                                                # 정해 놓은 문·길 자리 (흐리지 않음: 열림/막힘 딱 갈림)
 wall=wall0&~OPB
 wall=ndi.binary_opening(wall,iterations=1)                            # 문 뚫고 남은 실 같은 벽 조각 없앰
@@ -143,7 +143,7 @@ sealed=(~block)&~reach; slab,sn=ndi.label(sealed); ssz=ndi.sum(np.ones_like(slab
 SEALED_BIG=[int(v) for v in ssz if v>=300]
 wall|=sealed                                                          # 어디서도 못 들어가는 막힌 주머니 = 그냥 바위 (작은 것만 있어야 정상 → 검사에서 확인)
 GATES=[]                                                              # 문 자리: 길이 벽을 뚫고 지나가는 곳 (문기둥 세울 자리)
-for kind_,LST,wd in [('road',RADIAL+RING,15),('side',SIDE+TDOOR,10),('aggro',AGGRO,9),('sneak',SNEAK,8)]:
+for kind_,LST,wd in [('road',RADIAL+RING,12),('side',SIDE+TDOOR,8),('aggro',AGGRO,7),('sneak',SNEAK,6)]:
     for P in LST:
         for a_,b_ in zip(P[:-1],P[1:]):
             n_=int(math.hypot(b_[0]-a_[0],b_[1]-a_[1])/1.5)+1; run=[]

@@ -9,10 +9,13 @@ print('막힌 큰 주머니(300칸 이상):',SEALED_BIG)
 # 땅 조각 수
 bad=[v for v in np.unique(L[L<41]) if ndi.label(L==v)[1]!=1]; print('여러 조각인 땅:',bad)
 # 연결: 이웃 땅 쌍마다, 두 땅의 지나갈 수 있는 칸끼리 맞닿은 곳 수(=문 개수)
-def doors(a,b):
-    m=pas&((L==a)|(L==b)); A=pas&(L==a); B=pas&(L==b)
-    touch=(A&ndi.binary_dilation(B))|(B&ndi.binary_dilation(A))
-    return ndi.label(ndi.binary_dilation(touch,iterations=3)&m)[1]
+def doors(a,b):                                                       # 두 땅의 지나갈 수 있는 칸이 직접 맞닿은 자리 → 가까운 것(30칸 안)은 한 문으로 묶어 셈
+    A=pas&(L==a); Bm=pas&(L==b); st=np.array([[0,1,0],[1,1,1],[0,1,0]],bool)
+    C=(A&ndi.binary_dilation(Bm,st))|(Bm&ndi.binary_dilation(A,st))
+    lab,n=ndi.label(C); cs=[np.argwhere(lab==c).mean(0)*sc for c in range(1,n+1)]; g=[]
+    for c in cs:
+        if not any(np.hypot(*(c-q))<30 for q in g): g.append(c)
+    return len(g)
 name=lambda v: 'cen' if v==40 else f"{seeds[v][5]}{seeds[v][6]}"
 print('보물 땅 문:')
 okAll=True

@@ -2,23 +2,23 @@
    날아 보기: 1번 기지에서 기체를 조이스틱으로 몰아 맵 크기·길·문을 몸으로 확인(지금 있는 땅 이름 · 출발 뒤 걸린 시간 · 속도 바꾸기)
    보기: 날아 보기·지역 보기는 기체를 따라감, 맵 전체는 가운데 고정(끌어서 이동). 두 손가락(휠)로 확대. 시작 기지 자리는 빛 고리(다음 단계에서 진짜 기지) */
 import * as THREE from 'three';
-import { makeBloom } from '../core/hangar/bloom.js?v=11030029';
-import { makeMapFloor, MAP, toWorld } from './mapfloor.js?v=11030029';
-import { makePerf } from './perf.js?v=11030029';
+import { makeBloom } from '../core/hangar/bloom.js?v=11030035';
+import { makeMapFloor, MAP, toWorld } from './mapfloor.js?v=11030035';
+import { makePerf } from './perf.js?v=11030035';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
-import { makeFlight, loadBlock, FLY } from './flight.js?v=11030029';
+import { makeFlight, loadBlock, FLY } from './flight.js?v=11030035';
 
 const $ = s => document.querySelector(s), clamp = THREE.MathUtils.clamp;
-const VIEWS = [{ name: '날아 보기', h: 42, tilt: .38 }, { name: '지역 보기', h: 130, tilt: .25 }, { name: '맵 전체', h: 400, tilt: .02 }];
+const VIEWS = [{ name: '날아 보기', h: 42, tilt: .38 }, { name: '지역 보기', h: 160, tilt: .25 }, { name: '맵 전체', h: 520, tilt: .02 }];
 
 export async function start(canvas, onProgress = () => {}) {
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: false, powerPreference: 'high-performance' });
   renderer.toneMapping = THREE.NoToneMapping; renderer.autoClear = false; renderer.setClearColor(0, 1);
   const scene = new THREE.Scene(), camera = new THREE.PerspectiveCamera(40, 1, 1, 3000), bloom = makeBloom(renderer, { samples: 0 });
   onProgress(.2);
-  const floor = await makeMapFloor(renderer, './assets/map/v6.png?v=11030029');
-  const J = await (await fetch('./assets/map/v6.json?v=11030029')).json();
-  const BLK = await loadBlock('./assets/map/v6.png?v=11030029');                  /* 벽 판정 = 바닥에 그린 벽 그림 그대로 */
+  const floor = await makeMapFloor(renderer, './assets/map/v6.png?v=11030035');
+  const J = await (await fetch('./assets/map/v6.json?v=11030035')).json();
+  const BLK = await loadBlock('./assets/map/v6.png?v=11030035');                  /* 벽 판정 = 바닥에 그린 벽 그림 그대로 */
   { const pm = new THREE.PMREMGenerator(renderer); scene.environment = pm.fromScene(new RoomEnvironment(), .04).texture; scene.environmentIntensity = .6; pm.dispose(); }
   const SPAWN = J.spawns, ALL = [...J.labels.map(o => [o.x, o.y, o.n, o.l]), [500, 500, '무너진 중심부', 'Lv 10+']];
   onProgress(.7);
@@ -74,7 +74,7 @@ export async function start(canvas, onProgress = () => {}) {
   const fly = await makeFlight(renderer, BLK, [sx, sz], Math.atan2(sx, sz)); scene.add(fly); const FS = fly.userData.S;
   /* 보기 */
   const cam = { x: sx, z: sz, h: 42, H: 42, tilt: .38, T: .38, az: 0 }, tour = $('#tour'); let view = 0;
-  $('#head span').textContent = '맵 6안 · 280m · 화면 왼쪽을 누르면 조이스틱 (컴퓨터: WASD·방향키) · 두 손가락으로 확대';
+  $('#head span').textContent = '맵 6안 · 360m · 화면 왼쪽을 누르면 조이스틱 (컴퓨터: WASD·방향키) · 두 손가락으로 확대';
   VIEWS.forEach((v, i) => { const b = document.createElement('button'); b.type = 'button'; b.textContent = v.name; b.className = i === 0 ? 'on vw' : 'vw';
     b.onclick = () => { view = i; cam.H = v.h; cam.T = v.tilt; if (i === 2) { cam.x = 0; cam.z = 0; } tour.querySelectorAll('.vw').forEach(x => x.classList.toggle('on', x === b)); }; tour.appendChild(b); });
   /* 크기 재기: 지금 땅 이름 · 출발 뒤 걸린 시간 · 속도 바꾸기 · 기지로 */
@@ -87,7 +87,7 @@ export async function start(canvas, onProgress = () => {}) {
   addEventListener('pointerdown', e => { if (e.target.closest('#ui') || (e.clientX <= innerWidth * .55 && ptr.size === 0)) return;   /* 왼쪽 한 손가락 = 조이스틱 */
     ptr.set(e.pointerId, [e.clientX, e.clientY]); if (ptr.size === 2) { const [a, c] = [...ptr.values()]; pin = Math.hypot(a[0] - c[0], a[1] - c[1]); } });
   addEventListener('pointermove', e => { if (!ptr.has(e.pointerId)) return; const o = ptr.get(e.pointerId);
-    if (ptr.size === 1 && view === 2) { const k = cam.h * .0018; cam.x -= (e.clientX - o[0]) * k; cam.z -= (e.clientY - o[1]) * k; cam.x = clamp(cam.x, -140, 140); cam.z = clamp(cam.z, -140, 140); }
+    if (ptr.size === 1 && view === 2) { const k = cam.h * .0018; cam.x -= (e.clientX - o[0]) * k; cam.z -= (e.clientY - o[1]) * k; cam.x = clamp(cam.x, -180, 180); cam.z = clamp(cam.z, -180, 180); }
     ptr.set(e.pointerId, [e.clientX, e.clientY]);
     if (ptr.size === 2) { const [a, c] = [...ptr.values()], d = Math.hypot(a[0] - c[0], a[1] - c[1]); if (pin) cam.H = clamp(cam.H * pin / d, 20, 620); pin = d; } });
   const upF = e => { ptr.delete(e.pointerId); if (ptr.size < 2) pin = 0; }; addEventListener('pointerup', upF); addEventListener('pointercancel', upF);
