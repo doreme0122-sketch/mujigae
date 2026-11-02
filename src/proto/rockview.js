@@ -6,13 +6,16 @@ import { buildShip, engineSpots } from '../core/ships/build.js';
 import { makeGlow } from '../preview/glow.js';
 import { planetShader } from '../core/planet.js';
 import { planetFor } from '../data/planets.js';
-import { makeRidge, updateRidge, hitWall } from './rocks.js?v=11021234';
+import { makeIceRidge } from './ice.js?v=11021242';
+import { makeRidge, updateRidge, hitWall } from './rocks.js?v=11021242';
 
 const $ = s => document.querySelector(s), clamp = THREE.MathUtils.clamp, rnd = (a, b) => a + Math.random() * (b - a);
 const VIEWS = [
   { id: 'near', name: '가까이', h: 22, tilt: .62 },
   { id: 'game', name: '게임 시점', h: 44, tilt: .26 }];
-const TIP = { b: '용암 흑요석', s: '평소엔 빛나지 않는 검은 유리 바위예요. 탄에 맞으면 맞은 자리 둘레의 틈만 용암빛으로 짧게 반짝였다가 식어요. 화면의 바위를 누르면 그쪽으로 쏴요.' };
+const WALLS = [
+  { id: 'obsidian', name: '용암 흑요석', tip: '평소엔 빛나지 않는 검은 유리 바위예요. 탄에 맞으면 맞은 자리 둘레의 틈만 용암빛으로 짧게 반짝였다가 식어요. 화면의 벽을 누르면 그쪽으로 쏴요.', spark: [1.4, .7, .3], flash: [1.4, .55, .2], shard: 0x050407 },
+  { id: 'ice', name: '얼어붙은 빛 기둥', tip: '맑고 깊은 얼음 기둥이에요. 속에 얼어붙은 금과 기포가 보여요. 탄에 맞으면 근처 얼음 속에 갇힌 빛줄기가 깨어나 기둥을 타고 위로 흐르다 다시 얼어붙어요.', spark: [.8, 1.05, 1.4], flash: [.6, .85, 1.4], shard: 0x9fd8ff }];
 
 export async function start(canvas, onProgress = () => {}) {
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: false, powerPreference: 'high-performance' });
@@ -39,9 +42,11 @@ export async function start(canvas, onProgress = () => {}) {
 
   /* 흑요석 능선 하나 */
   const pts = []; for (let k = 0; k <= 8; k++) pts.push([-34 + k * 8.5, Math.sin(k * .9) * 2.2]);
-  const wall = makeRidge('obsidian', pts, { uT: UT, seed: 3, float: true }); scene.add(wall); onProgress(.55);
-  const items = wall.userData.items, fl = wall.userData.fl;
-  const targets = () => [...items.filter(i => !i.float && i.s > .6).map(i => ({ x: i.x, y: i.y + i.s * .15, z: i.z, r: i.s * .62 })), ...fl.map(f => ({ x: f.it.x, y: f.y ?? f.it.y + f.h, z: f.it.z, r: f.it.s * .5 }))];
+  const obs = makeRidge('obsidian', pts, { uT: UT, seed: 3, float: true }); scene.add(obs); onProgress(.45);
+  const ice = makeIceRidge(pts, { uT: UT, seed: 4 }); scene.add(ice); ice.visible = false; onProgress(.6);
+  const items = obs.userData.items, fl = obs.userData.fl;
+  let W = WALLS[0], wall = obs;
+  const targets = () => W.id === 'ice' ? ice.userData.targets() : [...items.filter(i => !i.float && i.s > .6).map(i => ({ x: i.x, y: i.y + i.s * .15, z: i.z, r: i.s * .62 })), ...fl.map(f => ({ x: f.it.x, y: f.y ?? f.it.y + f.h, z: f.it.z, r: f.it.s * .5 }))];
   /* 깨져 튀는 유리 조각 */
   const shardMat = new THREE.MeshPhysicalMaterial({ color: 0x050407, roughness: .08, clearcoat: 1, envMapIntensity: 1.2 });
   const SH = Array.from({ length: 36 }, () => { const o = new THREE.Mesh(new THREE.TetrahedronGeometry(.09), shardMat); o.visible = false; scene.add(o); return { o, v: new THREE.Vector3(), w: new THREE.Vector3(), life: 0 }; }); let shI = 0;
@@ -52,9 +57,14 @@ export async function start(canvas, onProgress = () => {}) {
   const shots = [], parts = [];
   const cam = { x: 0, z: 0, h: 22, H: 22, az: 0, tilt: .62, T: .62 };
   const tour = $('#tour');
+  const tip = () => { $('#tip').hidden = false; $('#tip b').textContent = W.name; $('#tip span').textContent = W.tip; $('#head b').textContent = W.name + ' 벽'; };
+  for (const w of WALLS) { const b = document.createElement('button'); b.type = 'button'; b.textContent = w.name; b.className = 'wall';
+    b.onclick = () => { W = w; wall = w.id === 'ice' ? ice : obs; obs.visible = w.id !== 'ice'; ice.visible = w.id === 'ice'; shardMat.color.set(w.shard);
+      shardMat.transmission = 0; document.querySelectorAll('#tour .wall').forEach(x => x.classList.toggle('on', x === b)); tip(); }; tour.appendChild(b); }
+  { const sep = document.createElement('i'); sep.style.cssText = 'width:1px;align-self:stretch;background:rgba(185,255,74,.25);margin:0 4px'; tour.appendChild(sep); }
   for (const v of VIEWS) { const b = document.createElement('button'); b.type = 'button'; b.textContent = v.name; b.dataset.id = v.id;
-    b.onclick = () => { cam.H = v.h; cam.T = v.tilt; document.querySelectorAll('#tour button').forEach(x => x.classList.toggle('on', x === b)); }; tour.appendChild(b); }
-  tour.firstChild.classList.add('on'); $('#tip').hidden = false; $('#tip b').textContent = TIP.b; $('#tip span').textContent = TIP.s;
+    b.className = 'view'; b.onclick = () => { cam.H = v.h; cam.T = v.tilt; document.querySelectorAll('#tour .view').forEach(x => x.classList.toggle('on', x === b)); }; tour.appendChild(b); }
+  tour.querySelector('.wall').classList.add('on'); tour.querySelector('.view').classList.add('on'); tip();
 
   /* 쏘기: 기체 코에서 목표까지 곧게 */
   const nose = new THREE.Vector3();
@@ -97,15 +107,15 @@ export async function start(canvas, onProgress = () => {}) {
     if (aimT > 0 && (aimT -= dt) <= 0 && !burst) aim = null;
     me.updateMatrixWorld(true); const hx = -Math.sin(me.rotation.y), hz = -Math.cos(me.rotation.y);
     for (const p of ENG) { v3.copy(p).applyMatrix4(sm.matrixWorld); glow.add(v3.x, v3.y, v3.z, -hx * .9, 0, -hz * .9, .15, 1, [.4, .6, 1.4], .9); glow.add(v3.x - hx * .2, v3.y, v3.z - hz * .2, -hx * .6, 0, -hz * .6, .4, 3, [.25, .45, 1.3], .7); }
-    updateRidge(wall, t, dt, glow);
+    if (obs.visible) updateRidge(obs, t, dt, glow);
     /* 탄 */
     const ts = targets();
     for (let i = shots.length - 1; i >= 0; i--) { const b = shots[i]; b.p.addScaledVector(b.v, dt); b.life -= dt; let hit = b.life <= 0;
       if (!hit) for (const o of ts) { if (Math.hypot(b.p.x - o.x, b.p.y - o.y, b.p.z - o.z) < o.r) { hit = true;
           const n = new THREE.Vector3(b.p.x - o.x, b.p.y - o.y, b.p.z - o.z).normalize(), hp = new THREE.Vector3(o.x, o.y, o.z).addScaledVector(n, o.r * .9);
           hitWall(hp.x, hp.y, hp.z, t);
-          parts.push({ p: hp.clone(), v: new THREE.Vector3(), life: .22, age: 0, r: 1.4, k: 3, c: [1.4, .55, .2], a: 1.3, grow: 1 });
-          for (let k = 0; k < 9; k++) { const dv = n.clone().multiplyScalar(rnd(3, 8)).add(new THREE.Vector3(rnd(-4, 4), rnd(-2, 4), rnd(-4, 4))); parts.push({ p: hp.clone(), v: dv, life: rnd(.25, .55), age: 0, r: rnd(.04, .08), k: 2, c: [1.4, .7, .3], a: 1 }); }
+          parts.push({ p: hp.clone(), v: new THREE.Vector3(), life: .22, age: 0, r: 1.4, k: 3, c: W.flash, a: 1.3, grow: 1 });
+          for (let k = 0; k < 9; k++) { const dv = n.clone().multiplyScalar(rnd(3, 8)).add(new THREE.Vector3(rnd(-4, 4), rnd(-2, 4), rnd(-4, 4))); parts.push({ p: hp.clone(), v: dv, life: rnd(.25, .55), age: 0, r: rnd(.04, .08), k: 2, c: W.spark, a: 1 }); }
           for (let k = 0; k < 2; k++) { const s = SH[shI++ % SH.length]; s.o.position.copy(hp); s.v.copy(n).multiplyScalar(rnd(2, 5)).add(new THREE.Vector3(rnd(-2, 2), rnd(0, 2), rnd(-2, 2))); s.w.set(rnd(-9, 9), rnd(-9, 9), rnd(-9, 9)); s.life = rnd(.8, 1.4); s.o.visible = true; s.o.scale.setScalar(rnd(.7, 1.6)); }
           break; } }
       if (hit) { shots.splice(i, 1); continue; }
@@ -124,5 +134,5 @@ export async function start(canvas, onProgress = () => {}) {
     bloom.render(Wd, Hd);
   }
   onProgress(1);
-  window.__rv = { cam, fire, shots };
+  window.__rv = { cam, fire, shots, wall: id => [...document.querySelectorAll('#tour .wall')][WALLS.findIndex(w => w.id === id)].click() };
 }
