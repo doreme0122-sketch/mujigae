@@ -24,7 +24,7 @@ function glowSprite(core, halo, shimmer = 0) {
   const m = new THREE.ShaderMaterial({ ...AB, uniforms: { uI: { value: 0 }, uT: { value: 0 }, uCore: { value: new THREE.Color(...core) }, uHalo: { value: new THREE.Color(...halo) } },
     vertexShader: 'varying vec2 vU; void main(){ vU=uv*2.-1.; vec4 c=modelViewMatrix*vec4(0.,0.,0.,1.); float s=length(modelMatrix[0].xyz); c.xy+=position.xy*s; gl_Position=projectionMatrix*c; }',
     fragmentShader: `uniform float uI, uT; uniform vec3 uCore, uHalo; varying vec2 vU; ${NOISE}
-      void main(){ float r=length(vU), a=atan(vU.y,vU.x);
+      void main(){ float r=length(vU), a=atan(vU.y, vU.x+1e-5);   /* 한가운데서 atan(0,0)이 계산 안 되는 값이 되지 않게 */
         float wob=${shimmer.toFixed(2)}*(fbm(vec2(a*2.5+uT*3., r*4.-uT*6.))-.5);           /* 둘레가 일렁임 */
         float rr=max(0., r+wob*r);
         float core=exp(-rr*rr*90.)*2.2, mid=exp(-rr*rr*14.)*.9, halo=exp(-rr*rr*3.5)*.3*(.8+.4*fbm(vec2(a*3.,uT*2.)));
@@ -104,7 +104,7 @@ export function makeBirth(ship) {
   const ringM = new THREE.ShaderMaterial({ ...AB, uniforms: { uR: U(0), uI: U(0), uT },
     vertexShader: 'varying vec2 vP; void main(){ vP=position.xy; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.); }',
     fragmentShader: `uniform float uR, uI, uT; varying vec2 vP; ${NOISE}
-      void main(){ float r=length(vP), a=atan(vP.y,vP.x); float br=.6+.6*fbm(vec2(a*6., r*2.-uT*4.));         /* 고리도 결이 있게 */
+      void main(){ float r=length(vP), a=atan(vP.y, vP.x+1e-5); float br=.6+.6*fbm(vec2(a*6., r*2.-uT*4.));         /* 고리도 결이 있게 */
         float k=(exp(-(((r-uR)/.1)*((r-uR)/.1)))*1.3+exp(-(((r-uR*.8)/.25)*((r-uR*.8)/.25)))*.25)*br; gl_FragColor=vec4(vec3(.5,.75,1.45)*k*uI,1.); }` });
   const ring = new THREE.Mesh(new THREE.CircleGeometry(5, 128), ringM); ring.rotation.x = -Math.PI / 2; ring.position.y = .24; ring.renderOrder = 7; G.add(ring);
 

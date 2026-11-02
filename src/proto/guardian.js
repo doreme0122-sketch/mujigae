@@ -105,7 +105,7 @@ export function makeGuardians() {
   /* 결정 빛 번짐: 화면을 향한 부드러운 빛 덩이 + 세로로 긴 빛 기둥 (빛 번짐 효과가 꺼져 있어도 밝아 보이게) */
   const flareMat = new THREE.ShaderMaterial({ uniforms: { uI: { value: 1 } }, transparent: true, depthWrite: false, depthTest: true, blending: THREE.AdditiveBlending,
     vertexShader: 'varying vec2 vU; void main(){ vU=uv*2.-1.; vec4 c=modelViewMatrix*vec4(0.,0.,0.,1.); c.xy+=position.xy; gl_Position=projectionMatrix*c; }',
-    fragmentShader: 'uniform float uI; varying vec2 vU; void main(){ float r=length(vU*vec2(1.,.55)); float core=exp(-r*r*9.), soft=exp(-r*r*2.5)*.35, streak=exp(-vU.y*vU.y*60.)*exp(-abs(vU.x)*3.)*.4; float edge=1.-smoothstep(.55,1.,max(abs(vU.x),abs(vU.y))); gl_FragColor=vec4(vec3(.45,.7,1.35)*(core+soft+streak)*uI*edge,1.); }' });
+    fragmentShader: 'uniform float uI; varying vec2 vU; void main(){ float r=length(vU); float core=exp(-r*r*16.)*.6, soft=exp(-r*r*4.)*.22, streak=0.;   /* 결정 모양이 보이게 둥글고 옅게 (뭉쳐 형상처럼 보이지 않게) */ float edge=1.-smoothstep(.55,1.,max(abs(vU.x),abs(vU.y))); gl_FragColor=vec4(vec3(.45,.7,1.35)*(core+soft+streak)*uI*edge,1.); }' });
   const units = [];
   for (let k = 0; k < GUARD_ANG.length; k++) { const a = GUARD_ANG[k], u = new THREE.Group(); u.position.set(Math.cos(a) * RR, Y0, Math.sin(a) * RR); u.rotation.y = -a; u.scale.setScalar(guardScale(a));
     u.add(new THREE.Mesh(gunG, gun), new THREE.Mesh(silverG, silver), new THREE.Mesh(darkG, dark), new THREE.Mesh(goldG, gold));
@@ -119,9 +119,9 @@ export function makeGuardians() {
   G.userData.fire = t => { uFire.value = t; };
   G.userData.update = (t, on) => { uT.value = t; uOn.value += ((on ? 1 : 0) - uOn.value) * .05; const e = t - uFire.value, burst = e >= 0 && e < 1.6 ? Math.exp(-e * 2.4) : 0;
     const breathe = .5 + .5 * Math.sin(t * 1.1);
-    uGem.value = 1.6 + .5 * breathe + uOn.value * .8 + burst * 4;
-    const ci = 1.6 + .5 * breathe + uOn.value * .9 + burst * 4; gemCore.color.setRGB(.55 * ci, .8 * ci, 1.3 * ci);
-    flareMat.uniforms.uI.value = .7 + .25 * breathe + uOn.value * .4 + burst * 2.5;
+    uGem.value = 1.1 + .35 * breathe + uOn.value * .5 + burst * 3;
+    const ci = 1.0 + .35 * breathe + uOn.value * .5 + burst * 3; gemCore.color.setRGB(.55 * ci, .8 * ci, 1.3 * ci);
+    flareMat.uniforms.uI.value = .45 + .15 * breathe + uOn.value * .25 + burst * 1.8;
     for (const U of units) U.shards.forEach((m, j) => { const a = t * (.35 + j * .08) + j * 2.1 + U.ph, r = .55 + j * .06; m.position.set(Math.cos(a) * r, 1.0 + j * .35 + Math.sin(t * .8 + j) * .06, Math.sin(a) * r); m.rotation.set(t * .5 + j, t * .7, .4); }); };
   return G;
 }

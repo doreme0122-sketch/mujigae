@@ -1,16 +1,16 @@
 /* 시작 기지 부품 보기 ① — 자기장 판(격납고 그대로) + 금테 네 갈래 별 */
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
-import { makeBloom } from '../core/hangar/bloom.js?v=11021944';
-import { makePad } from '../core/hangar/pad.js?v=11021944';
-import { makeMag } from '../core/hangar/mag.js?v=11021944';
+import { makeBloom } from '../core/hangar/bloom.js?v=11021949';
+import { makePad } from '../core/hangar/pad.js?v=11021949';
+import { makeMag } from '../core/hangar/mag.js?v=11021949';
 import { buildShip, engineSpots } from '../core/ships/build.js';
-import { makeGoldStar } from './goldstar.js?v=11021944';
-import { makeArena, SPEED, WAVE_R0 } from './arena.js?v=11021944';
-import { makeGuardians, GUARD } from './guardian.js?v=11021944';
-import { makeFloor, FLOORS } from './floor.js?v=11021944';
-import { makePerf } from './perf.js?v=11021944';
-import { makeBirth, BIRTH } from './birth.js?v=11021944';
+import { makeGoldStar } from './goldstar.js?v=11021949';
+import { makeArena, SPEED, WAVE_R0 } from './arena.js?v=11021949';
+import { makeGuardians, GUARD } from './guardian.js?v=11021949';
+import { makeFloor, FLOORS } from './floor.js?v=11021949';
+import { makePerf } from './perf.js?v=11021949';
+import { makeBirth, BIRTH } from './birth.js?v=11021949';
 
 const $ = s => document.querySelector(s), clamp = THREE.MathUtils.clamp;
 const SHIPL = 2.9;     /* 기체 길이: 자기장 판(지름 3.2)보다 약간 작게 */
@@ -42,7 +42,7 @@ export async function start(canvas, onProgress = () => {}) {
   const fcam = new THREE.PerspectiveCamera(36, 1, .05, 300);
   const stand = new THREE.Group(); base.add(stand);
   onProgress(.5);
-  const b = await buildShip(1, 1, 'ruby', { renderer, size: SHIPL }); const ship = b.root, sm = ship.children[0]; stand.add(ship);
+  const b = await buildShip(1, 1, 'ruby', { renderer, size: SHIPL }); const ship = b.root, sm = ship.children[0]; stand.add(ship); ship.rotation.y = -Math.PI / 2;   /* 머리가 출격로(+x) 쪽 */
   const k2 = ship.scale.x, shipHalf = new THREE.Box3().setFromObject(sm).getSize(new THREE.Vector3()).y * k2 / 2;
   const birth = makeBirth(ship); scene.add(birth);
   let showShip = true, onAt, born = false; ship.visible = false;

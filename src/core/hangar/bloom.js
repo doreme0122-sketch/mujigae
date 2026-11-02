@@ -12,7 +12,7 @@ export function makeBloom(renderer, bo = {}){
   const cut=new THREE.RawShaderMaterial({glslVersion:THREE.GLSL3,uniforms:{t:{value:null},th:{value:.95}},
     vertexShader:'in vec3 position;in vec2 uv;out vec2 vU;void main(){vU=uv;gl_Position=vec4(position.xy,0.,1.);}',
     fragmentShader:`precision highp float;in vec2 vU;out vec4 o;uniform sampler2D t;uniform float th;
-      void main(){ vec3 c=texture(t,vU).rgb; float l=max(c.r,max(c.g,c.b));
+      void main(){ vec3 c=texture(t,vU).rgb; if(any(isnan(c))||any(isinf(c))) c=vec3(0.); c=min(c,vec3(64.)); float l=max(c.r,max(c.g,c.b));   /* 계산 안 되는 값이 번지며 검은 네모가 되지 않게 */
         o=vec4(c*smoothstep(th,th+.5,l),1.); }`});
   const blur=new THREE.RawShaderMaterial({glslVersion:THREE.GLSL3,uniforms:{t:{value:null},dir:{value:new THREE.Vector2()}},
     vertexShader:'in vec3 position;in vec2 uv;out vec2 vU;void main(){vU=uv;gl_Position=vec4(position.xy,0.,1.);}',
@@ -29,7 +29,9 @@ export function makeBloom(renderer, bo = {}){
         if(warp.w>0.){ vec2 d=(vU-warp.xy)*vec2(asp,1.); float r=length(d)+1e-5, R=warp.z;      /* 공간이 일그러지는 파동: 센 첫 물결 + 뒤따르는 약한 물결 둘 */
           float w=exp(-(((r-R)/.035)*((r-R)/.035)))-exp(-(((r-R+.05)/.035)*((r-R+.05)/.035)))*.6+(exp(-(((r-R*.72)/.03)*((r-R*.72)/.03)))-exp(-(((r-R*.72+.04)/.03)*((r-R*.72+.04)/.03)))*.6)*.45+(exp(-(((r-R*.48)/.025)*((r-R*.48)/.025))))*.2;
           uv-=d/r/vec2(asp,1.)*w*warp.w; }
-        vec3 c=texture(t,uv).rgb + (texture(b1,uv).rgb*.45+texture(b2,uv).rgb*1.05)*k;
+        vec3 s0=texture(t,uv).rgb; if(any(isnan(s0))||any(isinf(s0))) s0=vec3(0.);
+        vec3 bb=texture(b1,uv).rgb*.45+texture(b2,uv).rgb*1.05; if(any(isnan(bb))||any(isinf(bb))) bb=vec3(0.);
+        vec3 c=s0 + bb*k;
         c=c/(1.+c*.52);
         o=vec4(pow(max(c,0.),vec3(1./2.2)),1.); }`});
   const mesh=new THREE.Mesh(geo,cut); sc.add(mesh);
