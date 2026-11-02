@@ -8,7 +8,7 @@
    지나간 길엔 짧은 엔진 빛 꼬리가 남았다 빠르게 사라짐. 적 탄이 막에 맞아 물결치는 것·실제 이동 속도는 맵이 생기면 연결
    무게: 불꽃·꼬리는 띠 몇 장, 막은 구 하나, 방울은 점 묶음 하나, 충격파 일그러짐은 빛 번짐 마무리 단계에 얹음 */
 import * as THREE from 'three';
-import { filmMaterial } from '../preview/fxmat.js?v=11022212';
+import { filmMaterial } from '../preview/fxmat.js?v=11022214';
 
 export const SORTIE = { IGN: .55, SHIELD: 3, BOOST: 5 };
 const AB = { transparent: true, depthWrite: false, blending: THREE.AdditiveBlending };
@@ -84,8 +84,10 @@ export function makeSortie(ship, sm, engines) {
     if (e >= -.25 && e < 0) { const k = sm01((e + .25) / .25); ship.rotation.z = -.06 * k; }              /* 웅크림: 머리를 숙임 */
     if (launched) {
       const vB = 16, vN = 7;                                                                               /* 빠른 이동 · 보통 (판 단위/초) */
-      const a = Math.min(e, .35), dist = (e < .35 ? vB * e * e / (2 * .35) : vB * .35 / 2 + vB * (Math.min(e, SORTIE.BOOST) - .35)) + Math.max(0, e - SORTIE.BOOST) * vN;
-      ship.position.set(pos0.x + dist, pos0.y + Math.min(.5, e * 1.2) + Math.sin(e * 3) * .05, pos0.z);
+      /* 충격파가 빵 터지는 순간 한 번에 확 튀어 나감(순간 속도 60 → 빠르게 잦아들어 빠른 이동 속도로) */
+      const VD = 60, TAU = .12, eb = Math.min(e, SORTIE.BOOST);
+      const dist = vB * eb + (VD - vB) * TAU * (1 - Math.exp(-e / TAU)) + Math.max(0, e - SORTIE.BOOST) * vN;
+      ship.position.set(pos0.x + dist, pos0.y + Math.min(.5, e * 4) + Math.sin(e * 3) * .05, pos0.z);
       ship.rotation.z = e < .3 ? -.06 * (1 - e / .3) + .05 * Math.sin(e / .3 * Math.PI) : Math.sin(e * 2.3) * .02;
       ship.updateMatrixWorld(true); box.setFromObject(sm); box.getCenter(cen);
       /* 꼬리 기록 */
