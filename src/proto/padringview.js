@@ -5,8 +5,8 @@ import { makeBloom } from '../core/hangar/bloom.js';
 import { makePad } from '../core/hangar/pad.js';
 import { makeMag } from '../core/hangar/mag.js';
 import { buildShip } from '../core/ships/build.js';
-import { makeGoldStar } from './goldstar.js?v=11021653';
-import { makePerf } from './perf.js?v=11021653';
+import { makeGoldStar } from './goldstar.js?v=11021657';
+import { makePerf } from './perf.js?v=11021657';
 
 const $ = s => document.querySelector(s), clamp = THREE.MathUtils.clamp;
 const VIEWS = [{ name: '비스듬히', h: 11, tilt: .9 }, { name: '위에서', h: 12, tilt: .06 }, { name: '낮게', h: 8, tilt: 1.22 }];

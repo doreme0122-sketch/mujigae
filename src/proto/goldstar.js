@@ -34,30 +34,39 @@ export function makeGoldStar() {
   const gold = new THREE.MeshPhysicalMaterial({ color: 0xe2b35c, metalness: 1, roughness: .26, clearcoat: .4, clearcoatRoughness: .2, envMapIntensity: 1.25 });
   const goldDim = new THREE.MeshPhysicalMaterial({ color: 0xb8893e, metalness: 1, roughness: .38, envMapIntensity: 1 });
   const dark = new THREE.MeshStandardMaterial({ color: 0x161a22, metalness: .85, roughness: .34, envMapIntensity: .8 });
-  const RIM = .15, IN_TIP = tip - .46;                      /* 테 두께, 안쪽 판이 끝나는 곳(끝 부분은 통금) */
-  /* 1) 비탈진 금 날개: 판 쪽 금 고리에서 높게 시작해 바깥 윤곽으로 갈수록 바닥까지 꺾여 내려간다.
-        높이가 '고리에서 윤곽까지 얼마나 왔나'로 정해지므로, 뾰족한 갈래는 저절로 가운데에 등선(모서리)이 서고 양쪽이 비탈이 된다.
-        가장자리 바로 앞에서 한 번 더 가파르게 꺾여(모따기) 금빛이 테두리에 선으로 맺힌다. */
-  const R0 = hole + .2, YT = .2, LIP = .86;
-  const height = u => u < LIP ? YT - .12 * Math.pow(u / LIP, 1.25) : (YT - .12) - (YT - .12 - .02) * Math.pow((u - LIP) / (1 - LIP), .8);
-  const at = (phi, u) => { const R = shapeR(phi, base, tip), r = R0 + (R - R0) * u; return [Math.cos(phi) * r, height(u), Math.sin(phi) * r]; };
-  const NA = 90, NU = 22, wings = [];
+  const RIM = .2, IN_TIP = tip - .5;                      /* 테 폭, 안쪽 판이 끝나는 곳(끝 부분은 통금) */
+  const inR = a => shapeR(a, base - RIM, IN_TIP);
+  /* 1) 바깥 금테만 비탈지게: 안쪽 판 가장자리에서 높게 시작해 바깥 윤곽으로 갈수록 바닥까지 꺾여 내려간다.
+        테의 높이가 '안쪽 가장자리에서 윤곽까지 얼마나 왔나'로 정해지므로, 통금인 갈래 끝은 저절로 가운데에 등선(모서리)이 선다.
+        윤곽 바로 앞에서 한 번 더 가파르게 꺾여(모따기) 금빛이 테두리에 선으로 맺힌다. 안쪽 판·등뼈는 그대로. */
+  const YT = .19, YP = .11, LIP = .82;
+  const height = u => u < LIP ? YT - .1 * Math.pow(u / LIP, 1.2) : (YT - .1) - (YT - .1 - .02) * Math.pow((u - LIP) / (1 - LIP), .8);
+  const at = (phi, u) => { const ri = inR(phi), R = shapeR(phi, base, tip), r = ri + (R - ri) * u; return [Math.cos(phi) * r, height(u), Math.sin(phi) * r]; };
+  const NA = 90, NU = 16, wings = [];
   for (let k = 0; k < 8; k++) {                 /* 갈래 끝과 갈래 사이에서 면을 나눠 등선이 날카롭게 */
     const pos = [], idx = [], a0 = k * Math.PI / 4;
-    for (let i = 0; i <= NA; i++) { const ph = a0 + (Math.PI / 4) * i / NA;
+    for (let i = 0; i <= NA; i++) { const ph = a0 + (Math.PI / 4) * i / NA, ri = inR(ph);
+      pos.push(Math.cos(ph) * ri, YP - .005, Math.sin(ph) * ri);                       /* 안쪽 판에서 테 꼭대기로 서는 안쪽 벽 */
       for (let j = 0; j <= NU; j++) { const u = j < NU - 4 ? (j / (NU - 4)) * LIP : LIP + (1 - LIP) * (j - (NU - 4)) / 4; pos.push(...at(ph, u)); }
       const e = at(ph, 1); pos.push(e[0], 0, e[2]); }                                  /* 바닥까지 내려가는 옆면 */
-    const W = NU + 2;
+    const W = NU + 3;
     for (let i = 0; i < NA; i++) for (let j = 0; j < W - 1; j++) { const p0 = i * W + j, p1 = p0 + W; idx.push(p0, p1, p0 + 1, p1, p1 + 1, p0 + 1); }
     const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setIndex(idx); g.computeVertexNormals(); wings.push(g); }
   G.add(new THREE.Mesh(mergeGeometries(wings), gold));
   /* 2) 모따기 꺾이는 자리 바로 안쪽의 가는 홈 (테두리를 두 줄로 보이게) */
-  { const pos = []; for (let i = 0; i < N; i++) { const p0 = i / N * Math.PI * 2, p1 = (i + 1) / N * Math.PI * 2, ua = LIP - .055, ub = LIP - .035;
+  { const pos = []; for (let i = 0; i < N; i++) { const p0 = i / N * Math.PI * 2, p1 = (i + 1) / N * Math.PI * 2, ua = LIP - .09, ub = LIP - .05;
       const A = at(p0, ua), B = at(p0, ub), C = at(p1, ub), D = at(p1, ua); [A, B, C, D].forEach(v => v[1] += .003); pos.push(...A, ...C, ...B, ...A, ...D, ...C); }
     const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.computeVertexNormals(); G.add(new THREE.Mesh(g, dark)); }
-  /* 3) 판을 바로 감싸는 금 고리 (두 단: 높은 안쪽 + 낮은 바깥) */
-  G.add(new THREE.Mesh(slab(p => circlePath(p, hole + .13), p => circlePath(p, hole, true), 0, .23, .025), gold));
-  G.add(new THREE.Mesh(slab(p => circlePath(p, R0 + .01), p => circlePath(p, hole + .125, true), 0, .205, .012), goldDim));
+  /* 3) 안쪽 짙은 판: 한 단 낮게 (그대로) */
+  G.add(new THREE.Mesh(slab(p => starPath(p, base - RIM + .01, IN_TIP + .01), p => circlePath(p, hole + .13, true), 0, YP, .012), dark));
+  /* 4) 판을 바로 감싸는 금 고리 (두 단: 높은 안쪽 + 낮은 바깥) */
+  G.add(new THREE.Mesh(slab(p => circlePath(p, hole + .13), p => circlePath(p, hole, true), 0, .19, .025), gold));
+  G.add(new THREE.Mesh(slab(p => circlePath(p, hole + .2), p => circlePath(p, hole + .125, true), 0, .135, .015), goldDim));
+  /* 5) 갈래마다 지붕 모양 금 등뼈 + 갈래 사이 오목한 곳의 리벳 셋 (그대로) */
+  const rg = [], rv = [];
+  for (let k = 0; k < 4; k++) { const a = k * Math.PI / 2, g = ridge(hole + .2, tip - .5, .2, .11, .19); g.rotateY(-a); rg.push(g);
+    for (let j = -1; j <= 1; j++) { const b = a + Math.PI / 4 + j * .09, r = base - RIM - .07, s = new THREE.CylinderGeometry(.022, .026, .02, 10); s.translate(Math.cos(b) * r, YP + .01, Math.sin(b) * r); rv.push(s); } }
+  G.add(new THREE.Mesh(mergeGeometries(rg), gold)); G.add(new THREE.Mesh(mergeGeometries(rv), goldDim));
   /* 5) 빛길: 등뼈 양옆의 가는 홈 + 판을 감싸는 고리 홈. uFlow = 빛이 끝(1)에서 고리(0)로 오는 위치 */
   const uFlow = { value: -1 }, uRing = { value: 0 };
   const lineMat = new THREE.ShaderMaterial({ transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, uniforms: { uFlow, uRing },
@@ -70,13 +79,13 @@ export function makeGoldStar() {
         gl_FragColor = vec4(c*b, 1.); }` });
   const pos = [], tt = [];
   const quad = (p0, p1, p2, p3, t0, t1) => { pos.push(...p0, ...p1, ...p2, ...p0, ...p2, ...p3); tt.push(t0, t0, t1, t0, t1, t1); };
-  for (let k = 0; k < 4; k++) { const a = k * Math.PI / 2;
-    for (const sd of [-1, 1]) { const n = 24;
-      for (let i = 0; i < n; i++) { const u0 = .06 + .7 * i / n, u1 = .06 + .7 * (i + 1) / n;
-        const P = (u, o) => { const R = shapeR(a, base, tip), r = R0 + (R - R0) * u, ph = a + sd * Math.asin(Math.min(.9, o / r)), p = at(ph, (r - R0) / (shapeR(ph, base, tip) - R0)); p[1] += .004; return p; };
-        const off = u => .07 * (1 - u) + .025, wd = .014;
-        quad(P(u0, off(u0)), P(u0, off(u0) + wd), P(u1, off(u1) + wd), P(u1, off(u1)), i / n, (i + 1) / n); } } }
-  for (let i = 0; i < 160; i++) { const a0 = i / 160 * Math.PI * 2, a1 = (i + 1) / 160 * Math.PI * 2, r0 = hole + .145, r1 = hole + .19, y = .207;
+  for (let k = 0; k < 4; k++) { const a = k * Math.PI / 2, c = Math.cos(a), s = Math.sin(a);
+    for (const sd of [-1, 1]) { const n = 20, r0 = hole + .25, r1 = tip - .62;
+      for (let i = 0; i < n; i++) { const u0 = i / n, u1 = (i + 1) / n, ra = r0 + (r1 - r0) * u0, rb = r0 + (r1 - r0) * u1;
+        const off = u => .2 * Math.pow(1 - u, .8) + .014, wd = .012;
+        const P = (r, o) => [c * r - s * o * sd, .113, s * r + c * o * sd];
+        quad(P(ra, off(u0)), P(ra, off(u0) + wd), P(rb, off(u1) + wd), P(rb, off(u1)), u0, u1); } } }
+  for (let i = 0; i < 160; i++) { const a0 = i / 160 * Math.PI * 2, a1 = (i + 1) / 160 * Math.PI * 2, r0 = hole + .145, r1 = hole + .175, y = .137;
     quad([Math.cos(a0) * r0, y, Math.sin(a0) * r0], [Math.cos(a0) * r1, y, Math.sin(a0) * r1], [Math.cos(a1) * r1, y, Math.sin(a1) * r1], [Math.cos(a1) * r0, y, Math.sin(a1) * r0], -1, -1); }
   const lg = new THREE.BufferGeometry(); lg.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); lg.setAttribute('aT', new THREE.Float32BufferAttribute(tt, 1));
   const lines = new THREE.Mesh(lg, lineMat); lines.renderOrder = 2; G.add(lines);
