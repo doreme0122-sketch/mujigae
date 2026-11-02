@@ -13,9 +13,9 @@ import { makeGlow } from '../preview/glow.js';
 import { filmMaterial, crystalMaterial } from '../preview/fxmat.js';
 import { planetShader } from '../core/planet.js';
 import { planetFor } from '../data/planets.js';
-import { makeRidge, updateRidge } from './rocks.js?v=11021646';
-import { makeFloor, FLOORS } from './floor.js?v=11021646';
-import { makePerf } from './perf.js?v=11021646';
+import { makeRidge, updateRidge } from './rocks.js?v=11021653';
+import { makeFloor, FLOORS } from './floor.js?v=11021653';
+import { makePerf } from './perf.js?v=11021653';
 
 const $ = s => document.querySelector(s), clamp = THREE.MathUtils.clamp, lerp = THREE.MathUtils.lerp, rnd = (a, b) => a + Math.random() * (b - a);
 const ease = t => t < .5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
