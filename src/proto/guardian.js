@@ -11,6 +11,8 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 export const GUARD = { r: 6.15, y: .91, DOWN: .7 };
 /* 탑 자리: 대각선 넷 + 그 사이 셋(출구 쪽 0도는 비움) = 일곱 */
 export const GUARD_ANG = [1, 2, 3, 4, 5, 6, 7].map(k => k * Math.PI / 4);
+/* 새로 넣은 셋(별의 끝 방향)은 낮고 작게 */
+export const guardScale = a => Math.abs(Math.cos(2 * a)) > .5 ? .7 : 1;
 const NI = g => { for (const k of Object.keys(g.attributes)) if (k !== 'position' && k !== 'normal') g.deleteAttribute(k); return g.index ? g.toNonIndexed() : g; };
 const lathe = (pts, seg = 8, phase = Math.PI / 8) => NI(new THREE.LatheGeometry(pts.map(([r, y]) => new THREE.Vector2(r, y)), seg, phase));
 
@@ -44,7 +46,7 @@ function baseParts() {
     const sa = a + Math.PI / 8; slits.push({ r: .655, a: sa, y0: .14, y1: .44 }); }               /* 판 사이 세로 빛 틈 */
   /* 가운데 단: 살창 두른 건메탈 */
   P.gun.push(lathe([[0, .5], [.48, .5], [.48, .86], [.44, .9], [0, .9]]));
-  for (let k = 0; k < 24; k++) { const a = k / 24 * Math.PI * 2, g = new THREE.BoxGeometry(.04, .3, .045); g.translate(.49, .69, 0); g.rotateY(-a); P.silver.push(NI(g)); }
+  for (let k = 0; k < 24; k++) { const a = k / 24 * Math.PI * 2, g = new THREE.BoxGeometry(.04, .3, .045); g.translate(.49, .69, 0); g.rotateY(-a); P.gold.push(NI(g)); }   /* 얇은 세로 살: 금 */
   /* 위 단: 넓어졌다 오므리는 받침 + 결정을 무는 금 집게 여섯 (왕관: 판과 같은 금으로 묶임) */
   P.silver.push(lathe([[0, .9], [.42, .9], [.52, 1.02], [.5, 1.1], [.36, 1.16], [0, 1.16]]));
   P.dark.push(lathe([[0, 1.161], [.3, 1.161], [.3, 1.17], [0, 1.17]], 12, 0));
@@ -105,7 +107,7 @@ export function makeGuardians() {
     vertexShader: 'varying vec2 vU; void main(){ vU=uv*2.-1.; vec4 c=modelViewMatrix*vec4(0.,0.,0.,1.); c.xy+=position.xy; gl_Position=projectionMatrix*c; }',
     fragmentShader: 'uniform float uI; varying vec2 vU; void main(){ float r=length(vU*vec2(1.,.55)); float core=exp(-r*r*9.), soft=exp(-r*r*2.5)*.35, streak=exp(-vU.y*vU.y*60.)*exp(-abs(vU.x)*3.)*.4; float edge=1.-smoothstep(.55,1.,max(abs(vU.x),abs(vU.y))); gl_FragColor=vec4(vec3(.45,.7,1.35)*(core+soft+streak)*uI*edge,1.); }' });
   const units = [];
-  for (let k = 0; k < GUARD_ANG.length; k++) { const a = GUARD_ANG[k], u = new THREE.Group(); u.position.set(Math.cos(a) * RR, Y0, Math.sin(a) * RR); u.rotation.y = -a;
+  for (let k = 0; k < GUARD_ANG.length; k++) { const a = GUARD_ANG[k], u = new THREE.Group(); u.position.set(Math.cos(a) * RR, Y0, Math.sin(a) * RR); u.rotation.y = -a; u.scale.setScalar(guardScale(a));
     u.add(new THREE.Mesh(gunG, gun), new THREE.Mesh(silverG, silver), new THREE.Mesh(darkG, dark), new THREE.Mesh(goldG, gold));
     const sm = new THREE.Mesh(slitG, sMat); sm.renderOrder = 3; u.add(sm);
     const cl = new THREE.Group(); cl.position.y = top + .02; u.add(cl);

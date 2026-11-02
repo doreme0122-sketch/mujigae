@@ -7,8 +7,8 @@
    단위는 자기장 판과 같음. */
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { sweep, posNor } from './floatring.js?v=11021828';
-import { GUARD_ANG, GUARD } from './guardian.js?v=11021828';
+import { sweep, posNor } from './floatring.js?v=11021836';
+import { GUARD_ANG, GUARD, guardScale } from './guardian.js?v=11021836';
 
 
 /* 건담처럼 장갑판을 조립한 느낌의 검은 판 선 — 면 위치로 바로 그림(텍스처 없음, 가벼움)
@@ -47,6 +47,7 @@ function panelLines(mat, cell = .55) {
   return mat;
 }
 
+export const SPEED = 5;   /* 켜지는 빛이 바깥에서 가운데로 오는 빠르기 (판 단위/초) */
 export const ARENA = { floor: 4.3, t1: [4.3, 5.3, .34], t2: [5.3, 7.0, .95], skirt: .85, exitHalf: .34, ramp: .3 };
 
 export function makeArena() {
@@ -60,6 +61,9 @@ export function makeArena() {
   const gold = new THREE.MeshPhysicalMaterial({ color: 0xe2b35c, metalness: 1, roughness: .26, clearcoat: .4, clearcoatRoughness: .2, envMapIntensity: 1.25 });
   const dark = new THREE.MeshStandardMaterial({ color: 0x0b0d12, metalness: .5, roughness: .45, envMapIntensity: .5 });
   const blue = new THREE.MeshBasicMaterial({ color: 0x3b6fd0 });
+  blue.onBeforeCompile = sh => { Object.assign(sh.uniforms, { uOn, uT, uW });
+    sh.vertexShader = 'varying vec3 vBw;\n' + sh.vertexShader.replace('#include <project_vertex>', '#include <project_vertex>\n vBw = (modelMatrix * vec4(transformed, 1.)).xyz;');
+    sh.fragmentShader = 'uniform float uOn,uT,uW; varying vec3 vBw;\n' + WAKE + '\n' + sh.fragmentShader.replace('vec4 diffuseColor = vec4( diffuse, opacity );', 'float ON = onAt(length(vBw.xz)); vec4 diffuseColor = vec4( vec3(.28,.58,1.35) * (.3 + ON * 1.1), opacity );'); };
   const L = { silver: [], silverHi: [], gun: [], rib: [], floor: [], dark: [], blue: [], gold: [] };
   const A0 = EH, A1 = Math.PI * 2 - EH, M0 = EH + RS, M1 = Math.PI * 2 - EH - RS;   /* 출구를 뺀 범위 / 그중 경사를 뺀 온전한 높이 범위 */
   const sm = u => u * u * (3 - 2 * u);
@@ -72,7 +76,8 @@ export function makeArena() {
   L.floor.push(sweep([[RF - .05, -.12], [RO + .02, -.12], [RO + .02, -.002], [RF - .05, -.002]], -EH, EH, undefined, 16));   /* 출구 길 바닥 */
 
   /* ── 빛 띠 (계단 세로면) ── */
-  const uOn = { value: 0 }, uT = { value: 0 };
+  const uOn = { value: 0 }, uT = { value: 0 }, uW = { value: 1e9 };   /* uW: 빛이 바깥에서 들어오기 시작한 시각 */
+  const WAKE = `float onAt(float r){ return uOn * clamp(((uT - uW) * ${SPEED.toFixed(2)} - (${(t2[1] + SK + .3).toFixed(2)} - r)) / .6, 0., 1.); }`;
   const glowPos = [], glowK = [], glowS = [];
   const band = (r, y0, y1, k, a0 = M0, a1 = M1) => { const n = 200; for (let i = 0; i < n; i++) { const a = a0 + (a1 - a0) * i / n, b = a0 + (a1 - a0) * (i + 1) / n;
     const P = (aa, y) => [Math.cos(aa) * r, y, Math.sin(aa) * r]; const p = [P(a, y0), P(b, y0), P(b, y1), P(a, y1)]; glowPos.push(...p[0], ...p[1], ...p[2], ...p[0], ...p[2], ...p[3]);
@@ -95,8 +100,8 @@ export function makeArena() {
   riser(q0, t1[2], H - .1, 1);
   const R = (() => { let v = 1234; return () => (v = (v * 9301 + 49297) % 233280) / 233280; })();
   /* 가장 가까운 탑까지 각도 거리 */
-  const near = a => { let m = 9; for (const g of GUARD_ANG) { const d = Math.abs(Math.atan2(Math.sin(a - g), Math.cos(a - g))); if (d < m) m = d; } return m; };
-  const SEAT = .8, seatA = (SEAT + .06) / GUARD.r;                        /* 탑을 앉히는 둥근 자리 반지름 */
+  const near = a => { let m = 9; for (const g of GUARD_ANG) { const d = Math.abs(Math.atan2(Math.sin(a - g), Math.cos(a - g))) - (1 - guardScale(g)) * seatA0; if (d < m) m = d; } return m; };
+  const SEAT = .8, seatA = (SEAT + .06) / GUARD.r, seatA0 = seatA;                        /* 탑을 앉히는 둥근 자리 반지름 */
   /* 2층 윗면: 탑에서 멀어지는 순서대로 정해진 장갑판이 되풀이됨 — 탑 옆은 무거운 덮개판 → 겹친 판 → 통풍칸 → 겹친 판 → … (양쪽 대칭, 정돈됨) */
   const N = 56, da = (M1 - M0) / N, SEQ = ['cover', 'overlap', 'vent', 'overlap'];
   for (let k = 0; k < N; k++) { const a0 = M0 + k * da + .007, a1 = a0 + da - .014, am = (a0 + a1) / 2, d = near(am);
@@ -118,19 +123,19 @@ export function makeArena() {
       L.dark.push(sweep([[q0 + .7, H + .13], [q0 + .95, H + .13], [q0 + .95, H + .135], [q0 + .7, H + .135]], am - .02, am + .02));
     } }
   /* 탑 자리: 둥글게 판 우묵한 자리(짙은 바닥) + 솟은 은색 테 + 테 안쪽 빛 고리. 탑이 그 안에 앉음 */
-  for (const g of GUARD_ANG) { const cx = Math.cos(g) * GUARD.r, cz = Math.sin(g) * GUARD.r;
-    const put = geo => { geo.translate(cx, 0, cz); return geo; };
+  for (const g of GUARD_ANG) { const cx = Math.cos(g) * GUARD.r, cz = Math.sin(g) * GUARD.r, sc = guardScale(g);
+    const put = geo => { geo.scale(sc, 1, sc); geo.translate(cx, 0, cz); return geo; };
     L.dark.push(put(sweep([[0.001, H - .045], [SEAT - .1, H - .045], [SEAT - .1, H - .03], [0.001, H - .03]], 0, Math.PI * 2, undefined, 48)));
-    L.silverHi.push(put(sweep([[SEAT - .12, H - .045], [SEAT + .04, H - .045], [SEAT + .04, H + .08], [SEAT - .02, H + .14], [SEAT - .1, H + .14], [SEAT - .12, H + .1]], 0, Math.PI * 2, undefined, 64)));
-    for (let i = 0; i < 64; i++) { const a = i / 64 * Math.PI * 2, b = (i + 1) / 64 * Math.PI * 2, r = SEAT - .125, P = (aa, y) => [cx + Math.cos(aa) * r, y, cz + Math.sin(aa) * r];
+    L.gold.push(put(sweep([[SEAT - .12, H - .045], [SEAT + .04, H - .045], [SEAT + .04, H + .08], [SEAT - .02, H + .14], [SEAT - .1, H + .14], [SEAT - .12, H + .1]], 0, Math.PI * 2, undefined, 64)));
+    for (let i = 0; i < 64; i++) { const a = i / 64 * Math.PI * 2, b = (i + 1) / 64 * Math.PI * 2, r = (SEAT - .125) * sc, P = (aa, y) => [cx + Math.cos(aa) * r, y, cz + Math.sin(aa) * r];
       const p = [P(a, H - .02), P(b, H - .02), P(b, H + .07), P(a, H + .07)]; glowPos.push(...p[0], ...p[1], ...p[2], ...p[0], ...p[2], ...p[3]); for (let j = 0; j < 6; j++) { glowK.push(5); glowS.push(-1); } } }
   /* ── 2층 바깥: 계단 대신 겹친 비탈 장갑(위 판이 아래 판을 덮으며 바닥까지) ── */
   { const sk = [[q1 - .02, -.12], [q1 + SK, -.12], [q1 + SK, .05], [q1 + SK * .55, .3], [q1 + .02, H - .12]];
-    L.gun.push(...ramped(sk));
+    L.gold.push(...ramped(sk));                                   /* 맨 바깥 고리: 금 */
     const NS = 36, ds = (M1 - M0) / NS;
     for (let k = 0; k < NS; k++) { const a0 = M0 + k * ds + .006, a1 = a0 + ds - .012;
       L.silver.push(sweep([[q1 - .03, H - .1], [q1 + SK * .5, .36], [q1 + SK * .5, .42], [q1 - .03, H - .04]], a0, a1));              /* 윗 비탈판 */
-      L.silverHi.push(sweep([[q1 + SK * .45, .2], [q1 + SK + .02, .02], [q1 + SK + .02, .07], [q1 + SK * .45, .27]], a0 + .01, a1 - .01));   /* 아랫 비탈판 */
+      L.blue.push(sweep([[q1 + SK * .45, .2], [q1 + SK + .02, .02], [q1 + SK + .02, .07], [q1 + SK * .45, .27]], a0 + .01, a1 - .01));   /* 박힌 가로 네모: 푸른 빛 */
       band(q1 + SK * .52, .3, .34, 20, a0 + .01, a1 - .01); } }                   /* 두 판 사이 빛 */
 
   /* ── 출구 화살표: 바깥을 가리키는 빛 화살표가 차례로 밝아지며 흘러감 + 길 양옆 빛 줄 ── */
@@ -146,7 +151,7 @@ export function makeArena() {
   /* ── 에너지 길: 꼭대기 단 → 계단을 타고 내려와 → 바닥 → 별의 갈래 사이. s: 바깥 1 → 안 0 ── */
   const e = .005;
   for (const a of GUARD_ANG) { const c = Math.cos(a), s = Math.sin(a), nx = -s, nz = c, diag = Math.abs(Math.cos(2 * a)) < .5;
-    const path = [[GUARD.r - SEAT + .02, H - .03 + e], [q0 - OV - e, H - .04 + e], [q0 - OV - e, t1[2] + e], [t1[0] - OV - e, t1[2] + e], [t1[0] - OV - e, .004], [diag ? 2.0 : 3.2, .004]];
+    const path = [[GUARD.r - SEAT * guardScale(a) + .02, H - .03 + e], [q0 - OV - e, H - .04 + e], [q0 - OV - e, t1[2] + e], [t1[0] - OV - e, t1[2] + e], [t1[0] - OV - e, .004], [diag ? 2.0 : 3.2, .004]];
     const segL = []; let tot = 0; for (let i = 0; i < path.length - 1; i++) { const l = Math.hypot(path[i + 1][0] - path[i][0], path[i + 1][1] - path[i][1]); segL.push(l); tot += l; }
     /* 홈: 바닥·계단에 파인 짙은 길 + 양옆 파란 실선 */
     let acc = 0;
@@ -171,34 +176,37 @@ export function makeArena() {
   const add = (list, mat) => { if (list.length) G.add(new THREE.Mesh(mergeGeometries(list.map(posNor)), mat)); };
   add(L.silver, silver); add(L.silverHi, silverHi); add(L.gun, gun); add(L.rib, gunRib); add(L.floor, floorM); add(L.dark, dark); add(L.blue, blue); add(L.gold, gold);
   /* 숨은 빛 + 에너지 길 */
-  const gMat = new THREE.ShaderMaterial({ uniforms: { uOn, uT }, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide,
+  const gMat = new THREE.ShaderMaterial({ uniforms: { uOn, uT, uW }, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide,
     vertexShader: 'attribute float aK, aS; varying float vK, vS; varying vec3 vW; void main(){ vK=aK; vS=aS; vec4 w=modelMatrix*vec4(position,1.); vW=w.xyz; gl_Position=projectionMatrix*viewMatrix*w; }',
-    fragmentShader: `uniform float uOn,uT; varying float vK, vS; varying vec3 vW;
-      void main(){
+    fragmentShader: `uniform float uOn,uT,uW; varying float vK, vS; varying vec3 vW;
+      ${WAKE}
+      void main(){ float ON = onAt(length(vW.xz));
         vec3 c = vec3(.28,.58,1.35); float b;
-        if (vS < -2.5) { float ph = fract(uT*.55 - vK*.16); b = .25 + .5*smoothstep(.0,.2,ph)*smoothstep(.6,.2,ph)*(.5+.5*uOn); }   /* 길 양옆 빛 줄 */
+        if (vS < -2.5) { float ph = fract(uT*.55 - vK*.16); b = .25 + .5*smoothstep(.0,.2,ph)*smoothstep(.6,.2,ph)*(.5+.5*ON); }   /* 길 양옆 빛 줄 */
         else if (vS < -1.5) { float ph = fract(uT*.55 - vK*.16), pk = smoothstep(.0,.08,ph)*smoothstep(.4,.08,ph);          /* 화살표: 안쪽부터 차례로 */
-          b = .32 + 1.3*pk*(.55+.45*uOn); c = mix(c, vec3(.8,.93,1.35), pk*.6); }
-        else if (vS < -.5) { float a=atan(vW.z,vW.x); b = .35 + uOn*(1.+.3*sin(uT*1.4+a*4.+vK*2.)); c = mix(c, vec3(.7,.88,1.4), .35); }          /* 계단 세로면 에너지 빛 */
+          b = .32 + 1.3*pk*(.55+.45*ON); c = mix(c, vec3(.8,.93,1.35), pk*.6); }
+        else if (vS < -.5) { float a=atan(vW.z,vW.x); b = .35 + ON*(1.+.3*sin(uT*1.4+a*4.+vK*2.)); c = mix(c, vec3(.7,.88,1.4), .35); }          /* 계단 세로면 에너지 빛 */
         else {   /* 이어진 빛줄기 + 판이 숨 쉴 때마다 탑에서 판으로 밀려오는 혜성 같은 빛 머리(긴 꼬리) + 속에 흐르는 결 */
           float head = 1.15 - fract(uT / 2.1) * 1.4;                       /* 2.1초마다 한 번 (판의 숨과 같은 박자) */
           float d = vS - head, front = exp(-d*d*900.), tail = step(0., d) * exp(-d * 4.5);
           float grain = .85 + .15 * sin(vS * 70. - uT * 9.) * sin(vS * 23. + uT * 3.);
-          b = (.35 + uOn*.55) * grain + (front * 2.4 + tail * 1.1) * (.45 + .55*uOn);
+          b = (.35 + ON*.55) * grain + (front * 2.4 + tail * 1.1) * (.45 + .55*ON);
           c = mix(c, vec3(.85,.95,1.35), clamp(front + tail * .4, 0., 1.)); }
         gl_FragColor = vec4(c*b*2.2,1.); }` });
 
   /* 판 둘레 빛 웅덩이: 판·결정의 빛이 검은 바닥에 비쳐 번짐 (판이 기지와 한 세상이 되게) */
-  { const pm = new THREE.ShaderMaterial({ uniforms: { uOn, uT }, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
+  { const pm = new THREE.ShaderMaterial({ uniforms: { uOn, uT, uW }, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
       vertexShader: 'varying vec2 vP; void main(){ vP=position.xy; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.); }',
-      fragmentShader: `uniform float uOn,uT; varying vec2 vP; void main(){ float r=length(vP), a=atan(vP.y,vP.x);
+      fragmentShader: `uniform float uOn,uT,uW; varying vec2 vP; ${WAKE} void main(){ float r=length(vP), a=atan(vP.y,vP.x); float ON = onAt(r);
         float pool = exp(-pow((r-2.6)/1.3,2.))*.55 + exp(-pow((r-${RF.toFixed(1)})/.25,2.))*.5;      /* 판 바깥 + 1층 발치 */
         float rays = pow(abs(cos(a*4.)),40.)*exp(-r*.35)*.6*smoothstep(.15,.4,abs(a));                  /* 빛길 쪽으로 뻗는 결 (출구 쪽 빼고) */
-        float b = (pool + rays) * (.35 + .65*uOn) * (.9+.1*sin(uT*1.5));
+        float b = (pool + rays) * (.35 + .65*ON) * (.9+.1*sin(uT*1.5));
         gl_FragColor = vec4(vec3(.25,.5,1.25)*b, 1.); }` });
     const m = new THREE.Mesh(new THREE.RingGeometry(1.6, RF + .4, 128, 1), pm); m.rotation.x = -Math.PI / 2; m.position.y = .006; m.renderOrder = 2; G.add(m); }
   const gg = new THREE.BufferGeometry(); gg.setAttribute('position', new THREE.Float32BufferAttribute(glowPos, 3)); gg.setAttribute('aK', new THREE.Float32BufferAttribute(glowK, 1)); gg.setAttribute('aS', new THREE.Float32BufferAttribute(glowS, 1));
   const gm = new THREE.Mesh(gg, gMat); gm.renderOrder = 3; G.add(gm);
-  G.userData.update = (t, on) => { uT.value = t; uOn.value += ((on ? 1 : 0) - uOn.value) * .05; const k = .25 + uOn.value * 1.1; blue.color.setRGB(.28 * k, .58 * k, 1.35 * k); };
+  G.userData.wake = t => { uW.value = t; uOn.value = 1; };
+  G.userData.sleep = () => { uW.value = 1e9; uOn.value = 0; };
+  G.userData.update = t => { uT.value = t; };
   return G;
 }
