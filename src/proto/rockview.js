@@ -6,9 +6,9 @@ import { buildShip, engineSpots } from '../core/ships/build.js';
 import { makeGlow } from '../preview/glow.js';
 import { planetShader } from '../core/planet.js';
 import { planetFor } from '../data/planets.js';
-import { makeIceRidge } from './ice.js?v=11021316';
-import { makeCrystalRidge } from './crystal.js?v=11021316';
-import { makeRidge, updateRidge, hitWall } from './rocks.js?v=11021316';
+import { makeIceRidge } from './ice.js?v=11021319';
+import { makeCrystalRidge } from './crystal.js?v=11021319';
+import { makeRidge, updateRidge, hitWall } from './rocks.js?v=11021319';
 
 const $ = s => document.querySelector(s), clamp = THREE.MathUtils.clamp, rnd = (a, b) => a + Math.random() * (b - a);
 const VIEWS = [
@@ -17,7 +17,7 @@ const VIEWS = [
 const WALLS = [
   { id: 'obsidian', name: '용암 흑요석', tip: '평소엔 빛나지 않는 검은 유리 바위예요. 탄에 맞으면 맞은 자리 둘레의 틈만 용암빛으로 짧게 반짝였다가 식어요. 화면의 벽을 누르면 그쪽으로 쏴요.', spark: [1.4, .7, .3], flash: [1.4, .55, .2], shard: 0x050407 },
   { id: 'ice', name: '빙하 얼음', tip: '거대한 얼음 덩어리가 이어진 벽이에요. 속에 푸른 층이 겹겹이 지고 기포가 얼어 있어요. 위엔 서리가 앉았어요. 탄에 맞으면 속 깊이 갇힌 빛이 깨어나 층을 따라 퍼졌다가 다시 얼어요.', spark: [.8, 1.05, 1.4], flash: [.6, .85, 1.4], shard: 0x9fd8ff },
-  { id: 'crystal', name: '자수정 무리', tip: '자수정 무리가 이어진 벽이에요. 뿌리는 작은 결정 알갱이가 덮고 있고, 짙은 보라에서 끝으로 갈수록 맑아요. 아주 천천히 자라듯 숨 쉬어요. 탄에 맞으면 결정 속에서 빛이 면마다 다르게 꺾여 무지개로 반짝이고, 맞은 결정은 움찔해요.', spark: [1.2, 1.1, 1.4], flash: [1.1, 1, 1.3], shard: 0xd8ccff }];
+  { id: 'crystal', name: '자수정 무리', tip: '자수정 무리가 이어진 벽이에요. 큰 결정 뿌리마다 작은 결정이 붙어 자랐고, 짙은 보라에서 끝으로 갈수록 맑아요. 아주 천천히 자라듯 숨 쉬어요. 탄에 맞으면 결정 속에서 빛이 면마다 다르게 꺾여 무지개로 반짝이고, 맞은 결정은 움찔해요.', spark: [1.2, 1.1, 1.4], flash: [1.1, 1, 1.3], shard: 0xd8ccff }];
 
 export async function start(canvas, onProgress = () => {}) {
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: false, powerPreference: 'high-performance' });

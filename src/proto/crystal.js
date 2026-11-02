@@ -1,11 +1,11 @@
 /* 맵 벽 — 자수정 무리 (결정 협곡)
-   큰 결정 무리가 이어진 벽. 뿌리는 작은 결정 알갱이가 융단처럼 덮고 있다(자수정 덩어리의 바닥처럼).
+   큰 결정 무리가 이어진 벽. 큰 결정마다 뿌리에서 작은 결정이 비스듬히 갈라져 나와 바짝 붙어 있다.
    · 결정 하나: 수정처럼 육각 기둥 + 끝이 정확한 여섯 면으로 깎인 뾰족한 머리. 면이 빠지는 곳이 없게 모든 면을 바깥으로 맞춤.
    · 평소: 빛나지 않는다. 뿌리는 짙은 보라, 끝으로 갈수록 맑아짐(자수정의 색 띠). 끝이 아주 천천히 뻗었다 움츠러든다(살아 있음).
    · 맞으면: 맞은 자리 근처(지름 3m 남짓) 결정 속으로 들어간 빛이 면마다 다르게 꺾여 면마다 다른 색으로 0.7초쯤 반짝인다(칠한 무지개가 아님).
      맞은 결정은 움찔 움츠러들었다가 다시 뻗는다. */
 import * as THREE from 'three';
-import { HITS } from './rocks.js?v=11021316';
+import { HITS } from './rocks.js?v=11021319';
 
 /* 결정 하나 (밑 0 ~ 기둥 끝 1 ~ 머리 꼭짓점 1.0+tip). 모든 삼각형을 바깥쪽으로 맞춘다 */
 function prism(seed) {
@@ -87,19 +87,20 @@ export function makeCrystalRidge(path, opt = {}) {
   for (let d = 0; d < len; d += 2.1 + R() * .8) { const u = d / len, p = curve.getPointAt(u), t = curve.getTangentAt(u), nx = -t.z, nz = t.x;
     const edge = Math.min(1, .5 + Math.min(u, 1 - u) * len / 6), side = (R() - .5) * .6, cx = p.x + nx * side, cz = p.z + nz * side;
     const rw = 1.3 * edge, rh = .6 * edge;                                                            /* 바위 받침 (쪼갠 바위의 겉껍질) */
-    /* 뿌리를 덮는 작은 결정 알갱이 융단 (흙더미 대신) */
-    const nd = Math.round(26 * edge);
-    for (let k = 0; k < nd; k++) { const a = R() * 6.28, rr = Math.sqrt(R()) * 1.15, lx = Math.cos(a) * rr, lz = Math.sin(a) * rr;
-      const ox = cx + (nx * lx + t.x * lz * 1.3) * rw, oz = cz + (nz * lx + t.z * lz * 1.3) * rw, oy = -.4 + rh * .35 * Math.max(0, 1 - rr * rr);
-      const dir = new THREE.Vector3(nx * lx * 1.4 + (R() - .5) * .6, .7 + R() * .6, nz * lx * 1.4 + (R() - .5) * .6).normalize(), h = (.18 + R() * .3) * edge;
-      cs.push({ g: Math.floor(R() * geos.length), x: ox, y: oy, z: oz, h, w: h * (.4 + R() * .2), q: new THREE.Quaternion().setFromUnitVectors(up, dir).multiply(new THREE.Quaternion().setFromAxisAngle(up, R() * 6.28)), tiny: true }); }
     const n = Math.round((5 + R() * 5) * edge);
     for (let k = 0; k < n; k++) { const a = R() * 6.28, rr = Math.sqrt(R()), lx = Math.cos(a) * rr, lz = Math.sin(a) * rr;   /* 받침 윗면 위의 한 점 */
       const ox = cx + (nx * lx + t.x * lz * 1.3) * rw, oz = cz + (nz * lx + t.z * lz * 1.3) * rw, oy = -.35 + rh * .55 * Math.sqrt(Math.max(0, 1 - rr * rr));
       const dir = new THREE.Vector3(nx * lx + t.x * lz * .8, 1.1 + R() * .4, nz * lx + t.z * lz * .8).normalize();     /* 표면에서 바깥·위로 */
       const h = (rr < .45 ? 1.2 + R() * 1.3 : .45 + R() * .9) * edge;                                   /* 가운데가 길고 가장자리가 짧음 */
       const q = new THREE.Quaternion().setFromUnitVectors(up, dir).multiply(new THREE.Quaternion().setFromAxisAngle(up, R() * 6.28));
-      cs.push({ g: Math.floor(R() * geos.length), x: ox, y: oy, z: oz, h, w: h * (.22 + R() * .14) + .1, q }); } }
+      const w0 = h * (.22 + R() * .14) + .1; cs.push({ g: Math.floor(R() * geos.length), x: ox, y: oy, z: oz, h, w: w0, q });
+      /* 뿌리에 바짝 붙어 비스듬히 자란 작은 결정 (같은 뿌리에서 갈라져 나옴) */
+      const nb = 2 + Math.floor(R() * 3);
+      for (let j = 0; j < nb; j++) { const b = R() * 6.28, ca = Math.cos(b), sa = Math.sin(b);
+        const sd = new THREE.Vector3(ca, 0, sa).applyQuaternion(q), d2 = dir.clone().multiplyScalar(.9).addScaledVector(sd, .55 + R() * .35).normalize();
+        const hh = h * (.22 + R() * .2), rr0 = w0 * .55;
+        cs.push({ g: Math.floor(R() * geos.length), x: ox + sd.x * rr0, y: oy + .02, z: oz + sd.z * rr0, h: hh, w: hh * (.32 + R() * .12) + .04,
+          q: new THREE.Quaternion().setFromUnitVectors(up, d2).multiply(new THREE.Quaternion().setFromAxisAngle(up, R() * 6.28)), tiny: true }); } } }
   const grp = new THREE.Group(), m4 = new THREE.Matrix4(), sc = new THREE.Vector3(), pos = new THREE.Vector3();
   geos.forEach((g, gi) => { const mine = cs.filter(c => c.g === gi); if (!mine.length) return;
     const im = new THREE.InstancedMesh(g, mat, mine.length);
