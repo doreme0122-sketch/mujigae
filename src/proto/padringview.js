@@ -2,15 +2,15 @@
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { makeBloom } from '../core/hangar/bloom.js';
-import { makePad } from '../core/hangar/pad.js?v=11021857';
-import { makeMag } from '../core/hangar/mag.js?v=11021857';
+import { makePad } from '../core/hangar/pad.js?v=11021900';
+import { makeMag } from '../core/hangar/mag.js?v=11021900';
 import { buildShip } from '../core/ships/build.js';
-import { makeGoldStar } from './goldstar.js?v=11021857';
-import { makeArena } from './arena.js?v=11021857';
-import { makeGuardians, GUARD } from './guardian.js?v=11021857';
-import { makeFloor, FLOORS } from './floor.js?v=11021857';
-import { makePerf } from './perf.js?v=11021857';
-import { makeBirth } from './birth.js?v=11021857';
+import { makeGoldStar } from './goldstar.js?v=11021900';
+import { makeArena } from './arena.js?v=11021900';
+import { makeGuardians, GUARD } from './guardian.js?v=11021900';
+import { makeFloor, FLOORS } from './floor.js?v=11021900';
+import { makePerf } from './perf.js?v=11021900';
+import { makeBirth, BIRTH } from './birth.js?v=11021900';
 
 const $ = s => document.querySelector(s), clamp = THREE.MathUtils.clamp;
 const SHIPL = 2.9;     /* 기체 길이: 자기장 판(지름 3.2)보다 약간 작게 */
@@ -46,8 +46,10 @@ export async function start(canvas, onProgress = () => {}) {
   const k2 = ship.scale.x, shipHalf = new THREE.Box3().setFromObject(sm).getSize(new THREE.Vector3()).y * k2 / 2;
   const birth = makeBirth(renderer, ship); scene.add(birth);
   let showShip = true, onAt, born = false; ship.visible = false;
-  const FILL = .9; let holdAt = 1e9;    /* 에너지가 별 고리에 닿은 뒤, 판이 바깥에서 가운데로 차오르는 시간 */
-  const wake = t0 => { guards.userData.fire(t0); ring.userData.wake(t0 + GUARD.DOWN); star.userData.fire(t0 + LEAD); holdAt = t0 + LEAD + star.userData.ARRIVE; onAt = holdAt + FILL; born = false; }; wake(.4);
+  const FILL = .35; let holdAt = 1e9;    /* 판이 바깥에서 가운데로 차오르는 시간 (짧게) */
+  /* 빛이 판 옆 넓은 바닥에 모이는 순간(GATHER) 바로 태어나도록 거꾸로 맞춤: 별·판은 그 직전에 함께 차오르고, 하늘 빛은 그 순간 꽂힘 */
+  const GATHER = GUARD.DOWN + 1.25;
+  const wake = t0 => { guards.userData.fire(t0); ring.userData.wake(t0 + GUARD.DOWN); onAt = t0 + GATHER - BIRTH.FALL; holdAt = onAt - FILL; star.userData.fire(holdAt - star.userData.ARRIVE); born = false; }; wake(.4);
   onProgress(.9);
 
   /* 버튼: 시점 · 기체 */
