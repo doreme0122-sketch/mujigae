@@ -5,7 +5,7 @@
      맞는 순간 깎인 면의 모서리에서 빛이 갈라져 무지개가 아주 짧게 반짝인다(칠한 무지개가 아님).
    투명 재질(뒤를 비추는 계산)은 폰에 무거워서 쓰지 않고, 속은 보는 방향으로 몇 겹 들여다본 잡음으로 흉내 낸다. */
 import * as THREE from 'three';
-import { HITS } from './rocks.js?v=11021249';
+import { HITS } from './rocks.js?v=11021255';
 
 /* 기둥 하나: 육각, 아래가 조금 굵고, 끝은 깨진 결정 */
 function column(seed) {

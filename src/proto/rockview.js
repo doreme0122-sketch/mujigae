@@ -6,8 +6,9 @@ import { buildShip, engineSpots } from '../core/ships/build.js';
 import { makeGlow } from '../preview/glow.js';
 import { planetShader } from '../core/planet.js';
 import { planetFor } from '../data/planets.js';
-import { makeIceRidge } from './ice.js?v=11021249';
-import { makeRidge, updateRidge, hitWall } from './rocks.js?v=11021249';
+import { makeIceRidge } from './ice.js?v=11021255';
+import { makeCrystalRidge } from './crystal.js?v=11021255';
+import { makeRidge, updateRidge, hitWall } from './rocks.js?v=11021255';
 
 const $ = s => document.querySelector(s), clamp = THREE.MathUtils.clamp, rnd = (a, b) => a + Math.random() * (b - a);
 const VIEWS = [
@@ -15,7 +16,8 @@ const VIEWS = [
   { id: 'game', name: '게임 시점', h: 44, tilt: .26 }];
 const WALLS = [
   { id: 'obsidian', name: '용암 흑요석', tip: '평소엔 빛나지 않는 검은 유리 바위예요. 탄에 맞으면 맞은 자리 둘레의 틈만 용암빛으로 짧게 반짝였다가 식어요. 화면의 벽을 누르면 그쪽으로 쏴요.', spark: [1.4, .7, .3], flash: [1.4, .55, .2], shard: 0x050407 },
-  { id: 'ice', name: '얼어붙은 빛 기둥', tip: '맑고 깊은 얼음 기둥이에요. 속에 얼어붙은 금과 기포가 보여요. 탄에 맞으면 근처 얼음 속에 갇힌 빛줄기가 깨어나 기둥을 타고 위로 흐르다 다시 얼어붙어요.', spark: [.8, 1.05, 1.4], flash: [.6, .85, 1.4], shard: 0x9fd8ff }];
+  { id: 'ice', name: '얼어붙은 빛 기둥', tip: '맑고 깊은 얼음 기둥이에요. 속에 얼어붙은 금과 기포가 보여요. 탄에 맞으면 근처 얼음 속에 갇힌 빛줄기가 깨어나 기둥을 타고 위로 흐르다 다시 얼어붙어요.', spark: [.8, 1.05, 1.4], flash: [.6, .85, 1.4], shard: 0x9fd8ff },
+  { id: 'crystal', name: '살아 있는 결정', tip: '맑은 결정 무리가 아주 천천히 자라듯 숨 쉬어요. 탄에 맞으면 근처 결정 속에서 빛이 면마다 다르게 꺾여 무지개로 반짝이고, 맞은 결정은 움찔 움츠러들었다 다시 뻗어요.', spark: [1.2, 1.1, 1.4], flash: [1.1, 1, 1.3], shard: 0xd8ccff }];
 
 export async function start(canvas, onProgress = () => {}) {
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: false, powerPreference: 'high-performance' });
@@ -43,10 +45,12 @@ export async function start(canvas, onProgress = () => {}) {
   /* 흑요석 능선 하나 */
   const pts = []; for (let k = 0; k <= 8; k++) pts.push([-34 + k * 8.5, Math.sin(k * .9) * 2.2]);
   const obs = makeRidge('obsidian', pts, { uT: UT, seed: 3, float: true }); scene.add(obs); onProgress(.45);
-  const ice = makeIceRidge(pts, { uT: UT, seed: 4 }); scene.add(ice); ice.visible = false; onProgress(.6);
+  const ice = makeIceRidge(pts, { uT: UT, seed: 4 }); scene.add(ice); ice.visible = false;
+  const cry = makeCrystalRidge(pts, { uT: UT, seed: 6 }); scene.add(cry); cry.visible = false; onProgress(.6);
+  const GR = { obsidian: null, ice, crystal: cry };
   const items = obs.userData.items, fl = obs.userData.fl;
   let W = WALLS[0], wall = obs;
-  const targets = () => W.id === 'ice' ? ice.userData.targets() : [...items.filter(i => !i.float && i.s > .6).map(i => ({ x: i.x, y: i.y + i.s * .15, z: i.z, r: i.s * .62 })), ...fl.map(f => ({ x: f.it.x, y: f.y ?? f.it.y + f.h, z: f.it.z, r: f.it.s * .5 }))];
+  const targets = () => GR[W.id] ? GR[W.id].userData.targets() : [...items.filter(i => !i.float && i.s > .6).map(i => ({ x: i.x, y: i.y + i.s * .15, z: i.z, r: i.s * .62 })), ...fl.map(f => ({ x: f.it.x, y: f.y ?? f.it.y + f.h, z: f.it.z, r: f.it.s * .5 }))];
   /* 깨져 튀는 유리 조각 */
   const shardMat = new THREE.MeshPhysicalMaterial({ color: 0x050407, roughness: .08, clearcoat: 1, envMapIntensity: 1.2 });
   const SH = Array.from({ length: 36 }, () => { const o = new THREE.Mesh(new THREE.TetrahedronGeometry(.09), shardMat); o.visible = false; scene.add(o); return { o, v: new THREE.Vector3(), w: new THREE.Vector3(), life: 0 }; }); let shI = 0;
@@ -59,7 +63,7 @@ export async function start(canvas, onProgress = () => {}) {
   const tour = $('#tour');
   const tip = () => { $('#tip').hidden = false; $('#tip b').textContent = W.name; $('#tip span').textContent = W.tip; $('#head b').textContent = W.name + ' 벽'; };
   for (const w of WALLS) { const b = document.createElement('button'); b.type = 'button'; b.textContent = w.name; b.className = 'wall';
-    b.onclick = () => { W = w; wall = w.id === 'ice' ? ice : obs; obs.visible = w.id !== 'ice'; ice.visible = w.id === 'ice'; shardMat.color.set(w.shard);
+    b.onclick = () => { W = w; wall = GR[w.id] || obs; obs.visible = w.id === 'obsidian'; ice.visible = w.id === 'ice'; cry.visible = w.id === 'crystal'; shardMat.color.set(w.shard);
       shardMat.transmission = 0; document.querySelectorAll('#tour .wall').forEach(x => x.classList.toggle('on', x === b)); tip(); }; tour.appendChild(b); }
   { const sep = document.createElement('i'); sep.style.cssText = 'width:1px;align-self:stretch;background:rgba(185,255,74,.25);margin:0 4px'; tour.appendChild(sep); }
   for (const v of VIEWS) { const b = document.createElement('button'); b.type = 'button'; b.textContent = v.name; b.dataset.id = v.id;
