@@ -51,11 +51,11 @@ export async function makeMapFloor(renderer, url) {
   const noise = bakeNoise(), V = (k, n) => ST.map(s => new THREE.Vector3(...s[k].slice(0, 3)));
   const WX = MAP.W * MAP.SCALE, WZ = MAP.H * MAP.SCALE;
   const mat = new THREE.ShaderMaterial({ depthWrite: false, depthTest: false,
-    uniforms: { uT: { value: 0 }, uN: { value: noise }, uR: { value: regTex }, uRs: { value: regSoft }, uWf: { value: regSoft },
+    uniforms: { uT: { value: 0 }, uFog: { value: 1 }, uN: { value: noise }, uR: { value: regTex }, uRs: { value: regSoft }, uWf: { value: regSoft },
       uA: { value: V('a') }, uB: { value: V('b') }, uG: { value: V('g') },
       uP: { value: ST.map(s => new THREE.Vector4(...s.p)) }, uQ: { value: ST.map(s => new THREE.Vector3(...s.q)) }, uWv: { value: ST.map(s => new THREE.Vector4(...s.wv)) } },
     vertexShader: 'varying vec3 vW; void main(){ vec4 w=modelMatrix*vec4(position,1.); vW=w.xyz; gl_Position=projectionMatrix*viewMatrix*w; }',
-    fragmentShader: `precision highp float; varying vec3 vW; uniform float uT; uniform sampler2D uN, uR, uRs, uWf;
+    fragmentShader: `precision highp float; varying vec3 vW; uniform float uT, uFog; uniform sampler2D uN, uR, uRs, uWf;
       uniform vec3 uA[18], uB[18], uG[18], uQ[18]; uniform vec4 uP[18], uWv[18];
       float h2(vec2 p){ p=fract(p*vec2(123.34,456.21)); p+=dot(p,p+45.32); return fract(p.x*p.y); }
       vec3 hue(float h){ return clamp(abs(mod(h*6.+vec3(0.,4.,2.),6.)-3.)-1.,0.,1.); }
@@ -67,7 +67,7 @@ export async function makeMapFloor(renderer, url) {
         vec2 uv = vW.xz/vec2(${WX.toFixed(1)}, ${WZ.toFixed(1)}) + .5;
         if (uv.x<0.||uv.y<0.||uv.x>1.||uv.y>1.) { gl_FragColor=vec4(.01,.012,.02,1.); return; }
         int id = int(floor(texture2D(uR, uv).r*255./12.+.5)); id = id<0?0:(id>17?17:id);
-        vec3 eg = texture2D(uRs, uv).rgb; float ridge = texture2D(uWf, uv).r, road = eg.b;   /* 벽 자리 = 바위벽과 같은 벽 높이 지도 */
+        vec3 eg = texture2D(uRs, uv).rgb; float road = eg.b;   /* 벽 자리 = 바위벽과 같은 벽 높이 지도 */
         vec4 P = uP[id]; vec3 Q = uQ[id]; vec4 Wv = uWv[id];
         float dens=P.x, speed=P.y, swirl=P.z, sc=P.w, t=uT*speed;
         vec2 L0=layer(vW.xz,sc,t,swirl), L1=layer(vW.xz*1.15+vec2(31.,17.),sc,t*.6,swirl);
@@ -75,6 +75,9 @@ export async function makeMapFloor(renderer, url) {
         vec3 base = uA[id]*(.55+.35*L1.x);                                                       /* 맨땅: 짙은 색 위에 먼 결 */
         vec3 c0=mix(uA[id],uB[id],smoothstep(.4,.95,L0.x))*(.8+.4*L0.y);
         vec3 c = mix(base, c0, clamp(a0+a1*.5,0.,1.));
+        /* 안개 끔: 흘러가는 구름 결 없이 땅 색 그대로 (서서히 걷힘) */
+        vec3 clr = mix(uA[id],uB[id],.3)*(.72+.4*texture2D(uN,vW.xz*.05).r);
+        c = mix(clr, c, uFog);
         if(Q.y>.5){ float hot=smoothstep(.55,.8,L1.x); c+=vec3(.5,.1,.02)*hot*(.6+.4*sin(uT*1.2+L0.x*9.))*(1.-L0.x*.6); }
         /* 큰길: 다져진 밝은 길 + 가운데 희미한 안내 점 */
         float rd = smoothstep(.6,.9,road), side = smoothstep(.18,.42,road)*(1.-rd);              /* 큰길 · 샛길 */
@@ -85,23 +88,10 @@ export async function makeMapFloor(renderer, url) {
         /* 지역 경계 = 짙은 바위 능선 (나중에 벽이 섬) */
         /* 바위 능선(벽 자리): 바닥보다 확 밝은 돌 띠 + 짙은 그림자 테두리 + 윗면 빛 → 멀리서도 '못 지나가는 곳'이 보이게 */
         /* 벽 자리 그림은 막힘(1)/지나감(0) 둘뿐 → 보이는 돌 띠 = 실제로 부딪히는 자리. 경계 판정은 게임과 같은 .5 */
-        float rk = smoothstep(.4,.6,ridge);
-        float sh = (texture2D(uWf,uv+vec2(.004,0.)).r + texture2D(uWf,uv-vec2(.004,0.)).r + texture2D(uWf,uv+vec2(0.,.004)).r + texture2D(uWf,uv-vec2(0.,.004)).r)*.25;
-        float rim = smoothstep(0.,.5,sh)*(1.-rk)*(1.-smoothstep(.2,.45,road));   /* 벽 바로 바깥 그림자: 벽이 바닥에서 솟아 있다는 느낌 (벽 크기는 안 바뀜) */
-        float tn = texture2D(uN,vW.xz*.06).b, tn2 = texture2D(uN,vW.xz*.18).r;
-        vec3 rockC = vec3(.30,.31,.34)*(.65+.55*tn) + vec3(.14,.14,.15)*smoothstep(.55,.8,tn2);      /* 밝은 회색 돌, 군데군데 더 밝은 면 */
-        int wk = int(floor(texture2D(uWf, uv).g*255./50.+.5));                                             /* 벽 종류 (밑 땅을 벽마다 다르게) */
-        vec3 gk = wk==1 ? vec3(.05,.08,.12)+vec3(.12,.15,.18)*smoothstep(.62,.8,tn2)      /* 빙하: 짙은 푸른 땅에 서리 얼룩 */
-                : wk==2 ? vec3(.045,.03,.07)+vec3(.12,.09,.2)*step(.86,tn2)                /* 자수정: 짙은 보랏빛 바위 + 부스러진 결정 알갱이 */
-                : wk==3 ? vec3(.06,.055,.05)*(.75+.5*step(.5,fract(vW.x*.55+tn*.6))*step(.5,fract(vW.z*.55+tn2*.6)))   /* 유적: 무너진 담 사이 깔린 짙은 돌판 */
-                : wk==4 ? vec3(.02,.055,.06)+vec3(.03,.1,.09)*smoothstep(.5,.8,tn)         /* 산호: 짙은 청록 개흙 */
-                : vec3(.018,.018,.022)+vec3(.03,.025,.03)*smoothstep(.6,.85,tn2);          /* 흑요석: 검은 유리 부스러기 땅 */
-        rockC = gk*(.75+.5*tn)*(.85+.3*smoothstep(.5,1.,sh));                                                         /* 벽 띠 바닥: 벽 덩어리 밑에 깔린 짙은 그늘 땅 → 덩어리 사이 틈도 막힌 곳으로 보임 */
-        c = mix(c, c*.3, rim*.85);
-        c = mix(c, rockC, rk);
+        /* 벽 밑 땅은 칠하지 않음: 벽은 바위벽 그 자체로만 보임 (사용자 결정 2026-11-03) */
         /* 반짝임 물결 (지역마다) */
         vec2 gq=vW.xz*.5; vec2 gc=floor(gq); float gh=h2(gc);
-        if(gh>1.-.03*Q.x && rk<.3 && id!=17){ vec2 gf=fract(gq)-.5, cc=(gc+.5)*2.;
+        if(gh>1.-.03*Q.x && texture2D(uWf,uv).r<.4 && id!=17){ vec2 gf=fract(gq)-.5, cc=(gc+.5)*2.;
           float ph = Wv.x<.5 ? dot(cc,Wv.yz) : (Wv.x<1.5 ? length(cc) : atan(cc.y,cc.x)*6.+length(cc)*.25);
           float wv=max(0.,sin(ph*.09-uT*Wv.w+gh*1.3)); wv=wv*wv; wv=wv*wv; wv=wv*wv; wv=wv*wv;   /* 물결 머리에서만 켜짐 (음수 거듭제곱 없이) */
           vec3 gcol=Q.z>.5?hue(fract(gh*7.+uT*.05))*.8+.4:uG[id]; float g=exp(-dot(gf,gf)*120.)*wv;
