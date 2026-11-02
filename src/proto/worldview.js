@@ -1,9 +1,9 @@
 /* 맵 만들기 ① — 맵 6안(10명 개인전 · 정사각형)대로 바닥 · 지역 · 경계 능선 · 큰길 · 샛길 깔기
    보기: 끌면 이동, 두 손가락(휠)로 확대. 지역 이름표는 화면 위 글자. 시작 기지 자리는 빛 고리로만 표시(다음 단계에서 진짜 기지) */
 import * as THREE from 'three';
-import { makeBloom } from '../core/hangar/bloom.js?v=11022328';
-import { makeMapFloor, MAP, toWorld } from './mapfloor.js?v=11022328';
-import { makePerf } from './perf.js?v=11022328';
+import { makeBloom } from '../core/hangar/bloom.js?v=11022331';
+import { makeMapFloor, MAP, toWorld } from './mapfloor.js?v=11022331';
+import { makePerf } from './perf.js?v=11022331';
 
 const $ = s => document.querySelector(s), clamp = THREE.MathUtils.clamp;
 const VIEWS = [{ name: '게임 시점', h: 60, tilt: .3 }, { name: '지역 보기', h: 180, tilt: .25 }, { name: '맵 전체', h: 560, tilt: .02 }];
@@ -13,8 +13,8 @@ export async function start(canvas, onProgress = () => {}) {
   renderer.toneMapping = THREE.NoToneMapping; renderer.autoClear = false; renderer.setClearColor(0, 1);
   const scene = new THREE.Scene(), camera = new THREE.PerspectiveCamera(40, 1, 1, 3000), bloom = makeBloom(renderer, { samples: 0 });
   onProgress(.2);
-  const floor = await makeMapFloor(renderer, './assets/map/v6.png?v=11022328');
-  const J = await (await fetch('./assets/map/v6.json?v=11022328')).json();
+  const floor = await makeMapFloor(renderer, './assets/map/v6.png?v=11022331');
+  const J = await (await fetch('./assets/map/v6.json?v=11022331')).json();
   const SPAWN = J.spawns, ALL = [...J.labels.map(o => [o.x, o.y, o.n, o.l]), [500, 500, '무너진 중심부', 'Lv 10+']];
   onProgress(.7);
   /* 시작 기지 자리: 빛 고리 (임시) */
@@ -54,6 +54,8 @@ export async function start(canvas, onProgress = () => {}) {
     renderer.setRenderTarget(bloom.scene); renderer.clear(); floor.render(camera, bloom.scene); renderer.render(scene, camera);
     bloom.render(Wd, Hd, !perf.st.bloom); perf.tick(dt);
   } catch (err) { console.error('[맵]', err); } });
+  { const v = (import.meta.url.match(/v=(\d+)/) || [])[1] || '개발'; const el = document.createElement('div'); el.textContent = '6안 · 판 번호 ' + v;   /* 어떤 버전이 열렸는지 바로 확인 */
+    el.style.cssText = 'position:fixed;left:max(18px,env(safe-area-inset-left,0px));bottom:calc(env(safe-area-inset-bottom,0px) + 14px);font-size:11px;color:rgba(185,255,74,.7);pointer-events:none'; document.body.appendChild(el); }
   onProgress(1);
   window.__wv = { get t() { return t; }, cam };
 }
