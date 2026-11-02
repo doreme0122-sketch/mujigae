@@ -9,11 +9,11 @@
    무게: 꼬리 가닥은 한 묶음으로 한 번에, 부스러기는 점 묶음 한 번 */
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
-import { makeBloom } from '../core/hangar/bloom.js?v=11022014';
-import { makePad } from '../core/hangar/pad.js?v=11022014';
-import { makeGoldStar } from './goldstar.js?v=11022014';
-import { gem } from './guardian.js?v=11022014';
-import { makePerf } from './perf.js?v=11022014';
+import { makeBloom } from '../core/hangar/bloom.js?v=11022019';
+import { makePad } from '../core/hangar/pad.js?v=11022019';
+import { makeGoldStar } from './goldstar.js?v=11022019';
+import { gem } from './guardian.js?v=11022019';
+import { makePerf } from './perf.js?v=11022019';
 
 const $ = s => document.querySelector(s), clamp = THREE.MathUtils.clamp;
 const N = 700, FALL = .5, REST = 1.2, CYCLE = FALL + REST;
@@ -121,8 +121,13 @@ export async function start(canvas, onProgress = () => {}) {
   const pick = i => { cur = i; const v = V[i]; Object.assign(U.uWhite, { value: v.white }); U.uDisp.value = v.disp; U.uSpread.value = v.spread; U.uLen.value = v.len; U.uCurve.value = v.curve; U.uDual.value = v.dual; U.uTurb.value = v.turb;
     headM.uniforms.uC.value.setRGB(...v.coma); headM.uniforms.uTurb.value = v.turb; lightM.uniforms.uC.value.setRGB(...v.coma); crystal.visible = !!v.crystal;
     pM.uniforms.uWhite.value = v.white; pM.uniforms.uWarm.value = i === 3 ? .6 : 0;
-    tour.querySelectorAll('button').forEach((b, j) => b.classList.toggle('on', j === i)); $('#tip b').textContent = v.name; $('#tip span').textContent = v.tip; $('#tip').hidden = false; T0 = t; SP.forEach(q => q.life = 0); };
+    tour.querySelectorAll('button:not(.speed)').forEach((b, j) => b.classList.toggle('on', j === i)); $('#tip b').textContent = v.name; $('#tip span').textContent = v.tip; $('#tip').hidden = false; T0 = t; SP.forEach(q => q.life = 0); };
   V.forEach((v, i) => { const b = document.createElement('button'); b.type = 'button'; b.textContent = v.name; b.onclick = () => pick(i); tour.appendChild(b); });
+  /* 빠르기: 1배 → 1/4 → 1/10 → 멈춤 */
+  const SPEEDS = [[1, '빠르기 1배'], [.25, '1/4 느리게'], [.1, '1/10 느리게'], [0, '멈춤']]; let spI = 0, rate = 1;
+  { const sep = document.createElement('i'); sep.style.cssText = 'width:1px;align-self:stretch;background:rgba(185,255,74,.25);margin:0 4px'; tour.appendChild(sep);
+    const sb = document.createElement('button'); sb.type = 'button'; sb.className = 'speed'; sb.textContent = SPEEDS[0][1];
+    sb.onclick = () => { spI = (spI + 1) % SPEEDS.length; rate = SPEEDS[spI][0]; sb.textContent = SPEEDS[spI][1]; sb.classList.toggle('on', spI > 0); }; tour.appendChild(sb); }
   const cam = { az: .9, tilt: 1.1, h: 17 };
   const ptr = new Map(); let pin = 0;
   addEventListener('pointerdown', e => { if (e.target.closest('#ui')) return; ptr.set(e.pointerId, [e.clientX, e.clientY]); if (ptr.size === 2) { const [a, c] = [...ptr.values()]; pin = Math.hypot(a[0] - c[0], a[1] - c[1]); } });
@@ -140,7 +145,7 @@ export async function start(canvas, onProgress = () => {}) {
   let last = performance.now();
   pick(0);
   renderer.setAnimationLoop(now => { try {
-    const dt = clamp((now - last) / 1000, 0, .05); last = now; t += dt;
+    const dt = clamp((now - last) / 1000, 0, .05) * rate; last = now; t += dt;
     const c = (t - T0) % CYCLE, e = c - REST;                                         /* 쉬고 → 떨어짐(0 → FALL) */
     const f = clamp(e / FALL, 0, 1), on = e >= 0 && e < FALL;
     prevH.copy(H); H.lerpVectors(S0, C, Math.pow(f, 1.6));
