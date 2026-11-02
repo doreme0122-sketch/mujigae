@@ -5,7 +5,7 @@
      맞는 순간 깎인 면의 모서리에서 빛이 갈라져 무지개가 아주 짧게 반짝인다(칠한 무지개가 아님).
    투명 재질(뒤를 비추는 계산)은 폰에 무거워서 쓰지 않고, 속은 보는 방향으로 몇 겹 들여다본 잡음으로 흉내 낸다. */
 import * as THREE from 'three';
-import { HITS } from './rocks.js?v=11021242';
+import { HITS } from './rocks.js?v=11021246';
 
 /* 기둥 하나: 육각, 아래가 조금 굵고, 끝은 깨진 결정 */
 function column(seed) {
@@ -52,13 +52,11 @@ export function iceMaterial(uT) {
         for(int i=0;i<16;i++){ float age=uT-uHits[i].w; if(age<0.||age>.9) continue; vec3 d3=vIw-uHits[i].xyz; float d2=dot(d3,d3); if(d2>10.) continue;
           float fall=exp(-d2*.5);
           hot+=fall*exp(-age*5.);
-          vec3 q=vIw-Vw*.25;
-          float lane=step(.5,ih(vec3(floor(q.xz*5.),11.)))*smoothstep(.5,.2,length(fract(q.xz*5.)-.5));                                        /* 얼음 속 빛줄기 자리 */
-          float run=pow(fract(q.y*.7-age*3.+ih(vec3(floor(q.xz*5.),3.))),4.);                                  /* 위로 달려가는 빛 */
-          flow+=fall*lane*run*exp(-age*3.2);
+          float dy=vIw.y-(uHits[i].y+age*4.5);                                                    /* 맞은 높이에서 위로 부드럽게 올라가는 빛 띠 */
+          flow+=exp(-d3.x*d3.x*.35-d3.z*d3.z*.35)*exp(-dy*dy*1.2)*exp(-age*2.8);
           flash+=fall*exp(-age*26.); }
         if(hot+flow>.002){
-          totalEmissiveRadiance+=vec3(.55,.85,1.3)*flow*4.5 + vec3(.12,.4,.85)*hot*(.7+fr*3.) + vec3(.9,.97,1.)*flash*.8;
+          totalEmissiveRadiance+=(vec3(.35,.7,1.2)*flow*1.8 + vec3(.12,.4,.85)*hot)*(.55+fr*2.2+deep*.6) + vec3(.9,.97,1.)*flash*.8;   /* 빛이 얼음 속 금에 걸려 퍼짐 */
           float edge=pow(1.-ndv,3.);                                                                    /* 깎인 면 모서리: 맞는 순간만 무지개 */
           totalEmissiveRadiance+=film(300.+240.*inz(vIo*5.),ndv)*edge*flash*2.2; }`); };
   m.customProgramCacheKey = () => 'ice-pillar';
