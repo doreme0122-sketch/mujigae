@@ -1,5 +1,5 @@
 /* 맵 날아 보기 — 기지에서 기체를 조이스틱으로 몰고 맵을 돌아다니며 크기·길·문을 몸으로 확인
-   · 조이스틱: 화면 왼쪽 아무 데나 손가락을 대면 그 자리에 생김(떠 있는 조이스틱). 민 만큼 빠르게, 민 쪽으로
+   · 조이스틱: 화면 왼쪽 아무 데나 손가락을 대면 그 자리에 생김(떠 있는 조이스틱). 얼마나 밀든 같은 속도, 민 쪽으로
      컴퓨터: WASD · 방향키
    · 움직임마다 이유:
      - 바로 꺾이지 않고 머리가 돌아감(무게가 있어서) → 도는 쪽으로 기체가 기울어짐(몸을 눕혀 도는 것)
@@ -74,7 +74,7 @@ export async function makeFlight(renderer, B, start, face) {
   G.userData.update = (t, dt) => {
     let ix = inp.x, iy = inp.y;
     if (keys.size) { ix = (keys.has('d') || keys.has('arrowright')) - (keys.has('a') || keys.has('arrowleft')); iy = (keys.has('s') || keys.has('arrowdown')) - (keys.has('w') || keys.has('arrowup')); const l = Math.hypot(ix, iy); if (l > 1) { ix /= l; iy /= l; } }
-    const m = Math.min(1, Math.hypot(ix, iy));
+    const m = Math.hypot(ix, iy) > .15 ? 1 : 0;                        /* 조이스틱: 조금만 밀어도 항상 같은 속도 (방향만 정함) */
     /* 머리 돌리기: 미는 쪽으로, 무게 때문에 한 번에 다 돌지 않음 */
     let turn = 0;
     if (m > .08) { const want = Math.atan2(-ix, -iy); let d = want - S.head; d = Math.atan2(Math.sin(d), Math.cos(d)); const st = Math.sign(d) * Math.min(Math.abs(d), FLY.TURN * dt); S.head += st; turn = st / Math.max(dt, 1e-4); }

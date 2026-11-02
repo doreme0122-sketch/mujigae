@@ -2,11 +2,11 @@
    날아 보기: 1번 기지에서 기체를 조이스틱으로 몰아 맵 크기·길·문을 몸으로 확인(지금 있는 땅 이름 · 출발 뒤 걸린 시간 · 속도 바꾸기)
    보기: 날아 보기·지역 보기는 기체를 따라감, 맵 전체는 가운데 고정(끌어서 이동). 두 손가락(휠)로 확대. 시작 기지 자리는 빛 고리(다음 단계에서 진짜 기지) */
 import * as THREE from 'three';
-import { makeBloom } from '../core/hangar/bloom.js?v=11030021';
-import { makeMapFloor, MAP, toWorld } from './mapfloor.js?v=11030021';
-import { makePerf } from './perf.js?v=11030021';
+import { makeBloom } from '../core/hangar/bloom.js?v=11030029';
+import { makeMapFloor, MAP, toWorld } from './mapfloor.js?v=11030029';
+import { makePerf } from './perf.js?v=11030029';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
-import { makeFlight, loadBlock, FLY } from './flight.js?v=11030021';
+import { makeFlight, loadBlock, FLY } from './flight.js?v=11030029';
 
 const $ = s => document.querySelector(s), clamp = THREE.MathUtils.clamp;
 const VIEWS = [{ name: '날아 보기', h: 42, tilt: .38 }, { name: '지역 보기', h: 130, tilt: .25 }, { name: '맵 전체', h: 400, tilt: .02 }];
@@ -16,9 +16,9 @@ export async function start(canvas, onProgress = () => {}) {
   renderer.toneMapping = THREE.NoToneMapping; renderer.autoClear = false; renderer.setClearColor(0, 1);
   const scene = new THREE.Scene(), camera = new THREE.PerspectiveCamera(40, 1, 1, 3000), bloom = makeBloom(renderer, { samples: 0 });
   onProgress(.2);
-  const floor = await makeMapFloor(renderer, './assets/map/v6.png?v=11030021');
-  const J = await (await fetch('./assets/map/v6.json?v=11030021')).json();
-  const BLK = await loadBlock('./assets/map/v6.png?v=11030021');                  /* 벽 판정 = 바닥에 그린 벽 그림 그대로 */
+  const floor = await makeMapFloor(renderer, './assets/map/v6.png?v=11030029');
+  const J = await (await fetch('./assets/map/v6.json?v=11030029')).json();
+  const BLK = await loadBlock('./assets/map/v6.png?v=11030029');                  /* 벽 판정 = 바닥에 그린 벽 그림 그대로 */
   { const pm = new THREE.PMREMGenerator(renderer); scene.environment = pm.fromScene(new RoomEnvironment(), .04).texture; scene.environmentIntensity = .6; pm.dispose(); }
   const SPAWN = J.spawns, ALL = [...J.labels.map(o => [o.x, o.y, o.n, o.l]), [500, 500, '무너진 중심부', 'Lv 10+']];
   onProgress(.7);
