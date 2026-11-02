@@ -1,18 +1,18 @@
 /* 벽 보기 (지금은 용암 흑요석) — 맵 미리보기와 같은 하늘(행성 위 궤도), 같은 위에서 본 카메라 */
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
-import { makeBloom } from '../core/hangar/bloom.js?v=11022336';
-import { makePerf } from './perf.js?v=11022336';
+import { makeBloom } from '../core/hangar/bloom.js?v=11022340';
+import { makePerf } from './perf.js?v=11022340';
 import { buildShip, engineSpots } from '../core/ships/build.js';
 import { makeGlow } from '../preview/glow.js';
 import { planetShader } from '../core/planet.js';
 import { planetFor } from '../data/planets.js';
-import { makeIceRidge } from './ice.js?v=11022336';
-import { makeCrystalRidge } from './crystal.js?v=11022336';
-import { makeRuinRidge, updateRuins } from './ruins.js?v=11022336';
-import { makeCoralRidge } from './coral.js?v=11022336';
-import { makeWalls } from './wallhit.js?v=11022336';
-import { makeRidge, updateRidge, hitWall } from './rocks.js?v=11022336';
+import { makeIceRidge } from './ice.js?v=11022340';
+import { makeCrystalRidge } from './crystal.js?v=11022340';
+import { makeRuinRidge, updateRuins } from './ruins.js?v=11022340';
+import { makeCoralRidge } from './coral.js?v=11022340';
+import { makeWalls } from './wallhit.js?v=11022340';
+import { makeRidge, updateRidge, hitWall } from './rocks.js?v=11022340';
 
 const $ = s => document.querySelector(s), clamp = THREE.MathUtils.clamp, rnd = (a, b) => a + Math.random() * (b - a);
 const VIEWS = [

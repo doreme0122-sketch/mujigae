@@ -46,8 +46,9 @@ kn=kinds[near]; k2=kinds[second]
 bossOut=((kn=='boss')&(k2!='boss'))|((k2=='boss')&(kn!='boss'))    # 보스 ↔ 보스 아닌 곳
 bossSide=(kn=='boss')&(k2=='boss')                                  # 보스 구역끼리 옆쪽 → 다른 곳처럼 덩어리만
 nearC=np.hypot(X-CX,Y-CY)<205                                       # 중심부 쪽 경계 → 활짝
-wallK=np.where(bossOut,frag2.astype(np.float32),frag.astype(np.float32))
-wallK=np.where(bossSide,frag.astype(np.float32),wallK)
+fill=((noise(27,.05)*.7+noise(28,.14)*.3)>.2).astype(np.float32)     # 경계는 대부분(약 80%) 이어진 벽
+wallK=fill.copy()
+wallK=np.where(bossSide,frag.astype(np.float32),wallK)             # 보스 구역끼리 옆쪽은 덩어리만
 wallK=np.where(nearC,0.,wallK)
 edge=edge*wallK
 from PIL import ImageDraw
@@ -60,6 +61,13 @@ ring=np.clip(1-np.abs(cen-1)/.1,0,1)
 for P in RADIAL+RING: opn(P,9)
 for P in SIDE: opn(P,5)
 for P in AGGRO: opn(P,5)
+SNEAK=[]                                                            # 몰래 지나가는 좁은 틈 (지역마다 한두 개, 직접 놓음)
+for k in range(10):
+    a=ANG[k]; m=MID[k]
+    SNEAK.append([pol(335,a-.24),pol(395,a-.2)])                    # 앞마당 ↔ 정글 (큰길 반대쪽)
+    SNEAK.append([pol(392,m+.13),pol(440,m+.15)])                   # 앞마당 ↔ 보물 땅 (다른 쪽)
+    SNEAK.append([pol(285,m-.02),pol(250,a+.42)])                   # 정글 ↔ 보스 구역 (샛길 말고 하나 더)
+for P in SNEAK: opn(P,4)
 openM=np.asarray(op.filter(ImageFilter.GaussianBlur(1.2))).astype(np.float32)/255
 edge=edge*(1-np.clip(openM*1.8,0,1)); ring=ring*0                    # 중심부 둘레 벽 없음
 rock=np.maximum(edge,ring)
@@ -84,6 +92,7 @@ def road(pts): path(pts,'#1b1610',11,.55); path(pts,'#d8c58e',4.5,.85)
 for P in RADIAL+RING: road(P)
 for P in SIDE: path(P,'#5fe0d8',3.2,.9,'2 6')
 for P in AGGRO: path(P,'#ff7a5a',3.2,.95,'2 6')
+for P in SNEAK: path(P,'#d6b3ff',2.6,.9,'1 5')
 random.seed(11)
 def bushc(px,py):
     j=min(h-1,max(0,int(py/sc))); i=min(w-1,max(0,int(px/sc)))
@@ -145,9 +154,9 @@ T(CX,CY-4,'무너진 중심부 (넓게 열림)',15,'#ffd6cc',700); T(CX,CY+13,'L
 T(W+24,40,'맵 뼈대 6안 (다시) · 10명 개인전 · 정사각형',19,'#b9ff4a',700,'start')
 # 범례
 X=W+24; Y=78
-items=[('spawn','시작 기지 10곳 (가운데에서 같은 거리)'),('mob','앞마당 약한 몬스터 (먼지 들판 Lv1–3)'),('camp','정글 몬스터 캠프 (Lv3–7)'),('boss','중간 보스 10곳 (5종류 × 2, 마주 보는 곳 같음)'),('ward','와드 (앞마당 빼고 색깔 지역마다 하나 · 30개)'),('bush','수풀 (지역 색 · 들어가면 안 보임)'),('cave','숨은 동굴'),('chest','보물'),('wh','웜홀 (마주 보는 보물 땅끼리, 같은 글자)'),('road','큰길 (기지 → 중심부 · 정글 고리 길)'),('fog','샛길 (좁고 굽음 · 몰래 넘어감)'),('aggro','보스 옆 샛길 (보스 공격을 피하거나 반사하며 지남)'),('ridge','바위 능선 덩어리 (이동기로 얇은 곳은 넘음)')]
+items=[('spawn','시작 기지 10곳 (가운데에서 같은 거리)'),('mob','앞마당 약한 몬스터 (먼지 들판 Lv1–3)'),('camp','정글 몬스터 캠프 (Lv3–7)'),('boss','중간 보스 10곳 (5종류 × 2, 마주 보는 곳 같음)'),('ward','와드 (앞마당 빼고 색깔 지역마다 하나 · 30개)'),('bush','수풀 (지역 색 · 들어가면 안 보임)'),('cave','숨은 동굴'),('chest','보물'),('wh','웜홀 (마주 보는 보물 땅끼리, 같은 글자)'),('road','큰길 (기지 → 중심부 · 정글 고리 길)'),('fog','샛길 (좁고 굽음 · 몰래 넘어감)'),('aggro','보스 옆 샛길 (보스 공격을 피하거나 반사하며 지남)'),('sneak','몰래 지나가는 좁은 틈'),('ridge','바위 능선 = 벽 (대부분 막힘 · 이동기로 넘음)')]
 for i,(k,n) in enumerate(items):
-    y=Y+i*28; x=X+14
+    y=Y+i*27; x=X+14
     if k=='spawn': add(f'<circle cx="{x}" cy="{y}" r="10" fill="#163a28" stroke="#b9ff4a" stroke-width="2.5"/>')
     if k=='mob': [add(f'<circle cx="{x-8+j*8}" cy="{y}" r="3.5" fill="#86d96f"/>') for j in range(3)]
     if k=='camp': add(f'<circle cx="{x}" cy="{y}" r="8" fill="#e9bd4c" stroke="#fff3c4" stroke-width="1.8"/>')
@@ -160,9 +169,10 @@ for i,(k,n) in enumerate(items):
     if k=='road': add(f'<line x1="{x-14}" y1="{y}" x2="{x+16}" y2="{y}" stroke="#d8c58e" stroke-width="4.5" stroke-linecap="round"/>')
     if k=='fog': add(f'<line x1="{x-14}" y1="{y}" x2="{x+16}" y2="{y}" stroke="#5fe0d8" stroke-width="4" stroke-dasharray="2 7" stroke-linecap="round"/>')
     if k=='aggro': add(f'<line x1="{x-14}" y1="{y}" x2="{x+16}" y2="{y}" stroke="#ff7a5a" stroke-width="3.5" stroke-dasharray="2 6" stroke-linecap="round"/>')
+    if k=='sneak': add(f'<line x1="{x-14}" y1="{y}" x2="{x+16}" y2="{y}" stroke="#d6b3ff" stroke-width="3" stroke-dasharray="1 5" stroke-linecap="round"/>')
     if k=='ridge': add(f'<rect x="{x-14}" y="{y-5}" width="30" height="10" rx="5" fill="#5c5f66"/>')
     T(X+42,y+5,n,13,'#d3d9ea',400,'start')
-y0=Y+len(items)*28+14
+y0=Y+len(items)*27+12
 T(X,y0,'고리 구조 (바깥 → 안)',14,'#b9ff4a',700,'start')
 for i,s in enumerate(['① 기지 앞마당 · 먼지 들판 Lv1–3 (기지마다 하나)','② 이웃 두 기지 사이 정글 Lv3–7 (이웃과 처음 부딪힘)','③ 중간 보스 10곳 Lv8–10 · 벽 반쯤 · 입구 서너 개','④ 무너진 중심부 Lv10+ · 벽 없이 넓게 · 잔해·수풀 사이 결판','⑤ 보물 땅 10곳 · 이웃 두 기지 사이 바깥 (양옆에 하나씩)']):
     T(X,y0+22+i*21,s,12,'#d8e6c8',400,'start')
