@@ -48,7 +48,7 @@ function baseParts() {
   P.gun.push(lathe([[0, .5], [.48, .5], [.48, .86], [.44, .9], [0, .9]]));
   for (let k = 0; k < 24; k++) { const a = k / 24 * Math.PI * 2, g = new THREE.BoxGeometry(.04, .3, .045); g.translate(.49, .69, 0); g.rotateY(-a); P.gold.push(NI(g)); }   /* 얇은 세로 살: 금 */
   /* 위 단: 넓어졌다 오므리는 받침 + 결정을 무는 금 집게 여섯 (왕관: 판과 같은 금으로 묶임) */
-  P.silver.push(lathe([[0, .9], [.42, .9], [.52, 1.02], [.5, 1.1], [.36, 1.16], [0, 1.16]]));
+  P.gun.push(lathe([[0, .9], [.42, .9], [.52, 1.02], [.5, 1.1], [.36, 1.16], [0, 1.16]]));   /* 결정 바로 아래: 건메탈 블랙 */
   P.dark.push(lathe([[0, 1.161], [.3, 1.161], [.3, 1.17], [0, 1.17]], 12, 0));
   for (let k = 0; k < 6; k++) { const a = k / 6 * Math.PI * 2 + Math.PI / 6, pts = [];
     for (let i = 0; i <= 6; i++) { const u = i / 6; pts.push([.42 - u * .14 + Math.sin(u * Math.PI) * .06, 1.08 + u * .5]); }
@@ -62,7 +62,7 @@ function baseParts() {
 
 export function makeGuardians() {
   const G = new THREE.Group(), { r: RR, y: Y0, DOWN } = GUARD;
-  const gun = new THREE.MeshPhysicalMaterial({ color: 0x2a2e35, metalness: .9, roughness: .28, clearcoat: .5, clearcoatRoughness: .2, envMapIntensity: 1.05, side: THREE.DoubleSide });
+  const gun = new THREE.MeshPhysicalMaterial({ color: 0x1d2026, metalness: .9, roughness: .28, clearcoat: .5, clearcoatRoughness: .2, envMapIntensity: 1.05, side: THREE.DoubleSide });
   const silver = new THREE.MeshPhysicalMaterial({ color: 0xccd2db, metalness: .4, roughness: .38, clearcoat: .5, clearcoatRoughness: .15, envMapIntensity: 1.15, side: THREE.DoubleSide });
   const dark = new THREE.MeshStandardMaterial({ color: 0x0b0d12, metalness: .5, roughness: .45 });
   const gold = new THREE.MeshPhysicalMaterial({ color: 0xe2b35c, metalness: 1, roughness: .26, clearcoat: .4, clearcoatRoughness: .2, envMapIntensity: 1.25, side: THREE.DoubleSide });
@@ -114,8 +114,7 @@ export function makeGuardians() {
     const core = new THREE.Mesh(coreG, gemCore); core.renderOrder = 4; cl.add(core);
     const outer = new THREE.Mesh(outerG, gemOuter); outer.renderOrder = 5; cl.add(outer);
     const fl = new THREE.Mesh(new THREE.PlaneGeometry(2.1, 2.6), flareMat); fl.position.y = .65; fl.renderOrder = 6; fl.frustumCulled = false; cl.add(fl);
-    /* 결정 둘레를 천천히 도는 작은 조각 셋 */
-    const shards = []; for (let j = 0; j < 3; j++) { const sg = gem(90 + j, .05); sg.scale(1, .5, 1); const m = new THREE.Mesh(sg, gemOuter); m.renderOrder = 5; cl.add(m); shards.push(m); }
+    const shards = [];
     G.add(u); units.push({ cl, shards, ph: k * 1.7 }); }
   G.userData.fire = t => { uFire.value = t; };
   G.userData.update = (t, on) => { uT.value = t; uOn.value += ((on ? 1 : 0) - uOn.value) * .05; const e = t - uFire.value, burst = e >= 0 && e < 1.6 ? Math.exp(-e * 2.4) : 0;
