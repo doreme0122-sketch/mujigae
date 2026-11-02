@@ -67,35 +67,49 @@ const NOISE = `float rh(vec3 p){ return fract(sin(dot(p,vec3(127.1,311.7,74.7)))
 float rn(vec3 p){ vec3 i=floor(p),f=fract(p); f=f*f*(3.-2.*f); return mix(mix(mix(rh(i),rh(i+vec3(1,0,0)),f.x),mix(rh(i+vec3(0,1,0)),rh(i+vec3(1,1,0)),f.x),f.y),mix(mix(rh(i+vec3(0,0,1)),rh(i+vec3(1,0,1)),f.x),mix(rh(i+vec3(0,1,1)),rh(i+vec3(1,1,1)),f.x),f.y),f.z); }
 vec2 vcell(vec3 p){ vec3 i=floor(p),f=fract(p); float a=9.,b=9.; for(int z=-1;z<=1;z++)for(int y=-1;y<=1;y++)for(int x=-1;x<=1;x++){ vec3 g=vec3(x,y,z); vec3 o=vec3(rh(i+g),rh(i+g+5.3),rh(i+g+9.1)); float d=length(g+o-f); if(d<a){b=a;a=d;}else if(d<b)b=d; } return vec2(a,b-a); }`;
 /* 용암 흑요석: 용암이 식어 생긴 검은 유리. 깨진 면은 거울처럼 매끈해 주변 빛이 비친다.
-   속에 용암 심장이 있어 쿵쿵 맥박 칠 때마다 빛이 틈을 따라 바위 끝까지 퍼지고, 그 맥박이 능선을 따라 옆 바위로 건너간다.
-   틈 가장자리의 얇은 유리 막에서 빛이 갈라져 아주 은은한 무지개가 일렁인다(칠한 무지개가 아님). */
-export const BEAT = 'float beat(float p){ float f=fract(p/2.6)*2.6; return exp(-f*f*30.)+.55*exp(-(f-.32)*(f-.32)*40.); }';
-export const beatJS = p => { const f = ((p / 2.6) % 1 + 1) % 1 * 2.6; return Math.exp(-f * f * 30) + .55 * Math.exp(-(f - .32) * (f - .32) * 40); };
+   평소엔 빛나지 않는다. 탄에 맞으면 맞은 자리에서 속의 용암이 깨어나 빛이 틈을 따라 번져 나갔다가 사그라든다.
+   틈 가장자리의 얇은 유리 막에서 빛이 갈라져 은은한 무지개가 잠깐 일렁인다(칠한 무지개가 아님). */
+export const HITS = { value: Array.from({ length: 8 }, () => new THREE.Vector4(0, -99, 0, -99)) };   /* 맞은 자리 (x,y,z, 맞은 시각) — 모든 벽이 같이 씀 */
+let hitI = 0;
+export function hitWall(x, y, z, t) { HITS.value[hitI++ % 8].set(x, y, z, t); }
+const WAVE = `uniform vec4 uHits[8];
+  /* 맞은 자리에서 번지는 빛: 앞머리(고리)가 바깥으로 달려가고, 지나간 자리는 천천히 식는다 */
+  vec3 hitWave(vec3 w, float t){ float near=0., spread=0., front=0.;
+    for(int i=0;i<8;i++){ float age=t-uHits[i].w; if(age<0.||age>2.6) continue; float d=distance(w,uHits[i].xyz);
+      float r=age*5.5;
+      spread+=smoothstep(r+.4,r-.6,d)*exp(-age*1.5)*exp(-d*.28);
+      front+=exp(-(d-r)*(d-r)*2.5)*exp(-age*1.1)*exp(-d*.2);
+      near+=exp(-d*d*2.)*exp(-age*4.); }
+    return vec3(near,spread,front); }`;
 export function obsidianMaterial(uT) {
-  const m = new THREE.MeshPhysicalMaterial({ vertexColors: true, roughness: .1, metalness: 0, clearcoat: .7, clearcoatRoughness: .05, envMapIntensity: .75, ior: 1.5, specularIntensity: 1 });
-  m.onBeforeCompile = sh => { sh.uniforms.uT = uT;
+  const m = new THREE.MeshPhysicalMaterial({ vertexColors: true, roughness: .1, metalness: 0, clearcoat: .6, clearcoatRoughness: .05, envMapIntensity: .38, ior: 1.5, specularIntensity: 1 });
+  m.onBeforeCompile = sh => { sh.uniforms.uT = uT; sh.uniforms.uHits = HITS;
     sh.vertexShader = 'varying vec3 vRp; varying vec3 vWq;\n' + sh.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\n vRp=position;')
-      .replace('#include <project_vertex>', '#include <project_vertex>\n vWq=(modelMatrix*vec4(transformed,1.)).xyz;');
-    sh.fragmentShader = `uniform float uT; varying vec3 vRp; varying vec3 vWq; ${NOISE} ${BEAT}
+      .replace('#include <project_vertex>', `#include <project_vertex>
+        { vec4 w4=vec4(transformed,1.);
+          #ifdef USE_INSTANCING
+            w4=instanceMatrix*w4;
+          #endif
+          vWq=(modelMatrix*w4).xyz; }`);
+    sh.fragmentShader = `uniform float uT; varying vec3 vRp; varying vec3 vWq; ${NOISE} ${WAVE}
       vec3 film(float d,float ct){ vec3 ph=6.2832*2.*1.5*d*ct/vec3(640.,540.,450.); return .5-.5*cos(ph); }\n` + sh.fragmentShader
       .replace('#include <normal_fragment_maps>', `#include <normal_fragment_maps>
         { vec3 q=vRp*3.; float e=.04; float h0=rn(q); vec3 gr=vec3(rn(q+vec3(e,0,0))-h0,rn(q+vec3(0,e,0))-h0,rn(q+vec3(0,0,e))-h0)/e;   /* 조개껍질처럼 물결진 깨진 면 */
           normal=normalize(normal-(mat3(viewMatrix)*gr)*.03); }`)
       .replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>
-        { vec3 wq=vRp+vec3(rn(vRp*1.5),rn(vRp*1.5+3.),rn(vRp*1.5+7.))*.7;
-          vec2 c=vcell(wq*1.9); vec2 c2=vcell(wq*4.6+5.);
-          float inner=clamp(1.2-length(vRp)*1.05,0.,1.);                                        /* 심장에 가까울수록 뜨겁다 */
-          float b=beat(uT-vWq.x*.09-vWq.z*.04);                                                /* 맥박이 능선을 따라 건너간다 */
-          float spread=smoothstep(.0,1.,b*1.4-length(vRp)*.35+.2);                              /* 쿵 하면 안쪽부터 바깥으로 번짐 */
-          float crack=smoothstep(.045,.0,c.y)+smoothstep(.03,.0,c2.y)*.55;
-          float idle=.25+.1*sin(uT*.7+rn(vRp*2.)*6.);
-          float heat=crack*(idle*inner+spread*1.4);
-          totalEmissiveRadiance+=vec3(1.,.25,.03)*heat*2.4+vec3(1.,.55,.18)*pow(heat,2.5)*1.1;
-          totalEmissiveRadiance+=vec3(.9,.12,.02)*smoothstep(.22,0.,c.y)*(inner*.12+spread*.25);   /* 유리 밑으로 비치는 붉은 기운 */
-          vec3 V=normalize(cameraPosition-vWq); float ct=abs(dot(normalize(normal),vec3(0.,0.,1.)));
-          float rim=smoothstep(.12,.05,c.y)-smoothstep(.05,.0,c.y);                              /* 틈 바로 옆의 얇은 막 */
-          totalEmissiveRadiance+=film(280.+260.*rn(vRp*4.),ct)*rim*(1.-ct)*.5; }`); };
-  m.customProgramCacheKey = () => 'rock-obsidian';
+        { vec3 hw=hitWave(vWq,uT); float on=hw.x+hw.y+hw.z;
+          if(on>.002){
+            vec3 wq=vRp+vec3(rn(vRp*1.5),rn(vRp*1.5+3.),rn(vRp*1.5+7.))*.7;
+            vec2 c=vcell(wq*1.9); vec2 c2=vcell(wq*4.6+5.);
+            float crack=smoothstep(.045,.0,c.y)+smoothstep(.03,.0,c2.y)*.55;
+            float heat=crack*(hw.y*1.3+hw.z*2.2+hw.x*2.5);
+            totalEmissiveRadiance+=vec3(1.,.25,.03)*heat*2.4+vec3(1.,.6,.22)*pow(heat,2.2)*1.3;
+            totalEmissiveRadiance+=vec3(.9,.12,.02)*smoothstep(.22,0.,c.y)*(hw.y*.35+hw.x*.8);   /* 유리 밑으로 비치는 붉은 기운 */
+            totalEmissiveRadiance+=vec3(1.,.55,.25)*hw.x*.6;                                     /* 맞은 자리 자체가 달아오름 */
+            float ct=abs(dot(normalize(normal),vec3(0.,0.,1.)));
+            float rim=smoothstep(.12,.05,c.y)-smoothstep(.05,.0,c.y);                              /* 틈 바로 옆의 얇은 막 */
+            totalEmissiveRadiance+=film(280.+260.*rn(vRp*4.),ct)*rim*(1.-ct)*(hw.z*1.4+hw.y*.4); } }`); };
+  m.customProgramCacheKey = () => 'rock-obsidian-hit';
   return m;
 }
 export function rockMaterial(kind, uT) {
@@ -162,19 +176,5 @@ export function updateRidge(grp, t, dt, glow) {
   const { fl, kind } = grp.userData; if (!fl || !fl.length) return;
   for (const f of fl) { const it = f.it, y = it.y + f.h + Math.sin(t * .45 + f.ph) * .35;
     f.ms.position.set(it.x, y, it.z); f.ms.quaternion.premultiply(_q.setFromAxisAngle(_ax, f.spin * dt)); f.y = y; }
-  const thread = (ax, ay, az, bx, by, bz, ph) => {                 /* 늘어났다 줄어드는 녹은 실: 가운데가 가늘고 아래로 처짐 */
-    const L = Math.hypot(bx - ax, by - ay, bz - az), str = .55 + .45 * Math.sin(t * .6 + ph), sag = L * .22 * (1.2 - str * .5), N = Math.max(8, Math.round(L * 2));
-    const b = beatJS(t - (ax + bx) * .045);
-    let px = ax, py = ay, pz = az;
-    for (let i = 1; i <= N; i++) { const s = i / N, x = ax + (bx - ax) * s, z = az + (bz - az) * s, y = ay + (by - ay) * s - Math.sin(s * Math.PI) * sag;
-      const thin = 1 - Math.sin(s * Math.PI) * (.75 - str * .3);
-      glow.add(px, py, pz, x - px, y - py, z - pz, .09 * thin + .03, 2, [1.5, .7, .25], .85);
-      glow.add(px, py, pz, x - px, y - py, z - pz, .45 * thin + .08, 3, [1.1, .26, .04], .45 + b * .5);
-      px = x; py = y; pz = z; }
-    const d = (t * .18 + ph) % 1, s = d, dx = ax + (bx - ax) * s, dz = az + (bz - az) * s, dy = ay + (by - ay) * s - Math.sin(s * Math.PI) * sag;   /* 실을 타고 흐르는 녹은 방울 */
-    glow.add(dx, dy, dz, 0, 0, 0, .14, 1, [1.4, .8, .4], .9); };
-  for (let i = 0; i < fl.length; i++) { const f = fl[i], it = f.it, r = it.s * .55;
-    if (f.below) thread(it.x, f.y - r * .6, it.z, f.below.x, f.below.y + f.below.s * .3, f.below.z, f.ph);
-    const g = fl[i + 1]; if (g && Math.hypot(g.it.x - it.x, g.it.z - it.z) < 8.5) thread(it.x + r * .5, f.y, it.z, g.it.x - g.it.s * .3, g.y, g.it.z, f.ph + 2);
-    const b = beatJS(t - it.x * .09 - it.z * .04); glow.add(it.x, f.y, it.z, 0, 0, 0, it.s * 1.3, 3, [1, .25, .04], .1 + b * .25); }
+
 }

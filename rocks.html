@@ -1,7 +1,7 @@
 <!doctype html>
 <html lang="ko"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>바위 능선</title>
+<title>벽 보기</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#04060e">
@@ -56,7 +56,7 @@ button{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:poin
 <canvas id="cv"></canvas>
 <div id="tags"><div id="hide"><i></i><b>숨는 중 · 남에게 안 보여요</b></div></div>
 <div id="ui">
-  <div id="head"><b>바위 능선</b><span>끌어서 돌려 보기 · 두 손가락으로 확대</span></div>
+  <div id="head"><b>용암 흑요석 벽</b><span>바위를 누르면 쏴요 · 끌어서 돌려 보기</span></div>
   <div id="fps"></div>
   <button id="follow" type="button" hidden>기체 따라가기</button>
   <div id="tip" hidden><b></b><span></span></div>
@@ -65,7 +65,7 @@ button{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:poin
 <div id="load"><p>바위를 깎고 있어요</p><div class="b"><i></i></div></div>
 <div id="rot">기기를 가로로 돌려 주세요</div>
 <script type="module">
-import { start } from './src/proto/rockview.js?v=11021155';
+import { start } from './src/proto/rockview.js?v=11021211';
 const bar = document.querySelector('#load i');
 start(document.querySelector('#cv'), p => { bar.style.transform = `scaleX(${p})`; })
   .then(() => setTimeout(() => document.querySelector('#load').classList.add('done'), 300))

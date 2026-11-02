@@ -1,4 +1,4 @@
-/* 바위 능선 3종 비교 보기 — 맵 미리보기와 같은 하늘(행성 위 궤도), 같은 위에서 본 카메라 */
+/* 벽 보기 (지금은 용암 흑요석) — 맵 미리보기와 같은 하늘(행성 위 궤도), 같은 위에서 본 카메라 */
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { makeBloom } from '../core/hangar/bloom.js';
@@ -6,14 +6,13 @@ import { buildShip, engineSpots } from '../core/ships/build.js';
 import { makeGlow } from '../preview/glow.js';
 import { planetShader } from '../core/planet.js';
 import { planetFor } from '../data/planets.js';
-import { makeRidge, updateRidge, beatJS } from './rocks.js?v=11021155';
+import { makeRidge, updateRidge, hitWall } from './rocks.js?v=11021211';
 
 const $ = s => document.querySelector(s), clamp = THREE.MathUtils.clamp, rnd = (a, b) => a + Math.random() * (b - a);
-const ROWS = [
-  { id: 'obsidian', name: '용암 흑요석', en: 'LAVA OBSIDIAN', z: -27, tip: '용암이 식어 생긴 검은 유리 바위예요. 속의 용암 심장이 쿵쿵 맥박 치면 빛이 틈을 따라 퍼지고, 그 맥박이 능선을 따라 옆 바위로 건너가요. 떠 있는 바위들은 녹은 용암 실로 이어져 있어요.' },
-  { id: 'plain', name: '그냥 바위', en: 'ROCK', z: -9, tip: '비스듬히 쌓인 결이 있는 퇴적암이에요. 깨진 면은 납작하고, 패인 틈엔 먼지가 고여요. 가장 흔한 경계 벽이에요.' },
-  { id: 'lava', name: '용암 바위', en: 'LAVA ROCK', z: 9, tip: '겉은 식어서 검게 굳었고, 갈라진 틈 일부에서 아직 뜨거운 용암이 숨 쉬듯 빛나요. 가까이 가면 불티가 날려요.' },
-  { id: 'meteor', name: '운석', en: 'METEORITE', z: 27, tip: '떨어지며 녹았다 굳은 매끈한 겉에 엄지로 누른 듯한 자국이 있어요. 깨진 곳은 속의 쇠가 드러나 반짝여요.' }];
+const VIEWS = [
+  { id: 'near', name: '가까이', h: 22, tilt: .62 },
+  { id: 'game', name: '게임 시점', h: 44, tilt: .26 }];
+const TIP = { b: '용암 흑요석', s: '평소엔 빛나지 않는 검은 유리 바위예요. 탄에 맞으면 맞은 자리에서 속의 용암이 깨어나 빛이 틈을 따라 번졌다가 사그라들어요. 화면의 바위를 누르면 그쪽으로 쏴요.' };
 
 export async function start(canvas, onProgress = () => {}) {
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: false, powerPreference: 'high-performance' });
@@ -24,7 +23,6 @@ export async function start(canvas, onProgress = () => {}) {
   const fill = new THREE.DirectionalLight(0x8fb0ff, .7); fill.position.set(7, 5, 9); scene.add(fill);
   const lavaUp = new THREE.DirectionalLight(0xff7a3c, .8); lavaUp.position.set(2, -6, 3); scene.add(lavaUp);     /* 아래 용암 행성에서 올라오는 빛 */
   scene.add(new THREE.HemisphereLight(0x7080a8, 0x2a1810, .4));
-  /* 아래 행성 */
   const PL = planetFor(1), bgS = new THREE.Scene(), bgCam = new THREE.Camera();
   const planetMat = new THREE.ShaderMaterial({ depthTest: false, depthWrite: false,
     uniforms: { uRes: U(new THREE.Vector2(2, 2)), uT: U(0), uYaw: U(PL.yaw0), uPitch: U(PL.tilt), uS: U(0), uFade: U(.5), uR: U(1), uC: U(new THREE.Vector2(.5, .5)), uSun: U(new THREE.Vector3(...PL.sun)), uDetail: U(1),
@@ -39,31 +37,42 @@ export async function start(canvas, onProgress = () => {}) {
   const glow = makeGlow(); scene.add(glow.mesh);
   onProgress(.15);
 
-  /* 능선 셋: 같은 굽이로 나란히 */
-  const R = {};
-  for (const [i, r] of ROWS.entries()) { const pts = []; for (let k = 0; k <= 8; k++) { const x = -34 + k * 8.5; pts.push([x, r.z + Math.sin(k * .9 + i) * 2.2]); }
-    const g = makeRidge(r.id, pts, { uT: UT, seed: 3 + i * 5, float: r.id === 'obsidian' }); scene.add(g); R[r.id] = g; onProgress(.15 + .17 * (i + 1)); }
-  /* 기체 (크기 비교용): 능선 사이를 천천히 지나간다 */
+  /* 흑요석 능선 하나 */
+  const pts = []; for (let k = 0; k <= 8; k++) pts.push([-34 + k * 8.5, Math.sin(k * .9) * 2.2]);
+  const wall = makeRidge('obsidian', pts, { uT: UT, seed: 3, float: true }); scene.add(wall); onProgress(.55);
+  const items = wall.userData.items, fl = wall.userData.fl;
+  const targets = () => [...items.filter(i => !i.float && i.s > .6).map(i => ({ x: i.x, y: i.y + i.s * .15, z: i.z, r: i.s * .62 })), ...fl.map(f => ({ x: f.it.x, y: f.y ?? f.it.y + f.h, z: f.it.z, r: f.it.s * .5 }))];
+  /* 깨져 튀는 유리 조각 */
+  const shardMat = new THREE.MeshPhysicalMaterial({ color: 0x050407, roughness: .08, clearcoat: 1, envMapIntensity: 1.2 });
+  const SH = Array.from({ length: 36 }, () => { const o = new THREE.Mesh(new THREE.TetrahedronGeometry(.09), shardMat); o.visible = false; scene.add(o); return { o, v: new THREE.Vector3(), w: new THREE.Vector3(), life: 0 }; }); let shI = 0;
   const ship = await buildShip(1, 1, 'ruby', { renderer, size: 2.0 }); const me = new THREE.Group(); me.add(ship.root); scene.add(me);
   const sm = ship.root.children[0], ENG = engineSpots(ship.ship, sm, new THREE.Box3().setFromObject(sm).getSize(new THREE.Vector3()));
   onProgress(.9);
 
-  /* 용암 불티 */
-  const lavaItems = R.lava.userData.items.filter(it => it.s > 1.2), obsItems = R.obsidian.userData.items.filter(it => it.s > 1.3 && !it.float), EMB = [];
-  const cam = { x: 0, z: -27, h: 30, H: 30, az: 0, tilt: .42 }; let focus = 'obsidian';
+  const shots = [], parts = [];
+  const cam = { x: 0, z: 0, h: 22, H: 22, az: 0, tilt: .62, T: .62 };
   const tour = $('#tour');
-  for (const r of [{ id: 'all', name: '셋 다' }, ...ROWS]) { const b = document.createElement('button'); b.type = 'button'; b.textContent = r.name; b.dataset.id = r.id;
-    b.onclick = () => { focus = r.id; cam.H = r.id === 'all' ? 84 : 28; document.querySelectorAll('#tour button').forEach(x => x.classList.toggle('on', x === b));
-      $('#tip').hidden = r.id === 'all'; if (r.tip) { $('#tip b').textContent = r.name; $('#tip span').textContent = r.tip; } }; tour.appendChild(b); }
-  tour.children[1].classList.add('on'); $('#tip').hidden = false; $('#tip b').textContent = ROWS[0].name; $('#tip span').textContent = ROWS[0].tip;
-  /* 끌면 카메라가 돈다, 두 손가락·휠로 확대 */
-  const ptr = new Map(); let pin = 0;
-  addEventListener('pointerdown', e => { if (e.target.closest('#ui')) return; ptr.set(e.pointerId, [e.clientX, e.clientY]); if (ptr.size === 2) { const [a, b] = [...ptr.values()]; pin = Math.hypot(a[0] - b[0], a[1] - b[1]); } });
-  addEventListener('pointermove', e => { if (!ptr.has(e.pointerId)) return; const o = ptr.get(e.pointerId);
-    if (ptr.size === 1) { cam.az -= (e.clientX - o[0]) * .006; cam.tilt = clamp(cam.tilt + (e.clientY - o[1]) * .004, .05, 1.1); }
+  for (const v of VIEWS) { const b = document.createElement('button'); b.type = 'button'; b.textContent = v.name; b.dataset.id = v.id;
+    b.onclick = () => { cam.H = v.h; cam.T = v.tilt; document.querySelectorAll('#tour button').forEach(x => x.classList.toggle('on', x === b)); }; tour.appendChild(b); }
+  tour.firstChild.classList.add('on'); $('#tip').hidden = false; $('#tip b').textContent = TIP.b; $('#tip span').textContent = TIP.s;
+
+  /* 쏘기: 기체 코에서 목표까지 곧게 */
+  const nose = new THREE.Vector3();
+  function fire(tx, ty, tz) { me.updateMatrixWorld(true); nose.set(0, 0, -1.1).applyMatrix4(me.matrixWorld);
+    const d = new THREE.Vector3(tx - nose.x, ty - nose.y, tz - nose.z).normalize(), side = new THREE.Vector3(-d.z, 0, d.x).normalize();
+    for (const k of [-1, 1]) shots.push({ p: nose.clone().addScaledVector(side, .3 * k), v: d.clone().multiplyScalar(30), life: 1.6 }); }
+  let auto = 1.5, burst = 0, aim = null;
+  /* 누르면: 누른 곳의 바위로 쏜다 / 끌면 카메라가 돈다 */
+  const ray = new THREE.Raycaster(), ndc = new THREE.Vector2(), ptr = new Map(); let pin = 0, moved = 0;
+  addEventListener('pointerdown', e => { if (e.target.closest('#ui')) return; ptr.set(e.pointerId, [e.clientX, e.clientY]); moved = 0; if (ptr.size === 2) { const [a, b] = [...ptr.values()]; pin = Math.hypot(a[0] - b[0], a[1] - b[1]); } });
+  addEventListener('pointermove', e => { if (!ptr.has(e.pointerId)) return; const o = ptr.get(e.pointerId); moved += Math.abs(e.clientX - o[0]) + Math.abs(e.clientY - o[1]);
+    if (ptr.size === 1 && moved > 8) { cam.az -= (e.clientX - o[0]) * .006; cam.T = cam.tilt = clamp(cam.tilt + (e.clientY - o[1]) * .004, .05, 1.1); }
     ptr.set(e.pointerId, [e.clientX, e.clientY]);
     if (ptr.size === 2) { const [a, b] = [...ptr.values()], d = Math.hypot(a[0] - b[0], a[1] - b[1]); if (pin) cam.H = clamp(cam.H * pin / d, 8, 120); pin = d; } });
-  const up = e => { ptr.delete(e.pointerId); if (ptr.size < 2) pin = 0; }; addEventListener('pointerup', up); addEventListener('pointercancel', up);
+  const up = e => { if (ptr.has(e.pointerId) && ptr.size === 1 && moved < 8) { ndc.set(e.clientX / innerWidth * 2 - 1, -(e.clientY / innerHeight) * 2 + 1); ray.setFromCamera(ndc, camera);
+      const hit = ray.intersectObject(wall, true)[0]; if (hit) { aim = hit.point.clone(); burst = 4; auto = 2.5; } }
+    ptr.delete(e.pointerId); if (ptr.size < 2) pin = 0; };
+  addEventListener('pointerup', up); addEventListener('pointercancel', up);
   addEventListener('wheel', e => { cam.H = clamp(cam.H * Math.exp(e.deltaY * .0012), 8, 120); }, { passive: true });
 
   let Wd = 2, Hd = 2;
@@ -72,29 +81,39 @@ export async function start(canvas, onProgress = () => {}) {
     camera.aspect = Wd / Hd; camera.updateProjectionMatrix(); glow.uRes.value.set(Wd, Hd); }
   addEventListener('resize', size); size();
 
-  let last = performance.now(), t = 0, fr = 0, ft = 0; const v3 = new THREE.Vector3();
+  let last = performance.now(), t = 0, fr = 0, ft = 0, cd = 0; const v3 = new THREE.Vector3();
   renderer.setAnimationLoop(now => {
     const dt = clamp((now - last) / 1000, 0, .05); last = now; t += dt; UT.value = t;
     fr++; ft += dt; if (ft > .5) { $('#fps').textContent = Math.round(fr / ft) + ' fps'; fr = 0; ft = 0; }
     glow.begin();
-    /* 기체: 용암 줄과 운석 줄 사이, 그냥 바위 줄과 용암 줄 사이를 번갈아 왕복 */
-    const lane = Math.sin(t * .11) > 0 ? -18 : 0, x = Math.sin(t * .22) * 30, vx = Math.cos(t * .22) * 30 * .22;
-    me.position.set(x, .6, lane + Math.sin(t * .7) * .4); me.rotation.order = 'YXZ'; me.rotation.set(0, vx > 0 ? -Math.PI / 2 : Math.PI / 2, -vx * .04);
-    me.updateMatrixWorld(true); const hx = vx > 0 ? 1 : -1;
-    for (const p of ENG) { v3.copy(p).applyMatrix4(sm.matrixWorld); glow.add(v3.x, v3.y, v3.z, -hx * .9, 0, 0, .15, 1, [.4, .6, 1.4], .9); glow.add(v3.x - hx * .2, v3.y, v3.z, -hx * .6, 0, 0, .4, 3, [.25, .45, 1.3], .7); }
-    /* 용암 바위: 큰 덩어리 둘레의 열기와 불티 */
-    for (const it of lavaItems) { const pulse = .5 + .5 * Math.sin(t * 1.3 + it.x); glow.add(it.x, it.y - .3, it.z, 0, 0, 0, it.s * 1.6, 3, [1, .3, .06], .12 + pulse * .06);
-      if (Math.random() < dt * .9) EMB.push({ x: it.x + rnd(-.6, .6) * it.s, y: it.y + it.s * .4, z: it.z + rnd(-.6, .6) * it.s, vx: rnd(-.4, .4), vy: rnd(.8, 1.8), vz: rnd(-.4, .4), life: rnd(1.2, 2.4), age: 0 }); }
-    for (let i = EMB.length - 1; i >= 0; i--) { const e = EMB[i]; e.age += dt; if (e.age > e.life) { EMB.splice(i, 1); continue; } e.x += e.vx * dt; e.y += e.vy * dt; e.z += e.vz * dt; e.vx += Math.sin(t * 2 + i) * dt * .5;
-      const k = e.age / e.life; glow.add(e.x, e.y, e.z, -e.vx * .05, -e.vy * .05, -e.vz * .05, .045 * (1 - k * .5), 2, [1.4, .55, .15], (1 - k) * .9); }
-    /* 흑요석: 떠 있는 바위·용암 실·맥박 따라 퍼지는 열기와 불티 */
-    updateRidge(R.obsidian, t, dt, glow);
-    for (const it of obsItems) { const b = beatJS(t - it.x * .09 - it.z * .04); glow.add(it.x, it.y - .2, it.z, 0, 0, 0, it.s * 1.5, 3, [1, .24, .04], .06 + b * .2);
-      if (Math.random() < dt * (.3 + b * 3)) EMB.push({ x: it.x + rnd(-.5, .5) * it.s, y: it.y + it.s * .3, z: it.z + rnd(-.5, .5) * it.s, vx: rnd(-.5, .5), vy: rnd(.6, 1.6), vz: rnd(-.5, .5), life: rnd(1, 2.2), age: 0 }); }
+    /* 기체: 벽 앞을 천천히 오가며, 이따금 벽을 쏜다 */
+    const x = Math.sin(t * .16) * 24, vx = Math.cos(t * .16) * 24 * .16, z = 8.5 + Math.sin(t * .5) * .6;
+    const face = aim ? Math.atan2(-(aim.x - x), -(aim.z - z)) : (vx > 0 ? -Math.PI / 2 : Math.PI / 2);
+    me.position.set(x, .6, z); me.rotation.order = 'YXZ'; me.rotation.y += THREE.MathUtils.euclideanModulo(face - me.rotation.y + Math.PI, Math.PI * 2) - Math.PI > 0 ? Math.min(dt * 5, THREE.MathUtils.euclideanModulo(face - me.rotation.y + Math.PI, Math.PI * 2) - Math.PI) : Math.max(-dt * 5, THREE.MathUtils.euclideanModulo(face - me.rotation.y + Math.PI, Math.PI * 2) - Math.PI);
+    me.rotation.z = -vx * .03;
+    if ((auto -= dt) <= 0 && !burst) { const ts = targets().filter(o => Math.abs(o.x - x) < 10); const o = ts[Math.floor(Math.random() * ts.length)]; if (o) { aim = new THREE.Vector3(o.x, o.y, o.z); burst = 3; } auto = rnd(1.6, 2.8); }
+    if (burst && (cd -= dt) <= 0) { cd = .13; fire(aim.x, aim.y, aim.z); if (--burst === 0) setTimeout(() => { aim = null; }, 500); }
+    me.updateMatrixWorld(true); const hx = -Math.sin(me.rotation.y), hz = -Math.cos(me.rotation.y);
+    for (const p of ENG) { v3.copy(p).applyMatrix4(sm.matrixWorld); glow.add(v3.x, v3.y, v3.z, -hx * .9, 0, -hz * .9, .15, 1, [.4, .6, 1.4], .9); glow.add(v3.x - hx * .2, v3.y, v3.z - hz * .2, -hx * .6, 0, -hz * .6, .4, 3, [.25, .45, 1.3], .7); }
+    updateRidge(wall, t, dt, glow);
+    /* 탄 */
+    const ts = targets();
+    for (let i = shots.length - 1; i >= 0; i--) { const b = shots[i]; b.p.addScaledVector(b.v, dt); b.life -= dt; let hit = b.life <= 0;
+      if (!hit) for (const o of ts) { if (Math.hypot(b.p.x - o.x, b.p.y - o.y, b.p.z - o.z) < o.r) { hit = true;
+          const n = new THREE.Vector3(b.p.x - o.x, b.p.y - o.y, b.p.z - o.z).normalize(), hp = new THREE.Vector3(o.x, o.y, o.z).addScaledVector(n, o.r * .9);
+          hitWall(hp.x, hp.y, hp.z, t);
+          parts.push({ p: hp.clone(), v: new THREE.Vector3(), life: .22, age: 0, r: 1.4, k: 3, c: [1.4, .55, .2], a: 1.3, grow: 1 });
+          for (let k = 0; k < 9; k++) { const dv = n.clone().multiplyScalar(rnd(3, 8)).add(new THREE.Vector3(rnd(-4, 4), rnd(-2, 4), rnd(-4, 4))); parts.push({ p: hp.clone(), v: dv, life: rnd(.25, .55), age: 0, r: rnd(.04, .08), k: 2, c: [1.4, .7, .3], a: 1 }); }
+          for (let k = 0; k < 2; k++) { const s = SH[shI++ % SH.length]; s.o.position.copy(hp); s.v.copy(n).multiplyScalar(rnd(2, 5)).add(new THREE.Vector3(rnd(-2, 2), rnd(0, 2), rnd(-2, 2))); s.w.set(rnd(-9, 9), rnd(-9, 9), rnd(-9, 9)); s.life = rnd(.8, 1.4); s.o.visible = true; s.o.scale.setScalar(rnd(.7, 1.6)); }
+          break; } }
+      if (hit) { shots.splice(i, 1); continue; }
+      glow.add(b.p.x, b.p.y, b.p.z, -b.v.x * .024, -b.v.y * .024, -b.v.z * .024, .08, 2, [.55, .75, 1.3], 1, i); }
+    for (let i = parts.length - 1; i >= 0; i--) { const p = parts[i]; p.age += dt; if (p.age > p.life) { parts.splice(i, 1); continue; } p.v.multiplyScalar(Math.exp(-2 * dt)); p.p.addScaledVector(p.v, dt);
+      const k = p.age / p.life; glow.add(p.p.x, p.p.y, p.p.z, -p.v.x * .03, -p.v.y * .03, -p.v.z * .03, p.grow ? p.r * (.6 + k) : p.r, p.k, p.c, p.a * (1 - k) * (p.grow ? 1 - k : 1), i); }
+    for (const s of SH) if (s.o.visible) { s.life -= dt; s.v.multiplyScalar(Math.exp(-1.2 * dt)); s.o.position.addScaledVector(s.v, dt); s.o.rotation.x += s.w.x * dt; s.o.rotation.y += s.w.y * dt; if (s.life <= 0) s.o.visible = false; }
     glow.end(); glow.uT.value = t;
     /* 카메라 */
-    const tz = focus === 'all' ? 0 : ROWS.find(r => r.id === focus).z, tx = focus === 'all' ? 0 : x * .5;
-    cam.x += (tx - cam.x) * Math.min(1, dt * 2); cam.z += (tz - cam.z) * Math.min(1, dt * 2); cam.h += (cam.H - cam.h) * Math.min(1, dt * 2.5);
+    cam.x += (x * .4 - cam.x) * Math.min(1, dt * 1.5); cam.z += (3 - cam.z) * Math.min(1, dt * 2); cam.h += (cam.H - cam.h) * Math.min(1, dt * 2.5); cam.tilt += (cam.T - cam.tilt) * Math.min(1, dt * 2.5);
     const back = cam.h * Math.sin(cam.tilt), hh = cam.h * Math.cos(cam.tilt);
     camera.position.set(cam.x + Math.sin(cam.az) * back, hh, cam.z + Math.cos(cam.az) * back); camera.lookAt(cam.x, 0, cam.z);
     planetMat.uniforms.uR.value = 450 / (cam.h + 400); planetMat.uniforms.uT.value = t; planetMat.uniforms.uYaw.value = PL.yaw0 + t * .006 + cam.az * .3;
@@ -103,5 +122,5 @@ export async function start(canvas, onProgress = () => {}) {
     bloom.render(Wd, Hd);
   });
   onProgress(1);
-  window.__rv = { cam, set: id => [...document.querySelectorAll('#tour button')].find(b => b.dataset.id === id).click() };
+  window.__rv = { cam, fire, shots };
 }
