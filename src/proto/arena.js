@@ -7,15 +7,15 @@
    단위는 자기장 판과 같음. */
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { sweep, posNor } from './floatring.js?v=11021915';
-import { GUARD_ANG, GUARD, guardScale } from './guardian.js?v=11021915';
+import { sweep, posNor } from './floatring.js?v=11021933';
+import { GUARD_ANG, GUARD, guardScale } from './guardian.js?v=11021933';
 
 
 /* 건담처럼 장갑판을 조립한 느낌의 검은 판 선 — 면 위치로 바로 그림(텍스처 없음, 가벼움)
    · 바닥·계단 윗면: 동심 띠 + 벽돌처럼 엇갈린 칸. 칸마다 운으로 '판 안의 판' · 반쯤 그은 선과 꺾인 끝 · 모서리 작은 네모 · 옆 칸과 이어진 긴 판
    · 세운 면(계단 앞면·벽): 세로 칸 + 칸마다 다른 높이의 가로 선 */
-function panelLines(mat, cell = .55) {
-  mat.onBeforeCompile = sh => {
+function panelLines(mat, cell = .55, imp = null) {   /* imp: { uImp } — 빛이 꽂힌 순간 판 선을 따라 퍼지는 빛 (앞머리 반지름) */
+  mat.onBeforeCompile = sh => { if (imp) sh.uniforms.uImp = imp.uImp;
     sh.vertexShader = 'varying vec3 vLp; varying vec3 vLn;\n' + sh.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\n vLp = position; vLn = normal;');
     sh.fragmentShader = `varying vec3 vLp; varying vec3 vLn;
       float ph(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
@@ -41,9 +41,10 @@ function panelLines(mat, cell = .55) {
           float yh = .12 + h * .5; k = max(k, ln(abs(p.y - yh), W) * step(.35, h));
         }
         return k; }
-      ` + sh.fragmentShader.replace('#include <map_fragment>', '#include <map_fragment>\n diffuseColor.rgb *= 1. - .82 * panel(vLp, normalize(vLn));');
+      ` + (imp ? 'uniform vec2 uImp;\n' : '') + sh.fragmentShader.replace('#include <map_fragment>', '#include <map_fragment>\n float pnl = panel(vLp, normalize(vLn)); diffuseColor.rgb *= 1. - .82 * pnl;')
+        .replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\n' + (imp ? ' { float r = length(vLp.xz), d = uImp.x - r; totalEmissiveRadiance += vec3(.35,.65,1.4) * pnl * (exp(-d*d*6.) * 2.5 + step(0., d) * exp(-d * 1.2) * .5) * uImp.y; }' : ''));
   };
-  mat.customProgramCacheKey = () => 'panel' + cell;
+  mat.customProgramCacheKey = () => 'panel' + cell + (imp ? 'i' : '');
   return mat;
 }
 
@@ -58,7 +59,8 @@ export function makeArena() {
   const silverHi = new THREE.MeshPhysicalMaterial({ color: 0xd4d9e1, metalness: .35, roughness: .36, clearcoat: .7, clearcoatRoughness: .15, envMapIntensity: .95, sheen: .4, sheenColor: 0x9fc2ff });
   const gun = new THREE.MeshPhysicalMaterial({ color: 0x2a2e35, metalness: .9, roughness: .3, clearcoat: .5, clearcoatRoughness: .2, envMapIntensity: 1 });
   const gunRib = new THREE.MeshPhysicalMaterial({ color: 0x3a3f48, metalness: .9, roughness: .26, clearcoat: .6, clearcoatRoughness: .15, envMapIntensity: 1.1 });
-  const floorM = panelLines(new THREE.MeshPhysicalMaterial({ color: 0x1c1f25, metalness: .88, roughness: .3, clearcoat: .45, clearcoatRoughness: .2, envMapIntensity: .95 }), .62);   /* 검은 건메탈 + 판 선 */
+  const uImp = { value: new THREE.Vector2(0, 0) };
+  const floorM = panelLines(new THREE.MeshPhysicalMaterial({ color: 0x1c1f25, metalness: .88, roughness: .3, clearcoat: .45, clearcoatRoughness: .2, envMapIntensity: .95 }), .62, { uImp });   /* 검은 건메탈 + 판 선 */
   const gold = new THREE.MeshPhysicalMaterial({ color: 0xe2b35c, metalness: 1, roughness: .26, clearcoat: .4, clearcoatRoughness: .2, envMapIntensity: 1.25 });
   const dark = new THREE.MeshStandardMaterial({ color: 0x0b0d12, metalness: .5, roughness: .45, envMapIntensity: .5 });
   const blue = new THREE.MeshBasicMaterial({ color: 0x3b6fd0 });
@@ -208,6 +210,7 @@ export function makeArena() {
   const gm = new THREE.Mesh(gg, gMat); gm.renderOrder = 3; G.add(gm);
   G.userData.wake = t => { uW.value = t; uOn.value = 1; };
   G.userData.sleep = () => { uW.value = 1e9; uOn.value = 0; };
+  G.userData.impact = (r, k) => { uImp.value.set(r, k); };   /* 빛이 꽂힌 뒤 판 선을 따라 퍼지는 빛 */
   G.userData.update = t => { uT.value = t; };
   return G;
 }

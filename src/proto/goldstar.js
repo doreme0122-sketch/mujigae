@@ -68,13 +68,13 @@ export function makeGoldStar() {
     for (let j = -1; j <= 1; j++) { const b = a + Math.PI / 4 + j * .09, r = base - RIM - .07, s = new THREE.CylinderGeometry(.022, .026, .02, 10); s.translate(Math.cos(b) * r, YP + .01, Math.sin(b) * r); rv.push(s); } }
   G.add(new THREE.Mesh(mergeGeometries(rg), gold)); G.add(new THREE.Mesh(mergeGeometries(rv), goldDim));
   /* 5) 빛길: 등뼈 양옆의 가는 홈 + 판을 감싸는 고리 홈. uFlow = 빛이 끝(1)에서 고리(0)로 오는 위치 */
-  const uFlow = { value: -1 }, uRing = { value: 0 };
-  const lineMat = new THREE.ShaderMaterial({ transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, uniforms: { uFlow, uRing },
+  const uFlow = { value: -1 }, uRing = { value: 0 }, uBurst = { value: 0 };
+  const lineMat = new THREE.ShaderMaterial({ transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, uniforms: { uFlow, uRing, uBurst },
     vertexShader: 'attribute float aT; varying float vT; void main(){ vT=aT; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.); }',
-    fragmentShader: `uniform float uFlow, uRing; varying float vT;
+    fragmentShader: `uniform float uFlow, uRing, uBurst; varying float vT;
       void main(){ float head = exp(-pow((vT-uFlow)*7., 2.)); float tail = step(uFlow, vT) * exp(-(vT-uFlow)*4.) * step(-.5, uFlow);
         float ring = vT < 0. ? uRing : 0.;
-        float b = vT < 0. ? ring : head*1.6 + tail*.35;
+        float b = vT < 0. ? ring + uBurst*1.5 : head*1.6 + tail*.35 + uBurst*exp(-pow(vT-(1.-uBurst),2.)*20.)*3. + uBurst*.6;   /* 빛이 꽂힌 순간: 고리에서 갈래 끝까지 번쩍 뻗음 */
         vec3 c = mix(vec3(.25,.5,1.2), vec3(.85,.95,1.3), head);
         gl_FragColor = vec4(c*b, 1.); }` });
   const pos = [], tt = [];
@@ -96,6 +96,7 @@ export function makeGoldStar() {
   G.userData.update = t => { const e = t - fireT;
     uFlow.value = e >= 0 && e < ARRIVE + .05 ? 1 - e / ARRIVE : -1;
     uRing.value = e >= ARRIVE - .05 ? .35 + Math.exp(-(e - ARRIVE + .05) * 2.6) * 1.1 : 0; };
+  G.userData.burst = k => { uBurst.value = k; };
   G.userData.off = () => { fireT = -99; uRing.value = 0; };
   return G;
 }

@@ -1,16 +1,16 @@
 /* 시작 기지 부품 보기 ① — 자기장 판(격납고 그대로) + 금테 네 갈래 별 */
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
-import { makeBloom } from '../core/hangar/bloom.js';
-import { makePad } from '../core/hangar/pad.js?v=11021915';
-import { makeMag } from '../core/hangar/mag.js?v=11021915';
-import { buildShip } from '../core/ships/build.js';
-import { makeGoldStar } from './goldstar.js?v=11021915';
-import { makeArena, SPEED, WAVE_R0 } from './arena.js?v=11021915';
-import { makeGuardians, GUARD } from './guardian.js?v=11021915';
-import { makeFloor, FLOORS } from './floor.js?v=11021915';
-import { makePerf } from './perf.js?v=11021915';
-import { makeBirth, BIRTH } from './birth.js?v=11021915';
+import { makeBloom } from '../core/hangar/bloom.js?v=11021933';
+import { makePad } from '../core/hangar/pad.js?v=11021933';
+import { makeMag } from '../core/hangar/mag.js?v=11021933';
+import { buildShip, engineSpots } from '../core/ships/build.js';
+import { makeGoldStar } from './goldstar.js?v=11021933';
+import { makeArena, SPEED, WAVE_R0 } from './arena.js?v=11021933';
+import { makeGuardians, GUARD } from './guardian.js?v=11021933';
+import { makeFloor, FLOORS } from './floor.js?v=11021933';
+import { makePerf } from './perf.js?v=11021933';
+import { makeBirth, BIRTH } from './birth.js?v=11021933';
 
 const $ = s => document.querySelector(s), clamp = THREE.MathUtils.clamp;
 const SHIPL = 2.9;     /* 기체 길이: 자기장 판(지름 3.2)보다 약간 작게 */
@@ -44,13 +44,13 @@ export async function start(canvas, onProgress = () => {}) {
   onProgress(.5);
   const b = await buildShip(1, 1, 'ruby', { renderer, size: SHIPL }); const ship = b.root, sm = ship.children[0]; stand.add(ship);
   const k2 = ship.scale.x, shipHalf = new THREE.Box3().setFromObject(sm).getSize(new THREE.Vector3()).y * k2 / 2;
-  const birth = makeBirth(renderer, ship); scene.add(birth);
+  const birth = makeBirth(ship, sm, engineSpots(b.ship, sm, new THREE.Box3().setFromObject(sm).getSize(new THREE.Vector3()).divideScalar(1))); scene.add(birth);
   let showShip = true, onAt, born = false; ship.visible = false;
   /* 원인 → 결과: 탑이 빛남 → 빛 물결이 한 속도로 바닥 → 금테 별 → 판의 정중앙까지 모임 → 모이는 그 순간 하늘 빛이 가운데 땅에 닿음 → 태어남 */
   let holdAt = 1e9, W0 = 0; const FILL = 1.62 / SPEED;
   const tw = r => W0 + (WAVE_R0 - r) / SPEED;                  /* 물결이 반지름 r에 닿는 때 */
   const wake = t0 => { W0 = t0 + GUARD.DOWN; guards.userData.fire(t0); ring.userData.wake(W0);
-    star.userData.fire(tw(2.55), (2.55 - 1.8) / SPEED); holdAt = tw(1.62); onAt = tw(0) - BIRTH.FALL; born = false; };   /* 빛이 정중앙에 모이는 그 순간 하늘 빛이 땅에 닿음 */ wake(.4);
+    star.userData.fire(tw(2.55), (2.55 - 1.8) / SPEED); holdAt = tw(1.62); onAt = tw(0) - BIRTH.PRE; born = false; };   /* 빛이 정중앙에 모이는 그 순간 하늘 빛이 땅에 닿음 */ wake(.4);
   onProgress(.9);
 
   /* 버튼: 시점 · 기체 */
@@ -72,7 +72,7 @@ export async function start(canvas, onProgress = () => {}) {
   let Wd = 2, Hd = 2;
   const perf = makePerf(st => { bloom.setSamples(st.aa ? 4 : 0); size(); });
   function size() { const r = canvas.getBoundingClientRect(); [Wd, Hd] = perf.size(r.width, r.height);
-    renderer.setSize(Wd, Hd, false); bloom.size(Wd, Hd); camera.aspect = Wd / Hd; camera.updateProjectionMatrix(); fcam.aspect = Wd / Hd; fcam.updateProjectionMatrix(); floor.size(Wd, Hd); mag.userData.setPixel(Hd / 20); }
+    renderer.setSize(Wd, Hd, false); bloom.size(Wd, Hd); camera.aspect = Wd / Hd; camera.updateProjectionMatrix(); fcam.aspect = Wd / Hd; fcam.updateProjectionMatrix(); floor.size(Wd, Hd); mag.userData.setPixel(Hd / 20); birth.userData.setPx(Hd); }
   addEventListener('resize', size); size(); bloom.setSamples(perf.st.aa ? 4 : 0);
 
   let last = performance.now(), t = 0;
@@ -81,7 +81,9 @@ export async function start(canvas, onProgress = () => {}) {
     const on = showShip && t >= onAt, filling = showShip && t >= holdAt; if (on && !born) { born = true; ship.visible = true; birth.userData.start(t); } mag.userData.setHold(filling);
     pad.userData.update(t); mag.userData.update(t, on ? ship : null, shipHalf);
     { const LU = pad.userData.lampU, q = (t - holdAt) / FILL;          /* 들어온 순서대로: 바깥 고리 → 가운데 */
-      if (filling && q < 1.1) { LU.uIn.value = Math.max(0, 1.62 * (1 - Math.min(1, q))); LU.uInHead.value = q < 1 ? 1.4 : 0; } else { LU.uIn.value = -1; LU.uInHead.value = 0; } } star.userData.update(t); ring.userData.update(t); birth.userData.update(t, dt); guards.userData.update(t, on);
+      if (filling && q < 1.1) { LU.uIn.value = Math.max(0, 1.62 * (1 - Math.min(1, q))); LU.uInHead.value = q < 1 ? 1.4 : 0; } else { LU.uIn.value = -1; LU.uInHead.value = 0; } } star.userData.update(t); ring.userData.update(t); birth.userData.update(t, dt);
+    { const S = birth.userData.S; for (const o of [pad, mag, star, stand]) o.position.y = S.punch; star.userData.burst(S.burst); ring.userData.impact(S.impR, S.impK);
+      const sp = new THREE.Vector3(0, .2, 0).project(camera); bloom.warp(sp.x * .5 + .5, sp.y * .5 + .5, S.warpR, S.warpS, Wd / Hd); } guards.userData.update(t, on);
     cam.h += (cam.H - cam.h) * Math.min(1, dt * 3); cam.tilt += (cam.T - cam.tilt) * Math.min(1, dt * 3);
     camera.position.set(Math.sin(cam.az) * cam.h * Math.sin(cam.tilt), cam.h * Math.cos(cam.tilt) + .3, Math.cos(cam.az) * cam.h * Math.sin(cam.tilt)); camera.lookAt(0, .35, 0);
     fcam.position.copy(camera.position).multiplyScalar(BS); fcam.position.y += HOVER; fcam.quaternion.copy(camera.quaternion); floor.update(t, dt, 0, 0);

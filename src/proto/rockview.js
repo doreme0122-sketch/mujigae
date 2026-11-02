@@ -2,17 +2,17 @@
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { makeBloom } from '../core/hangar/bloom.js?v=11021559';
-import { makePerf } from './perf.js?v=11021915';
+import { makePerf } from './perf.js?v=11021933';
 import { buildShip, engineSpots } from '../core/ships/build.js';
 import { makeGlow } from '../preview/glow.js';
 import { planetShader } from '../core/planet.js';
 import { planetFor } from '../data/planets.js';
-import { makeIceRidge } from './ice.js?v=11021915';
-import { makeCrystalRidge } from './crystal.js?v=11021915';
-import { makeRuinRidge, updateRuins } from './ruins.js?v=11021915';
-import { makeCoralRidge } from './coral.js?v=11021915';
-import { makeWalls } from './wallhit.js?v=11021915';
-import { makeRidge, updateRidge, hitWall } from './rocks.js?v=11021915';
+import { makeIceRidge } from './ice.js?v=11021933';
+import { makeCrystalRidge } from './crystal.js?v=11021933';
+import { makeRuinRidge, updateRuins } from './ruins.js?v=11021933';
+import { makeCoralRidge } from './coral.js?v=11021933';
+import { makeWalls } from './wallhit.js?v=11021933';
+import { makeRidge, updateRidge, hitWall } from './rocks.js?v=11021933';
 
 const $ = s => document.querySelector(s), clamp = THREE.MathUtils.clamp, rnd = (a, b) => a + Math.random() * (b - a);
 const VIEWS = [

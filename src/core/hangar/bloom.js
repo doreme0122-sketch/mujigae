@@ -22,10 +22,14 @@ export function makeBloom(renderer, bo = {}){
         s+=(texture(t,vU+dir*3.2308).rgb+texture(t,vU-dir*3.2308).rgb)*.0702;
         o=vec4(s,1.); }`});
   const comp=new THREE.RawShaderMaterial({glslVersion:THREE.GLSL3,
-    uniforms:{t:{value:null},b1:{value:null},b2:{value:null},k:{value:.28}},
+    uniforms:{t:{value:null},b1:{value:null},b2:{value:null},k:{value:.28},warp:{value:new THREE.Vector4(.5,.5,0,0)},asp:{value:1}},
     vertexShader:'in vec3 position;in vec2 uv;out vec2 vU;void main(){vU=uv;gl_Position=vec4(position.xy,0.,1.);}',
-    fragmentShader:`precision highp float;in vec2 vU;out vec4 o;uniform sampler2D t,b1,b2;uniform float k;
-      void main(){ vec3 c=texture(t,vU).rgb + (texture(b1,vU).rgb*.45+texture(b2,vU).rgb*1.05)*k;
+    fragmentShader:`precision highp float;in vec2 vU;out vec4 o;uniform sampler2D t,b1,b2;uniform float k,asp;uniform vec4 warp;
+      void main(){ vec2 uv=vU;
+        if(warp.w>0.){ vec2 d=(vU-warp.xy)*vec2(asp,1.); float r=length(d)+1e-5, R=warp.z;      /* 공간이 일그러지는 파동: 센 첫 물결 + 뒤따르는 약한 물결 둘 */
+          float w=exp(-pow((r-R)/.035,2.))-exp(-pow((r-R+.05)/.035,2.))*.6+(exp(-pow((r-R*.72)/.03,2.))-exp(-pow((r-R*.72+.04)/.03,2.))*.6)*.45+(exp(-pow((r-R*.48)/.025,2.)))*.2;
+          uv-=d/r/vec2(asp,1.)*w*warp.w; }
+        vec3 c=texture(t,uv).rgb + (texture(b1,uv).rgb*.45+texture(b2,uv).rgb*1.05)*k;
         c=c/(1.+c*.52);
         o=vec4(pow(max(c,0.),vec3(1./2.2)),1.); }`});
   const mesh=new THREE.Mesh(geo,cut); sc.add(mesh);
@@ -36,6 +40,8 @@ export function makeBloom(renderer, bo = {}){
       a.setSize(w,h);b.setSize(w,h); c.setSize(Math.max(2,W>>4),Math.max(2,H>>4));d.setSize(Math.max(2,W>>4),Math.max(2,H>>4)); },
     /* 모서리 매끄럽게 하는 계산 횟수 바꾸기 (0 = 끔) */
     setSamples(n){ if(rtS.samples!==n){ rtS.samples=n; rtS.dispose(); } },
+    /* 공간 일그러짐 파동 (화면 좌표 중심 cx,cy · 반지름 r · 세기 s, 0이면 꺼짐) */
+    warp(cx,cy,r,s,asp){ comp.uniforms.warp.value.set(cx,cy,r,s); comp.uniforms.asp.value=asp||1; },
     render(W,H,off){
       if(off){ comp.uniforms.t.value=rtS.texture; comp.uniforms.b1.value=rtS.texture; comp.uniforms.b2.value=rtS.texture; const k=comp.uniforms.k.value; comp.uniforms.k.value=0; run(comp,null); comp.uniforms.k.value=k; return; }   /* 빛 번짐 끔: 밝기 정리만 */
       cut.uniforms.t.value=rtS.texture; run(cut,a);
