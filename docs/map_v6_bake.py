@@ -19,5 +19,6 @@ img=np.stack([ids*12,(G*255).astype(np.uint8),(B*255).astype(np.uint8)],-1).asty
 Image.fromarray(img,'RGB').save('../assets/map/v6.png')
 lab=[dict(x=round(s[0],1),y=round(s[1],1),n=s[2],l=s[3],k=s[5]) for s in seeds if s[5]!='yard']
 spawns=[[round(c,1) for c in pol(372,a)] for a in ANG]
-json.dump(dict(W=W,H=H,labels=lab,spawns=spawns,gates=GATES),open('../assets/map/v6.json','w'),ensure_ascii=False)
+NAMES=[YARD[0]]+[j[0] for j in JUN]+[b[0] for b in BOSS]+[t[0] for t in TRE]+['무너진 중심부','소행성 잔해']
+json.dump(dict(W=W,H=H,labels=lab,spawns=spawns,gates=GATES,names=NAMES),open('../assets/map/v6.json','w'),ensure_ascii=False)
 print(img.shape,np.bincount(ids.ravel()))

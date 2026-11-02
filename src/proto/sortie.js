@@ -8,14 +8,14 @@
    지나간 길엔 짧은 엔진 빛 꼬리가 남았다 빠르게 사라짐. 적 탄이 막에 맞아 물결치는 것·실제 이동 속도는 맵이 생기면 연결
    무게: 불꽃·꼬리는 띠 몇 장, 막은 구 하나, 방울은 점 묶음 하나, 충격파 일그러짐은 빛 번짐 마무리 단계에 얹음 */
 import * as THREE from 'three';
-import { filmMaterial } from '../preview/fxmat.js?v=11030014';
+import { filmMaterial } from '../preview/fxmat.js?v=11030021';
 
 export const SORTIE = { IGN: .55, SHIELD: 3, BOOST: 5 };
 const AB = { transparent: true, depthWrite: false, blending: THREE.AdditiveBlending };
 const sm01 = x => { x = Math.min(1, Math.max(0, x)); return x * x * (3 - 2 * x); };
 
 /* 화면을 향해 눕는 띠 A→B (불꽃): 뿌리는 하얗고 굵게, 끝은 파랗게 가늘어지며 흔들림 */
-function flameMesh() {
+export function flameMesh() {
   const m = new THREE.ShaderMaterial({ ...AB, side: THREE.DoubleSide, uniforms: { uA: { value: new THREE.Vector3() }, uB: { value: new THREE.Vector3() }, uW: { value: .1 }, uI: { value: 0 }, uT: { value: 0 } },
     vertexShader: `uniform vec3 uA, uB; uniform float uW; varying vec2 vU;
       void main(){ vU = uv; vec3 P = mix(uA, uB, uv.y), ax = normalize(uB - uA + vec3(1e-4));
