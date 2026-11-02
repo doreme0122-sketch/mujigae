@@ -1,16 +1,16 @@
 /* 시작 기지 부품 보기 ① — 자기장 판(격납고 그대로) + 금테 네 갈래 별 */
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
-import { makeBloom } from '../core/hangar/bloom.js?v=11021933';
-import { makePad } from '../core/hangar/pad.js?v=11021933';
-import { makeMag } from '../core/hangar/mag.js?v=11021933';
+import { makeBloom } from '../core/hangar/bloom.js?v=11021942';
+import { makePad } from '../core/hangar/pad.js?v=11021942';
+import { makeMag } from '../core/hangar/mag.js?v=11021942';
 import { buildShip, engineSpots } from '../core/ships/build.js';
-import { makeGoldStar } from './goldstar.js?v=11021933';
-import { makeArena, SPEED, WAVE_R0 } from './arena.js?v=11021933';
-import { makeGuardians, GUARD } from './guardian.js?v=11021933';
-import { makeFloor, FLOORS } from './floor.js?v=11021933';
-import { makePerf } from './perf.js?v=11021933';
-import { makeBirth, BIRTH } from './birth.js?v=11021933';
+import { makeGoldStar } from './goldstar.js?v=11021942';
+import { makeArena, SPEED, WAVE_R0 } from './arena.js?v=11021942';
+import { makeGuardians, GUARD } from './guardian.js?v=11021942';
+import { makeFloor, FLOORS } from './floor.js?v=11021942';
+import { makePerf } from './perf.js?v=11021942';
+import { makeBirth, BIRTH } from './birth.js?v=11021942';
 
 const $ = s => document.querySelector(s), clamp = THREE.MathUtils.clamp;
 const SHIPL = 2.9;     /* 기체 길이: 자기장 판(지름 3.2)보다 약간 작게 */
@@ -44,7 +44,7 @@ export async function start(canvas, onProgress = () => {}) {
   onProgress(.5);
   const b = await buildShip(1, 1, 'ruby', { renderer, size: SHIPL }); const ship = b.root, sm = ship.children[0]; stand.add(ship);
   const k2 = ship.scale.x, shipHalf = new THREE.Box3().setFromObject(sm).getSize(new THREE.Vector3()).y * k2 / 2;
-  const birth = makeBirth(ship, sm, engineSpots(b.ship, sm, new THREE.Box3().setFromObject(sm).getSize(new THREE.Vector3()).divideScalar(1))); scene.add(birth);
+  const birth = makeBirth(ship); scene.add(birth);
   let showShip = true, onAt, born = false; ship.visible = false;
   /* 원인 → 결과: 탑이 빛남 → 빛 물결이 한 속도로 바닥 → 금테 별 → 판의 정중앙까지 모임 → 모이는 그 순간 하늘 빛이 가운데 땅에 닿음 → 태어남 */
   let holdAt = 1e9, W0 = 0; const FILL = 1.62 / SPEED;
