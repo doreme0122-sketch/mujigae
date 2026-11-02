@@ -3,12 +3,12 @@ import * as THREE from 'three';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { makeBloom } from '../core/hangar/bloom.js';
 import { makePad } from '../core/hangar/pad.js';
-import { makeMag } from '../core/hangar/mag.js?v=11021707';
+import { makeMag } from '../core/hangar/mag.js?v=11021710';
 import { buildShip } from '../core/ships/build.js';
-import { makeGoldStar } from './goldstar.js?v=11021707';
-import { makeFloatRing } from './floatring.js?v=11021707';
-import { makeFloor, FLOORS } from './floor.js?v=11021707';
-import { makePerf } from './perf.js?v=11021707';
+import { makeGoldStar } from './goldstar.js?v=11021710';
+import { makeFloatRing } from './floatring.js?v=11021710';
+import { makeFloor, FLOORS } from './floor.js?v=11021710';
+import { makePerf } from './perf.js?v=11021710';
 
 const $ = s => document.querySelector(s), clamp = THREE.MathUtils.clamp;
 const SHIPL = 2.9;     /* 기체 길이: 자기장 판(지름 3.2)보다 약간 작게 */
@@ -32,7 +32,7 @@ export async function start(canvas, onProgress = () => {}) {
   const base = new THREE.Group(); scene.add(base);
   const pad = makePad(); base.add(pad); const mag = makeMag(pad, { dust: false }); base.add(mag); mag.userData.setMode(1);
   const star = makeGoldStar(); base.add(star);
-  base.add(makeFloatRing());
+  const ring = makeFloatRing(); base.add(ring);
   /* 아래 맵: 판 단위 → 맵 단위(기체 2m = 판 단위 SHIPL). 부활 자리는 맵 바닥에서 4m 위에 떠 있음 */
   const BS = 2 / SHIPL, HOVER = 2.4, floor = makeFloor(renderer); floor.set(FLOORS[1]);
   const fcam = new THREE.PerspectiveCamera(36, 1, .05, 300);
@@ -69,7 +69,7 @@ export async function start(canvas, onProgress = () => {}) {
   renderer.setAnimationLoop(now => { try {
     const dt = clamp((now - last) / 1000, 0, .05); last = now; t += dt;
     const on = showShip && t >= onAt; if (on && !ship.visible) ship.visible = true; mag.userData.setHold(on);
-    pad.userData.update(t); mag.userData.update(t, on ? ship : null, shipHalf); star.userData.update(t);
+    pad.userData.update(t); mag.userData.update(t, on ? ship : null, shipHalf); star.userData.update(t); ring.userData.update(t, on);
     cam.h += (cam.H - cam.h) * Math.min(1, dt * 3); cam.tilt += (cam.T - cam.tilt) * Math.min(1, dt * 3);
     camera.position.set(Math.sin(cam.az) * cam.h * Math.sin(cam.tilt), cam.h * Math.cos(cam.tilt) + .3, Math.cos(cam.az) * cam.h * Math.sin(cam.tilt)); camera.lookAt(0, .35, 0);
     fcam.position.copy(camera.position).multiplyScalar(BS); fcam.position.y += HOVER; fcam.quaternion.copy(camera.quaternion); floor.update(t, dt, 0, 0);
