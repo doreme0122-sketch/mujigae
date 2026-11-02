@@ -10,7 +10,7 @@ ids=idmap[near]; ids=np.where(inC,16,ids); ids=np.where(debris>.5,17,ids).astype
 rd=Image.new('L',(w,h),0); d=ImageDraw.Draw(rd)
 for P in RADIAL+RING: d.line([(x/sc,y/sc) for x,y in P],fill=255,width=6,joint='curve')
 sp=Image.new('L',(w,h),0); d2=ImageDraw.Draw(sp)
-for P in SIDE+AGGRO+SNEAK: d2.line([(x/sc,y/sc) for x,y in P],fill=255,width=3,joint='curve')
+for P in SIDE+TDOOR+AGGRO+SNEAK: d2.line([(x/sc,y/sc) for x,y in P],fill=255,width=3,joint='curve')
 rd=np.asarray(rd.filter(ImageFilter.GaussianBlur(1.3))).astype(np.float32)/255
 sp=np.asarray(sp.filter(ImageFilter.GaussianBlur(1.))).astype(np.float32)/255
 B=np.maximum(rd, sp*.5)

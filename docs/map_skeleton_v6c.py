@@ -21,7 +21,7 @@ RING=[arcp(300,ANG[k]+.02,ANG[k]+2*math.pi/10-.02,12) for k in range(10)]
 SIDE=[]                                                             # 샛길: 이웃 앞마당끼리 · 앞마당→보물 땅 · 보물 땅→정글 · 정글→보스 옆구리 없음(보스는 막힘)
 for k in range(10):
     a=ANG[k]; m=MID[k]; a2=ANG[(k+1)%10]
-    SIDE.append([pol(400,m),pol(430,m)])                            # 보물 땅 입구
+    pass
 AGGRO=[[pol(300,a+.2),pol(268,a+.17),pol(232,a+.16),pol(196,a+.15),pol(140,a+.12)] for a in ANG]   # 보스 옆 샛길: 보스가 알아채는 범위 안을 지남
 sc=2; w=h=W//sc
 yy,xx=np.mgrid[0:h,0:w].astype(np.float32)*sc
@@ -48,6 +48,19 @@ fill=((noise(27,.05)*.7+noise(28,.14)*.3)>.2).astype(np.float32)     # 경계는
 wallK=fill.copy()
 wallK=np.where(bossSide,frag.astype(np.float32),wallK)             # 보스 구역끼리 옆쪽은 덩어리만
 wallK=np.where(np.hypot(X-CX,Y-CY)<182,0.,wallK)   # 중심부 안·둘레는 지역 경계 벽 없음 → 둘레 벽(ring)이 맡음
+treB=(kn=='tre')|(k2=='tre'); wallK=np.where(treB,1.,wallK); edge=np.where(treB,np.clip(1-(d2-d1)/40,0,1),edge)   # 보물 땅은 거리 1.2배라 띠가 얇아짐 → 같은 두께로        # 보물 땅 둘레는 열 곳 모두 빈틈없이 벽 (문은 아래에서 정해 뚫음)
+TDOOR=[]                                                            # 보물 땅 문 셋: 왼쪽 앞마당 · 오른쪽 앞마당 · 앞쪽 정글 — 실제 경계선 위에
+def doorAt(t,o):
+    A=((near==t)&(second==o))|((near==o)&(second==t)); M=A&(d2-d1<6)&(np.hypot(X-CX,Y-CY)<462)        # 맵 안쪽 경계만 (모서리 잔해 쪽 제외)
+    py,px=np.nonzero(M); bx,by=xx[py,px],yy[py,px]; cx,cy=bx.mean(),by.mean()
+    i=np.argmin((bx-cx)**2+(by-cy)**2); qx,qy=bx[i],by[i]
+    nb=(bx-qx)**2+(by-qy)**2<22**2; P=np.stack([bx[nb]-qx,by[nb]-qy]); ev=np.linalg.eigh(P@P.T)[1]
+    nx_,ny_=ev[0,0],ev[1,0]                                         # 경계선에 수직 → 문이 벽을 곧게 뚫음 (비스듬히 길게 찢지 않게)
+    if nx_*(seeds[o][0]-qx)+ny_*(seeds[o][1]-qy)<0: nx_,ny_=-nx_,-ny_
+    return [(qx+nx_*26,qy+ny_*26),(qx,qy),(qx-nx_*26,qy-ny_*26)]
+for k in range(10):
+    t=30+k
+    for o in (k,(k+1)%10,10+k): TDOOR.append(doorAt(t,o))
 edge=edge*wallK
 from PIL import ImageDraw
 op=Image.new('L',(w,h),0); od=ImageDraw.Draw(op)
@@ -58,6 +71,7 @@ col[inC]=np.array([.4,.13,.13])*(.75+.5*tex[inC])[...,None]
 ring=np.clip(1-np.abs(cen-1)/.1,0,1)
 for P in RADIAL+RING: opn(P,15)                                     # 문: 넓고 확실하게 뚫음
 for P in SIDE: opn(P,9)
+for P in TDOOR: opn(P,10)
 for P in AGGRO: opn(P,9)
 SNEAK=[]                                                            # 몰래 지나가는 좁은 틈 (지역마다 한두 개, 직접 놓음)
 for k in range(10):
@@ -86,7 +100,7 @@ def path(pts,stroke,wd,op=1,dash=None):
 def road(pts): path(pts,'#1b1610',11,.55); path(pts,'#d8c58e',4.5,.85)
 # 큰길 · 샛길
 for P in RADIAL+RING: road(P)
-for P in SIDE: path(P,'#5fe0d8',3.2,.9,'2 6')
+for P in SIDE+TDOOR: path(P,'#5fe0d8',3.2,.9,'2 6')
 for P in AGGRO: path(P,'#ff7a5a',3.2,.95,'2 6')
 for P in SNEAK: path(P,'#d6b3ff',2.6,.9,'1 5')
 random.seed(11)
@@ -150,7 +164,7 @@ T(CX,CY-4,'무너진 중심부 (넓게 열림)',15,'#ffd6cc',700); T(CX,CY+13,'L
 T(W+24,40,'맵 뼈대 6안 (다시) · 10명 개인전 · 정사각형',19,'#b9ff4a',700,'start')
 # 범례
 X=W+24; Y=78
-items=[('spawn','시작 기지 10곳 (가운데에서 같은 거리)'),('mob','앞마당 약한 몬스터 (먼지 들판 Lv1–3)'),('camp','정글 몬스터 캠프 (Lv3–7)'),('boss','중간 보스 10곳 (5종류 × 2, 마주 보는 곳 같음)'),('ward','와드 (앞마당 빼고 색깔 지역마다 하나 · 30개)'),('bush','수풀 (지역 색 · 들어가면 안 보임)'),('cave','숨은 동굴'),('chest','보물'),('wh','웜홀 (마주 보는 보물 땅끼리, 같은 글자)'),('road','큰길 (기지 → 중심부 · 정글 고리 길)'),('fog','보물 땅 입구 (지역마다 문 두세 개뿐 → 문 앞에서 자주 만남)'),('aggro','보스 옆 샛길 (보스 공격을 피하거나 반사하며 지남)'),('sneak','중심부로 가는 좁은 틈 (보스마다 하나)'),('ridge','바위 능선 = 벽 (대부분 막힘 · 이동기로 넘음)')]
+items=[('spawn','시작 기지 10곳 (가운데에서 같은 거리)'),('mob','앞마당 약한 몬스터 (먼지 들판 Lv1–3)'),('camp','정글 몬스터 캠프 (Lv3–7)'),('boss','중간 보스 10곳 (5종류 × 2, 마주 보는 곳 같음)'),('ward','와드 (앞마당 빼고 색깔 지역마다 하나 · 30개)'),('bush','수풀 (지역 색 · 들어가면 안 보임)'),('cave','숨은 동굴'),('chest','보물'),('wh','웜홀 (마주 보는 보물 땅끼리, 같은 글자)'),('road','큰길 (기지 → 중심부 · 정글 고리 길)'),('fog','보물 땅 문 셋 (양옆 앞마당 · 앞쪽 정글) · 나머지 둘레는 막힘'),('aggro','보스 옆 샛길 (보스 공격을 피하거나 반사하며 지남)'),('sneak','중심부로 가는 좁은 틈 (보스마다 하나)'),('ridge','바위 능선 = 벽 (대부분 막힘 · 이동기로 넘음)')]
 for i,(k,n) in enumerate(items):
     y=Y+i*27; x=X+14
     if k=='spawn': add(f'<circle cx="{x}" cy="{y}" r="10" fill="#163a28" stroke="#b9ff4a" stroke-width="2.5"/>')

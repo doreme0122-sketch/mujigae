@@ -1,9 +1,9 @@
 /* 맵 만들기 ① — 맵 6안(10명 개인전 · 정사각형)대로 바닥 · 지역 · 경계 능선 · 큰길 · 샛길 깔기
    보기: 끌면 이동, 두 손가락(휠)로 확대. 지역 이름표는 화면 위 글자. 시작 기지 자리는 빛 고리로만 표시(다음 단계에서 진짜 기지) */
 import * as THREE from 'three';
-import { makeBloom } from '../core/hangar/bloom.js?v=11022353';
-import { makeMapFloor, MAP, toWorld } from './mapfloor.js?v=11022353';
-import { makePerf } from './perf.js?v=11022353';
+import { makeBloom } from '../core/hangar/bloom.js?v=11030002';
+import { makeMapFloor, MAP, toWorld } from './mapfloor.js?v=11030002';
+import { makePerf } from './perf.js?v=11030002';
 
 const $ = s => document.querySelector(s), clamp = THREE.MathUtils.clamp;
 const VIEWS = [{ name: '게임 시점', h: 60, tilt: .3 }, { name: '지역 보기', h: 130, tilt: .25 }, { name: '맵 전체', h: 400, tilt: .02 }];
@@ -13,8 +13,8 @@ export async function start(canvas, onProgress = () => {}) {
   renderer.toneMapping = THREE.NoToneMapping; renderer.autoClear = false; renderer.setClearColor(0, 1);
   const scene = new THREE.Scene(), camera = new THREE.PerspectiveCamera(40, 1, 1, 3000), bloom = makeBloom(renderer, { samples: 0 });
   onProgress(.2);
-  const floor = await makeMapFloor(renderer, './assets/map/v6.png?v=11022353');
-  const J = await (await fetch('./assets/map/v6.json?v=11022353')).json();
+  const floor = await makeMapFloor(renderer, './assets/map/v6.png?v=11030002');
+  const J = await (await fetch('./assets/map/v6.json?v=11030002')).json();
   const SPAWN = J.spawns, ALL = [...J.labels.map(o => [o.x, o.y, o.n, o.l]), [500, 500, '무너진 중심부', 'Lv 10+']];
   onProgress(.7);
   /* 시작 기지 자리: 빛 고리 (임시) */
