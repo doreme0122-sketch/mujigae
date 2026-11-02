@@ -48,12 +48,15 @@ export async function makeMapFloor(renderer, url) {
   const regTex = await new THREE.TextureLoader().loadAsync(url);
   regTex.colorSpace = THREE.NoColorSpace; regTex.magFilter = regTex.minFilter = THREE.NearestFilter; regTex.generateMipmaps = false; regTex.flipY = false;
   const regSoft = regTex.clone(); regSoft.magFilter = regSoft.minFilter = THREE.LinearFilter; regSoft.needsUpdate = true;      /* 경계·길은 부드럽게 */
-  const noise = bakeNoise(), V = (k, n) => ST.map(s => new THREE.Vector3(...s[k].slice(0, 3)));
+  const noise = bakeNoise();
+  /* 땅 색은 칠하지 않음 (사용자 결정 2026-11-03): 모든 땅이 같은 짙은 우주 바닥 색 · 같은 흰 반짝임.
+     땅마다 다른 건 바닥 결이 흐르는 빠르기·비틀림·반짝임 물결 모양뿐(색 아님). 불씨(붉은 얼룩)·무지개 반짝임도 색이라 뺌 */
+  const ONE = { a: [.045, .05, .06], b: [.16, .17, .19], g: [.9, .92, 1] }, V = k => ST.map(s => k === 'q' ? new THREE.Vector3(s.q[0], 0, 0) : new THREE.Vector3(...(ONE[k] || s[k]).slice(0, 3)));
   const WX = MAP.W * MAP.SCALE, WZ = MAP.H * MAP.SCALE;
   const mat = new THREE.ShaderMaterial({ depthWrite: false, depthTest: false,
     uniforms: { uT: { value: 0 }, uFog: { value: 1 }, uN: { value: noise }, uR: { value: regTex }, uRs: { value: regSoft }, uWf: { value: regSoft },
       uA: { value: V('a') }, uB: { value: V('b') }, uG: { value: V('g') },
-      uP: { value: ST.map(s => new THREE.Vector4(...s.p)) }, uQ: { value: ST.map(s => new THREE.Vector3(...s.q)) }, uWv: { value: ST.map(s => new THREE.Vector4(...s.wv)) } },
+      uP: { value: ST.map(s => new THREE.Vector4(...s.p)) }, uQ: { value: V('q') }, uWv: { value: ST.map(s => new THREE.Vector4(...s.wv)) } },
     vertexShader: 'varying vec3 vW; void main(){ vec4 w=modelMatrix*vec4(position,1.); vW=w.xyz; gl_Position=projectionMatrix*viewMatrix*w; }',
     fragmentShader: `precision highp float; varying vec3 vW; uniform float uT, uFog; uniform sampler2D uN, uR, uRs, uWf;
       uniform vec3 uA[18], uB[18], uG[18], uQ[18]; uniform vec4 uP[18], uWv[18];
