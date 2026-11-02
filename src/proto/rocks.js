@@ -69,13 +69,20 @@ vec2 vcell(vec3 p){ vec3 i=floor(p),f=fract(p); float a=9.,b=9.; for(int z=-1;z<
 /* 용암 흑요석: 용암이 식어 생긴 검은 유리. 깨진 면은 거울처럼 매끈해 주변 빛이 비친다.
    평소엔 빛나지 않는다. 탄에 맞으면 맞은 자리에서 속의 용암이 깨어나 빛이 틈을 따라 번져 나갔다가 사그라든다.
    틈 가장자리의 얇은 유리 막에서 빛이 갈라져 은은한 무지개가 잠깐 일렁인다(칠한 무지개가 아님). */
-export const HITS = { value: Array.from({ length: 8 }, () => new THREE.Vector4(0, -99, 0, -99)) };   /* 맞은 자리 (x,y,z, 맞은 시각) — 모든 벽이 같이 씀 */
-let hitI = 0;
-export function hitWall(x, y, z, t) { HITS.value[hitI++ % 8].set(x, y, z, t); }
-const WAVE = `uniform vec4 uHits[8];
+export const NHIT = 16;
+export const HITS = { value: Array.from({ length: NHIT }, () => new THREE.Vector4(0, -99, 0, -99)) };   /* 맞은 자리 (x,y,z, 맞은 시각) — 모든 벽이 같이 씀 */
+/* 새로 맞으면: 바로 옆에 방금 맞은 자리가 있으면 합치고(쌍발 두 알), 아니면 이미 다 식은 칸 → 없으면 가장 오래된 칸에 넣는다.
+   (차례대로 덮어쓰면 다른 곳에서 번지던 빛이 갑자기 사라짐) */
+export function hitWall(x, y, z, t) { const H = HITS.value; let best = 0, bestAge = -1;
+  for (let i = 0; i < NHIT; i++) { const h = H[i], age = t - h.w;
+    if (age < .2 && Math.hypot(h.x - x, h.y - y, h.z - z) < 1.2) return;
+    if (age > 2.6) { best = i; bestAge = 99; break; }
+    if (age > bestAge) { bestAge = age; best = i; } }
+  H[best].set(x, y, z, t); }
+const WAVE = `uniform vec4 uHits[16];
   /* 맞은 자리에서 번지는 빛: 앞머리(고리)가 바깥으로 달려가고, 지나간 자리는 천천히 식는다 */
   vec3 hitWave(vec3 w, float t){ float near=0., spread=0., front=0.;
-    for(int i=0;i<8;i++){ float age=t-uHits[i].w; if(age<0.||age>2.6) continue; float d=distance(w,uHits[i].xyz);
+    for(int i=0;i<16;i++){ float age=t-uHits[i].w; if(age<0.||age>2.6) continue; float d=distance(w,uHits[i].xyz);
       float r=age*5.5;
       spread+=smoothstep(r+.4,r-.6,d)*exp(-age*1.5)*exp(-d*.28);
       front+=exp(-(d-r)*(d-r)*2.5)*exp(-age*1.1)*exp(-d*.2);
