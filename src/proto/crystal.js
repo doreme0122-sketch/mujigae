@@ -1,11 +1,11 @@
 /* 맵 벽 — 자수정 무리 (결정 협곡)
-   어두운 바위 받침(쪼갠 바위의 속처럼)에 결정이 빽빽하게 박혀 자란 벽. 빈틈 없이 촘촘하다.
+   큰 결정 무리가 이어진 벽. 뿌리는 작은 결정 알갱이가 융단처럼 덮고 있다(자수정 덩어리의 바닥처럼).
    · 결정 하나: 수정처럼 육각 기둥 + 끝이 정확한 여섯 면으로 깎인 뾰족한 머리. 면이 빠지는 곳이 없게 모든 면을 바깥으로 맞춤.
    · 평소: 빛나지 않는다. 뿌리는 짙은 보라, 끝으로 갈수록 맑아짐(자수정의 색 띠). 끝이 아주 천천히 뻗었다 움츠러든다(살아 있음).
    · 맞으면: 맞은 자리 근처(지름 3m 남짓) 결정 속으로 들어간 빛이 면마다 다르게 꺾여 면마다 다른 색으로 0.7초쯤 반짝인다(칠한 무지개가 아님).
      맞은 결정은 움찔 움츠러들었다가 다시 뻗는다. */
 import * as THREE from 'three';
-import { HITS, chunk, rockMaterial } from './rocks.js?v=11021311';
+import { HITS } from './rocks.js?v=11021316';
 
 /* 결정 하나 (밑 0 ~ 기둥 끝 1 ~ 머리 꼭짓점 1.0+tip). 모든 삼각형을 바깥쪽으로 맞춘다 */
 function prism(seed) {
@@ -81,15 +81,18 @@ export function crystalMaterial(uT) {
 export function makeCrystalRidge(path, opt = {}) {
   const uT = opt.uT || { value: 0 }, mat = crystalMaterial(uT);
   const geos = [1, 2, 3, 4, 5].map(prism);
-  const rockG = [0, 1, 2].map(i => chunk('plain', 80 + i)), rockM = rockMaterial('plain', uT);
-  rockM.color.setRGB(.11, .085, .12);                                                             /* 자수정을 품은 짙은 바위 껍질 */
   const R = (() => { let s = (opt.seed || 9) * 7919; return () => (s = (s * 9301 + 49297) % 233280) / 233280; })();
   const curve = new THREE.CatmullRomCurve3(path.map(p => new THREE.Vector3(p[0], 0, p[1])), false, 'centripetal'), len = curve.getLength();
   const cs = [], rocks = [], up = new THREE.Vector3(0, 1, 0);
   for (let d = 0; d < len; d += 2.1 + R() * .8) { const u = d / len, p = curve.getPointAt(u), t = curve.getTangentAt(u), nx = -t.z, nz = t.x;
     const edge = Math.min(1, .5 + Math.min(u, 1 - u) * len / 6), side = (R() - .5) * .6, cx = p.x + nx * side, cz = p.z + nz * side;
     const rw = 1.3 * edge, rh = .6 * edge;                                                            /* 바위 받침 (쪼갠 바위의 겉껍질) */
-    rocks.push({ g: Math.floor(R() * 3), x: cx, z: cz, y: -.35, sq: [rw * 1.1, rh, rw * 1.4], q: new THREE.Quaternion().setFromEuler(new THREE.Euler(0, Math.atan2(t.x, t.z) + (R() - .5) * .4, 0)) });
+    /* 뿌리를 덮는 작은 결정 알갱이 융단 (흙더미 대신) */
+    const nd = Math.round(26 * edge);
+    for (let k = 0; k < nd; k++) { const a = R() * 6.28, rr = Math.sqrt(R()) * 1.15, lx = Math.cos(a) * rr, lz = Math.sin(a) * rr;
+      const ox = cx + (nx * lx + t.x * lz * 1.3) * rw, oz = cz + (nz * lx + t.z * lz * 1.3) * rw, oy = -.4 + rh * .35 * Math.max(0, 1 - rr * rr);
+      const dir = new THREE.Vector3(nx * lx * 1.4 + (R() - .5) * .6, .7 + R() * .6, nz * lx * 1.4 + (R() - .5) * .6).normalize(), h = (.18 + R() * .3) * edge;
+      cs.push({ g: Math.floor(R() * geos.length), x: ox, y: oy, z: oz, h, w: h * (.4 + R() * .2), q: new THREE.Quaternion().setFromUnitVectors(up, dir).multiply(new THREE.Quaternion().setFromAxisAngle(up, R() * 6.28)), tiny: true }); }
     const n = Math.round((5 + R() * 5) * edge);
     for (let k = 0; k < n; k++) { const a = R() * 6.28, rr = Math.sqrt(R()), lx = Math.cos(a) * rr, lz = Math.sin(a) * rr;   /* 받침 윗면 위의 한 점 */
       const ox = cx + (nx * lx + t.x * lz * 1.3) * rw, oz = cz + (nz * lx + t.z * lz * 1.3) * rw, oy = -.35 + rh * .55 * Math.sqrt(Math.max(0, 1 - rr * rr));
@@ -102,14 +105,9 @@ export function makeCrystalRidge(path, opt = {}) {
     const im = new THREE.InstancedMesh(g, mat, mine.length);
     mine.forEach((c, j) => { m4.compose(pos.set(c.x, c.y, c.z), c.q, sc.set(c.w, c.h, c.w)); im.setMatrixAt(j, m4); });
     im.computeBoundingSphere(); grp.add(im); });
-  rockG.forEach((g, gi) => { const mine = rocks.filter(r => r.g === gi); if (!mine.length) return;
-    const im = new THREE.InstancedMesh(g, rockM, mine.length);
-    mine.forEach((r, j) => { m4.compose(pos.set(r.x, r.y, r.z), r.q, sc.set(...r.sq)); im.setMatrixAt(j, m4); });
-    im.computeBoundingSphere(); grp.add(im); });
   const tg = [], ax = new THREE.Vector3();
-  for (const c of cs) { ax.set(0, 1, 0).applyQuaternion(c.q); const n = Math.max(1, Math.round(c.h / .6));
+  for (const c of cs) { if (c.tiny) { tg.push({ x: c.x, y: c.y + c.h * .4, z: c.z, r: .35 }); continue; } ax.set(0, 1, 0).applyQuaternion(c.q); const n = Math.max(1, Math.round(c.h / .6));
     for (let k = 0; k < n; k++) { const s = (k + .5) / n * c.h * 1.2; tg.push({ x: c.x + ax.x * s, y: c.y + ax.y * s, z: c.z + ax.z * s, r: c.w * .5 }); } }
-  for (const r of rocks) tg.push({ x: r.x, y: r.y + r.sq[1] * .3, z: r.z, r: r.sq[0] * .8 });
   grp.userData = { targets: () => tg, uT, kind: 'crystal' };
   return grp;
 }
