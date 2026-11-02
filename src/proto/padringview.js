@@ -3,16 +3,16 @@ import * as THREE from 'three';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { makeBloom } from '../core/hangar/bloom.js';
 import { makePad } from '../core/hangar/pad.js';
-import { makeMag } from '../core/hangar/mag.js?v=11021733';
+import { makeMag } from '../core/hangar/mag.js?v=11021739';
 import { buildShip } from '../core/ships/build.js';
-import { makeGoldStar } from './goldstar.js?v=11021733';
-import { makeArena } from './arena.js?v=11021733';
-import { makeFloor, FLOORS } from './floor.js?v=11021733';
-import { makePerf } from './perf.js?v=11021733';
+import { makeGoldStar } from './goldstar.js?v=11021739';
+import { makeArena } from './arena.js?v=11021739';
+import { makeFloor, FLOORS } from './floor.js?v=11021739';
+import { makePerf } from './perf.js?v=11021739';
 
 const $ = s => document.querySelector(s), clamp = THREE.MathUtils.clamp;
 const SHIPL = 2.9;     /* 기체 길이: 자기장 판(지름 3.2)보다 약간 작게 */
-const VIEWS = [{ name: '비스듬히', h: 22, tilt: .82 }, { name: '위에서', h: 26, tilt: .06 }, { name: '낮게', h: 14, tilt: 1.2 }];
+const VIEWS = [{ name: '비스듬히', h: 24, tilt: .82 }, { name: '위에서', h: 28, tilt: .06 }, { name: '낮게', h: 15, tilt: 1.2 }];
 
 export async function start(canvas, onProgress = () => {}) {
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: false, powerPreference: 'high-performance' });

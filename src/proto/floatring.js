@@ -12,13 +12,13 @@ export const RING = { r0: 3.3, r1: 4.25, bridgeFrom: 1.98 };
 
 /* 단면(r,y 다각형)을 각도 a0→a1로 돌려 만든 덩어리. lift(u): 각도 진행(0~1)에 따른 높이 더하기(비늘 들림).
    단면 모서리는 날카롭게, 둘레 방향은 매끈하게. 삼각형 앞뒤는 법선에 맞춰 자동으로 맞춘다. */
-export function sweep(prof, a0, a1, lift = () => 0, n = 0) {
+export function sweep(prof, a0, a1, lift = () => 0, n = 0, ymap = null) {   /* ymap(u, y): 각도 진행에 따라 높이를 바꿈(경사) */
   n = n || Math.max(6, Math.ceil(Math.abs(a1 - a0) / .02));
   const pos = [], nor = [], v = new THREE.Vector3(), w = new THREE.Vector3(), c = new THREE.Vector3();
   const tri = (A, B, C, N) => { v.set(B[0] - A[0], B[1] - A[1], B[2] - A[2]); w.set(C[0] - A[0], C[1] - A[1], C[2] - A[2]); c.crossVectors(v, w);
     const flip = c.x * N[0][0] + c.y * N[0][1] + c.z * N[0][2] < 0, V = flip ? [A, C, B] : [A, B, C], NN = flip ? [N[0], N[2], N[1]] : N;
     for (let i = 0; i < 3; i++) { pos.push(...V[i]); nor.push(...NN[i]); } };
-  const P = (q, a, u) => [Math.cos(a) * q[0], q[1] + lift(u), Math.sin(a) * q[0]];
+  const P = (q, a, u) => [Math.cos(a) * q[0], ymap ? ymap(u, q[1]) : q[1] + lift(u), Math.sin(a) * q[0]];
   const m = prof.length;
   /* 단면이 반시계(바깥 법선 = (dy,-dr))인지 확인 */
   let area = 0; for (let k = 0; k < m; k++) { const p = prof[k], q = prof[(k + 1) % m]; area += p[0] * q[1] - q[0] * p[1]; }
