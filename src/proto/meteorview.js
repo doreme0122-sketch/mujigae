@@ -5,17 +5,17 @@
      그 자리의 '지난 시간'에 따라 변한다 — 막 지나간 곳은 하얗게 뜨겁고 가늘게 모여 있고, 시간이 지날수록 파랗게 식으며
      가닥이 퍼지고 흔들리다가, 끝내 빛이 갈라져 옅은 무지개로 풀리며 꺼진다(칠한 색이 아님: 가닥마다 파장 하나, 퍼질수록 파장마다 다르게 어긋남)
    · 반짝이는 부스러기가 흔적을 따라 남아 깜빡이다 꺼짐
-   · 꽂힌 뒤엔 새로 생기는 것 없이, 하늘에서 바닥까지 이어진 흔적이 오래된 위쪽부터 흩어짐 (충격파·태어남은 다음 단계)
+   · 꽂힌 뒤엔 새로 생기는 것 없이, 흔적이 오래된 위쪽부터 빠르게 흩어짐(1초 안쪽) (충격파·태어남은 다음 단계)
    무게: 빛 가닥 700개는 한 묶음으로 한 번에(위치는 셰이더가 계산), 부스러기는 점 묶음 한 번 */
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
-import { makeBloom } from '../core/hangar/bloom.js?v=11022032';
-import { makePad } from '../core/hangar/pad.js?v=11022032';
-import { makeGoldStar } from './goldstar.js?v=11022032';
-import { makePerf } from './perf.js?v=11022032';
+import { makeBloom } from '../core/hangar/bloom.js?v=11022048';
+import { makePad } from '../core/hangar/pad.js?v=11022048';
+import { makeGoldStar } from './goldstar.js?v=11022048';
+import { makePerf } from './perf.js?v=11022048';
 
 const $ = s => document.querySelector(s), clamp = THREE.MathUtils.clamp;
-const N = 700, FALL = 1.1, LINGER = 1.9, REST = .7, CYCLE = REST + FALL + LINGER, EXP = 1.25;   /* 진행 u = (t/FALL)^EXP : 거의 일정, 끝에서 살짝 가속 */
+const N = 700, FALL = 1.1, LINGER = .8, REST = .7, CYCLE = REST + FALL + LINGER, EXP = 1.25;   /* 진행 u = (t/FALL)^EXP : 거의 일정, 끝에서 살짝 가속 */
 const S0 = new THREE.Vector3(-14, 30, -9), C = new THREE.Vector3(0, .3, 0);
 const AB = { transparent: true, depthWrite: false, blending: THREE.AdditiveBlending };
 const NOISE = `float h1(vec2 p){ return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453); }
@@ -59,9 +59,9 @@ export async function start(canvas, onProgress = () => {}) {
         float age = max(0., uE - tPass); vAge = age; vNear = s;
         vec3 D = normalize(uC-uS0), P1 = normalize(cross(D, vec3(0.,1.,.001))), P2 = cross(D,P1);
         /* 지난 시간만큼 퍼지고 흔들림. 파장마다 조금씩 다르게 어긋남(무지개로 갈라짐) */
-        float spread = r*(.03 + age*.55 + age*age*.25);
+        float spread = r*(.03 + age*1.1 + age*age*.9);                        /* 빨리 사라지는 만큼 빨리 퍼짐 */
         float tb = (fbm(vec2(seed*7.+u*9., uT*.8))-.5)*age*1.4;
-        float A = ang + (w-.5)*age*1.2;
+        float A = ang + (w-.5)*age*3.;
         vec3 off = (cos(A)*P1 + sin(A)*P2)*spread + (P1*.8+P2*.6)*tb + P1*(w-.5)*age*.6;
         off.y -= age*age*.35*seed;                                           /* 오래된 부스러기 빛은 살짝 처짐 */
         vec3 p = path(u) + off, q = path(max(u-.004,0.)) + off;
@@ -69,17 +69,17 @@ export async function start(canvas, onProgress = () => {}) {
         vec3 n=cross(normalize(b-a+vec3(1e-4)), normalize(-a+vec3(1e-4))); n = dot(n,n) > 1e-8 ? normalize(n) : vec3(1.,0.,0.);
         a += n*sd*.01*wid*(1.+age*1.5);
         /* 사는 시간: 가닥마다 조금씩 다르게 꺼짐 */
-        float life = .9 + seed*1.3;
+        float life = .3 + seed*.4;                                           /* 꼬리도 빠르게 사라짐 */
         vA = (uE>0.?1.:0.) * clamp(1.-age/life, 0., 1.) * (.5+.5*seed) * step(.0005, uH);
         gl_Position=projectionMatrix*vec4(a,1.); }`,
     fragmentShader: `uniform float uT; varying float vX, vW, vAge, vA, vNear; ${NOISE}
       void main(){ vec3 spec = .5+.5*cos(6.2832*(vW+vec3(0.,.33,.67)));
         vec3 hot = vec3(1.,1.,1.05), cool = vec3(.32,.55,1.35);
-        vec3 c = mix(hot, cool, smoothstep(.02,.35,vAge));                    /* 하얗게 뜨거움 → 파랗게 식음 */
-        c = mix(c, spec*1.1, smoothstep(.35,1.2,vAge)*.75);                    /* 끝내 무지개로 풀림 */
+        vec3 c = mix(hot, cool, smoothstep(.02,.15,vAge));                    /* 하얗게 뜨거움 → 파랗게 식음 */
+        c = mix(c, spec*1.1, smoothstep(.15,.5,vAge)*.75);                    /* 끝내 무지개로 풀림 */
         float across = max(0., 1.-vX*vX);                                       /* 0 아래로 내려가지 않게(빛을 빼는 검은 점 방지) */
         float flick = .7+.3*fbm(vec2(vAge*9.-uT*5., vW*40.));
-        float heat = 1.6*exp(-vAge*9.) + .55;
+        float heat = 1.6*exp(-vAge*14.) + .55;
         gl_FragColor = vec4(c*across*flick*heat*vA*.42, 1.); }` });
   const trail = new THREE.Mesh(tg, trailM); trail.frustumCulled = false; trail.renderOrder = 8; scene.add(trail);
   /* ── 머리 ── */
@@ -133,7 +133,7 @@ export async function start(canvas, onProgress = () => {}) {
     /* 머리: 멀리서 작은 점으로 반짝 나타나 커지며 다가옴 */
     head.visible = falling; head.position.copy(H); head.scale.setScalar(.6 + uH * 1.5); headM.uniforms.uI.value = falling ? Math.min(1, f * 10) * (1 + .15 * Math.sin(t * 40)) : 0; headM.uniforms.uT.value = t;
     lightM.uniforms.uI.value = falling ? Math.pow(uH, 3) * .45 : 0; lightM.uniforms.uR.value = 1 + uH * 2.5;
-    if (falling) for (let j = 0, k = 0; j < NP && k < 4; j++) if (SP[j].life <= 0) { const q = SP[j]; q.max = q.life = .8 + Math.random() * 1.2;
+    if (falling) for (let j = 0, k = 0; j < NP && k < 4; j++) if (SP[j].life <= 0) { const q = SP[j]; q.max = q.life = .25 + Math.random() * .45;
       q.p.copy(H).add(new THREE.Vector3((Math.random() - .5) * .3, (Math.random() - .5) * .3, (Math.random() - .5) * .3)); q.v.copy(D).multiplyScalar(-(.5 + Math.random() * 1.5)).add(new THREE.Vector3((Math.random() - .5) * .8, (Math.random() - .5) * .8, (Math.random() - .5) * .8)); k++; }
     const P = pg.attributes.position, A = pg.attributes.aA, W = pg.attributes.aW, Cc = pg.attributes.aC;
     SP.forEach((q, i) => { if (q.life > 0) { q.life -= dt; q.p.addScaledVector(q.v, dt); q.v.multiplyScalar(Math.exp(-1.5 * dt)); q.v.y -= .3 * dt; }
