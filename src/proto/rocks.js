@@ -110,7 +110,7 @@ export function obsidianMaterial(uT) {
             float crack=smoothstep(.05,.0,c.y)+smoothstep(.035,.0,c2.y)*.6;
             float heat=crack*hg.x*3.4;
             vec3 hot=mix(vec3(.9,.12,.02),vec3(1.,.42,.08),clamp(hg.x*1.5,0.,1.));            /* 식으면서 주황 → 짙은 빨강 */
-            totalEmissiveRadiance+=hot*heat*2.4+vec3(1.,.7,.35)*pow(heat,2.2)*1.2*hg.y;
+            totalEmissiveRadiance+=hot*heat*2.4+vec3(1.,.7,.35)*pow(max(heat,0.),2.2)*1.2*hg.y;
             totalEmissiveRadiance+=vec3(1.,.5,.2)*hg.y*.9+vec3(.9,.15,.02)*smoothstep(.25,0.,c.y)*hg.x*.35;                                      /* 맞는 순간 그 자리가 확 */
             float ct=abs(dot(normalize(normal),vec3(0.,0.,1.)));
             float rim=smoothstep(.12,.05,c.y)-smoothstep(.05,.0,c.y);                              /* 틈 옆 얇은 막: 맞는 순간만 무지개 */
@@ -139,7 +139,7 @@ export function rockMaterial(kind, uT) {
             float br=.75+.25*sin(uT*1.3+rn(vRp*3.)*6.);                                          /* 숨 쉬듯 */
             float heat=crack*live*br;
             diffuseColor.rgb*=1.-smoothstep(.1,0.,c.y)*.5*live;                                       /* 틈 가장자리는 그을려 더 검게 */
-            totalEmissiveRadiance+=vec3(1.,.28,.04)*heat*3.2+vec3(1.,.65,.25)*pow(heat,3.)*2.5+vec3(.9,.18,.02)*smoothstep(.3,0.,c.y)*live*.22; }` : ''}`); };
+            totalEmissiveRadiance+=vec3(1.,.28,.04)*heat*3.2+vec3(1.,.65,.25)*pow(max(heat,0.),3.)*2.5+vec3(.9,.18,.02)*smoothstep(.3,0.,c.y)*live*.22; }` : ''}`); };
   m.customProgramCacheKey = () => 'rock-' + kind;
   return m;
 }

@@ -9,11 +9,11 @@
    무게: 꼬리 가닥은 한 묶음으로 한 번에, 부스러기는 점 묶음 한 번 */
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
-import { makeBloom } from '../core/hangar/bloom.js';
-import { makePad } from '../core/hangar/pad.js';
-import { makeGoldStar } from './goldstar.js?v=11022010';
-import { gem } from './guardian.js?v=11022010';
-import { makePerf } from './perf.js?v=11022010';
+import { makeBloom } from '../core/hangar/bloom.js?v=11022014';
+import { makePad } from '../core/hangar/pad.js?v=11022014';
+import { makeGoldStar } from './goldstar.js?v=11022014';
+import { gem } from './guardian.js?v=11022014';
+import { makePerf } from './perf.js?v=11022014';
 
 const $ = s => document.querySelector(s), clamp = THREE.MathUtils.clamp;
 const N = 700, FALL = .5, REST = 1.2, CYCLE = FALL + REST;
@@ -65,7 +65,7 @@ export async function start(canvas, onProgress = () => {}) {
         vec3 D=normalize(uD), P1=normalize(cross(D, vec3(0.,1.,.001))), P2=cross(D,P1);
         float L=uLen*aB.z*mix(1.,.8,grp);
         float spread=uSpread*mix(1.,2.4,grp);
-        float rad=spread*r*(.04+pow(s,.75));                                                  /* 머리 쪽 좁고 뒤로 퍼짐 */
+        float rad=spread*r*(.04+pow(max(s,0.),.75));                                                  /* 머리 쪽 좁고 뒤로 퍼짐 */
         float da=(w-.5)*uDisp*1.1*s;                                                           /* 파장마다 다르게 꺾여 갈라짐 */
         float A=ang+da*3.;
         vec3 off=(cos(A)*P1+sin(A)*P2)*rad + P1*(w-.5)*uDisp*s*1.2;
@@ -88,7 +88,7 @@ export async function start(canvas, onProgress = () => {}) {
         c=mix(c, dust, vG);
         float across=1.-vX*vX;
         float tw=.7+.3*fbm(vec2(vS*20.-uT*12., vW*30.));                                        /* 가닥 속에서 빛이 흐름 */
-        float k=across*pow(1.-vS,1.8)*tw*vA*uOn;
+        float k=across*pow(max(1.-vS,0.),1.8)*tw*vA*uOn;
         gl_FragColor=vec4(c*k*.5,1.); }` });
   const tail = new THREE.Mesh(tg, tailM); tail.frustumCulled = false; tail.renderOrder = 8; scene.add(tail);
   /* ── 머리: 타는 심 + 빛 안개(일렁이는 가장자리) ── */

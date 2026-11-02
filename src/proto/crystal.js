@@ -5,7 +5,7 @@
    · 맞으면: 맞은 자리 근처(지름 3m 남짓) 결정 속으로 들어간 빛이 면마다 다르게 꺾여 면마다 다른 색으로 0.7초쯤 반짝인다(칠한 무지개가 아님).
      맞은 결정은 움찔 움츠러들었다가 다시 뻗는다. */
 import * as THREE from 'three';
-import { HITS } from './rocks.js?v=11022010';
+import { HITS } from './rocks.js?v=11022014';
 
 /* 결정 하나 (밑 0 ~ 기둥 끝 1 ~ 머리 꼭짓점 1.0+tip). 모든 삼각형을 바깥쪽으로 맞춘다 */
 function prism(seed) {
@@ -62,7 +62,7 @@ export function crystalMaterial(uT) {
         float band=.5+.5*sin(vCo.y*9.+vSeed*20.);                                                    /* 자라며 생긴 옅은 색 결 */
         vec3 inside=mix(vec3(.11,.02,.2),vec3(.06,.05,.1),zone)*(.75+band*.35);
         inside+=vec3(.25,.18,.3)*smoothstep(1.,1.5,vCo.y)*.4;                                        /* 맑은 끝 */
-        diffuseColor.rgb=mix(inside,diffuseColor.rgb,pow(1.-ndv,1.4));
+        diffuseColor.rgb=mix(inside,diffuseColor.rgb,pow(max(1.-ndv,0.),1.4));
         /* 맞으면: 들어온 빛이 면마다 다르게 꺾여 갈라진다 */
         vec3 disp=vec3(0.); float flash=0.;
         for(int i=0;i<16;i++){ float age=uT-uHits[i].w; if(age<0.||age>.9) continue; vec3 d3=vCw-uHits[i].xyz; float d2=dot(d3,d3); if(d2>10.) continue;
@@ -72,7 +72,7 @@ export function crystalMaterial(uT) {
           disp+=hue(fract(bend))*fall*life;
           flash+=fall*exp(-age*24.); }
         if(dot(disp,vec3(1.))+flash>.003){
-          totalEmissiveRadiance+=disp*(.45+.55*pow(ndv,.7))*2.2+disp*pow(1.-ndv,3.)*1.6+vec3(1.)*flash*.8; }`); };
+          totalEmissiveRadiance+=disp*(.45+.55*pow(max(ndv,0.),.7))*2.2+disp*pow(max(1.-ndv,0.),3.)*1.6+vec3(1.)*flash*.8; }`); };
   m.customProgramCacheKey = () => 'amethyst';
   return m;
 }

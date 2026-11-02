@@ -49,7 +49,7 @@ export function makeMag(pad,opt={}){   /* opt.dust=false: 떠오르는 알갱이
           /* 2번: 기체에 묶임 + 불이 다 들어온 순간 판에서 확 솟구쳐 제자리로 */
           float G=max(.4,topMax-.04-y0)+smoothstep(.9,1.2,a.x)*(.55+.35*uGrade), f=a.z;
           float slot=y0+f*G+(uTop-topMax)+sin(uT*.8+a.w*30.)*.006;
-          float q=clamp((uRise-f*.10-a.w*.05)/.42,0.,1.); q=1.-pow(1.-q,3.);
+          float q=clamp((uRise-f*.10-a.w*.05)/.42,0.,1.); q=1.-pow(max(1.-q,0.),3.);
           y=mix(y0,slot,q);
           float streak=uRise<.6?(1.-q)*2.:0.;
           float hide=uRise<.6?1.:smoothstep(y0,y0+.05,y);
@@ -58,7 +58,7 @@ export function makeMag(pad,opt={}){   /* opt.dust=false: 떠오르는 알갱이
         vec3 p=vec3(cos(a.y)*a.x,max(y,y0),sin(a.y)*a.x);
         vA=al*(1.+.7*uGrade)*${LV.toFixed(2)};
         vCol = uGrade<.5 ? vec3(.22,.45,1.2) : uGrade<1.5 ? vec3(1.,.32,1.15) : hsv(fract(a.w*3.7+uT*.12+y*.35))*1.1+.12;   /* 알갱이 색도 등급대로, 전설은 하나하나 색이 다르고 오르며 바뀜 */
-        float sz=fract(a.w*7.31+a.z*3.71); sz=.5+5.5*pow(sz,3.2);
+        float sz=fract(a.w*7.31+a.z*3.71); sz=.5+5.5*pow(max(sz,0.),3.2);
         vSz=sz; vA*=mix(1.,.55,smoothstep(1.5,6.,sz));
         vec4 mv=modelViewMatrix*vec4(p,1.); gl_Position=projectionMatrix*mv; gl_PointSize=sz*uPx/(-mv.z)*.55; }`,
     fragmentShader:`precision highp float;varying float vA,vSz;varying vec3 vCol;
@@ -72,8 +72,8 @@ export function makeMag(pad,opt={}){   /* opt.dust=false: 떠오르는 알갱이
       vertexShader:'varying vec2 vP;void main(){vP=position.xy;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);}',
       fragmentShader:`precision highp float;varying vec2 vP;uniform float uR,uA;void main(){float r=length(vP);${frag}}`});
     const o=new THREE.Mesh(new THREE.CircleGeometry(2.0,96),m); o.rotation.x=-Math.PI/2; G.add(o); return o; };
-  const lens=disc(`gl_FragColor=vec4(vec3(.36,.64,1.05)*exp(-pow(r/uR,2.)*2.2)*uA,1.);`); lens.visible=false;   /* 빛 판 없음 */
-  const shadow=disc(`gl_FragColor=vec4(0.,0.,0.,exp(-pow(r/uR,2.)*1.8)*uA);`,false); shadow.renderOrder=-1;
+  const lens=disc(`gl_FragColor=vec4(vec3(.36,.64,1.05)*exp(-(r/uR*r/uR)*2.2)*uA,1.);`); lens.visible=false;   /* 빛 판 없음 */
+  const shadow=disc(`gl_FragColor=vec4(0.,0.,0.,exp(-(r/uR*r/uR)*1.8)*uA);`,false); shadow.renderOrder=-1;
 
   const bellyLight=new THREE.PointLight(0x4f8dff,2,.75,2); G.add(bellyLight);
   bellyLight.visible=false;   /* 배 쪽 빛 없음 */

@@ -5,7 +5,7 @@
      가지에도 끝 쪽으로 빛이 살짝 번진다. */
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { HITS } from './rocks.js?v=11022010';
+import { HITS } from './rocks.js?v=11022014';
 
 const rng = seed => { let s = seed * 9301 + 49297; return () => (s = (s * 9301 + 49297) % 233280) / 233280; };
 
@@ -54,7 +54,7 @@ export function coralMaterial(uT) {
         float ndv=abs(dot(normal,normalize(vViewPosition))), d=min(vD,1.), tip=step(1.1,vD);
         diffuseColor.rgb=mix(vec3(.012,.05,.055),vec3(.05,.025,.08),smoothstep(.2,1.,d));                /* 뿌리 청록 → 끝 보라 */
         diffuseColor.rgb=mix(diffuseColor.rgb,vec3(.08,.06,.12),tip*.6);
-        diffuseColor.rgb+=vec3(.03,.08,.09)*pow(1.-ndv,2.5)*(.5+d);                                  /* 반투명한 가장자리 */
+        diffuseColor.rgb+=vec3(.03,.08,.09)*pow(max(1.-ndv,0.),2.5)*(.5+d);                                  /* 반투명한 가장자리 */
         float fire=0., wash=0.;
         for(int i=0;i<16;i++){ float age=uT-uHits[i].w; if(age<0.||age>1.2) continue; float dd=distance(vKw,uHits[i].xyz); if(dd>3.4) continue;
           float fall=exp(-dd*dd*.36);

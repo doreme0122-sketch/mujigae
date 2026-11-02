@@ -53,14 +53,14 @@ export function makeBirth(ship) {
       void main(){ vU=aU; vS=aS;
         vec3 a=(viewMatrix*vec4(uHead,1.)).xyz, b=(viewMatrix*vec4(uHead+vec3(0.,uLen,0.),1.)).xyz;
         vec3 d=normalize(b-a+vec3(0.,1e-4,0.)), n=cross(d, normalize(-a)); n = dot(n,n) > 1e-8 ? normalize(n) : vec3(1.,0.,0.);   /* 똑바로 내려다볼 때 0으로 나누지 않게 */
-        float w=mix(.16,.95,pow(aU,.7));                                                    /* 머리 쪽 가늘고 위로 넓어짐 */
+        float w=mix(.16,.95,pow(max(aU,0.),.7));                                                    /* 머리 쪽 가늘고 위로 넓어짐 */
         gl_Position=projectionMatrix*vec4(mix(a,b,aU)+n*aS*w,1.); }`,
     fragmentShader: `uniform float uT, uI, uLen; varying float vU, vS; ${NOISE}
       void main(){ float y=vU*uLen;
         vec2 q=vec2(vS*1.8, y*.9-uT*7.); q.x+=(fbm(q*.8+uT*.5)-.5)*1.2;                       /* 흔들리며 갈라지는 결 */
         float f=fbm(q*1.6), f2=fbm(q*3.4+3.);
         float body=smoothstep(.25+vU*.45, .9, f*(1.-abs(vS)*.9))*(1.-vU);                      /* 위로 갈수록 성기게 흩어짐 */
-        float spine=exp(-vS*vS*28.)*pow(1.-vU,2.5)*1.6;                                       /* 머리 쪽 짙은 심 */
+        float spine=exp(-vS*vS*28.)*pow(max(1.-vU,0.),2.5)*1.6;                                       /* 머리 쪽 짙은 심 */
         float k=(body*(.8+f2*.6)+spine)*smoothstep(0.,.03,vU);
         vec3 c=mix(vec3(.95,.98,1.4),vec3(.3,.55,1.35),smoothstep(.0,.35,vU));
         gl_FragColor=vec4(c*k*uI*1.5,1.); }` });
@@ -90,7 +90,7 @@ export function makeBirth(ship) {
     fragmentShader: `uniform float uT; varying float vU, vS, vA, vSeed;
       void main(){ float across=exp(-vS*vS*4.);
         float flick=.75+.25*sin(vU*40.-uT*30.+vSeed*20.);                                   /* 가닥 안에서 빛이 달림 */
-        float k=across*pow(1.-vU,1.4)*flick*vA;
+        float k=across*pow(max(1.-vU,0.),1.4)*flick*vA;
         gl_FragColor=vec4(mix(vec3(1.,1.,1.05),vec3(.35,.6,1.4),vU)*k*2.,1.); }` });
   const rayG = (() => { const pos = [], dir = [], P = [], au = [], as = [], idx = []; let b = 0;
     for (let r = 0; r < NR; r++) { const up = Math.random() < .2, a = Math.random() * 6.283, el = up ? .6 + Math.random() * .8 : Math.random() * .22;

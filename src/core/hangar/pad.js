@@ -61,9 +61,9 @@ export function makePad(){
     fragmentShader:`precision highp float;varying float vR,vA;uniform float uFront,uHead,uAfter,uBase,uBack,uTail,uGrade,uT,uIn,uInHead;
       vec3 hsv(float h){ return clamp(abs(mod(h*6.+vec3(0.,4.,2.),6.)-3.)-1.,0.,1.); }
       void main(){ float lit=uFront<0.?0.:smoothstep(uFront+.02,uFront-.06,vR)*smoothstep(uBack+.10,uBack-.04,vR);   /* 바깥부터 꺼짐 */
-        float tail=uBack<0.||uBack>8.?0.:exp(-pow((vR-uBack)/.12,2.))*uTail;
-        float head=uFront<0.?0.:exp(-pow((vR-uFront)/.09,2.))*uHead;   /* 번지는 앞머리를 넓고 밝게 */
-        if(uIn>=0.){ lit*=smoothstep(uIn-.04,uIn+.06,vR); head+=exp(-pow((vR-uIn)/.09,2.))*uInHead; }   /* 바깥 → 가운데로 차오름 */
+        float tail=uBack<0.||uBack>8.?0.:exp(-((vR-uBack)/.12*(vR-uBack)/.12))*uTail;
+        float head=uFront<0.?0.:exp(-((vR-uFront)/.09*(vR-uFront)/.09))*uHead;   /* 번지는 앞머리를 넓고 밝게 */
+        if(uIn>=0.){ lit*=smoothstep(uIn-.04,uIn+.06,vR); head+=exp(-((vR-uIn)/.09*(vR-uIn)/.09))*uInHead; }   /* 바깥 → 가운데로 차오름 */
         float k=uBase+uAfter*lit*1.6+head*4.5+tail*2.;
         /* 등급 색: 일반 진한 파랑 / 정예 보랏빛 자홍 / 전설 무지개(가운데서 바깥으로 색이 갈라지며 천천히 돎) */
         vec3 col = uGrade<.5 ? vec3(.10,.30,1.) : uGrade<1.5 ? vec3(.80,.16,1.) : hsv(fract(vR*.42+vA/6.2832-uT*.06))*vec3(1.,.95,1.05)+.08;
