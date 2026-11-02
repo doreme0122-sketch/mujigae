@@ -55,7 +55,7 @@ button{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:poin
 </head><body>
 <canvas id="cv"></canvas>
 <div id="ui">
-  <div id="head"><b>시작 기지 부품 ① · 금테 네 갈래 별</b><span>자기장 판(격납고 그대로)을 감싸는 금테 · 판이 깨어나기 직전 빛이 갈래를 타고 들어와요</span></div>
+  <div id="head"><b>시작 기지 · 태어나는 곳</b><span>자기장 판 · 금테 별 · 계단 세 단 · 아치 벽 · 판에 힘을 넣는 빛의 길</span></div>
   <div id="fps"></div>
   <div id="tip" hidden><b></b><span></span></div>
   <div id="tour"></div>
@@ -63,7 +63,7 @@ button{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:poin
 <div id="load"><p>판을 놓고 있어요</p><div class="b"><i></i></div></div>
 <div id="rot">기기를 가로로 돌려 주세요</div>
 <script type="module">
-import { start } from './src/proto/padringview.js?v=11021714';
+import { start } from './src/proto/padringview.js?v=11021723';
 const bar = document.querySelector('#load i');
 start(document.querySelector('#cv'), p => { bar.style.transform = `scaleX(${p})`; })
   .then(() => setTimeout(() => document.querySelector('#load').classList.add('done'), 300))

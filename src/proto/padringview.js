@@ -3,16 +3,16 @@ import * as THREE from 'three';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { makeBloom } from '../core/hangar/bloom.js';
 import { makePad } from '../core/hangar/pad.js';
-import { makeMag } from '../core/hangar/mag.js?v=11021714';
+import { makeMag } from '../core/hangar/mag.js?v=11021723';
 import { buildShip } from '../core/ships/build.js';
-import { makeGoldStar } from './goldstar.js?v=11021714';
-import { makeFloatRing } from './floatring.js?v=11021714';
-import { makeFloor, FLOORS } from './floor.js?v=11021714';
-import { makePerf } from './perf.js?v=11021714';
+import { makeGoldStar } from './goldstar.js?v=11021723';
+import { makeArena } from './arena.js?v=11021723';
+import { makeFloor, FLOORS } from './floor.js?v=11021723';
+import { makePerf } from './perf.js?v=11021723';
 
 const $ = s => document.querySelector(s), clamp = THREE.MathUtils.clamp;
 const SHIPL = 2.9;     /* 기체 길이: 자기장 판(지름 3.2)보다 약간 작게 */
-const VIEWS = [{ name: '비스듬히', h: 17, tilt: .8 }, { name: '위에서', h: 19, tilt: .06 }, { name: '낮게', h: 12, tilt: 1.2 }];
+const VIEWS = [{ name: '비스듬히', h: 22, tilt: .82 }, { name: '위에서', h: 26, tilt: .06 }, { name: '낮게', h: 14, tilt: 1.2 }];
 
 export async function start(canvas, onProgress = () => {}) {
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: false, powerPreference: 'high-performance' });
@@ -32,9 +32,9 @@ export async function start(canvas, onProgress = () => {}) {
   const base = new THREE.Group(); scene.add(base);
   const pad = makePad(); base.add(pad); const mag = makeMag(pad, { dust: false }); base.add(mag); mag.userData.setMode(1);
   const star = makeGoldStar(); base.add(star);
-  const ring = makeFloatRing(); base.add(ring);
-  /* 아래 맵: 판 단위 → 맵 단위(기체 2m = 판 단위 SHIPL). 부활 자리는 맵 바닥에서 4m 위에 떠 있음 */
-  const BS = 2 / SHIPL, HOVER = 2.4, floor = makeFloor(renderer); floor.set(FLOORS[1]);
+  const ring = makeArena(); base.add(ring);
+  /* 아래 맵: 판 단위 → 맵 단위(기체 2m = 판 단위 SHIPL). 기지는 맵 바닥 바로 위에 앉음 */
+  const BS = 2 / SHIPL, HOVER = .25, floor = makeFloor(renderer); floor.set(FLOORS[1]);
   const fcam = new THREE.PerspectiveCamera(36, 1, .05, 300);
   const stand = new THREE.Group(); base.add(stand);
   onProgress(.5);
@@ -44,7 +44,7 @@ export async function start(canvas, onProgress = () => {}) {
   onProgress(.9);
 
   /* 버튼: 시점 · 기체 */
-  const cam = { h: 17, H: 17, tilt: .8, T: .8, az: -.6 }, tour = $('#tour');
+  const cam = { h: 22, H: 22, tilt: .82, T: .82, az: -.6 }, tour = $('#tour');
   VIEWS.forEach((v, i) => { const bt = document.createElement('button'); bt.type = 'button'; bt.textContent = v.name; bt.className = 'view' + (i ? '' : ' on');
     bt.onclick = () => { cam.H = v.h; cam.T = v.tilt; tour.querySelectorAll('.view').forEach(x => x.classList.toggle('on', x === bt)); }; tour.appendChild(bt); });
   { const sep = document.createElement('i'); sep.style.cssText = 'width:1px;align-self:stretch;background:rgba(185,255,74,.25);margin:0 4px'; tour.appendChild(sep); }
@@ -55,9 +55,9 @@ export async function start(canvas, onProgress = () => {}) {
   addEventListener('pointermove', e => { if (!ptr.has(e.pointerId)) return; const o = ptr.get(e.pointerId);
     if (ptr.size === 1) { cam.az -= (e.clientX - o[0]) * .006; cam.T = cam.tilt = clamp(cam.tilt + (e.clientY - o[1]) * .004, .02, 1.4); }
     ptr.set(e.pointerId, [e.clientX, e.clientY]);
-    if (ptr.size === 2) { const [a, c] = [...ptr.values()], d = Math.hypot(a[0] - c[0], a[1] - c[1]); if (pin) cam.H = clamp(cam.H * pin / d, 3, 45); pin = d; } });
+    if (ptr.size === 2) { const [a, c] = [...ptr.values()], d = Math.hypot(a[0] - c[0], a[1] - c[1]); if (pin) cam.H = clamp(cam.H * pin / d, 3, 60); pin = d; } });
   const upF = e => { ptr.delete(e.pointerId); if (ptr.size < 2) pin = 0; }; addEventListener('pointerup', upF); addEventListener('pointercancel', upF);
-  addEventListener('wheel', e => { cam.H = clamp(cam.H * Math.exp(e.deltaY * .0012), 3, 45); }, { passive: true });
+  addEventListener('wheel', e => { cam.H = clamp(cam.H * Math.exp(e.deltaY * .0012), 3, 60); }, { passive: true });
 
   let Wd = 2, Hd = 2;
   const perf = makePerf(st => { bloom.setSamples(st.aa ? 4 : 0); size(); });

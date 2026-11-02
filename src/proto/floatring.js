@@ -12,7 +12,7 @@ export const RING = { r0: 3.3, r1: 4.25, bridgeFrom: 1.98 };
 
 /* 단면(r,y 다각형)을 각도 a0→a1로 돌려 만든 덩어리. lift(u): 각도 진행(0~1)에 따른 높이 더하기(비늘 들림).
    단면 모서리는 날카롭게, 둘레 방향은 매끈하게. 삼각형 앞뒤는 법선에 맞춰 자동으로 맞춘다. */
-function sweep(prof, a0, a1, lift = () => 0, n = 0) {
+export function sweep(prof, a0, a1, lift = () => 0, n = 0) {
   n = n || Math.max(6, Math.ceil(Math.abs(a1 - a0) / .02));
   const pos = [], nor = [], v = new THREE.Vector3(), w = new THREE.Vector3(), c = new THREE.Vector3();
   const tri = (A, B, C, N) => { v.set(B[0] - A[0], B[1] - A[1], B[2] - A[2]); w.set(C[0] - A[0], C[1] - A[1], C[2] - A[2]); c.crossVectors(v, w);
@@ -34,7 +34,7 @@ function sweep(prof, a0, a1, lift = () => 0, n = 0) {
     for (const [x, y, z] of tris) tri(P(prof[x], ai, ui), P(prof[y], ai, ui), P(prof[z], ai, ui), [nn, nn, nn]); }
   const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('normal', new THREE.Float32BufferAttribute(nor, 3)); return g;
 }
-const posNor = g => { if (g.index) g = g.toNonIndexed(); for (const k of Object.keys(g.attributes)) if (k !== 'position' && k !== 'normal') g.deleteAttribute(k); return g; };
+export const posNor = g => { if (g.index) g = g.toNonIndexed(); for (const k of Object.keys(g.attributes)) if (k !== 'position' && k !== 'normal') g.deleteAttribute(k); return g; };
 
 /* 지붕 모양 단면의 곧은 금 다리 (x축 방향, a→b) */
 function beam(a, b, w, h1, h2, y0) {
