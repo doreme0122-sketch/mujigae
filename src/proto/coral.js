@@ -5,18 +5,18 @@
      가지에도 끝 쪽으로 빛이 살짝 번진다. */
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { HITS } from './rocks.js?v=11030801';
+import { HITS } from './rocks.js?v=11030813';
 
 const rng = seed => { let s = seed * 9301 + 49297; return () => (s = (s * 9301 + 49297) % 233280) / 233280; };
 
 /* 산호 하나: 가지를 재귀로 뻗고 끝에 방울 */
-function coral(seed) {
+export function coral(seed, lite = false) {   /* lite: 맵 전체에 깔 때 — 위에서 40m 떨어져 보면 같은 모양, 삼각형은 절반 아래 */
   const R = rng(seed), parts = [], up = new THREE.Vector3(0, 1, 0), MAX = 4;
-  const seg = (a, b, r0, r1, d) => { const L = a.distanceTo(b), g = new THREE.CylinderGeometry(r1, r0, L, 7, 2, true); g.translate(0, L / 2, 0);
+  const seg = (a, b, r0, r1, d) => { const L = a.distanceTo(b), g = new THREE.CylinderGeometry(r1, r0, L, lite ? 5 : 7, lite ? 1 : 2, true); g.translate(0, L / 2, 0);
     g.applyQuaternion(new THREE.Quaternion().setFromUnitVectors(up, b.clone().sub(a).normalize())); g.translate(a.x, a.y, a.z);
     const n = g.attributes.position.count; g.setAttribute('aD', new THREE.Float32BufferAttribute(new Array(n).fill(0).map((_, i) => (d + (g.attributes.position.getY(i) > (a.y + b.y) / 2 ? 1 : 0)) / MAX), 1));
     g.setAttribute('aS', new THREE.Float32BufferAttribute(new Array(n).fill(R()), 1)); g.deleteAttribute('uv'); parts.push(g); };
-  const bulb = (p, r) => { const g = new THREE.IcosahedronGeometry(r, 1); g.translate(p.x, p.y, p.z); const n = g.attributes.position.count;
+  const bulb = (p, r) => { const g = new THREE.IcosahedronGeometry(r, lite ? 0 : 1); g.translate(p.x, p.y, p.z); const n = g.attributes.position.count;
     g.setAttribute('aD', new THREE.Float32BufferAttribute(new Array(n).fill(1.25), 1)); g.setAttribute('aS', new THREE.Float32BufferAttribute(new Array(n).fill(R()), 1)); g.deleteAttribute('uv'); parts.push(g); };
   const grow = (p, dir, len, r, d) => { const bend = new THREE.Vector3(R() - .5, R() * .3, R() - .5).multiplyScalar(.35);
     const mid = p.clone().addScaledVector(dir, len * .5).add(bend.clone().multiplyScalar(len * .3)), end = p.clone().addScaledVector(dir.clone().add(bend).normalize(), len);
@@ -71,11 +71,11 @@ export function coralMaterial(uT) {
 }
 
 export function makeCoralRidge(path, opt = {}) {
-  const uT = opt.uT || { value: 0 }, mat = coralMaterial(uT), geos = [1, 2, 3, 4].map(coral), R = rng(opt.seed || 41);
+  const uT = opt.uT || { value: 0 }, mat = opt.mat || coralMaterial(uT), geos = opt.geos || [1, 2, 3, 4].map(coral), R = rng(opt.seed || 41);
   const curve = new THREE.CatmullRomCurve3(path.map(p => new THREE.Vector3(p[0], 0, p[1])), false, 'centripetal'), len = curve.getLength();
   const cs = [], tg = [];
   for (let d = .5; d < len - .3; d += 1.9 + R() * 1.2) { const u = d / len, p = curve.getPointAt(u), t = curve.getTangentAt(u), nx = -t.z, nz = t.x;
-    const edge = Math.min(1, .45 + Math.min(u, 1 - u) * len / 6), side = (R() - .5) * 1.6, s = (1.5 + R() * .9) * edge;
+    const edge = Math.min(1, .45 + (opt.noTaper ? 9 : Math.min(u, 1 - u)) * len / 6), side = (R() - .5) * 1.6, s = (1.5 + R() * .9) * edge;
     cs.push({ g: Math.floor(R() * 4), x: p.x + nx * side, z: p.z + nz * side, s, yaw: R() * 6.28 });
     if (R() < .5) { const a = R() * 6.28, rr = 1 + R() * .8; cs.push({ g: Math.floor(R() * 4), x: p.x + nx * side + Math.cos(a) * rr, z: p.z + nz * side + Math.sin(a) * rr, s: s * (.45 + R() * .25), yaw: R() * 6.28 }); } }
   const grp = new THREE.Group(), m4 = new THREE.Matrix4(), sc = new THREE.Vector3(), pos = new THREE.Vector3(), q = new THREE.Quaternion(), Y = new THREE.Vector3(0, 1, 0);

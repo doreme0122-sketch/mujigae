@@ -5,10 +5,10 @@
    · 맞으면: 맞은 자리 근처(지름 3m 남짓) 결정 속으로 들어간 빛이 면마다 다르게 꺾여 면마다 다른 색으로 0.7초쯤 반짝인다(칠한 무지개가 아님).
      맞은 결정은 움찔 움츠러들었다가 다시 뻗는다. */
 import * as THREE from 'three';
-import { HITS } from './rocks.js?v=11030801';
+import { HITS } from './rocks.js?v=11030813';
 
 /* 결정 하나 (밑 0 ~ 기둥 끝 1 ~ 머리 꼭짓점 1.0+tip). 모든 삼각형을 바깥쪽으로 맞춘다 */
-function prism(seed) {
+export function prism(seed) {
   const R = (() => { let s = seed * 9301 + 49297; return () => (s = (s * 9301 + 49297) % 233280) / 233280; })();
   const tip = .55 + R() * .3, off = [(R() - .5) * .08, (R() - .5) * .08];
   const w = []; for (let k = 0; k < 6; k++) w.push(.36 + R() * .1);                       /* 면 너비를 조금씩 다르게 (실제 수정처럼) */
@@ -79,13 +79,13 @@ export function crystalMaterial(uT) {
 
 /* 능선: 바위 받침을 겹쳐 잇고, 그 윗면에서 결정이 빽빽하게 뻗는다 */
 export function makeCrystalRidge(path, opt = {}) {
-  const uT = opt.uT || { value: 0 }, mat = crystalMaterial(uT);
-  const geos = [1, 2, 3, 4, 5].map(prism);
+  const uT = opt.uT || { value: 0 }, mat = opt.mat || crystalMaterial(uT);
+  const geos = opt.geos || [1, 2, 3, 4, 5].map(prism);
   const R = (() => { let s = (opt.seed || 9) * 7919; return () => (s = (s * 9301 + 49297) % 233280) / 233280; })();
   const curve = new THREE.CatmullRomCurve3(path.map(p => new THREE.Vector3(p[0], 0, p[1])), false, 'centripetal'), len = curve.getLength();
   const cs = [], rocks = [], up = new THREE.Vector3(0, 1, 0);
   for (let d = 0; d < len; d += 2.1 + R() * .8) { const u = d / len, p = curve.getPointAt(u), t = curve.getTangentAt(u), nx = -t.z, nz = t.x;
-    const edge = Math.min(1, .5 + Math.min(u, 1 - u) * len / 6), side = (R() - .5) * .6, cx = p.x + nx * side, cz = p.z + nz * side;
+    const edge = Math.min(1, .5 + (opt.noTaper ? 9 : Math.min(u, 1 - u)) * len / 6), side = (R() - .5) * .6, cx = p.x + nx * side, cz = p.z + nz * side;
     const rw = 1.3 * edge, rh = .6 * edge;                                                            /* 바위 받침 (쪼갠 바위의 겉껍질) */
     const n = Math.round((5 + R() * 5) * edge);
     for (let k = 0; k < n; k++) { const a = R() * 6.28, rr = Math.sqrt(R()), lx = Math.cos(a) * rr, lz = Math.sin(a) * rr;   /* 받침 윗면 위의 한 점 */

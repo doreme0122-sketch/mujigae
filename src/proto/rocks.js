@@ -17,9 +17,9 @@ const fbm = (x, y, z, o = 5) => { let s = 0, a = .5, q = 1; for (let i = 0; i < 
 const ridged = (x, y, z) => { let s = 0, a = .5, q = 1; for (let i = 0; i < 4; i++) { s += (1 - Math.abs(vn(x * q, y * q, z * q) * 2 - 1)) * a; a *= .5; q *= 2.1; } return s; };
 
 /* ───── 덩어리 깎기 ───── */
-export function chunk(kind, seed) {
+export function chunk(kind, seed, detail) {
   const R = (() => { let s = seed * 9301 + 49297; return () => (s = (s * 9301 + 49297) % 233280) / 233280; })();
-  let g = new THREE.IcosahedronGeometry(1, kind === 'meteor' ? 5 : 4); g.deleteAttribute('normal'); g.deleteAttribute('uv'); g = mergeVertices(g, 1e-4);
+  let g = new THREE.IcosahedronGeometry(1, detail ?? (kind === 'meteor' ? 5 : 4)); g.deleteAttribute('normal'); g.deleteAttribute('uv'); g = mergeVertices(g, 1e-4);
   const P = g.attributes.position, n = P.count, v = new THREE.Vector3(), rad = new Float32Array(n);
   const sx = .8 + R() * .55, sy = kind === 'meteor' ? .75 + R() * .25 : .55 + R() * .35, sz = .8 + R() * .55;
   /* 잘린 면: 운석은 거의 없고(녹아서 둥긂), 바위는 많이 */
@@ -146,29 +146,28 @@ export function rockMaterial(kind, uT) {
 
 /* ───── 능선: 길을 따라 덩어리를 늘어놓는다 ───── */
 export function makeRidge(kind, path, opt = {}) {
-  const uT = opt.uT || { value: 0 }, mat = rockMaterial(kind, uT);
-  const geos = [0, 1, 2, 3, 4, 5].map(i => chunk(kind, i + 1 + ({ lava: 20, meteor: 40, obsidian: 60 }[kind] || 0)));
+  const uT = opt.uT || { value: 0 }, mat = opt.mat || rockMaterial(kind, uT);   /* 맵 전체 벽: 재질·덩어리 모양을 한 벌만 만들어 나눠 씀 */
+  const geos = opt.geos || [0, 1, 2, 3, 4, 5].map(i => chunk(kind, i + 1 + ({ lava: 20, meteor: 40, obsidian: 60 }[kind] || 0)));
   const R = (() => { let s = (opt.seed || 7) * 7919; return () => (s = (s * 9301 + 49297) % 233280) / 233280; })();
   const curve = new THREE.CatmullRomCurve3(path.map(p => new THREE.Vector3(p[0], 0, p[1])), false, 'centripetal'), len = curve.getLength();
   const items = [], width = opt.width || 3.4;
   /* 큰 덩어리가 등뼈, 중간이 살, 작은 돌이 발치에 */
   const put = (u, side, s, y) => { const p = curve.getPointAt(u), t = curve.getTangentAt(u), nx = -t.z, nz = t.x;
     items.push({ g: Math.floor(R() * 6), x: p.x + nx * side, z: p.z + nz * side, y, s, q: new THREE.Quaternion().setFromEuler(new THREE.Euler((R() - .5) * .5, R() * 6.28, (R() - .5) * .5)), sq: [1 + (R() - .5) * .4, 1 + (R() - .5) * .5, 1 + (R() - .5) * .4] }); };
-  for (let d = 0; d < len; d += 2.0 + R() * 1.2) { const u = d / len, edge = Math.min(u, 1 - u) * len / 6, k = Math.min(1, .45 + edge);
+  for (let d = 0; d < len; d += 2.0 + R() * 1.2) { const u = d / len, edge = (opt.noTaper ? 9 : Math.min(u, 1 - u)) * len / 6, k = Math.min(1, .45 + edge);
     put(u, (R() - .5) * width * .3, (1.7 + R() * 1.2) * k, .1 + R() * .5); }
-  for (let d = 0; d < len; d += 1.4 + R() * 1.1) { const u = d / len, k = Math.min(1, .5 + Math.min(u, 1 - u) * len / 6);
+  for (let d = 0; d < len; d += 1.4 + R() * 1.1) { const u = d / len, k = Math.min(1, .5 + (opt.noTaper ? 9 : Math.min(u, 1 - u)) * len / 6);
     put(u, (R() < .5 ? -1 : 1) * width * (.3 + R() * .3), (.7 + R() * .8) * k, R() * .3 - .2); }
   for (let d = 0; d < len; d += .55 + R() * .5) { const u = d / len; put(u, (R() < .5 ? -1 : 1) * width * (.6 + R() * .55), .25 + R() * .55, -.25 + R() * .2); }
   const grp = new THREE.Group(), m4 = new THREE.Matrix4(), sc = new THREE.Vector3(), pos = new THREE.Vector3();
-  if (opt.float) { let lastX = -1e9; for (const it of items.filter(i => i.s > 1.9).sort((a, b) => a.x - b.x)) { if (it.x - lastX < 7) continue; lastX = it.x; it.skip = true; } }
+  if (opt.float) { const gap = opt.floatGap || 7; let lx = -1e9, lz = -1e9; for (const it of items.filter(i => i.s > 1.9)) { if (Math.hypot(it.x - lx, it.z - lz) < gap) continue; lx = it.x; lz = it.z; it.skip = true; } }   /* 길을 따라 gap마다 하나씩 띄움 */
   geos.forEach((g, gi) => { const mine = items.filter(it => it.g === gi && !it.skip); if (!mine.length) return;
     const im = new THREE.InstancedMesh(g, mat, mine.length);
     mine.forEach((it, j) => { m4.compose(pos.set(it.x, it.y, it.z), it.q, sc.set(it.s * it.sq[0], it.s * it.sq[1], it.s * it.sq[2])); im.setMatrixAt(j, m4); });
     im.computeBoundingSphere(); grp.add(im); });
   /* 떠 있는 큰 바위: 바닥에서 떨어져 천천히 돌고, 서로 · 아래 바위와 녹은 용암 실로 이어진다 */
   const fl = [];
-  if (opt.float) { const big = items.filter(it => it.s > 1.9).sort((a, b) => a.x - b.x); let lastX = -1e9;
-    for (const it of big) { if (it.x - lastX < 7) continue; lastX = it.x; it.float = true;
+  if (opt.float) { for (const it of items.filter(i => i.skip)) { it.float = true;
       const ms = new THREE.Mesh(geos[it.g], mat); ms.scale.set(it.s * it.sq[0] * .8, it.s * it.sq[1] * .8, it.s * it.sq[2] * .8); ms.quaternion.copy(it.q); grp.add(ms);
       const below = items.filter(o => !o.float && o.s > .9).sort((a, b) => Math.hypot(a.x - it.x, a.z - it.z) - Math.hypot(b.x - it.x, b.z - it.z))[0];
       fl.push({ it, ms, ph: R() * 6.28, h: 2.2 + R() * 1.6, spin: (R() - .5) * .25, below }); } }

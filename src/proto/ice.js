@@ -6,7 +6,7 @@
    투명 재질(뒤를 비추는 계산)은 폰에 무거워서 쓰지 않고, 속은 보는 방향으로 몇 겹 들여다본 잡음으로 흉내 낸다. */
 import * as THREE from 'three';
 import { mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js';
-import { HITS } from './rocks.js?v=11030801';
+import { HITS } from './rocks.js?v=11030813';
 
 function hash(a, b, c) { const s = Math.sin(a * 127.1 + b * 311.7 + c * 74.7) * 43758.5453; return s - Math.floor(s); }
 function vn(x, y, z) { const ix = Math.floor(x), iy = Math.floor(y), iz = Math.floor(z), fx = x - ix, fy = y - iy, fz = z - iz, s = t => t * t * (3 - 2 * t), u = s(fx), v = s(fy), w = s(fz), L = (a, b, t) => a + (b - a) * t;
@@ -14,7 +14,7 @@ function vn(x, y, z) { const ix = Math.floor(x), iy = Math.floor(y), iz = Math.f
 const fbm = (x, y, z, o = 4) => { let s = 0, a = .5, q = 1; for (let i = 0; i < o; i++) { s += (vn(x * q, y * q, z * q) - .5) * a; a *= .5; q *= 2.05; } return s; };
 
 /* 얼음 덩어리 하나 */
-function block(seed) {
+export function block(seed) {
   const R = (() => { let s = seed * 9301 + 49297; return () => (s = (s * 9301 + 49297) % 233280) / 233280; })();
   let g = new THREE.IcosahedronGeometry(1, 2); g.deleteAttribute('normal'); g.deleteAttribute('uv'); g = mergeVertices(g, 1e-4);   /* 면이 큰 덩어리 → 각진 얼음 */
   const P = g.attributes.position, v = new THREE.Vector3(), o = seed * 2.3;
@@ -66,15 +66,15 @@ export function iceMaterial(uT) {
 
 /* 능선: 덩어리를 겹쳐 빈틈없이 잇는다 (큰 덩어리 등줄기 + 앞뒤로 받치는 덩어리 + 발치 조각) */
 export function makeIceRidge(path, opt = {}) {
-  const uT = opt.uT || { value: 0 }, mat = iceMaterial(uT);
-  const geos = [1, 2, 3, 4, 5, 6].map(block);
+  const uT = opt.uT || { value: 0 }, mat = opt.mat || iceMaterial(uT);
+  const geos = opt.geos || [1, 2, 3, 4, 5, 6].map(block);
   const R = (() => { let s = (opt.seed || 5) * 7919; return () => (s = (s * 9301 + 49297) % 233280) / 233280; })();
   const curve = new THREE.CatmullRomCurve3(path.map(p => new THREE.Vector3(p[0], 0, p[1])), false, 'centripetal'), len = curve.getLength();
   const bl = [];
   const put = (u, side, s, y, stretch) => { const p = curve.getPointAt(u), t = curve.getTangentAt(u), nx = -t.z, nz = t.x, yaw = Math.atan2(t.x, t.z);
     bl.push({ g: Math.floor(R() * geos.length), x: p.x + nx * side, z: p.z + nz * side, y, sq: [s * (.85 + R() * .3), s * (.8 + R() * .45), s * stretch * (.9 + R() * .3)], q: new THREE.Quaternion().setFromEuler(new THREE.Euler((R() - .5) * .25, yaw + (R() - .5) * .5, (R() - .5) * .25)) }); };
-  for (let d = 0; d < len; d += 2.8 + R() * 1.6) { const u = d / len, edge = Math.min(1, .5 + Math.min(u, 1 - u) * len / 6); put(u, (R() - .5) * .8, (1.7 + R() * .9) * edge, .1 + R() * .4, 1.35); }
-  for (let d = 1.4; d < len; d += 4.2 + R() * 2.5) { const u = d / len, edge = Math.min(1, .5 + Math.min(u, 1 - u) * len / 6); put(u, (R() < .5 ? -1 : 1) * (1.1 + R() * .6), (1 + R() * .7) * edge, -.1 + R() * .2, 1.2); }
+  for (let d = 0; d < len; d += 2.8 + R() * 1.6) { const u = d / len, edge = Math.min(1, .5 + (opt.noTaper ? 9 : Math.min(u, 1 - u)) * len / 6); put(u, (R() - .5) * .8, (1.7 + R() * .9) * edge, .1 + R() * .4, 1.35); }
+  for (let d = 1.4; d < len; d += 4.2 + R() * 2.5) { const u = d / len, edge = Math.min(1, .5 + (opt.noTaper ? 9 : Math.min(u, 1 - u)) * len / 6); put(u, (R() < .5 ? -1 : 1) * (1.1 + R() * .6), (1 + R() * .7) * edge, -.1 + R() * .2, 1.2); }
   for (let d = 0; d < len; d += 2 + R() * 2.2) { const u = d / len; put(u, (R() < .5 ? -1 : 1) * (2.1 + R() * 1.2), .25 + R() * .35, -.25, 1); }
   const grp = new THREE.Group(), m4 = new THREE.Matrix4(), sc = new THREE.Vector3(), pos = new THREE.Vector3();
   geos.forEach((g, gi) => { const mine = bl.filter(b => b.g === gi); if (!mine.length) return;

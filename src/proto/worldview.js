@@ -2,12 +2,12 @@
    날아 보기: 1번 기지에서 기체를 조이스틱으로 몰아 맵 크기·길·문을 몸으로 확인(지금 있는 땅 이름 · 출발 뒤 걸린 시간 · 속도 바꾸기)
    보기: 날아 보기·지역 보기는 기체를 따라감, 맵 전체는 가운데 고정(끌어서 이동). 두 손가락(휠)로 확대. 시작 기지 자리는 빛 고리(다음 단계에서 진짜 기지) */
 import * as THREE from 'three';
-import { makeBloom } from '../core/hangar/bloom.js?v=11030801';
-import { makeMapFloor, MAP, toWorld } from './mapfloor.js?v=11030801';
-import { makePerf } from './perf.js?v=11030801';
+import { makeBloom } from '../core/hangar/bloom.js?v=11030813';
+import { makeMapFloor, MAP, toWorld } from './mapfloor.js?v=11030813';
+import { makePerf } from './perf.js?v=11030813';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
-import { makeFlight, loadBlock, FLY } from './flight.js?v=11030801';
-import { makeWalls } from './walls.js?v=11030801';
+import { makeFlight, loadBlock, FLY } from './flight.js?v=11030813';
+import { makeWalls } from './walls.js?v=11030813';
 
 const $ = s => document.querySelector(s), clamp = THREE.MathUtils.clamp;
 const VIEWS = [{ name: '날아 보기', h: 42, tilt: .38 }, { name: '지역 보기', h: 160, tilt: .25 }, { name: '맵 전체', h: 520, tilt: .02 }];
@@ -17,10 +17,11 @@ export async function start(canvas, onProgress = () => {}) {
   renderer.toneMapping = THREE.NoToneMapping; renderer.autoClear = false; renderer.setClearColor(0, 1);
   const scene = new THREE.Scene(), camera = new THREE.PerspectiveCamera(40, 1, 1, 3000), bloom = makeBloom(renderer, { samples: 0 });
   onProgress(.2);
-  const floor = await makeMapFloor(renderer, './assets/map/v6.png?v=11030801');
-  const J = await (await fetch('./assets/map/v6.json?v=11030801')).json();
-  const BLK = await loadBlock('./assets/map/v6.png?v=11030801');                  /* 벽 판정 = 바닥에 그린 벽 그림 그대로 */
-  const WALL = makeWalls(BLK, floor); scene.add(WALL.mesh); floor.mat.uniforms.uWf.value = WALL.fieldTex;   /* 바위벽 세우기 · 바닥도 같은 벽 지도로 */
+  const floor = await makeMapFloor(renderer, './assets/map/v6.png?v=11030813');
+  const J = await (await fetch('./assets/map/v6.json?v=11030813')).json();
+  const BLK = await loadBlock('./assets/map/v6.png?v=11030813');                  /* 벽 판정 = 바닥에 그린 벽 그림 그대로 */
+  const UT = { value: 0 }, WALL = makeWalls(BLK, floor, J.ridges, UT); floor.mat.uniforms.uWf.value = WALL.fieldTex;   /* 바닥도 같은 벽 지도로 */
+  scene.add(WALL.real); scene.add(WALL.mesh); WALL.mesh.visible = false;   /* 승인된 벽 5종 · 맵 전체 보기에서만 가벼운 한 덩어리 벽(멀리서 보는 지도) */
   { const pm = new THREE.PMREMGenerator(renderer); scene.environment = pm.fromScene(new RoomEnvironment(), .04).texture; scene.environmentIntensity = .6; pm.dispose(); }
   const SPAWN = J.spawns, ALL = [...J.labels.map(o => [o.x, o.y, o.n, o.l]), [500, 500, '무너진 중심부', 'Lv 10+']];
   onProgress(.7);
@@ -36,7 +37,8 @@ export async function start(canvas, onProgress = () => {}) {
        종류 색: 큰길 금빛 · 보물 땅 문 호박빛 · 보스 옆 샛길 붉은빛(위험) · 좁은 틈 보랏빛
      무게: 기둥·머리·빛 줄·바닥 빛 각각 한 묶음(InstancedMesh) → 문이 백 개여도 그리기 4번 */
   scene.add(new THREE.HemisphereLight(0x8a9ac0, 0x14100c, 1.1));
-  { const k = new THREE.DirectionalLight(0xfff0dc, 2.4); k.position.set(-60, 120, -40); scene.add(k); }
+  { const k = new THREE.DirectionalLight(0xfff0dc, 2.4); k.position.set(-60, 120, -40); scene.add(k);
+    const f = new THREE.DirectionalLight(0x8fb0ff, .6); f.position.set(70, 50, 90); scene.add(f); }   /* 반대쪽 푸른 빛: 흑요석·얼음의 매끈한 면에 비치는 빛 (벽 보기와 같게) */
   const GC = { road: [1, .78, .38], side: [1, .62, .22], aggro: [1, .3, .2], sneak: [.72, .45, 1] }, G = J.gates || [], S = MAP.SCALE;
   const colM = new THREE.MeshStandardMaterial({ color: 0x4a4f58, metalness: .55, roughness: .42 });   /* 건메탈: 주변 반사 없이도 형태가 보이게 금속감 낮춤 */
   const capM = new THREE.MeshStandardMaterial({ color: 0xd9a441, metalness: 1, roughness: .28, emissive: 0x3a2508 });
@@ -78,7 +80,7 @@ export async function start(canvas, onProgress = () => {}) {
   const cam = { x: sx, z: sz, h: 42, H: 42, tilt: .38, T: .38, az: 0 }, tour = $('#tour'); let view = 0;
   $('#head span').textContent = '맵 6안 · 360m · 화면 왼쪽을 누르면 조이스틱 (컴퓨터: WASD·방향키) · 두 손가락으로 확대';
   VIEWS.forEach((v, i) => { const b = document.createElement('button'); b.type = 'button'; b.textContent = v.name; b.className = i === 0 ? 'on vw' : 'vw';
-    b.onclick = () => { view = i; cam.H = v.h; cam.T = v.tilt; if (i === 2) { cam.x = 0; cam.z = 0; } tour.querySelectorAll('.vw').forEach(x => x.classList.toggle('on', x === b)); }; tour.appendChild(b); });
+    b.onclick = () => { view = i; cam.H = v.h; cam.T = v.tilt; if (i === 2) { cam.x = 0; cam.z = 0; } WALL.real.visible = i < 2; WALL.mesh.visible = i === 2; tour.querySelectorAll('.vw').forEach(x => x.classList.toggle('on', x === b)); }; tour.appendChild(b); });
   /* 크기 재기: 지금 땅 이름 · 출발 뒤 걸린 시간 · 속도 바꾸기 · 기지로 */
   const hud = document.createElement('div'); hud.style.cssText = 'position:fixed;left:50%;top:calc(env(safe-area-inset-top,0px) + 54px);transform:translateX(-50%);padding:6px 14px;border-radius:14px;background:rgba(4,8,6,.55);border:1px solid rgba(185,255,74,.25);color:#e8f6d0;font-size:12.5px;letter-spacing:.03em;pointer-events:none;white-space:nowrap'; document.body.appendChild(hud);
   let clock = -1, spI = 1;
@@ -100,7 +102,8 @@ export async function start(canvas, onProgress = () => {}) {
   function size() { const r = canvas.getBoundingClientRect(); cw = r.width; ch = r.height; [Wd, Hd] = perf.size(r.width, r.height); renderer.setSize(Wd, Hd, false); bloom.size(Wd, Hd); floor.size(Wd, Hd); camera.aspect = Wd / Hd; camera.updateProjectionMatrix(); fly.userData.setPx(Hd); }
   addEventListener('resize', size); size();
   let last = performance.now(), t = 0; const v = new THREE.Vector3();
-  renderer.setAnimationLoop(now => { try {
+  renderer.info.autoReset = false;
+  renderer.setAnimationLoop(now => { try { renderer.info.reset();
     const dt = clamp((now - last) / 1000, 0, .05); last = now; t += dt;
     fly.userData.update(t, dt);
     if (view < 2) { const lx = FS.x + FS.vx * .35, lz = FS.z + FS.vz * .35, k = Math.min(1, dt * 5); cam.x += (lx - cam.x) * k; cam.z += (lz - cam.z) * k; }   /* 기체를 따라감: 가는 쪽을 조금 더 보여줌 */
@@ -108,7 +111,7 @@ export async function start(canvas, onProgress = () => {}) {
       hud.textContent = `${J.names[BLK.region(FS.x, FS.z)] || ''} · ${clock < 0 ? '출발 전' : '출발 뒤 ' + (t - clock).toFixed(1) + '초'} · ${mv.toFixed(1)}m/초`; }
     cam.h += (cam.H - cam.h) * Math.min(1, dt * 3); cam.tilt += (cam.T - cam.tilt) * Math.min(1, dt * 3);
     camera.position.set(cam.x, cam.h * Math.cos(cam.tilt), cam.z + cam.h * Math.sin(cam.tilt)); camera.lookAt(cam.x, 0, cam.z);
-    floor.update(t); ringM.uniforms.uT.value = t; sillM.uniforms.uT.value = t;
+    UT.value = t; WALL.real.userData.update(t, dt); floor.update(t); ringM.uniforms.uT.value = t; sillM.uniforms.uT.value = t;
     for (const g of tags) { v.copy(g.p).project(camera); const on = v.z < 1 && Math.abs(v.x) < 1.1 && Math.abs(v.y) < 1.1;
       g.el.style.opacity = on ? 1 : 0; if (on) g.el.style.transform = `translate(${(v.x * .5 + .5) * cw}px,${(-v.y * .5 + .5) * ch}px) translate(-50%,-50%)`; }
     renderer.setRenderTarget(bloom.scene); renderer.clear(); floor.render(camera, bloom.scene); renderer.render(scene, camera);
@@ -117,5 +120,5 @@ export async function start(canvas, onProgress = () => {}) {
   { const v = (import.meta.url.match(/v=(\d+)/) || [])[1] || '개발'; const el = document.createElement('div'); el.textContent = '6안 · 판 번호 ' + v;   /* 어떤 버전이 열렸는지 바로 확인 */
     el.style.cssText = 'position:fixed;left:max(18px,env(safe-area-inset-left,0px));bottom:calc(env(safe-area-inset-bottom,0px) + 14px);font-size:11px;color:rgba(185,255,74,.7);pointer-events:none'; document.body.appendChild(el); }
   onProgress(1);
-  window.__wv = { get t() { return t; }, cam, fly: FS, wallTris: WALL.mesh.userData.tris };
+  window.__wv = { get t() { return t; }, cam, fly: FS, wallTris: WALL.mesh.userData.tris, real: WALL.real.userData, info: renderer.info, dbg: () => { const o = {}; const ex = []; scene.traverse(m => { if (m.isMesh && !m.isInstancedMesh && !m.material.customProgramCacheKey && ex.length < 3) { const w = new THREE.Vector3(); m.getWorldPosition(w); ex.push([m.geometry.type, m.parent && m.parent.type, w.x.toFixed(1), w.z.toFixed(1), m.material.type]); } }); o.ex = ex; scene.traverse(m => { if (!m.isMesh && !m.isPoints) return; const k = (m.isInstancedMesh ? 'I:' : 'M:') + (m.material.customProgramCacheKey ? m.material.customProgramCacheKey() : m.material.type); const tri = (m.geometry.index ? m.geometry.index.count : m.geometry.attributes.position.count) / 3; o[k] = o[k] || [0, 0, 0]; o[k][0]++; o[k][1] += tri * (m.count || 1); o[k][2] = tri; }); return o; } };
 }

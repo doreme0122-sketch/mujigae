@@ -90,7 +90,13 @@ export async function makeMapFloor(renderer, url) {
         float rim = smoothstep(0.,.5,sh)*(1.-rk)*(1.-smoothstep(.2,.45,road));   /* 벽 바로 바깥 그림자: 벽이 바닥에서 솟아 있다는 느낌 (벽 크기는 안 바뀜) */
         float tn = texture2D(uN,vW.xz*.06).b, tn2 = texture2D(uN,vW.xz*.18).r;
         vec3 rockC = vec3(.30,.31,.34)*(.65+.55*tn) + vec3(.14,.14,.15)*smoothstep(.55,.8,tn2);      /* 밝은 회색 돌, 군데군데 더 밝은 면 */
-        rockC *= .8 + .35*smoothstep(.5,1.,sh);                                                         /* 벽 안쪽 깊은 곳(등선)이 더 밝음 */
+        int wk = int(floor(texture2D(uWf, uv).g*255./50.+.5));                                             /* 벽 종류 (밑 땅을 벽마다 다르게) */
+        vec3 gk = wk==1 ? vec3(.05,.08,.12)+vec3(.12,.15,.18)*smoothstep(.62,.8,tn2)      /* 빙하: 짙은 푸른 땅에 서리 얼룩 */
+                : wk==2 ? vec3(.045,.03,.07)+vec3(.12,.09,.2)*step(.86,tn2)                /* 자수정: 짙은 보랏빛 바위 + 부스러진 결정 알갱이 */
+                : wk==3 ? vec3(.06,.055,.05)*(.75+.5*step(.5,fract(vW.x*.55+tn*.6))*step(.5,fract(vW.z*.55+tn2*.6)))   /* 유적: 무너진 담 사이 깔린 짙은 돌판 */
+                : wk==4 ? vec3(.02,.055,.06)+vec3(.03,.1,.09)*smoothstep(.5,.8,tn)         /* 산호: 짙은 청록 개흙 */
+                : vec3(.018,.018,.022)+vec3(.03,.025,.03)*smoothstep(.6,.85,tn2);          /* 흑요석: 검은 유리 부스러기 땅 */
+        rockC = gk*(.75+.5*tn)*(.85+.3*smoothstep(.5,1.,sh));                                                         /* 벽 띠 바닥: 벽 덩어리 밑에 깔린 짙은 그늘 땅 → 덩어리 사이 틈도 막힌 곳으로 보임 */
         c = mix(c, c*.3, rim*.85);
         c = mix(c, rockC, rk);
         /* 반짝임 물결 (지역마다) */

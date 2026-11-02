@@ -4,12 +4,12 @@
    · 평소: 빛나지 않는다. 문양은 어두운 홈으로만 보인다.
    · 맞으면: 맞은 자리에서 가까운 문양부터 하나씩 차례로 금빛으로 켜졌다가(지름 3m 남짓) 0.8초쯤에 꺼진다. */
 import * as THREE from 'three';
-import { HITS } from './rocks.js?v=11030801';
+import { HITS } from './rocks.js?v=11030813';
 
 const rng = seed => { let s = seed * 9301 + 49297; return () => (s = (s * 9301 + 49297) % 233280) / 233280; };
 
 /* 돌기둥: 상자를 모서리 깎고 윗부분은 부서진 듯 */
-function pillar(seed) {
+export function pillar(seed) {
   const R = rng(seed), g = new THREE.BoxGeometry(1, 1, 1, 3, 6, 3); g.translate(0, .5, 0);
   const P = g.attributes.position, v = new THREE.Vector3();
   const cuts = []; for (let i = 0; i < 3; i++) { const a = R() * 6.28; cuts.push([new THREE.Vector3(Math.cos(a), .25 + R() * .6, Math.sin(a)).normalize(), .78 + R() * .12]); }
@@ -23,7 +23,7 @@ function pillar(seed) {
   g.deleteAttribute('uv'); const ng = g.toNonIndexed(); ng.computeVertexNormals(); return ng;
 }
 /* 고리 조각: 네모난 단면이 원호를 따라 */
-function arc(seed) {
+export function arc(seed) {
   const R = rng(seed), rad = 1, w = .16, h = .11, span = 1 + R() * .8, N = 22, pos = [];
   const pt = (a, dx, dy) => new THREE.Vector3(Math.cos(a) * (rad + dx), dy, Math.sin(a) * (rad + dx));
   const q = (a, b, c, d) => pos.push(a, b, c, a, c, d);
@@ -83,14 +83,14 @@ export function ruinMaterial(uT) {
 }
 
 export function makeRuinRidge(path, opt = {}) {
-  const uT = opt.uT || { value: 0 }, mat = ruinMaterial(uT);
-  const pg = [1, 2, 3, 4].map(pillar), ag = [11, 12, 13].map(arc);
+  const uT = opt.uT || { value: 0 }, mat = opt.mat || ruinMaterial(uT);
+  const pg = opt.geos || [1, 2, 3, 4].map(pillar), ag = opt.arcs || [11, 12, 13].map(arc);
   const R = rng(opt.seed || 21);
   const curve = new THREE.CatmullRomCurve3(path.map(p => new THREE.Vector3(p[0], 0, p[1])), false, 'centripetal'), len = curve.getLength();
   const st = [], fl = [], tg = [];
   /* 이어진 무너진 담: 길이 방향으로 돌덩이를 쌓은 낮은 벽 (군데군데 무너져 낮아짐) */
   for (let d = 0; d < len; d += 1.25 + R() * .3) { const u = d / len, p = curve.getPointAt(u), t = curve.getTangentAt(u), yaw = Math.atan2(t.x, t.z);
-    const ruin = .5 + .5 * Math.sin(d * .45 + R() * 1.5), h = (.5 + ruin * 1.3) * Math.min(1, .4 + Math.min(u, 1 - u) * len / 5);
+    const ruin = .5 + .5 * Math.sin(d * .45 + R() * 1.5), h = (.5 + ruin * 1.3) * Math.min(1, .4 + (opt.noTaper ? 9 : Math.min(u, 1 - u)) * len / 5);
     if (h < .35) continue;
     st.push({ g: Math.floor(R() * 4), x: p.x, y: -.5, z: p.z, s: [.95, h, 1.3 + R() * .15], q: new THREE.Quaternion().setFromEuler(new THREE.Euler((R() - .5) * .06, yaw + (R() - .5) * .08, (R() - .5) * .06)) });
     tg.push({ x: p.x, y: -.5 + h * .5, z: p.z, r: .75 }); }
