@@ -6,7 +6,7 @@ import { buildShip, engineSpots } from '../core/ships/build.js';
 import { makeGlow } from '../preview/glow.js';
 import { planetShader } from '../core/planet.js';
 import { planetFor } from '../data/planets.js';
-import { makeRidge, updateRidge, beatJS } from './rocks.js';
+import { makeRidge, updateRidge, beatJS } from './rocks.js?v=11021155';
 
 const $ = s => document.querySelector(s), clamp = THREE.MathUtils.clamp, rnd = (a, b) => a + Math.random() * (b - a);
 const ROWS = [
