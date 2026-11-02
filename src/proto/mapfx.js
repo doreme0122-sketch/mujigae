@@ -16,9 +16,9 @@ const FS = 'varying vec2 vU;void main(){vU=uv;gl_Position=vec4(position.xy,0.,1.
 const U = v => ({ value: v });
 
 /* ───── 깊은 우주 ───── */
-export function skyMaterial(regions) {
+export function skyMaterial(regions, haze = false) {
   const rg = regions.map(r => new THREE.Vector4(r.x, r.z, r.r, r.k ?? 1)), rc = regions.map(r => new THREE.Vector3(...r.c));
-  return new THREE.ShaderMaterial({ depthTest: false, depthWrite: false,
+  return new THREE.ShaderMaterial({ depthTest: false, depthWrite: false, ...(haze ? { transparent: true, blending: THREE.AdditiveBlending } : {}),
     uniforms: { uRes: U(new THREE.Vector2(2, 2)), uCam: U(new THREE.Vector2()), uSpan: U(60), uT: U(0), uRg: U(rg), uRc: U(rc) },
     vertexShader: FS,
     fragmentShader: `precision highp float; varying vec2 vU; uniform vec2 uRes,uCam; uniform float uSpan,uT;
@@ -43,6 +43,7 @@ export function skyMaterial(regions) {
         float ppu=uRes.y/uSpan; vec2 fc=gl_FragCoord.xy, cm=vec2(uCam.x,-uCam.y)*ppu;
         vec3 st=stars(fc+cm*.06,uRes.y*.03,.6,.45)*.5 + stars(fc+cm*.12+91.,uRes.y*.055,.8,.55)*.8 + stars(fc+cm*.2+37.,uRes.y*.12,.93,.7)*1.3;
         col+=st*(1.-dust*.6);
+        ${haze ? 'col=rc*(.03+.42*pow(neb,2.2)+.4*fil)*(1.-dust*.85) + vec3(.05,.06,.1)*fil*.25*(1.-dust);' : ''}
         gl_FragColor=vec4(col,1.); }` });
 }
 
