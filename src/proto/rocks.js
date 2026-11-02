@@ -76,15 +76,15 @@ export const HITS = { value: Array.from({ length: NHIT }, () => new THREE.Vector
 export function hitWall(x, y, z, t) { const H = HITS.value; let best = 0, bestAge = -1;
   for (let i = 0; i < NHIT; i++) { const h = H[i], age = t - h.w;
     if (age < .08 && Math.hypot(h.x - x, h.y - y, h.z - z) < .6) return;
-    if (age > .6) { best = i; bestAge = 99; break; }
+    if (age > .8) { best = i; bestAge = 99; break; }
     if (age > bestAge) { bestAge = age; best = i; } }
   H[best].set(x, y, z, t); }
 const WAVE = `uniform vec4 uHits[16];
-  /* 맞은 자리 둘레만 짧게: 지름 1m 남짓, 0.4초쯤에 식는다 (x = 뜨거움, y = 맞는 순간의 번쩍) */
+  /* 맞은 자리 둘레만 짧게: 지름 3m 남짓(기체 하나 반), 0.6초쯤에 식는다 (x = 뜨거움, y = 맞는 순간의 번쩍) */
   vec2 hitGlow(vec3 w, float t){ float h=0., f=0.;
-    for(int i=0;i<16;i++){ float age=t-uHits[i].w; if(age<0.||age>.6) continue; vec3 d3=w-uHits[i].xyz; float d2=dot(d3,d3); if(d2>2.) continue;
-      float fall=exp(-d2*3.2);
-      h+=fall*exp(-age*7.5);
+    for(int i=0;i<16;i++){ float age=t-uHits[i].w; if(age<0.||age>.8) continue; vec3 d3=w-uHits[i].xyz; float d2=dot(d3,d3); if(d2>10.) continue;
+      float fall=exp(-d2*.5);
+      h+=fall*exp(-age*5.5);
       f+=fall*exp(-age*28.); }
     return vec2(h,f); }`;
 export function obsidianMaterial(uT) {
@@ -108,10 +108,10 @@ export function obsidianMaterial(uT) {
             vec3 wq=vRp+vec3(rn(vRp*1.5),rn(vRp*1.5+3.),rn(vRp*1.5+7.))*.7;
             vec2 c=vcell(wq*1.9); vec2 c2=vcell(wq*4.6+5.);
             float crack=smoothstep(.05,.0,c.y)+smoothstep(.035,.0,c2.y)*.6;
-            float heat=crack*hg.x*3.;
+            float heat=crack*hg.x*3.4;
             vec3 hot=mix(vec3(.9,.12,.02),vec3(1.,.42,.08),clamp(hg.x*1.5,0.,1.));            /* 식으면서 주황 → 짙은 빨강 */
-            totalEmissiveRadiance+=hot*heat*2.4+vec3(1.,.75,.4)*pow(heat,2.2)*1.2*hg.y*2.;
-            totalEmissiveRadiance+=vec3(1.,.5,.2)*hg.y*1.2;                                      /* 맞는 순간 그 자리가 확 */
+            totalEmissiveRadiance+=hot*heat*2.4+vec3(1.,.7,.35)*pow(heat,2.2)*1.2*hg.y;
+            totalEmissiveRadiance+=vec3(1.,.5,.2)*hg.y*.9+vec3(.9,.15,.02)*smoothstep(.25,0.,c.y)*hg.x*.35;                                      /* 맞는 순간 그 자리가 확 */
             float ct=abs(dot(normalize(normal),vec3(0.,0.,1.)));
             float rim=smoothstep(.12,.05,c.y)-smoothstep(.05,.0,c.y);                              /* 틈 옆 얇은 막: 맞는 순간만 무지개 */
             totalEmissiveRadiance+=film(280.+260.*rn(vRp*4.),ct)*rim*(1.-ct)*hg.y*1.6; } }`); };
