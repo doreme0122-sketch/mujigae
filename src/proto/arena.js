@@ -7,7 +7,7 @@
    단위는 자기장 판과 같음. */
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { sweep, posNor } from './floatring.js?v=11021815';
+import { sweep, posNor } from './floatring.js?v=11021820';
 
 
 /* 건담처럼 장갑판을 조립한 느낌의 검은 판 선 — 면 위치로 바로 그림(텍스처 없음, 가벼움)
@@ -147,14 +147,13 @@ export function makeArena() {
         else { glowPos.push(...p0, ...p1, ...p2, ...p0, ...p2, ...p3); for (const v of [sa, sa, sb, sa, sb, sb]) { glowK.push(9); glowS.push(v); } } }
       for (const sd of [-1, 1]) { if (vert) continue; const g = new THREE.BoxGeometry(Math.abs(rb - ra), .012, .014); g.translate((ra + rb) / 2, ya + .006, sd * .09); g.rotateY(-a); L.blue.push(posNor(g)); } } }
 
-  /* 출구 양옆 끝에만 금 테: 내려앉는 경사 구간의 단 모서리를 따라 (출구가 기지의 얼굴이 되게) */
-  { const up = (u, y) => y > 0 ? Math.max(.006, y * sm(u)) : y, dn = (u, y) => y > 0 ? Math.max(.006, y * sm(1 - u)) : y;
-    for (const [r, h] of [[t1[0] - OV, t1[2]], [q0 - OV, H - .04]]) {
-      const prof = [[r - .03, h - .06], [r + .02, h - .065], [r + .1, h + .004], [r + .1, h + .02], [r + .01, h + .02], [r - .03, h - .02]];
-      L.gold.push(sweep(prof, A0, M0 + .06, undefined, 40, (u, y) => up(Math.min(1, u * (M0 + .06 - A0) / (M0 - A0)), y)));
-      L.gold.push(sweep(prof, M1 - .06, A1, undefined, 40, (u, y) => dn(Math.max(0, (u * (A1 - M1 + .06) - .06) / (A1 - M1)), y))); }
-    /* 출구 바깥 끝 모서리 두 곳: 세운 금 판 */
-    for (const aa of [A0, A1]) { const g = new THREE.BoxGeometry(.5, .03, .06); g.translate(RO - .25, .02, 0); g.rotateY(-aa); L.gold.push(posNor(g)); } }
+  /* 금 테: 1층·2층 단 모서리를 따라 원으로 빙 두르고(출구 쪽은 경사를 따라 내려앉음),
+     출구 양옆 가장자리를 따라 같은 금이 세로로(안 → 바깥) 이어 두 고리를 묶는다 */
+  for (const [r, h] of [[t1[0] - OV, t1[2]], [q0 - OV, H - .04]]) {
+    const prof = [[r - .03, h - .06], [r + .02, h - .065], [r + .1, h + .004], [r + .1, h + .02], [r + .01, h + .02], [r - .03, h - .02]];
+    L.gold.push(...ramped(prof)); }
+  for (const aa of [A0, A1]) { const sd = aa === A0 ? 1 : -1, w = .05;
+    L.gold.push(sweep([[t1[0] - OV - .03, -.002], [RO + .02, -.002], [RO + .02, .03], [t1[0] - OV - .03, .03]], aa + sd * .004, aa + sd * (.004 + w / RO * 1.0), undefined, 2)); }
 
   const add = (list, mat) => { if (list.length) G.add(new THREE.Mesh(mergeGeometries(list.map(posNor)), mat)); };
   add(L.silver, silver); add(L.silverHi, silverHi); add(L.gun, gun); add(L.rib, gunRib); add(L.floor, floorM); add(L.dark, dark); add(L.blue, blue); add(L.gold, gold);

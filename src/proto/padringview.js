@@ -3,13 +3,13 @@ import * as THREE from 'three';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { makeBloom } from '../core/hangar/bloom.js';
 import { makePad } from '../core/hangar/pad.js';
-import { makeMag } from '../core/hangar/mag.js?v=11021815';
+import { makeMag } from '../core/hangar/mag.js?v=11021820';
 import { buildShip } from '../core/ships/build.js';
-import { makeGoldStar } from './goldstar.js?v=11021815';
-import { makeArena } from './arena.js?v=11021815';
-import { makeGuardians, GUARD } from './guardian.js?v=11021815';
-import { makeFloor, FLOORS } from './floor.js?v=11021815';
-import { makePerf } from './perf.js?v=11021815';
+import { makeGoldStar } from './goldstar.js?v=11021820';
+import { makeArena } from './arena.js?v=11021820';
+import { makeGuardians, GUARD } from './guardian.js?v=11021820';
+import { makeFloor, FLOORS } from './floor.js?v=11021820';
+import { makePerf } from './perf.js?v=11021820';
 
 const $ = s => document.querySelector(s), clamp = THREE.MathUtils.clamp;
 const SHIPL = 2.9;     /* 기체 길이: 자기장 판(지름 3.2)보다 약간 작게 */
