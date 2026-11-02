@@ -6,9 +6,9 @@ import { buildShip, engineSpots } from '../core/ships/build.js';
 import { makeGlow } from '../preview/glow.js';
 import { planetShader } from '../core/planet.js';
 import { planetFor } from '../data/planets.js';
-import { makeIceRidge } from './ice.js?v=11021255';
-import { makeCrystalRidge } from './crystal.js?v=11021255';
-import { makeRidge, updateRidge, hitWall } from './rocks.js?v=11021255';
+import { makeIceRidge } from './ice.js?v=11021311';
+import { makeCrystalRidge } from './crystal.js?v=11021311';
+import { makeRidge, updateRidge, hitWall } from './rocks.js?v=11021311';
 
 const $ = s => document.querySelector(s), clamp = THREE.MathUtils.clamp, rnd = (a, b) => a + Math.random() * (b - a);
 const VIEWS = [
@@ -16,8 +16,8 @@ const VIEWS = [
   { id: 'game', name: '게임 시점', h: 44, tilt: .26 }];
 const WALLS = [
   { id: 'obsidian', name: '용암 흑요석', tip: '평소엔 빛나지 않는 검은 유리 바위예요. 탄에 맞으면 맞은 자리 둘레의 틈만 용암빛으로 짧게 반짝였다가 식어요. 화면의 벽을 누르면 그쪽으로 쏴요.', spark: [1.4, .7, .3], flash: [1.4, .55, .2], shard: 0x050407 },
-  { id: 'ice', name: '얼어붙은 빛 기둥', tip: '맑고 깊은 얼음 기둥이에요. 속에 얼어붙은 금과 기포가 보여요. 탄에 맞으면 근처 얼음 속에 갇힌 빛줄기가 깨어나 기둥을 타고 위로 흐르다 다시 얼어붙어요.', spark: [.8, 1.05, 1.4], flash: [.6, .85, 1.4], shard: 0x9fd8ff },
-  { id: 'crystal', name: '살아 있는 결정', tip: '맑은 결정 무리가 아주 천천히 자라듯 숨 쉬어요. 탄에 맞으면 근처 결정 속에서 빛이 면마다 다르게 꺾여 무지개로 반짝이고, 맞은 결정은 움찔 움츠러들었다 다시 뻗어요.', spark: [1.2, 1.1, 1.4], flash: [1.1, 1, 1.3], shard: 0xd8ccff }];
+  { id: 'ice', name: '빙하 얼음', tip: '거대한 얼음 덩어리가 이어진 벽이에요. 속에 푸른 층이 겹겹이 지고 기포가 얼어 있어요. 위엔 서리가 앉았어요. 탄에 맞으면 속 깊이 갇힌 빛이 깨어나 층을 따라 퍼졌다가 다시 얼어요.', spark: [.8, 1.05, 1.4], flash: [.6, .85, 1.4], shard: 0x9fd8ff },
+  { id: 'crystal', name: '자수정 무리', tip: '어두운 바위에 자수정이 박혀 자랐어요. 뿌리는 짙은 보라, 끝은 맑아요. 아주 천천히 자라듯 숨 쉬어요. 탄에 맞으면 결정 속에서 빛이 면마다 다르게 꺾여 무지개로 반짝이고, 맞은 결정은 움찔해요.', spark: [1.2, 1.1, 1.4], flash: [1.1, 1, 1.3], shard: 0xd8ccff }];
 
 export async function start(canvas, onProgress = () => {}) {
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: false, powerPreference: 'high-performance' });
