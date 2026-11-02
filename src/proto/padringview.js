@@ -48,7 +48,7 @@ export async function start(canvas, onProgress = () => {}) {
   let showShip = true, onAt, born = false; ship.visible = false;
   const FILL = .35; let holdAt = 1e9;    /* 판이 바깥에서 가운데로 차오르는 시간 (짧게) */
   /* 빛이 판 옆 넓은 바닥에 모이는 순간(GATHER) 바로 태어나도록 거꾸로 맞춤: 별·판은 그 직전에 함께 차오르고, 하늘 빛은 그 순간 꽂힘 */
-  const GATHER = GUARD.DOWN + 1.25;
+  const GATHER = GUARD.DOWN + .8;    /* 빛이 판 옆 넓은 바닥 가장자리에 닿는 때 */
   const wake = t0 => { guards.userData.fire(t0); ring.userData.wake(t0 + GUARD.DOWN); onAt = t0 + GATHER - BIRTH.FALL; holdAt = onAt - FILL; star.userData.fire(holdAt - star.userData.ARRIVE); born = false; }; wake(.4);
   onProgress(.9);
 
