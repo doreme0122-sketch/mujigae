@@ -7,7 +7,7 @@
    단위는 자기장 판과 같음. */
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { sweep, posNor } from './floatring.js?v=11021808';
+import { sweep, posNor } from './floatring.js?v=11021815';
 
 
 /* 건담처럼 장갑판을 조립한 느낌의 검은 판 선 — 면 위치로 바로 그림(텍스처 없음, 가벼움)
@@ -147,14 +147,14 @@ export function makeArena() {
         else { glowPos.push(...p0, ...p1, ...p2, ...p0, ...p2, ...p3); for (const v of [sa, sa, sb, sa, sb, sb]) { glowK.push(9); glowS.push(v); } } }
       for (const sd of [-1, 1]) { if (vert) continue; const g = new THREE.BoxGeometry(Math.abs(rb - ra), .012, .014); g.translate((ra + rb) / 2, ya + .006, sd * .09); g.rotateY(-a); L.blue.push(posNor(g)); } } }
 
-  /* 금 이음쇠: 빛길이 탑에서 나오는 곳(빛을 받아 내보내는 금 입) + 별로 들어가는 곳(금 고리쇠) — 판과 네 탑을 금으로 잇는다 */
-  for (let q = 0; q < 4; q++) { const a = Math.PI / 4 + q * Math.PI / 2;
-    const mouth = new THREE.Shape(); mouth.moveTo(0, -.16); mouth.lineTo(.34, -.11); mouth.lineTo(.44, 0); mouth.lineTo(.34, .11); mouth.lineTo(0, .16); mouth.lineTo(.08, 0); mouth.closePath();
-    const mg = new THREE.ExtrudeGeometry(mouth, { depth: .05, bevelEnabled: true, bevelThickness: .015, bevelSize: .012, bevelSegments: 2 });
-    mg.rotateX(-Math.PI / 2); mg.rotateY(Math.PI); mg.translate(q0 + .62, H - .02, 0); mg.rotateY(-a); L.gold.push(posNor(mg));
-    for (const r of [2.08, 2.32]) { const g = new THREE.BoxGeometry(.05, .045, .24); g.translate(r, .022, 0); g.rotateY(-a); L.gold.push(posNor(g)); }
-    const tip = new THREE.Shape(); tip.moveTo(0, -.13); tip.lineTo(-.2, 0); tip.lineTo(0, .13); tip.lineTo(-.06, 0); tip.closePath();
-    const tg = new THREE.ExtrudeGeometry(tip, { depth: .03, bevelEnabled: true, bevelThickness: .01, bevelSize: .008, bevelSegments: 1 }); tg.rotateX(-Math.PI / 2); tg.translate(2.02, .04, 0); tg.rotateY(-a); L.gold.push(posNor(tg)); }
+  /* 출구 양옆 끝에만 금 테: 내려앉는 경사 구간의 단 모서리를 따라 (출구가 기지의 얼굴이 되게) */
+  { const up = (u, y) => y > 0 ? Math.max(.006, y * sm(u)) : y, dn = (u, y) => y > 0 ? Math.max(.006, y * sm(1 - u)) : y;
+    for (const [r, h] of [[t1[0] - OV, t1[2]], [q0 - OV, H - .04]]) {
+      const prof = [[r - .03, h - .06], [r + .02, h - .065], [r + .1, h + .004], [r + .1, h + .02], [r + .01, h + .02], [r - .03, h - .02]];
+      L.gold.push(sweep(prof, A0, M0 + .06, undefined, 40, (u, y) => up(Math.min(1, u * (M0 + .06 - A0) / (M0 - A0)), y)));
+      L.gold.push(sweep(prof, M1 - .06, A1, undefined, 40, (u, y) => dn(Math.max(0, (u * (A1 - M1 + .06) - .06) / (A1 - M1)), y))); }
+    /* 출구 바깥 끝 모서리 두 곳: 세운 금 판 */
+    for (const aa of [A0, A1]) { const g = new THREE.BoxGeometry(.5, .03, .06); g.translate(RO - .25, .02, 0); g.rotateY(-aa); L.gold.push(posNor(g)); } }
 
   const add = (list, mat) => { if (list.length) G.add(new THREE.Mesh(mergeGeometries(list.map(posNor)), mat)); };
   add(L.silver, silver); add(L.silverHi, silverHi); add(L.gun, gun); add(L.rib, gunRib); add(L.floor, floorM); add(L.dark, dark); add(L.blue, blue); add(L.gold, gold);
