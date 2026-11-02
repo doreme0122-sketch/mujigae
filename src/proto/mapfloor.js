@@ -84,12 +84,14 @@ export async function makeMapFloor(renderer, url) {
         if (id==17) { float rb=texture2D(uN,vW.xz*.03).r; c = vec3(.035,.035,.04)*(.5+1.2*rb) + vec3(.06,.055,.05)*smoothstep(.55,.75,texture2D(uN,vW.xz*.11).b); }   /* 소행성 잔해: 울퉁불퉁 짙은 돌 */
         /* 지역 경계 = 짙은 바위 능선 (나중에 벽이 섬) */
         /* 바위 능선(벽 자리): 바닥보다 확 밝은 돌 띠 + 짙은 그림자 테두리 + 윗면 빛 → 멀리서도 '못 지나가는 곳'이 보이게 */
-        float rk = smoothstep(.12,.42,ridge);
-        float rim = smoothstep(.05,.14,ridge)*(1.-smoothstep(.16,.3,ridge))*(1.-smoothstep(.2,.45,road));   /* 띠 바깥 그림자 (길이 지나는 문에는 없음) */
+        /* 벽 자리 그림은 막힘(1)/지나감(0) 둘뿐 → 보이는 돌 띠 = 실제로 부딪히는 자리. 경계 판정은 게임과 같은 .5 */
+        float rk = smoothstep(.4,.6,ridge);
+        float sh = (texture2D(uRs,uv+vec2(.004,0.)).g + texture2D(uRs,uv-vec2(.004,0.)).g + texture2D(uRs,uv+vec2(0.,.004)).g + texture2D(uRs,uv-vec2(0.,.004)).g)*.25;
+        float rim = smoothstep(0.,.5,sh)*(1.-rk)*(1.-smoothstep(.2,.45,road));   /* 벽 바로 바깥 그림자: 벽이 바닥에서 솟아 있다는 느낌 (벽 크기는 안 바뀜) */
         float tn = texture2D(uN,vW.xz*.06).b, tn2 = texture2D(uN,vW.xz*.18).r;
         vec3 rockC = vec3(.30,.31,.34)*(.65+.55*tn) + vec3(.14,.14,.15)*smoothstep(.55,.8,tn2);      /* 밝은 회색 돌, 군데군데 더 밝은 면 */
-        rockC *= .75 + .45*smoothstep(.45,.9,ridge);                                                   /* 띠 가운데(등선)가 가장 밝음 */
-        c = mix(c, c*.25, rim);
+        rockC *= .8 + .35*smoothstep(.5,1.,sh);                                                         /* 벽 안쪽 깊은 곳(등선)이 더 밝음 */
+        c = mix(c, c*.3, rim*.85);
         c = mix(c, rockC, rk);
         /* 반짝임 물결 (지역마다) */
         vec2 gq=vW.xz*.5; vec2 gc=floor(gq); float gh=h2(gc);

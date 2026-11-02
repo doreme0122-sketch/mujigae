@@ -58,9 +58,6 @@ def doorAt(t,o):
     nx_,ny_=ev[0,0],ev[1,0]                                         # 경계선에 수직 → 문이 벽을 곧게 뚫음 (비스듬히 길게 찢지 않게)
     if nx_*(seeds[o][0]-qx)+ny_*(seeds[o][1]-qy)<0: nx_,ny_=-nx_,-ny_
     return [(qx+nx_*26,qy+ny_*26),(qx,qy),(qx-nx_*26,qy-ny_*26)]
-for k in range(10):
-    t=30+k
-    for o in (k,(k+1)%10,10+k): TDOOR.append(doorAt(t,o))
 edge=edge*wallK
 from PIL import ImageDraw
 op=Image.new('L',(w,h),0); od=ImageDraw.Draw(op)
@@ -82,6 +79,88 @@ openM=np.asarray(op.filter(ImageFilter.GaussianBlur(1.4))).astype(np.float32)/25
 edge=edge*(1-np.clip(openM*1.8,0,1)); ring=ring*fill*(1-np.clip(openM*1.8,0,1))   # 중심부 둘레: 반쯤 막고 보스마다 입구 서너 개(큰길·보스 옆 샛길·좁은 틈)
 rock=np.maximum(edge,ring)
 debris=np.clip((np.hypot(X-CX,Y-CY)-478)/22,0,1)*(.6+.4*noise(23,.2))   # 모서리 = 소행성 잔해
+
+# ───── 설계도 = 게임이 쓰는 그대로: 보이는 회색은 무조건 막힘, 색깔 땅은 무조건 지나감 ─────
+from scipy import ndimage as ndi
+R0=np.hypot(xx-CX,yy-CY)
+L=near.astype(np.int32).copy(); L[inC]=40; L[debris>.5]=41               # 40 무너진 중심부 · 41 소행성 잔해
+L[:3,:]=41; L[-3:,:]=41; L[:,:3]=41; L[:,-3:]=41                     # 맵 테두리도 잔해 → 땅이 그림 끝에 닿아 생기는 틈 없음
+def mergeFrag(L):                                                     # 떨어져 나간 땅 조각 → 둘러싼 땅에 붙임 (지역마다 한 덩어리)
+    for _ in range(6):
+        moved=0
+        for v in np.unique(L[L<40]):                                   # 잔해(모서리 넷)·중심부는 그대로
+            lab,n=ndi.label(L==v)
+            if n<2: continue
+            sz=ndi.sum(np.ones_like(lab),lab,range(1,n+1)); keep=1+int(np.argmax(sz))
+            for c in range(1,n+1):
+                if c==keep: continue
+                m=lab==c; ring_=ndi.binary_dilation(m)&~m; nb=L[ring_]; nb=nb[nb!=v]
+                if len(nb): L[m]=np.bincount(nb).argmax(); moved+=1
+        if not moved: break
+    return L
+L=mergeFrag(L)
+bd=np.zeros_like(L,bool)
+bd[:,1:]|=L[:,1:]!=L[:,:-1]; bd[:,:-1]|=L[:,1:]!=L[:,:-1]; bd[1:,:]|=L[1:,:]!=L[:-1,:]; bd[:-1,:]|=L[1:,:]!=L[:-1,:]
+dist,(iy,ix)=ndi.distance_transform_edt(~bd,return_indices=True)
+WALLW=4                                                               # 벽 두께: 어디서나 같음 (반쪽 4칸 → 약 4.5m)
+band=dist<=WALLW
+La=L[iy,ix]                                                           # 가장 가까운 경계의 이쪽 땅
+Lb=La.copy()                                                          # 그 경계의 저쪽 땅
+for dy,dx in [(0,1),(0,-1),(1,0),(-1,0)]:
+    sh=np.roll(np.roll(L,dy,0),dx,1)[iy,ix]; Lb=np.where((Lb==La)&(sh!=La),sh,Lb)
+KIND=np.array([s[5] for s in seeds]+['cen','deb'])
+ka,kb=KIND[La],KIND[Lb]
+pol_=np.ones_like(L,bool)                                             # 기본: 경계는 이어진 벽
+                                                                      # 잔해 쪽 경계도 벽 → 맵 끝에서 벽이 끊겨 생기는 틈 없음
+isCen=(ka=='cen')|(kb=='cen')
+pol_=np.where(isCen,fill>.5,pol_)                                     # 중심부 둘레: 반쯤 막음 (막힌 곳/열린 곳 딱 갈림)
+pol_=np.where((ka=='boss')&(kb=='boss')&~isCen,frag,pol_)             # 보스 구역끼리 옆쪽: 덩어리만
+pol_=np.where((R0<182)&~isCen,False,pol_)                             # 중심부 안: 벽 없음
+wall0=band&pol_
+wall0=ndi.binary_closing(wall0,iterations=2)                          # 기체가 못 빠지는 실틈은 메움 (애매한 틈 없음)
+lab,n=ndi.label(wall0); sz=ndi.sum(np.ones_like(lab),lab,range(1,n+1))
+wall0&=~np.isin(lab,1+np.nonzero(sz<25)[0])                           # 바닥에 떨어진 부스러기 벽 없앰
+def door2(t,o):                                                        # 두 땅이 맞닿은 경계 중 '세 땅이 만나는 모퉁이'에서 가장 먼 곳 = 경계 한가운데
+    tm=L==t; om=L==o
+    S=tm&ndi.binary_dilation(om)
+    J=tm&ndi.binary_dilation(~(tm|om))                               # 다른 땅(잔해 포함)과 만나는 자리
+    dJ=ndi.distance_transform_edt(~J); ys,xs=np.nonzero(S); i=int(np.argmax(dJ[ys,xs])); qy,qx=ys[i],xs[i]
+    nb=(ys-qy)**2+(xs-qx)**2<10**2; P=np.stack([xs[nb]-qx,ys[nb]-qy]).astype(float); ev=np.linalg.eigh(P@P.T)[1]
+    nx_,ny_=ev[0,0],ev[1,0]                                           # 경계선에 수직 → 벽을 곧게 뚫음
+    oy,ox=np.nonzero(om); c=(ox.mean()-qx)*nx_+(oy.mean()-qy)*ny_
+    if c<0: nx_,ny_=-nx_,-ny_
+    X0,Y0=float(qx*sc),float(qy*sc); return [(X0+nx_*30,Y0+ny_*30),(X0,Y0),(X0-nx_*30,Y0-ny_*30)]
+TDOOR=[door2(30+k,o) for k in range(10) for o in (k,(k+1)%10,10+k)]   # 보물 땅 문 셋: 양옆 앞마당 · 앞쪽 정글
+for P in TDOOR: opn(P,10)
+OPB=np.asarray(op)>127                                                # 정해 놓은 문·길 자리 (흐리지 않음: 열림/막힘 딱 갈림)
+wall=wall0&~OPB
+wall=ndi.binary_opening(wall,iterations=1)                            # 문 뚫고 남은 실 같은 벽 조각 없앰
+lab,n=ndi.label(wall); sz=ndi.sum(np.ones_like(lab),lab,range(1,n+1)); wall&=~np.isin(lab,1+np.nonzero(sz<40)[0])   # 작은 벽 부스러기 없앰
+block=wall|(L==41)
+SP=[(int(pol(372,a)[1]/sc),int(pol(372,a)[0]/sc)) for a in ANG]
+plab,pn=ndi.label(~block); reach=np.isin(plab,[plab[y,x] for y,x in SP])
+sealed=(~block)&~reach; slab,sn=ndi.label(sealed); ssz=ndi.sum(np.ones_like(slab),slab,range(1,sn+1)) if sn else []
+SEALED_BIG=[int(v) for v in ssz if v>=300]
+wall|=sealed                                                          # 어디서도 못 들어가는 막힌 주머니 = 그냥 바위 (작은 것만 있어야 정상 → 검사에서 확인)
+GATES=[]                                                              # 문 자리: 길이 벽을 뚫고 지나가는 곳 (문기둥 세울 자리)
+for kind_,LST,wd in [('road',RADIAL+RING,15),('side',SIDE+TDOOR,10),('aggro',AGGRO,9),('sneak',SNEAK,8)]:
+    for P in LST:
+        for a_,b_ in zip(P[:-1],P[1:]):
+            n_=int(math.hypot(b_[0]-a_[0],b_[1]-a_[1])/1.5)+1; run=[]
+            for i in range(n_+1):
+                x_=a_[0]+(b_[0]-a_[0])*i/n_; y_=a_[1]+(b_[1]-a_[1])*i/n_; j_,i_=int(y_/sc),int(x_/sc)
+                hit=0<=j_<h and 0<=i_<w and wall0[j_,i_]
+                if hit: run.append((x_,y_))
+                if (not hit or i==n_) and len(run)>2:
+                    mx=sum(q[0] for q in run)/len(run); my=sum(q[1] for q in run)/len(run)
+                    GATES.append(dict(x=round(float(mx),1),y=round(float(my),1),a=round(float(math.atan2(b_[1]-a_[1],b_[0]-a_[0])),3),w=wd*sc,k=kind_,d=round(float(math.hypot(run[-1][0]-run[0][0],run[-1][1]-run[0][1])),1)))
+                if not hit: run=[]
+G2=[]                                                                 # 같은 문을 두 번 센 것(길이 두 토막으로 지나감) 하나로
+for g in sorted(GATES,key=lambda q:-q['d']):                         # 벽을 길게 뚫은 쪽을 남김
+    if g['d']<6 or any(math.hypot(g['x']-q['x'],g['y']-q['y'])<26 for q in G2): continue   # 모퉁이를 스치기만 한 건 문 아님
+    G2.append(g)
+GATES=G2
+rock=ndi.gaussian_filter(wall.astype(np.float32),.7)                  # 모양은 그대로, 가장자리만 살짝 부드럽게 (막힘 판정은 wall 그대로)
 
 rocktex=(noise(9,.35)>.42).astype(np.float32)*.6+.4
 col=col*(1-rock[...,None]*.92)+np.array([.36,.37,.41])*rocktex[...,None]*rock[...,None]*.92
