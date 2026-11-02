@@ -32,7 +32,7 @@ export function gem(seed, w = .2) {
 }
 
 function baseParts() {
-  const P = { gun: [], silver: [], dark: [] }, slits = [];
+  const P = { gun: [], silver: [], dark: [], gold: [] }, slits = [];
   /* 아래 단: 팔각 건메탈 몸통 + 면마다 비스듬한 은색 장갑판 */
   P.gun.push(lathe([[0, 0], [.72, 0], [.72, .08], [.66, .1], [.62, .42], [.5, .5], [0, .5]]));
   for (let k = 0; k < 8; k++) { const a = k / 8 * Math.PI * 2, s = new THREE.Shape(), W = .2;
@@ -43,7 +43,7 @@ function baseParts() {
   /* 가운데 단: 살창 두른 건메탈 */
   P.gun.push(lathe([[0, .5], [.48, .5], [.48, .86], [.44, .9], [0, .9]]));
   for (let k = 0; k < 24; k++) { const a = k / 24 * Math.PI * 2, g = new THREE.BoxGeometry(.04, .3, .045); g.translate(.49, .69, 0); g.rotateY(-a); P.silver.push(NI(g)); }
-  /* 위 단: 넓어졌다 오므리는 받침 + 결정을 무는 집게 여섯 */
+  /* 위 단: 넓어졌다 오므리는 받침 + 결정을 무는 금 집게 여섯 (왕관: 판과 같은 금으로 묶임) */
   P.silver.push(lathe([[0, .9], [.42, .9], [.52, 1.02], [.5, 1.1], [.36, 1.16], [0, 1.16]]));
   P.dark.push(lathe([[0, 1.161], [.3, 1.161], [.3, 1.17], [0, 1.17]], 12, 0));
   for (let k = 0; k < 6; k++) { const a = k / 6 * Math.PI * 2 + Math.PI / 6, pts = [];
@@ -52,7 +52,7 @@ function baseParts() {
       const c = Math.cos(a), s = Math.sin(a), Q = (r, y, o, d) => [c * (r + d) - s * o, y, s * (r + d) + c * o];
       const A = [Q(r0, y0, -w0, 0), Q(r0, y0, w0, 0), Q(r0, y0, w0, .05), Q(r0, y0, -w0, .05)], B = [Q(r1, y1, -w1, 0), Q(r1, y1, w1, 0), Q(r1, y1, w1, .04), Q(r1, y1, -w1, .04)];
       for (let j = 0; j < 4; j++) { const j2 = (j + 1) % 4; pos.push(...A[j], ...B[j], ...B[j2], ...A[j], ...B[j2], ...A[j2]); } }
-    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.computeVertexNormals(); P.gun.push(g); }
+    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.computeVertexNormals(); P.gold.push(g); }
   return { P, slits, top: 1.16 };
 }
 
@@ -61,6 +61,7 @@ export function makeGuardians() {
   const gun = new THREE.MeshPhysicalMaterial({ color: 0x2a2e35, metalness: .9, roughness: .28, clearcoat: .5, clearcoatRoughness: .2, envMapIntensity: 1.05, side: THREE.DoubleSide });
   const silver = new THREE.MeshPhysicalMaterial({ color: 0xccd2db, metalness: .4, roughness: .38, clearcoat: .5, clearcoatRoughness: .15, envMapIntensity: 1.15, side: THREE.DoubleSide });
   const dark = new THREE.MeshStandardMaterial({ color: 0x0b0d12, metalness: .5, roughness: .45 });
+  const gold = new THREE.MeshPhysicalMaterial({ color: 0xe2b35c, metalness: 1, roughness: .26, clearcoat: .4, clearcoatRoughness: .2, envMapIntensity: 1.25, side: THREE.DoubleSide });
   const uT = { value: 0 }, uOn = { value: 0 }, uFire = { value: -99 }, uGem = { value: .4 };
   /* 결정 겉: 반투명 유리 결정, 아래 짙은 파랑 → 위로 맑고 밝게(빛이 위에서 들어와 모임) */
   const gemOuter = new THREE.MeshPhysicalMaterial({ color: 0x8fb8ff, metalness: 0, roughness: .05, transparent: true, opacity: .62, clearcoat: 1, clearcoatRoughness: .03,
@@ -80,7 +81,7 @@ export function makeGuardians() {
         gl_FragColor = vec4(mix(vec3(.28,.58,1.35), vec3(.85,.95,1.35), pour) * b * 2.2, 1.); }` });
   const { P, slits, top } = baseParts();
   const merged = l => mergeGeometries(l.map(NI));
-  const gunG = merged(P.gun), silverG = merged(P.silver), darkG = merged(P.dark);
+  const gunG = merged(P.gun), silverG = merged(P.silver), darkG = merged(P.dark), goldG = merged(P.gold);
   /* 빛 틈 (받침 아래 단 판 사이 + 가운데 단 둘레 두 줄) */
   const sp = [], ss = [];
   const quad = (A, B, C, D, sa, sb) => { sp.push(...A, ...B, ...C, ...A, ...C, ...D); ss.push(sa, sb, sb, sa, sb, sa); };
@@ -91,8 +92,8 @@ export function makeGuardians() {
     quad(P2(a, y - .01), P2(b, y - .01), P2(b, y + .01), P2(a, y + .01), y > .7 ? .05 : .2, y > .7 ? .05 : .2); }
   const slitG = new THREE.BufferGeometry(); slitG.setAttribute('position', new THREE.Float32BufferAttribute(sp, 3)); slitG.setAttribute('aS', new THREE.Float32BufferAttribute(ss, 1));
   /* 결정 무리 모양: 큰 것 하나 + 작은 것 다섯 (뿌리에서 비스듬히) */
-  const cluster = [{ s: 1.75, w: .27, tilt: 0, yaw: 0, off: 0 }];
-  for (let k = 0; k < 5; k++) cluster.push({ s: .75 + (k % 3) * .2, w: .13 + (k % 2) * .03, tilt: .34 + (k % 2) * .14, yaw: k / 5 * Math.PI * 2 + .3, off: .2 });
+  const cluster = [{ s: 1.2, w: .34, tilt: 0, yaw: 0, off: 0 }];
+  for (let k = 0; k < 5; k++) cluster.push({ s: .55 + (k % 3) * .15, w: .17 + (k % 2) * .04, tilt: .34 + (k % 2) * .14, yaw: k / 5 * Math.PI * 2 + .3, off: .2 });
   const outerList = [], coreList = [];
   cluster.forEach((c, i) => { const g = gem(11 + i * 7, c.w); g.scale(1, c.s, 1); g.rotateZ(c.tilt); g.rotateY(c.yaw); g.translate(Math.cos(c.yaw) * c.off, 0, -Math.sin(c.yaw) * c.off); outerList.push(g);
     const k = gem(11 + i * 7, c.w * .45); k.scale(1, c.s * .82, 1); k.translate(0, c.s * .05, 0); k.rotateZ(c.tilt); k.rotateY(c.yaw); k.translate(Math.cos(c.yaw) * c.off, 0, -Math.sin(c.yaw) * c.off); coreList.push(k); });
@@ -103,12 +104,12 @@ export function makeGuardians() {
     fragmentShader: 'uniform float uI; varying vec2 vU; void main(){ float r=length(vU*vec2(1.,.55)); float core=exp(-r*r*9.), soft=exp(-r*r*2.5)*.35, streak=exp(-vU.y*vU.y*60.)*exp(-abs(vU.x)*3.)*.4; float edge=1.-smoothstep(.55,1.,max(abs(vU.x),abs(vU.y))); gl_FragColor=vec4(vec3(.45,.7,1.35)*(core+soft+streak)*uI*edge,1.); }' });
   const units = [];
   for (let k = 0; k < 4; k++) { const a = Math.PI / 4 + k * Math.PI / 2, u = new THREE.Group(); u.position.set(Math.cos(a) * RR, Y0, Math.sin(a) * RR); u.rotation.y = -a;
-    u.add(new THREE.Mesh(gunG, gun), new THREE.Mesh(silverG, silver), new THREE.Mesh(darkG, dark));
+    u.add(new THREE.Mesh(gunG, gun), new THREE.Mesh(silverG, silver), new THREE.Mesh(darkG, dark), new THREE.Mesh(goldG, gold));
     const sm = new THREE.Mesh(slitG, sMat); sm.renderOrder = 3; u.add(sm);
     const cl = new THREE.Group(); cl.position.y = top + .02; u.add(cl);
     const core = new THREE.Mesh(coreG, gemCore); core.renderOrder = 4; cl.add(core);
     const outer = new THREE.Mesh(outerG, gemOuter); outer.renderOrder = 5; cl.add(outer);
-    const fl = new THREE.Mesh(new THREE.PlaneGeometry(1.9, 3.2), flareMat); fl.position.y = .85; fl.renderOrder = 6; fl.frustumCulled = false; cl.add(fl);
+    const fl = new THREE.Mesh(new THREE.PlaneGeometry(2.1, 2.6), flareMat); fl.position.y = .65; fl.renderOrder = 6; fl.frustumCulled = false; cl.add(fl);
     /* 결정 둘레를 천천히 도는 작은 조각 셋 */
     const shards = []; for (let j = 0; j < 3; j++) { const sg = gem(90 + j, .05); sg.scale(1, .5, 1); const m = new THREE.Mesh(sg, gemOuter); m.renderOrder = 5; cl.add(m); shards.push(m); }
     G.add(u); units.push({ cl, shards, ph: k * 1.7 }); }
