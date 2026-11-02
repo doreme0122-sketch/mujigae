@@ -3,17 +3,17 @@
    바깥으로 갈수록 파장마다 조금씩 다른 방향으로 꺾여(분산) 색이 갈라져 보인다. 프리즘을 지난 빛처럼.
    ① 프리즘 다발  ② 빛의 비(파장마다 떨어지는 속도가 달라 머리가 무지개로 풀림)  ③ 나선 다발(파장마다 감기는 빠르기가 다름)
    ④ 빛의 창(머리가 한 점으로 모이고 위로 부채꼴로 퍼짐)  ⑤ 빛의 장막(속이 빈 원통 + 하얀 심)
-   닿는 순간: 빛선이 땅에 부딪혀 파장마다 다른 각도로 튀어 흩어지고, 섬광. (태어나는 효과 전체는 고른 뒤에)
+   혜성처럼 빠르게 떨어지기만 한다. 떨어진 뒤의 일(튀김·섬광)은 만들지 않음.
    무게: 빛선 900가닥을 한 묶음으로 한 번에 그림 */
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { makeBloom } from '../core/hangar/bloom.js';
 import { makePad } from '../core/hangar/pad.js';
-import { makeGoldStar } from './goldstar.js?v=11022002';
-import { makePerf } from './perf.js?v=11022002';
+import { makeGoldStar } from './goldstar.js?v=11022006';
+import { makePerf } from './perf.js?v=11022006';
 
 const $ = s => document.querySelector(s), clamp = THREE.MathUtils.clamp;
-const N = 900, TOP = 13, G0 = .2, FALL = .85, CYCLE = 3.2;
+const N = 900, TOP = 16, G0 = .2, FALL = .42, CYCLE = 2.0;   /* 혜성처럼 빠르게 */
 /* 시안별 값: spread 다발 굵기 · disp 분산(색 갈라짐) · stag 파장별 속도차 · twist 나선 · spear 머리 모음 · ring 속 빈 정도 · len 꼬리 길이 */
 const V = [
   { name: '① 프리즘 다발', tip: '가운데는 하얗고 바깥으로 갈수록 색이 갈라지는 굵은 빛 다발', spread: .55, disp: .7, stag: .04, twist: 0, spear: 0, ring: 0, len: 5.5 },
@@ -75,7 +75,7 @@ export async function start(canvas, onProgress = () => {}) {
         /* 닿은 뒤: 땅에서 파장마다 다른 각도로 튀어 흩어짐 */
         float sp = hit*(3.+seed*5.)*(1.+(w-.5)*.6);
         p.xz += vec2(cos(A),sin(A))*sp; p.y = max(p.y - hit*hit*2., G0) + (vU>.5 ? .0 : 0.);
-        vA = (f>0.?1.:0.) * exp(-hit*2.6) * (.5+.5*seed);
+        vA = (f>0.?1.:0.) * step(hit, 0.) * (.5+.5*seed);                                     /* 닿으면 끝 (떨어진 뒤의 일은 없음) */
         vec3 a = (viewMatrix*vec4(p,1.)).xyz, d = (mat3(viewMatrix)*vec3(0.,1.,0.));
         vec3 n = cross(normalize(d+vec3(1e-4)), normalize(-a+vec3(1e-4))); n = dot(n,n) > 1e-8 ? normalize(n) : vec3(1.,0.,0.);
         a += n*vS*.011*aS.w*(1.+hit*.5);
@@ -115,12 +115,12 @@ export async function start(canvas, onProgress = () => {}) {
   pick(0);
   renderer.setAnimationLoop(now => { try {
     const dt = clamp((now - last) / 1000, 0, .05); last = now; t += dt;
-    const c = (t - T0) % CYCLE, e = c - 1.0 - FALL;                                     /* 1초 쉬고 → 떨어짐 → 닿음(e=0) */
+    const c = (t - T0) % CYCLE, e = c - 1.2 - FALL;                                     /* 1초 쉬고 → 떨어짐 → 닿음(e=0) */
     U.uE.value = e; U.uT.value = t;
     const f = clamp((e + FALL) / FALL, 0, 1);
-    lightM.uniforms.uI.value = e < 0 ? Math.pow(f, 3) * 1.1 : Math.max(0, 1.4 - e * 1.6); lightM.uniforms.uR.value = e < 0 ? .8 + f * 1.6 : 2.4 + e * 2;
-    flash.scale.setScalar(3 + Math.max(0, e) * 3); flashM.uniforms.uI.value = e >= 0 ? (e < .07 ? 3 : 0) + Math.exp(-e * 4) * 1.8 : 0;
-    pad.userData.update(t); star.userData.update(t); star.userData.burst(e >= 0 ? Math.exp(-e * 2.5) : 0);
+    lightM.uniforms.uI.value = e < 0 ? Math.pow(f, 3) * 1.1 : 0; lightM.uniforms.uR.value = e < 0 ? .8 + f * 1.6 : 2.4 + e * 2;
+    flash.scale.setScalar(3 + Math.max(0, e) * 3); flashM.uniforms.uI.value = 0;
+    pad.userData.update(t); star.userData.update(t); 
     camera.position.set(Math.sin(cam.az) * cam.h * Math.sin(cam.tilt), cam.h * Math.cos(cam.tilt) + 1.5, Math.cos(cam.az) * cam.h * Math.sin(cam.tilt)); camera.lookAt(0, 2.6, 0);
     renderer.setRenderTarget(bloom.scene); renderer.clear(); renderer.render(scene, camera);
     bloom.render(Wd, Hd, !perf.st.bloom); perf.tick(dt);
