@@ -7,7 +7,8 @@
    단위는 자기장 판과 같음. */
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { sweep, posNor } from './floatring.js?v=11021820';
+import { sweep, posNor } from './floatring.js?v=11021828';
+import { GUARD_ANG, GUARD } from './guardian.js?v=11021828';
 
 
 /* 건담처럼 장갑판을 조립한 느낌의 검은 판 선 — 면 위치로 바로 그림(텍스처 없음, 가벼움)
@@ -88,31 +89,41 @@ export function makeArena() {
     riser(r0, 0, h - TH, 0); }
 
   /* ── 2층: 두껍고 높은 장갑 단. 윗면은 칸마다 다른 장갑판이 겹겹이 ── */
-  const [q0, q1, H] = t2, LANE = .07;                                   /* 대각선 빛길 자리는 판을 비워 길을 냄 */
+  const [q0, q1, H] = t2;
   L.gun.push(...ramped([[q0, -.12], [q1, -.12], [q1, H - .1], [q0, H - .1]]));
   L.silver.push(...ramped([[q0 - OV, H - .1], [q1, H - .1], [q1, H - .04], [q0 - OV + .02, H - .04], [q0 - OV, H - .055]]));   /* 바탕 판(경사 구간까지) */
   riser(q0, t1[2], H - .1, 1);
   const R = (() => { let v = 1234; return () => (v = (v * 9301 + 49297) % 233280) / 233280; })();
-  const diag = a => { const d = ((a - Math.PI / 4) % (Math.PI / 2) + Math.PI / 2) % (Math.PI / 2); return Math.min(d, Math.PI / 2 - d); };
-  const N = 44, da = (M1 - M0) / N;
-  for (let k = 0; k < N; k++) { const a0 = M0 + k * da + .008, a1 = a0 + da - .016, am = (a0 + a1) / 2;
-    if (diag(am) < LANE + da * .5) { /* 빛길 자리: 낮은 홈 + 양옆 턱 */ L.gun.push(sweep([[q0 + .1, H - .04], [q1 - .1, H - .04], [q1 - .1, H - .02], [q0 + .1, H - .02]], a0, a1)); continue; }
-    const t = R();
-    if (t < .4) {             /* 겹친 장갑판: 안쪽 낮은 판 + 바깥 높은 판(모따기) + 볼트 */
+  /* 가장 가까운 탑까지 각도 거리 */
+  const near = a => { let m = 9; for (const g of GUARD_ANG) { const d = Math.abs(Math.atan2(Math.sin(a - g), Math.cos(a - g))); if (d < m) m = d; } return m; };
+  const SEAT = .8, seatA = (SEAT + .06) / GUARD.r;                        /* 탑을 앉히는 둥근 자리 반지름 */
+  /* 2층 윗면: 탑에서 멀어지는 순서대로 정해진 장갑판이 되풀이됨 — 탑 옆은 무거운 덮개판 → 겹친 판 → 통풍칸 → 겹친 판 → … (양쪽 대칭, 정돈됨) */
+  const N = 56, da = (M1 - M0) / N, SEQ = ['cover', 'overlap', 'vent', 'overlap'];
+  for (let k = 0; k < N; k++) { const a0 = M0 + k * da + .007, a1 = a0 + da - .014, am = (a0 + a1) / 2, d = near(am);
+    if (d < seatA) continue;                                                    /* 탑 자리 */
+    const kind = SEQ[Math.floor((d - seatA) / da) % SEQ.length];
+    if (kind === 'overlap') {  /* 겹친 장갑판: 안쪽 낮은 판 + 바깥 높은 판(모따기) + 볼트 */
       L.silverHi.push(sweep([[q0 + .02, H - .04], [q0 + .78, H - .04], [q0 + .78, H + .01], [q0 + .04, H + .01]], a0, a1));
       L.silver.push(sweep([[q0 + .7, H - .04], [q1 - .02, H - .04], [q1 - .02, H + .02], [q1 - .14, H + .1], [q0 + .86, H + .1], [q0 + .7, H + .04]], a0 + .006, a1 - .006));
       for (const f of [.25, .75]) { const aa = a0 + (a1 - a0) * f, g = new THREE.CylinderGeometry(.026, .03, .02, 8); g.translate(q0 + 1.15, H + .11, 0); g.rotateY(-aa); L.gun.push(posNor(g)); }
-    } else if (t < .7) {      /* 파인 통풍칸: 짙은 바닥 + 살창 + 가는 빛 */
-      L.silverHi.push(sweep([[q0 + .02, H - .04], [q1 - .02, H - .04], [q1 - .02, H + .04], [q1 - .12, H + .07], [q0 + .12, H + .07], [q0 + .02, H + .03]], a0, a0 + .012, undefined, 1));
-      L.silverHi.push(sweep([[q0 + .02, H - .04], [q1 - .02, H - .04], [q1 - .02, H + .04], [q1 - .12, H + .07], [q0 + .12, H + .07], [q0 + .02, H + .03]], a1 - .012, a1, undefined, 1));
+    } else if (kind === 'vent') {   /* 파인 통풍칸: 짙은 바닥 + 살창 + 가는 빛 */
+      const rim = [[q0 + .02, H - .04], [q1 - .02, H - .04], [q1 - .02, H + .04], [q1 - .12, H + .07], [q0 + .12, H + .07], [q0 + .02, H + .03]];
+      L.silverHi.push(sweep(rim, a0, a0 + .012, undefined, 1)); L.silverHi.push(sweep(rim, a1 - .012, a1, undefined, 1));
       L.dark.push(sweep([[q0 + .15, H - .04], [q1 - .15, H - .04], [q1 - .15, H - .03], [q0 + .15, H - .03]], a0 + .012, a1 - .012));
       for (let j = 0; j < 9; j++) { const r = q0 + .3 + (q1 - q0 - .6) * j / 8, g = new THREE.BoxGeometry(.035, .05, (a1 - a0 - .03) * r); g.translate(r, H - .01, 0); g.rotateY(-am); L.gun.push(posNor(g)); }
       band(q0 + .2, H - .028, H - .026, 30, a0 + .015, a1 - .015);
-    } else {                  /* 큰 덮개판: 두 단으로 솟은 판 + 가운데 작은 점검구 */
+    } else {                   /* 무거운 덮개판(탑 옆): 두 단으로 솟은 판 + 점검구 */
       L.silver.push(sweep([[q0 + .02, H - .04], [q1 - .02, H - .04], [q1 - .02, H + .03], [q1 - .1, H + .08], [q0 + .1, H + .08], [q0 + .02, H + .03]], a0, a1));
       L.silverHi.push(sweep([[q0 + .45, H + .08], [q1 - .4, H + .08], [q1 - .45, H + .13], [q0 + .5, H + .13]], a0 + .02, a1 - .02));
       L.dark.push(sweep([[q0 + .7, H + .13], [q0 + .95, H + .13], [q0 + .95, H + .135], [q0 + .7, H + .135]], am - .02, am + .02));
     } }
+  /* 탑 자리: 둥글게 판 우묵한 자리(짙은 바닥) + 솟은 은색 테 + 테 안쪽 빛 고리. 탑이 그 안에 앉음 */
+  for (const g of GUARD_ANG) { const cx = Math.cos(g) * GUARD.r, cz = Math.sin(g) * GUARD.r;
+    const put = geo => { geo.translate(cx, 0, cz); return geo; };
+    L.dark.push(put(sweep([[0.001, H - .045], [SEAT - .1, H - .045], [SEAT - .1, H - .03], [0.001, H - .03]], 0, Math.PI * 2, undefined, 48)));
+    L.silverHi.push(put(sweep([[SEAT - .12, H - .045], [SEAT + .04, H - .045], [SEAT + .04, H + .08], [SEAT - .02, H + .14], [SEAT - .1, H + .14], [SEAT - .12, H + .1]], 0, Math.PI * 2, undefined, 64)));
+    for (let i = 0; i < 64; i++) { const a = i / 64 * Math.PI * 2, b = (i + 1) / 64 * Math.PI * 2, r = SEAT - .125, P = (aa, y) => [cx + Math.cos(aa) * r, y, cz + Math.sin(aa) * r];
+      const p = [P(a, H - .02), P(b, H - .02), P(b, H + .07), P(a, H + .07)]; glowPos.push(...p[0], ...p[1], ...p[2], ...p[0], ...p[2], ...p[3]); for (let j = 0; j < 6; j++) { glowK.push(5); glowS.push(-1); } } }
   /* ── 2층 바깥: 계단 대신 겹친 비탈 장갑(위 판이 아래 판을 덮으며 바닥까지) ── */
   { const sk = [[q1 - .02, -.12], [q1 + SK, -.12], [q1 + SK, .05], [q1 + SK * .55, .3], [q1 + .02, H - .12]];
     L.gun.push(...ramped(sk));
@@ -133,9 +144,10 @@ export function makeArena() {
         glowPos.push(xa, y, z - w, xb, y, z - w, xb, y, z + w, xa, y, z - w, xb, y, z + w, xa, y, z + w); for (let j = 0; j < 6; j++) { glowK.push(-1 + (i + .5) / n * 6); glowS.push(-3); } } } }
 
   /* ── 에너지 길: 꼭대기 단 → 계단을 타고 내려와 → 바닥 → 별의 갈래 사이. s: 바깥 1 → 안 0 ── */
-  const e = .005, path = [[q0 + .7, H - .02 + e], [q0 - OV - e, H - .04 + e], [q0 - OV - e, t1[2] + e], [t1[0] - OV - e, t1[2] + e], [t1[0] - OV - e, .004], [2.0, .004]];
-  const segL = []; let tot = 0; for (let i = 0; i < path.length - 1; i++) { const l = Math.hypot(path[i + 1][0] - path[i][0], path[i + 1][1] - path[i][1]); segL.push(l); tot += l; }
-  for (let q = 0; q < 4; q++) { const a = Math.PI / 4 + q * Math.PI / 2, c = Math.cos(a), s = Math.sin(a), nx = -s, nz = c;
+  const e = .005;
+  for (const a of GUARD_ANG) { const c = Math.cos(a), s = Math.sin(a), nx = -s, nz = c, diag = Math.abs(Math.cos(2 * a)) < .5;
+    const path = [[GUARD.r - SEAT + .02, H - .03 + e], [q0 - OV - e, H - .04 + e], [q0 - OV - e, t1[2] + e], [t1[0] - OV - e, t1[2] + e], [t1[0] - OV - e, .004], [diag ? 2.0 : 3.2, .004]];
+    const segL = []; let tot = 0; for (let i = 0; i < path.length - 1; i++) { const l = Math.hypot(path[i + 1][0] - path[i][0], path[i + 1][1] - path[i][1]); segL.push(l); tot += l; }
     /* 홈: 바닥·계단에 파인 짙은 길 + 양옆 파란 실선 */
     let acc = 0;
     for (let i = 0; i < path.length - 1; i++) { const [ra, ya] = path[i], [rb, yb] = path[i + 1], sa = 1 - acc / tot, sb = 1 - (acc + segL[i]) / tot; acc += segL[i];
@@ -152,8 +164,9 @@ export function makeArena() {
   for (const [r, h] of [[t1[0] - OV, t1[2]], [q0 - OV, H - .04]]) {
     const prof = [[r - .03, h - .06], [r + .02, h - .065], [r + .1, h + .004], [r + .1, h + .02], [r + .01, h + .02], [r - .03, h - .02]];
     L.gold.push(...ramped(prof)); }
-  for (const aa of [A0, A1]) { const sd = aa === A0 ? 1 : -1, w = .05;
-    L.gold.push(sweep([[t1[0] - OV - .03, -.002], [RO + .02, -.002], [RO + .02, .03], [t1[0] - OV - .03, .03]], aa + sd * .004, aa + sd * (.004 + w / RO * 1.0), undefined, 2)); }
+  for (const aa of [A0, A1]) { const sd = aa === A0 ? 1 : -1, W = .2;                 /* 두께 있는 금 띠: 넓고 높게, 위 모서리 깎음 */
+    const r0 = t1[0] - OV - .03, r1 = RO + .02, a0 = aa + sd * .004, a1 = aa + sd * (.004 + W / ((r0 + r1) / 2));
+    L.gold.push(sweep([[r0, -.002], [r1, -.002], [r1, .11], [r1 - .03, .14], [r0 + .03, .14], [r0, .11]], Math.min(a0, a1), Math.max(a0, a1), undefined, 4)); }
 
   const add = (list, mat) => { if (list.length) G.add(new THREE.Mesh(mergeGeometries(list.map(posNor)), mat)); };
   add(L.silver, silver); add(L.silverHi, silverHi); add(L.gun, gun); add(L.rib, gunRib); add(L.floor, floorM); add(L.dark, dark); add(L.blue, blue); add(L.gold, gold);
@@ -180,7 +193,7 @@ export function makeArena() {
       vertexShader: 'varying vec2 vP; void main(){ vP=position.xy; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.); }',
       fragmentShader: `uniform float uOn,uT; varying vec2 vP; void main(){ float r=length(vP), a=atan(vP.y,vP.x);
         float pool = exp(-pow((r-2.6)/1.3,2.))*.55 + exp(-pow((r-${RF.toFixed(1)})/.25,2.))*.5;      /* 판 바깥 + 1층 발치 */
-        float rays = pow(abs(cos(a*2.)),24.)*exp(-r*.35)*.6;                                           /* 대각선 빛길 쪽으로 뻗는 결 */
+        float rays = pow(abs(cos(a*4.)),40.)*exp(-r*.35)*.6*smoothstep(.15,.4,abs(a));                  /* 빛길 쪽으로 뻗는 결 (출구 쪽 빼고) */
         float b = (pool + rays) * (.35 + .65*uOn) * (.9+.1*sin(uT*1.5));
         gl_FragColor = vec4(vec3(.25,.5,1.25)*b, 1.); }` });
     const m = new THREE.Mesh(new THREE.RingGeometry(1.6, RF + .4, 128, 1), pm); m.rotation.x = -Math.PI / 2; m.position.y = .006; m.renderOrder = 2; G.add(m); }

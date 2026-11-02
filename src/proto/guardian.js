@@ -1,4 +1,4 @@
-/* 시작 기지 — 수호 탑 넷 (대각선, 2층 위) — 원본 사진의 결정 탑처럼
+/* 시작 기지 — 수호 탑 일곱 (대각선 넷 + 그 사이 셋, 출구 쪽 빼고. 2층 위의 둥근 자리에 앉음) — 원본 사진의 결정 탑처럼
    · 장갑 받침: 팔각 세 단. 아래 단은 면마다 비스듬한 은색 장갑판 + 판 사이 세로 빛 틈, 가운데 단은 살창 두른 건메탈, 위 단은 결정을 무는 집게 받침
    · 결정 무리: 가운데 큰 결정 하나 + 둘레에 비스듬히 솟은 작은 결정 다섯. 결정은 모서리를 깎은 열두 면 기둥 + 두 단으로 깎인 머리,
      속에 더 작은 빛 결정(속 결정)이 비쳐 보여 깊이가 있다. 아래는 짙은 파랑 → 위로 갈수록 맑고 밝게.
@@ -9,6 +9,8 @@ import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 
 export const GUARD = { r: 6.15, y: .91, DOWN: .7 };
+/* 탑 자리: 대각선 넷 + 그 사이 셋(출구 쪽 0도는 비움) = 일곱 */
+export const GUARD_ANG = [1, 2, 3, 4, 5, 6, 7].map(k => k * Math.PI / 4);
 const NI = g => { for (const k of Object.keys(g.attributes)) if (k !== 'position' && k !== 'normal') g.deleteAttribute(k); return g.index ? g.toNonIndexed() : g; };
 const lathe = (pts, seg = 8, phase = Math.PI / 8) => NI(new THREE.LatheGeometry(pts.map(([r, y]) => new THREE.Vector2(r, y)), seg, phase));
 
@@ -103,7 +105,7 @@ export function makeGuardians() {
     vertexShader: 'varying vec2 vU; void main(){ vU=uv*2.-1.; vec4 c=modelViewMatrix*vec4(0.,0.,0.,1.); c.xy+=position.xy; gl_Position=projectionMatrix*c; }',
     fragmentShader: 'uniform float uI; varying vec2 vU; void main(){ float r=length(vU*vec2(1.,.55)); float core=exp(-r*r*9.), soft=exp(-r*r*2.5)*.35, streak=exp(-vU.y*vU.y*60.)*exp(-abs(vU.x)*3.)*.4; float edge=1.-smoothstep(.55,1.,max(abs(vU.x),abs(vU.y))); gl_FragColor=vec4(vec3(.45,.7,1.35)*(core+soft+streak)*uI*edge,1.); }' });
   const units = [];
-  for (let k = 0; k < 4; k++) { const a = Math.PI / 4 + k * Math.PI / 2, u = new THREE.Group(); u.position.set(Math.cos(a) * RR, Y0, Math.sin(a) * RR); u.rotation.y = -a;
+  for (let k = 0; k < GUARD_ANG.length; k++) { const a = GUARD_ANG[k], u = new THREE.Group(); u.position.set(Math.cos(a) * RR, Y0, Math.sin(a) * RR); u.rotation.y = -a;
     u.add(new THREE.Mesh(gunG, gun), new THREE.Mesh(silverG, silver), new THREE.Mesh(darkG, dark), new THREE.Mesh(goldG, gold));
     const sm = new THREE.Mesh(slitG, sMat); sm.renderOrder = 3; u.add(sm);
     const cl = new THREE.Group(); cl.position.y = top + .02; u.add(cl);
