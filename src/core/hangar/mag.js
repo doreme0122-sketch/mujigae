@@ -9,7 +9,7 @@ const S=1.5, PADY=.175, T=4.2, IMP=.5, SPREAD=1.25, RISE=.50, LV=1.6, FRONT_END=
 const AB={transparent:true,depthWrite:false,blending:THREE.AdditiveBlending};
 const sm=(a,b,x)=>{ const t=Math.min(1,Math.max(0,(x-a)/(b-a))); return t*t*(3-2*t); };
 
-export function makeMag(pad){
+export function makeMag(pad,opt={}){   /* opt.dust=false: 떠오르는 알갱이 없음(격납고 밖) */
   const G=new THREE.Group();
   const st={grade:0,push:0,pb:undefined,lt:undefined,fired:-1,mode:'bend'};
   const bellyY=bob=>PADY+S*(.57+bob*.07);
@@ -64,7 +64,7 @@ export function makeMag(pad){
     fragmentShader:`precision highp float;varying float vA,vSz;varying vec3 vCol;
       void main(){ vec2 q=gl_PointCoord-.5; float k=mix(16.,7.,smoothstep(1.5,6.,vSz));   /* 큰 건 부드럽게 번짐 */
         gl_FragColor=vec4(vCol*exp(-dot(q,q)*k)*vA,1.); }`});
-  const idle=new THREE.Points(ig,idleMat); idle.frustumCulled=false; G.add(idle);
+  const idle=new THREE.Points(ig,idleMat); idle.frustumCulled=false; G.add(idle); if(opt.dust===false) idle.visible=false;
 
   /* ── 기체 바닥 빛 렌즈 + 그림자 ── */
   const disc=(frag,add=true)=>{ const m=new THREE.ShaderMaterial({...(add?AB:{transparent:true,depthWrite:false}),side:THREE.DoubleSide,
@@ -99,6 +99,7 @@ export function makeMag(pad){
     L.uFront.value = lampOn ? (front<0?FRONT_END:front) : -1;
     L.uHead.value=Math.max(0,head)*(1+.6*st.grade); L.uAfter.value=lampOn?1+.7*st.grade:0; L.uBase.value=.22;
     if(L.uBack){ L.uBack.value=back; L.uTail.value=tail; }
+    if(st.hold){ L.uFront.value=FRONT_END; L.uHead.value=0; L.uAfter.value=1+.7*st.grade; if(L.uBack){ L.uBack.value=9; L.uTail.value=0; } }   /* 켜 둔 채로 (기체가 있는 동안) */
     /* 원인: 가운데 렌즈가 먼저 터짐 / 빛이 다 모이면 가운데가 한 번 숨 쉬듯 밝았다 잦아듦 */
     const gath = e>=OFF0+OFFD ? Math.exp(-(e-OFF0-OFFD)*2.2) : (e>=OFF0 ? sm(.6,1,(e-OFF0)/OFFD) : 0);
     const g=pad.userData.groups; if(g&&g.lens) g.lens.uniforms.uK.value=.7+2.2*Math.exp(-Math.max(0,e)*5)*(e>=0?1:0)+.6*(lampOn?1:0)+1.2*gath;
@@ -117,6 +118,7 @@ export function makeMag(pad){
   G.userData.update=update;
   G.userData.setPixel=px=>{ idleMat.uniforms.uPx.value=px; };
   G.userData.setMode=k=>{ idleMat.uniforms.uMode.value=k; };
+  G.userData.setHold=on=>{ st.hold=!!on; };
   const GC=[0x2f6bff,0xd03cff,0xffffff];
   G.userData.setGrade=g=>{ st.grade=g; idleMat.uniforms.uGrade.value=g; L.uGrade.value=g; bellyLight.color.setHex(GC[g]); };
   return G;

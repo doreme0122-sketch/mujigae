@@ -89,9 +89,13 @@ export function makeGoldStar() {
     quad([Math.cos(a0) * r0, y, Math.sin(a0) * r0], [Math.cos(a0) * r1, y, Math.sin(a0) * r1], [Math.cos(a1) * r1, y, Math.sin(a1) * r1], [Math.cos(a1) * r0, y, Math.sin(a1) * r0], -1, -1); }
   const lg = new THREE.BufferGeometry(); lg.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); lg.setAttribute('aT', new THREE.Float32BufferAttribute(tt, 1));
   const lines = new THREE.Mesh(lg, lineMat); lines.renderOrder = 2; G.add(lines);
-  /* 판의 자기장 주기(4.2초)에 맞춤: 판 가운데가 터지기(주기 .85초) 직전, 빛이 갈래 끝 → 고리로 흘러 들어가 고리에 불이 들어옴 */
-  G.userData.update = (t, T = 4.2) => { const c = t % T, s = .3, e = .85;
-    uFlow.value = c >= s && c < e + .05 ? 1 - (c - s) / (e - s) : -1;
-    uRing.value = c >= e - .05 ? Math.exp(-(c - e + .05) * 2.6) * 1.4 : 0; };
+  /* 기체가 올라올 때 한 번: 빛이 갈래 끝 → 고리로 흘러 들어가 고리에 불이 들어오고, 그 순간 판이 켜진다(ARRIVE초 뒤) */
+  let fireT = -99; const ARRIVE = .55;
+  G.userData.ARRIVE = ARRIVE;
+  G.userData.fire = t => { fireT = t; };
+  G.userData.update = t => { const e = t - fireT;
+    uFlow.value = e >= 0 && e < ARRIVE + .05 ? 1 - e / ARRIVE : -1;
+    uRing.value = e >= ARRIVE - .05 ? .35 + Math.exp(-(e - ARRIVE + .05) * 2.6) * 1.1 : 0; };
+  G.userData.off = () => { fireT = -99; uRing.value = 0; };
   return G;
 }
