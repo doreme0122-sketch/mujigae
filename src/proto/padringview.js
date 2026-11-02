@@ -3,14 +3,15 @@ import * as THREE from 'three';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { makeBloom } from '../core/hangar/bloom.js';
 import { makePad } from '../core/hangar/pad.js';
-import { makeMag } from '../core/hangar/mag.js?v=11021705';
+import { makeMag } from '../core/hangar/mag.js?v=11021707';
 import { buildShip } from '../core/ships/build.js';
-import { makeGoldStar } from './goldstar.js?v=11021705';
-import { makeFloatRing } from './floatring.js?v=11021705';
-import { makeFloor, FLOORS } from './floor.js?v=11021705';
-import { makePerf } from './perf.js?v=11021705';
+import { makeGoldStar } from './goldstar.js?v=11021707';
+import { makeFloatRing } from './floatring.js?v=11021707';
+import { makeFloor, FLOORS } from './floor.js?v=11021707';
+import { makePerf } from './perf.js?v=11021707';
 
 const $ = s => document.querySelector(s), clamp = THREE.MathUtils.clamp;
+const SHIPL = 2.9;     /* 기체 길이: 자기장 판(지름 3.2)보다 약간 작게 */
 const VIEWS = [{ name: '비스듬히', h: 17, tilt: .8 }, { name: '위에서', h: 19, tilt: .06 }, { name: '낮게', h: 12, tilt: 1.2 }];
 
 export async function start(canvas, onProgress = () => {}) {
@@ -32,12 +33,12 @@ export async function start(canvas, onProgress = () => {}) {
   const pad = makePad(); base.add(pad); const mag = makeMag(pad, { dust: false }); base.add(mag); mag.userData.setMode(1);
   const star = makeGoldStar(); base.add(star);
   base.add(makeFloatRing());
-  /* 아래 맵: 판 단위 → 맵 단위(기체 2m = 판 단위 7.5). 부활 자리는 맵 바닥에서 4m 위에 떠 있음 */
-  const BS = 2 / 7.5, HOVER = 2.4, floor = makeFloor(renderer); floor.set(FLOORS[1]);
+  /* 아래 맵: 판 단위 → 맵 단위(기체 2m = 판 단위 SHIPL). 부활 자리는 맵 바닥에서 4m 위에 떠 있음 */
+  const BS = 2 / SHIPL, HOVER = 2.4, floor = makeFloor(renderer); floor.set(FLOORS[1]);
   const fcam = new THREE.PerspectiveCamera(36, 1, .05, 300);
   const stand = new THREE.Group(); base.add(stand);
   onProgress(.5);
-  const b = await buildShip(1, 1, 'ruby', { renderer, size: 7.5 }); const ship = b.root, sm = ship.children[0]; stand.add(ship);
+  const b = await buildShip(1, 1, 'ruby', { renderer, size: SHIPL }); const ship = b.root, sm = ship.children[0]; stand.add(ship);
   const k2 = ship.scale.x, shipHalf = new THREE.Box3().setFromObject(sm).getSize(new THREE.Vector3()).y * k2 / 2;
   let showShip = true, onAt = .5; ship.visible = false; star.userData.fire(.5 - star.userData.ARRIVE);
   onProgress(.9);
