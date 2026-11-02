@@ -2,15 +2,15 @@
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { makeBloom } from '../core/hangar/bloom.js';
-import { makePad } from '../core/hangar/pad.js?v=11021909';
-import { makeMag } from '../core/hangar/mag.js?v=11021909';
+import { makePad } from '../core/hangar/pad.js?v=11021915';
+import { makeMag } from '../core/hangar/mag.js?v=11021915';
 import { buildShip } from '../core/ships/build.js';
-import { makeGoldStar } from './goldstar.js?v=11021909';
-import { makeArena, SPEED, WAVE_R0 } from './arena.js?v=11021909';
-import { makeGuardians, GUARD } from './guardian.js?v=11021909';
-import { makeFloor, FLOORS } from './floor.js?v=11021909';
-import { makePerf } from './perf.js?v=11021909';
-import { makeBirth, BIRTH } from './birth.js?v=11021909';
+import { makeGoldStar } from './goldstar.js?v=11021915';
+import { makeArena, SPEED, WAVE_R0 } from './arena.js?v=11021915';
+import { makeGuardians, GUARD } from './guardian.js?v=11021915';
+import { makeFloor, FLOORS } from './floor.js?v=11021915';
+import { makePerf } from './perf.js?v=11021915';
+import { makeBirth, BIRTH } from './birth.js?v=11021915';
 
 const $ = s => document.querySelector(s), clamp = THREE.MathUtils.clamp;
 const SHIPL = 2.9;     /* 기체 길이: 자기장 판(지름 3.2)보다 약간 작게 */
@@ -46,11 +46,11 @@ export async function start(canvas, onProgress = () => {}) {
   const k2 = ship.scale.x, shipHalf = new THREE.Box3().setFromObject(sm).getSize(new THREE.Vector3()).y * k2 / 2;
   const birth = makeBirth(renderer, ship); scene.add(birth);
   let showShip = true, onAt, born = false; ship.visible = false;
-  /* 원인 → 결과: 탑이 빛남 → 빛 물결이 한 속도로 바닥 → 금테 별 → 판의 정중앙까지 모임 → 모인 빛이 하늘로 솟아 부름 → 하늘에서 빛이 떨어져 꽂힘 → 태어남 */
+  /* 원인 → 결과: 탑이 빛남 → 빛 물결이 한 속도로 바닥 → 금테 별 → 판의 정중앙까지 모임 → 모이는 그 순간 하늘 빛이 가운데 땅에 닿음 → 태어남 */
   let holdAt = 1e9, W0 = 0; const FILL = 1.62 / SPEED;
   const tw = r => W0 + (WAVE_R0 - r) / SPEED;                  /* 물결이 반지름 r에 닿는 때 */
   const wake = t0 => { W0 = t0 + GUARD.DOWN; guards.userData.fire(t0); ring.userData.wake(W0);
-    star.userData.fire(tw(2.55), (2.55 - 1.8) / SPEED); holdAt = tw(1.62); onAt = tw(0); born = false; }; wake(.4);
+    star.userData.fire(tw(2.55), (2.55 - 1.8) / SPEED); holdAt = tw(1.62); onAt = tw(0) - BIRTH.FALL; born = false; };   /* 빛이 정중앙에 모이는 그 순간 하늘 빛이 땅에 닿음 */ wake(.4);
   onProgress(.9);
 
   /* 버튼: 시점 · 기체 */

@@ -8,7 +8,7 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 
-export const GUARD = { r: 6.15, y: .91, DOWN: .7 };
+export const GUARD = { r: 6.15, y: .91, DOWN: .6 };   /* DOWN: 결정에서 받침 바닥까지 빛이 내려오는 시간(모든 탑이 같은 속도·같은 때에 바닥 도착) */
 /* 탑 자리: 대각선 넷 + 그 사이 셋(출구 쪽 0도는 비움) = 일곱 */
 export const GUARD_ANG = [1, 2, 3, 4, 5, 6, 7].map(k => k * Math.PI / 4);
 /* 새로 넣은 셋(별의 끝 방향)은 낮고 작게 */
@@ -77,10 +77,10 @@ export function makeGuardians() {
   const gemCore = new THREE.MeshBasicMaterial({ color: 0x6aa0ff, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false });
   /* 받침 빛 틈: s=0 위 → 1 아래 */
   const sMat = new THREE.ShaderMaterial({ uniforms: { uT, uOn, uFire }, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide,
-    vertexShader: 'attribute float aS; varying float vS; void main(){ vS=aS; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.); }',
-    fragmentShader: `uniform float uT, uOn, uFire; varying float vS;
-      void main(){ float e = uT - uFire, head = e / ${DOWN.toFixed(2)};
-        float pour = exp(-pow((vS - head) * 5., 2.)) * step(0., e) * step(head, 1.3);
+    vertexShader: 'attribute float aS; varying float vS; varying float vY; void main(){ vS=aS; vec4 w=modelMatrix*vec4(position,1.); vY=w.y; gl_Position=projectionMatrix*viewMatrix*w; }',
+    fragmentShader: `uniform float uT, uOn, uFire; varying float vS; varying float vY;
+      void main(){ float e = uT - uFire, hy = ${(Y0 + .9).toFixed(3)} - e * ${(.9 / DOWN).toFixed(3)};   /* 빛 머리 높이: 모든 탑이 같은 높이·같은 속도로 */
+        float pour = exp(-pow((vY - hy) * 12., 2.)) * step(0., e) * step(${(Y0 - .1).toFixed(3)}, hy);
         float b = .25 + .1 * sin(uT * 1.3 - vS * 4.) + uOn * (.5 + .3 * sin(uT * 2. - vS * 7.)) + pour * 2.2;
         gl_FragColor = vec4(mix(vec3(.28,.58,1.35), vec3(.85,.95,1.35), pour) * b * 2.2, 1.); }` });
   const { P, slits, top } = baseParts();

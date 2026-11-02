@@ -7,8 +7,8 @@
    단위는 자기장 판과 같음. */
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { sweep, posNor } from './floatring.js?v=11021909';
-import { GUARD_ANG, GUARD, guardScale } from './guardian.js?v=11021909';
+import { sweep, posNor } from './floatring.js?v=11021915';
+import { GUARD_ANG, GUARD, guardScale } from './guardian.js?v=11021915';
 
 
 /* 건담처럼 장갑판을 조립한 느낌의 검은 판 선 — 면 위치로 바로 그림(텍스처 없음, 가벼움)
@@ -187,12 +187,12 @@ export function makeArena() {
         else if (vS < -1.5) { float ph = fract(uT*.55 - vK*.16), pk = smoothstep(.0,.08,ph)*smoothstep(.4,.08,ph);          /* 화살표: 안쪽부터 차례로 */
           b = .32 + 1.3*pk*(.55+.45*ON); c = mix(c, vec3(.8,.93,1.35), pk*.6); }
         else if (vS < -.5) { float a=atan(vW.z,vW.x); b = .35 + ON*(1.+.3*sin(uT*1.4+a*4.+vK*2.)); c = mix(c, vec3(.7,.88,1.4), .35); }          /* 계단 세로면 에너지 빛 */
-        else {   /* 이어진 빛줄기 + 판이 숨 쉴 때마다 탑에서 판으로 밀려오는 혜성 같은 빛 머리(긴 꼬리) + 속에 흐르는 결 */
-          float head = 1.15 - fract(uT / 2.1) * 1.4;                       /* 2.1초마다 한 번 (판의 숨과 같은 박자) */
-          float d = vS - head, front = exp(-d*d*900.), tail = step(0., d) * exp(-d * 4.5);
+        else {   /* 빛길: 탑에서 나온 빛 머리가 바닥 빛 물결과 같은 자리·같은 속도로 가운데로 옴. 지나간 자리는 이어진 빛줄기로 남음 */
+          float r = length(vW.xz), front = ${WAVE_R0.toFixed(2)} - (uT - uW) * ${SPEED.toFixed(2)};
+          float d = r - front, head = exp(-d*d*18.) * step(-1., front + 1.5), lit = smoothstep(-.3, .3, d) * uOn;
           float grain = .85 + .15 * sin(vS * 70. - uT * 9.) * sin(vS * 23. + uT * 3.);
-          b = (.35 + ON*.55) * grain + (front * 2.4 + tail * 1.1) * (.45 + .55*ON);
-          c = mix(c, vec3(.85,.95,1.35), clamp(front + tail * .4, 0., 1.)); }
+          b = .3 * grain + lit * (.55 * grain + exp(-max(d, 0.) * .9) * .9) + head * 2.6;
+          c = mix(c, vec3(.85,.95,1.35), clamp(head + lit * exp(-max(d,0.)) * .4, 0., 1.)); }
         gl_FragColor = vec4(c*b*2.2,1.); }` });
 
   /* 판 둘레 빛 웅덩이: 판·결정의 빛이 검은 바닥에 비쳐 번짐 (판이 기지와 한 세상이 되게) */
