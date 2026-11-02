@@ -6,13 +6,14 @@ import { buildShip, engineSpots } from '../core/ships/build.js';
 import { makeGlow } from '../preview/glow.js';
 import { planetShader } from '../core/planet.js';
 import { planetFor } from '../data/planets.js';
-import { makeRidge } from './rocks.js';
+import { makeRidge, updateRidge, beatJS } from './rocks.js';
 
 const $ = s => document.querySelector(s), clamp = THREE.MathUtils.clamp, rnd = (a, b) => a + Math.random() * (b - a);
 const ROWS = [
-  { id: 'plain', name: '그냥 바위', en: 'ROCK', z: -16, tip: '비스듬히 쌓인 결이 있는 퇴적암이에요. 깨진 면은 납작하고, 패인 틈엔 먼지가 고여요. 가장 흔한 경계 벽이에요.' },
-  { id: 'lava', name: '용암 바위', en: 'LAVA ROCK', z: 0, tip: '겉은 식어서 검게 굳었고, 갈라진 틈 일부에서 아직 뜨거운 용암이 숨 쉬듯 빛나요. 가까이 가면 불티가 날려요.' },
-  { id: 'meteor', name: '운석', en: 'METEORITE', z: 16, tip: '떨어지며 녹았다 굳은 매끈한 겉에 엄지로 누른 듯한 자국이 있어요. 깨진 곳은 속의 쇠가 드러나 반짝여요.' }];
+  { id: 'obsidian', name: '용암 흑요석', en: 'LAVA OBSIDIAN', z: -27, tip: '용암이 식어 생긴 검은 유리 바위예요. 속의 용암 심장이 쿵쿵 맥박 치면 빛이 틈을 따라 퍼지고, 그 맥박이 능선을 따라 옆 바위로 건너가요. 떠 있는 바위들은 녹은 용암 실로 이어져 있어요.' },
+  { id: 'plain', name: '그냥 바위', en: 'ROCK', z: -9, tip: '비스듬히 쌓인 결이 있는 퇴적암이에요. 깨진 면은 납작하고, 패인 틈엔 먼지가 고여요. 가장 흔한 경계 벽이에요.' },
+  { id: 'lava', name: '용암 바위', en: 'LAVA ROCK', z: 9, tip: '겉은 식어서 검게 굳었고, 갈라진 틈 일부에서 아직 뜨거운 용암이 숨 쉬듯 빛나요. 가까이 가면 불티가 날려요.' },
+  { id: 'meteor', name: '운석', en: 'METEORITE', z: 27, tip: '떨어지며 녹았다 굳은 매끈한 겉에 엄지로 누른 듯한 자국이 있어요. 깨진 곳은 속의 쇠가 드러나 반짝여요.' }];
 
 export async function start(canvas, onProgress = () => {}) {
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: false, powerPreference: 'high-performance' });
@@ -41,20 +42,20 @@ export async function start(canvas, onProgress = () => {}) {
   /* 능선 셋: 같은 굽이로 나란히 */
   const R = {};
   for (const [i, r] of ROWS.entries()) { const pts = []; for (let k = 0; k <= 8; k++) { const x = -34 + k * 8.5; pts.push([x, r.z + Math.sin(k * .9 + i) * 2.2]); }
-    const g = makeRidge(r.id, pts, { uT: UT, seed: 3 + i * 5 }); scene.add(g); R[r.id] = g; onProgress(.15 + .2 * (i + 1)); }
+    const g = makeRidge(r.id, pts, { uT: UT, seed: 3 + i * 5, float: r.id === 'obsidian' }); scene.add(g); R[r.id] = g; onProgress(.15 + .17 * (i + 1)); }
   /* 기체 (크기 비교용): 능선 사이를 천천히 지나간다 */
   const ship = await buildShip(1, 1, 'ruby', { renderer, size: 2.0 }); const me = new THREE.Group(); me.add(ship.root); scene.add(me);
   const sm = ship.root.children[0], ENG = engineSpots(ship.ship, sm, new THREE.Box3().setFromObject(sm).getSize(new THREE.Vector3()));
   onProgress(.9);
 
   /* 용암 불티 */
-  const lavaItems = R.lava.userData.items.filter(it => it.s > 1.2), EMB = [];
-  const cam = { x: 0, z: 0, h: 62, H: 62, az: 0, tilt: .26 }; let focus = 'all';
+  const lavaItems = R.lava.userData.items.filter(it => it.s > 1.2), obsItems = R.obsidian.userData.items.filter(it => it.s > 1.3 && !it.float), EMB = [];
+  const cam = { x: 0, z: -27, h: 30, H: 30, az: 0, tilt: .42 }; let focus = 'obsidian';
   const tour = $('#tour');
   for (const r of [{ id: 'all', name: '셋 다' }, ...ROWS]) { const b = document.createElement('button'); b.type = 'button'; b.textContent = r.name; b.dataset.id = r.id;
-    b.onclick = () => { focus = r.id; cam.H = r.id === 'all' ? 62 : 26; document.querySelectorAll('#tour button').forEach(x => x.classList.toggle('on', x === b));
+    b.onclick = () => { focus = r.id; cam.H = r.id === 'all' ? 84 : 28; document.querySelectorAll('#tour button').forEach(x => x.classList.toggle('on', x === b));
       $('#tip').hidden = r.id === 'all'; if (r.tip) { $('#tip b').textContent = r.name; $('#tip span').textContent = r.tip; } }; tour.appendChild(b); }
-  tour.firstChild.classList.add('on');
+  tour.children[1].classList.add('on'); $('#tip').hidden = false; $('#tip b').textContent = ROWS[0].name; $('#tip span').textContent = ROWS[0].tip;
   /* 끌면 카메라가 돈다, 두 손가락·휠로 확대 */
   const ptr = new Map(); let pin = 0;
   addEventListener('pointerdown', e => { if (e.target.closest('#ui')) return; ptr.set(e.pointerId, [e.clientX, e.clientY]); if (ptr.size === 2) { const [a, b] = [...ptr.values()]; pin = Math.hypot(a[0] - b[0], a[1] - b[1]); } });
@@ -77,7 +78,7 @@ export async function start(canvas, onProgress = () => {}) {
     fr++; ft += dt; if (ft > .5) { $('#fps').textContent = Math.round(fr / ft) + ' fps'; fr = 0; ft = 0; }
     glow.begin();
     /* 기체: 용암 줄과 운석 줄 사이, 그냥 바위 줄과 용암 줄 사이를 번갈아 왕복 */
-    const lane = Math.sin(t * .11) > 0 ? -8 : 8, x = Math.sin(t * .22) * 30, vx = Math.cos(t * .22) * 30 * .22;
+    const lane = Math.sin(t * .11) > 0 ? -18 : 0, x = Math.sin(t * .22) * 30, vx = Math.cos(t * .22) * 30 * .22;
     me.position.set(x, .6, lane + Math.sin(t * .7) * .4); me.rotation.order = 'YXZ'; me.rotation.set(0, vx > 0 ? -Math.PI / 2 : Math.PI / 2, -vx * .04);
     me.updateMatrixWorld(true); const hx = vx > 0 ? 1 : -1;
     for (const p of ENG) { v3.copy(p).applyMatrix4(sm.matrixWorld); glow.add(v3.x, v3.y, v3.z, -hx * .9, 0, 0, .15, 1, [.4, .6, 1.4], .9); glow.add(v3.x - hx * .2, v3.y, v3.z, -hx * .6, 0, 0, .4, 3, [.25, .45, 1.3], .7); }
@@ -86,6 +87,10 @@ export async function start(canvas, onProgress = () => {}) {
       if (Math.random() < dt * .9) EMB.push({ x: it.x + rnd(-.6, .6) * it.s, y: it.y + it.s * .4, z: it.z + rnd(-.6, .6) * it.s, vx: rnd(-.4, .4), vy: rnd(.8, 1.8), vz: rnd(-.4, .4), life: rnd(1.2, 2.4), age: 0 }); }
     for (let i = EMB.length - 1; i >= 0; i--) { const e = EMB[i]; e.age += dt; if (e.age > e.life) { EMB.splice(i, 1); continue; } e.x += e.vx * dt; e.y += e.vy * dt; e.z += e.vz * dt; e.vx += Math.sin(t * 2 + i) * dt * .5;
       const k = e.age / e.life; glow.add(e.x, e.y, e.z, -e.vx * .05, -e.vy * .05, -e.vz * .05, .045 * (1 - k * .5), 2, [1.4, .55, .15], (1 - k) * .9); }
+    /* 흑요석: 떠 있는 바위·용암 실·맥박 따라 퍼지는 열기와 불티 */
+    updateRidge(R.obsidian, t, dt, glow);
+    for (const it of obsItems) { const b = beatJS(t - it.x * .09 - it.z * .04); glow.add(it.x, it.y - .2, it.z, 0, 0, 0, it.s * 1.5, 3, [1, .24, .04], .06 + b * .2);
+      if (Math.random() < dt * (.3 + b * 3)) EMB.push({ x: it.x + rnd(-.5, .5) * it.s, y: it.y + it.s * .3, z: it.z + rnd(-.5, .5) * it.s, vx: rnd(-.5, .5), vy: rnd(.6, 1.6), vz: rnd(-.5, .5), life: rnd(1, 2.2), age: 0 }); }
     glow.end(); glow.uT.value = t;
     /* 카메라 */
     const tz = focus === 'all' ? 0 : ROWS.find(r => r.id === focus).z, tx = focus === 'all' ? 0 : x * .5;

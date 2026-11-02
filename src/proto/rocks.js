@@ -23,8 +23,8 @@ export function chunk(kind, seed) {
   const P = g.attributes.position, n = P.count, v = new THREE.Vector3(), rad = new Float32Array(n);
   const sx = .8 + R() * .55, sy = kind === 'meteor' ? .75 + R() * .25 : .55 + R() * .35, sz = .8 + R() * .55;
   /* 잘린 면: 운석은 거의 없고(녹아서 둥긂), 바위는 많이 */
-  const cuts = []; const nc = kind === 'meteor' ? 0 : 8 + Math.floor(R() * 5);
-  for (let i = 0; i < nc; i++) { const d = new THREE.Vector3(R() - .5, (R() - .5) * (kind === 'plain' ? 1.4 : .9), R() - .5).normalize(); cuts.push([d, .38 + R() * .3]); }
+  const cuts = []; const nc = kind === 'meteor' ? 0 : kind === 'obsidian' ? 11 + Math.floor(R() * 5) : 8 + Math.floor(R() * 5);
+  for (let i = 0; i < nc; i++) { const d = new THREE.Vector3(R() - .5, (R() - .5) * (kind === 'plain' ? 1.4 : .9), R() - .5).normalize(); cuts.push([d, kind === 'obsidian' ? .3 + R() * .32 : .38 + R() * .3]); }
   /* 운석의 엄지 자국: 얕고 넓은 둥근 패임 여러 개 */
   const dents = []; if (kind === 'meteor') for (let i = 0; i < 40; i++) dents.push([new THREE.Vector3(R() - .5, R() - .5, R() - .5).normalize(), .12 + R() * .14, .012 + R() * .018]);
   const o = seed * 3.17;
@@ -32,10 +32,11 @@ export function chunk(kind, seed) {
     let r = 1;
     if (kind === 'meteor') { r += fbm(v.x * 1.1 + o, v.y * 1.1, v.z * 1.1 - o, 3) * .35;
       for (const [d, w, dp] of dents) { const t = v.distanceTo(d) / w; if (t < 1) r -= dp * (1 - t * t) * (1 - t * t); } }
+    else if (kind === 'obsidian') r += fbm(v.x * .9 + o, v.y * .9, v.z * .9 - o, 2) * .3;            /* 유리처럼 매끈: 잘게 울퉁불퉁하지 않음 */
     else { r += fbm(v.x * 1.1 + o, v.y * 1.1, v.z * 1.1 - o, 3) * .45 + (ridged(v.x * 2.6 + o, v.y * 2.6, v.z * 2.6) - .55) * .12; }
     v.multiplyScalar(r); v.x *= sx; v.y *= sy; v.z *= sz;
     for (const [d, k] of cuts) { const h = v.dot(d); if (h > k) v.addScaledVector(d, -(h - k) * .96); }   /* 쪼개진 납작한 면 */
-    if (kind !== 'meteor') v.addScaledVector(v.clone().normalize(), fbm(v.x * 6 + o, v.y * 6, v.z * 6, 3) * .05);   /* 단면도 거칠게 */
+    if (kind !== 'meteor' && kind !== 'obsidian') v.addScaledVector(v.clone().normalize(), fbm(v.x * 6 + o, v.y * 6, v.z * 6, 3) * .05);   /* 단면도 거칠게 */
     if (v.y < -.35 * sy) v.y = -.35 * sy + (v.y + .35 * sy) * .25;                                       /* 밑은 납작하게 앉음 */
     P.setXYZ(i, v.x, v.y, v.z); rad[i] = v.length(); }
   g.computeVertexNormals();
@@ -51,6 +52,7 @@ export function chunk(kind, seed) {
     if (kind === 'plain') { const band = .5 + .5 * Math.sin(v.dot(axis) * 13 + fbm(v.x * 3, v.y * 3, v.z * 3) * 4);          /* 비스듬한 결 */
       const base = .05 + band * .045 + fbm(v.x * 4 + 7, v.y * 4, v.z * 4) * .04, dust = Math.max(0, ny) * Math.max(0, -cav * 14) * .09;
       const warm = .5 + fbm(v.x * 1.5 + 2, v.y * 1.5, v.z * 1.5) * 1.2; c = [base * (1 + warm * .12) + dust * .55, base * .97 + dust * .5, base * (.92 - warm * .08) + dust * .42]; }
+    else if (kind === 'obsidian') { const base = .008 + fbm(v.x * 3, v.y * 3, v.z * 3) * .006; c = [base * .95, base * .85, base * 1.15]; }
     else if (kind === 'lava') { const base = .022 + fbm(v.x * 5, v.y * 5, v.z * 5) * .016;
       c = [base * 1.1, base * .95, base * .9]; }
     else { const fused = .028 + fbm(v.x * 7, v.y * 7, v.z * 7) * .012, rust = Math.max(0, fbm(v.x * 2.5 + 3, v.y * 2.5, v.z * 2.5)) * .08;
@@ -64,7 +66,40 @@ export function chunk(kind, seed) {
 const NOISE = `float rh(vec3 p){ return fract(sin(dot(p,vec3(127.1,311.7,74.7)))*43758.5453); }
 float rn(vec3 p){ vec3 i=floor(p),f=fract(p); f=f*f*(3.-2.*f); return mix(mix(mix(rh(i),rh(i+vec3(1,0,0)),f.x),mix(rh(i+vec3(0,1,0)),rh(i+vec3(1,1,0)),f.x),f.y),mix(mix(rh(i+vec3(0,0,1)),rh(i+vec3(1,0,1)),f.x),mix(rh(i+vec3(0,1,1)),rh(i+vec3(1,1,1)),f.x),f.y),f.z); }
 vec2 vcell(vec3 p){ vec3 i=floor(p),f=fract(p); float a=9.,b=9.; for(int z=-1;z<=1;z++)for(int y=-1;y<=1;y++)for(int x=-1;x<=1;x++){ vec3 g=vec3(x,y,z); vec3 o=vec3(rh(i+g),rh(i+g+5.3),rh(i+g+9.1)); float d=length(g+o-f); if(d<a){b=a;a=d;}else if(d<b)b=d; } return vec2(a,b-a); }`;
+/* 용암 흑요석: 용암이 식어 생긴 검은 유리. 깨진 면은 거울처럼 매끈해 주변 빛이 비친다.
+   속에 용암 심장이 있어 쿵쿵 맥박 칠 때마다 빛이 틈을 따라 바위 끝까지 퍼지고, 그 맥박이 능선을 따라 옆 바위로 건너간다.
+   틈 가장자리의 얇은 유리 막에서 빛이 갈라져 아주 은은한 무지개가 일렁인다(칠한 무지개가 아님). */
+export const BEAT = 'float beat(float p){ float f=fract(p/2.6)*2.6; return exp(-f*f*30.)+.55*exp(-(f-.32)*(f-.32)*40.); }';
+export const beatJS = p => { const f = ((p / 2.6) % 1 + 1) % 1 * 2.6; return Math.exp(-f * f * 30) + .55 * Math.exp(-(f - .32) * (f - .32) * 40); };
+export function obsidianMaterial(uT) {
+  const m = new THREE.MeshPhysicalMaterial({ vertexColors: true, roughness: .1, metalness: 0, clearcoat: .7, clearcoatRoughness: .05, envMapIntensity: .75, ior: 1.5, specularIntensity: 1 });
+  m.onBeforeCompile = sh => { sh.uniforms.uT = uT;
+    sh.vertexShader = 'varying vec3 vRp; varying vec3 vWq;\n' + sh.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\n vRp=position;')
+      .replace('#include <project_vertex>', '#include <project_vertex>\n vWq=(modelMatrix*vec4(transformed,1.)).xyz;');
+    sh.fragmentShader = `uniform float uT; varying vec3 vRp; varying vec3 vWq; ${NOISE} ${BEAT}
+      vec3 film(float d,float ct){ vec3 ph=6.2832*2.*1.5*d*ct/vec3(640.,540.,450.); return .5-.5*cos(ph); }\n` + sh.fragmentShader
+      .replace('#include <normal_fragment_maps>', `#include <normal_fragment_maps>
+        { vec3 q=vRp*3.; float e=.04; float h0=rn(q); vec3 gr=vec3(rn(q+vec3(e,0,0))-h0,rn(q+vec3(0,e,0))-h0,rn(q+vec3(0,0,e))-h0)/e;   /* 조개껍질처럼 물결진 깨진 면 */
+          normal=normalize(normal-(mat3(viewMatrix)*gr)*.03); }`)
+      .replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>
+        { vec3 wq=vRp+vec3(rn(vRp*1.5),rn(vRp*1.5+3.),rn(vRp*1.5+7.))*.7;
+          vec2 c=vcell(wq*1.9); vec2 c2=vcell(wq*4.6+5.);
+          float inner=clamp(1.2-length(vRp)*1.05,0.,1.);                                        /* 심장에 가까울수록 뜨겁다 */
+          float b=beat(uT-vWq.x*.09-vWq.z*.04);                                                /* 맥박이 능선을 따라 건너간다 */
+          float spread=smoothstep(.0,1.,b*1.4-length(vRp)*.35+.2);                              /* 쿵 하면 안쪽부터 바깥으로 번짐 */
+          float crack=smoothstep(.045,.0,c.y)+smoothstep(.03,.0,c2.y)*.55;
+          float idle=.25+.1*sin(uT*.7+rn(vRp*2.)*6.);
+          float heat=crack*(idle*inner+spread*1.4);
+          totalEmissiveRadiance+=vec3(1.,.25,.03)*heat*2.4+vec3(1.,.55,.18)*pow(heat,2.5)*1.1;
+          totalEmissiveRadiance+=vec3(.9,.12,.02)*smoothstep(.22,0.,c.y)*(inner*.12+spread*.25);   /* 유리 밑으로 비치는 붉은 기운 */
+          vec3 V=normalize(cameraPosition-vWq); float ct=abs(dot(normalize(normal),vec3(0.,0.,1.)));
+          float rim=smoothstep(.12,.05,c.y)-smoothstep(.05,.0,c.y);                              /* 틈 바로 옆의 얇은 막 */
+          totalEmissiveRadiance+=film(280.+260.*rn(vRp*4.),ct)*rim*(1.-ct)*.5; }`); };
+  m.customProgramCacheKey = () => 'rock-obsidian';
+  return m;
+}
 export function rockMaterial(kind, uT) {
+  if (kind === 'obsidian') return obsidianMaterial(uT);
   const m = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: kind === 'meteor' ? .62 : .92, metalness: kind === 'meteor' ? .3 : .03, envMapIntensity: kind === 'meteor' ? .7 : .3 });
   m.onBeforeCompile = sh => { sh.uniforms.uT = uT;
     sh.vertexShader = 'varying vec3 vRp;\n' + sh.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\n vRp=position;');
@@ -92,7 +127,7 @@ export function rockMaterial(kind, uT) {
 /* ───── 능선: 길을 따라 덩어리를 늘어놓는다 ───── */
 export function makeRidge(kind, path, opt = {}) {
   const uT = opt.uT || { value: 0 }, mat = rockMaterial(kind, uT);
-  const geos = [0, 1, 2, 3, 4, 5].map(i => chunk(kind, i + 1 + (kind === 'lava' ? 20 : kind === 'meteor' ? 40 : 0)));
+  const geos = [0, 1, 2, 3, 4, 5].map(i => chunk(kind, i + 1 + ({ lava: 20, meteor: 40, obsidian: 60 }[kind] || 0)));
   const R = (() => { let s = (opt.seed || 7) * 7919; return () => (s = (s * 9301 + 49297) % 233280) / 233280; })();
   const curve = new THREE.CatmullRomCurve3(path.map(p => new THREE.Vector3(p[0], 0, p[1])), false, 'centripetal'), len = curve.getLength();
   const items = [], width = opt.width || 3.4;
@@ -105,10 +140,41 @@ export function makeRidge(kind, path, opt = {}) {
     put(u, (R() < .5 ? -1 : 1) * width * (.3 + R() * .3), (.7 + R() * .8) * k, R() * .3 - .2); }
   for (let d = 0; d < len; d += .55 + R() * .5) { const u = d / len; put(u, (R() < .5 ? -1 : 1) * width * (.6 + R() * .55), .25 + R() * .55, -.25 + R() * .2); }
   const grp = new THREE.Group(), m4 = new THREE.Matrix4(), sc = new THREE.Vector3(), pos = new THREE.Vector3();
-  geos.forEach((g, gi) => { const mine = items.filter(it => it.g === gi); if (!mine.length) return;
+  if (opt.float) { let lastX = -1e9; for (const it of items.filter(i => i.s > 1.9).sort((a, b) => a.x - b.x)) { if (it.x - lastX < 7) continue; lastX = it.x; it.skip = true; } }
+  geos.forEach((g, gi) => { const mine = items.filter(it => it.g === gi && !it.skip); if (!mine.length) return;
     const im = new THREE.InstancedMesh(g, mat, mine.length);
     mine.forEach((it, j) => { m4.compose(pos.set(it.x, it.y, it.z), it.q, sc.set(it.s * it.sq[0], it.s * it.sq[1], it.s * it.sq[2])); im.setMatrixAt(j, m4); });
     im.computeBoundingSphere(); grp.add(im); });
-  grp.userData = { items, curve, len, uT, kind };
+  /* 떠 있는 큰 바위: 바닥에서 떨어져 천천히 돌고, 서로 · 아래 바위와 녹은 용암 실로 이어진다 */
+  const fl = [];
+  if (opt.float) { const big = items.filter(it => it.s > 1.9).sort((a, b) => a.x - b.x); let lastX = -1e9;
+    for (const it of big) { if (it.x - lastX < 7) continue; lastX = it.x; it.float = true;
+      const ms = new THREE.Mesh(geos[it.g], mat); ms.scale.set(it.s * it.sq[0] * .8, it.s * it.sq[1] * .8, it.s * it.sq[2] * .8); ms.quaternion.copy(it.q); grp.add(ms);
+      const below = items.filter(o => !o.float && o.s > .9).sort((a, b) => Math.hypot(a.x - it.x, a.z - it.z) - Math.hypot(b.x - it.x, b.z - it.z))[0];
+      fl.push({ it, ms, ph: R() * 6.28, h: 2.2 + R() * 1.6, spin: (R() - .5) * .25, below }); } }
+  grp.userData = { items, curve, len, uT, kind, fl };
   return grp;
+}
+
+/* 매 프레임: 떠 있는 바위 움직이기 + 용암 실 그리기 (glow 공용 블록에) */
+const _q = new THREE.Quaternion(), _ax = new THREE.Vector3(0, 1, 0);
+export function updateRidge(grp, t, dt, glow) {
+  const { fl, kind } = grp.userData; if (!fl || !fl.length) return;
+  for (const f of fl) { const it = f.it, y = it.y + f.h + Math.sin(t * .45 + f.ph) * .35;
+    f.ms.position.set(it.x, y, it.z); f.ms.quaternion.premultiply(_q.setFromAxisAngle(_ax, f.spin * dt)); f.y = y; }
+  const thread = (ax, ay, az, bx, by, bz, ph) => {                 /* 늘어났다 줄어드는 녹은 실: 가운데가 가늘고 아래로 처짐 */
+    const L = Math.hypot(bx - ax, by - ay, bz - az), str = .55 + .45 * Math.sin(t * .6 + ph), sag = L * .22 * (1.2 - str * .5), N = Math.max(8, Math.round(L * 2));
+    const b = beatJS(t - (ax + bx) * .045);
+    let px = ax, py = ay, pz = az;
+    for (let i = 1; i <= N; i++) { const s = i / N, x = ax + (bx - ax) * s, z = az + (bz - az) * s, y = ay + (by - ay) * s - Math.sin(s * Math.PI) * sag;
+      const thin = 1 - Math.sin(s * Math.PI) * (.75 - str * .3);
+      glow.add(px, py, pz, x - px, y - py, z - pz, .09 * thin + .03, 2, [1.5, .7, .25], .85);
+      glow.add(px, py, pz, x - px, y - py, z - pz, .45 * thin + .08, 3, [1.1, .26, .04], .45 + b * .5);
+      px = x; py = y; pz = z; }
+    const d = (t * .18 + ph) % 1, s = d, dx = ax + (bx - ax) * s, dz = az + (bz - az) * s, dy = ay + (by - ay) * s - Math.sin(s * Math.PI) * sag;   /* 실을 타고 흐르는 녹은 방울 */
+    glow.add(dx, dy, dz, 0, 0, 0, .14, 1, [1.4, .8, .4], .9); };
+  for (let i = 0; i < fl.length; i++) { const f = fl[i], it = f.it, r = it.s * .55;
+    if (f.below) thread(it.x, f.y - r * .6, it.z, f.below.x, f.below.y + f.below.s * .3, f.below.z, f.ph);
+    const g = fl[i + 1]; if (g && Math.hypot(g.it.x - it.x, g.it.z - it.z) < 8.5) thread(it.x + r * .5, f.y, it.z, g.it.x - g.it.s * .3, g.y, g.it.z, f.ph + 2);
+    const b = beatJS(t - it.x * .09 - it.z * .04); glow.add(it.x, f.y, it.z, 0, 0, 0, it.s * 1.3, 3, [1, .25, .04], .1 + b * .25); }
 }
