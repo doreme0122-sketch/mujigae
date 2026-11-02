@@ -2,11 +2,12 @@
    날아 보기: 1번 기지에서 기체를 조이스틱으로 몰아 맵 크기·길·문을 몸으로 확인(지금 있는 땅 이름 · 출발 뒤 걸린 시간 · 속도 바꾸기)
    보기: 날아 보기·지역 보기는 기체를 따라감, 맵 전체는 가운데 고정(끌어서 이동). 두 손가락(휠)로 확대. 시작 기지 자리는 빛 고리(다음 단계에서 진짜 기지) */
 import * as THREE from 'three';
-import { makeBloom } from '../core/hangar/bloom.js?v=11030035';
-import { makeMapFloor, MAP, toWorld } from './mapfloor.js?v=11030035';
-import { makePerf } from './perf.js?v=11030035';
+import { makeBloom } from '../core/hangar/bloom.js?v=11030801';
+import { makeMapFloor, MAP, toWorld } from './mapfloor.js?v=11030801';
+import { makePerf } from './perf.js?v=11030801';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
-import { makeFlight, loadBlock, FLY } from './flight.js?v=11030035';
+import { makeFlight, loadBlock, FLY } from './flight.js?v=11030801';
+import { makeWalls } from './walls.js?v=11030801';
 
 const $ = s => document.querySelector(s), clamp = THREE.MathUtils.clamp;
 const VIEWS = [{ name: '날아 보기', h: 42, tilt: .38 }, { name: '지역 보기', h: 160, tilt: .25 }, { name: '맵 전체', h: 520, tilt: .02 }];
@@ -16,9 +17,10 @@ export async function start(canvas, onProgress = () => {}) {
   renderer.toneMapping = THREE.NoToneMapping; renderer.autoClear = false; renderer.setClearColor(0, 1);
   const scene = new THREE.Scene(), camera = new THREE.PerspectiveCamera(40, 1, 1, 3000), bloom = makeBloom(renderer, { samples: 0 });
   onProgress(.2);
-  const floor = await makeMapFloor(renderer, './assets/map/v6.png?v=11030035');
-  const J = await (await fetch('./assets/map/v6.json?v=11030035')).json();
-  const BLK = await loadBlock('./assets/map/v6.png?v=11030035');                  /* 벽 판정 = 바닥에 그린 벽 그림 그대로 */
+  const floor = await makeMapFloor(renderer, './assets/map/v6.png?v=11030801');
+  const J = await (await fetch('./assets/map/v6.json?v=11030801')).json();
+  const BLK = await loadBlock('./assets/map/v6.png?v=11030801');                  /* 벽 판정 = 바닥에 그린 벽 그림 그대로 */
+  const WALL = makeWalls(BLK, floor); scene.add(WALL.mesh); floor.mat.uniforms.uWf.value = WALL.fieldTex;   /* 바위벽 세우기 · 바닥도 같은 벽 지도로 */
   { const pm = new THREE.PMREMGenerator(renderer); scene.environment = pm.fromScene(new RoomEnvironment(), .04).texture; scene.environmentIntensity = .6; pm.dispose(); }
   const SPAWN = J.spawns, ALL = [...J.labels.map(o => [o.x, o.y, o.n, o.l]), [500, 500, '무너진 중심부', 'Lv 10+']];
   onProgress(.7);
@@ -59,7 +61,7 @@ export async function start(canvas, onProgress = () => {}) {
     G.forEach((g, i) => { const [x, z] = toWorld(g.x, g.y), dx = Math.cos(g.a), dz = Math.sin(g.a), px = -dz, pz = dx, hw = g.w / 2 * S + .55;
       const [r, gg, b] = GC[g.k] || GC.road; c.setRGB(r * 2.2, gg * 2.2, b * 2.2);
       for (const s of [-1, 1]) { const j = i * 2 + (s > 0);
-        q.setFromAxisAngle(up, Math.atan2(-s * px, -s * pz)); p.set(x + px * hw * s, 0, z + pz * hw * s); sc.set(1, 1, 1);
+        q.setFromAxisAngle(up, Math.atan2(-s * px, -s * pz)); p.set(x + px * hw * s, 0, z + pz * hw * s); sc.set(1, 1.55, 1);   /* 기둥은 바위벽보다 높게: 문틀이 벽 위로 솟아 멀리서도 문 자리가 보임 */
         m.compose(p, q, sc); cols.setMatrixAt(j, m); caps.setMatrixAt(j, m);
         p.set(x + px * (hw - .55) * s, 0, z + pz * (hw - .55) * s); m.compose(p, q, sc); slits.setMatrixAt(j, m); slits.setColorAt(j, c); }
       q.setFromAxisAngle(up, -Math.atan2(pz, px)); p.set(x, .12, z); sc.set(hw * 2, 1, 1.6); m.compose(p, q, sc); sills.setMatrixAt(i, m); c.setRGB(r, gg, b); sills.setColorAt(i, c); });
@@ -115,5 +117,5 @@ export async function start(canvas, onProgress = () => {}) {
   { const v = (import.meta.url.match(/v=(\d+)/) || [])[1] || '개발'; const el = document.createElement('div'); el.textContent = '6안 · 판 번호 ' + v;   /* 어떤 버전이 열렸는지 바로 확인 */
     el.style.cssText = 'position:fixed;left:max(18px,env(safe-area-inset-left,0px));bottom:calc(env(safe-area-inset-bottom,0px) + 14px);font-size:11px;color:rgba(185,255,74,.7);pointer-events:none'; document.body.appendChild(el); }
   onProgress(1);
-  window.__wv = { get t() { return t; }, cam, fly: FS };
+  window.__wv = { get t() { return t; }, cam, fly: FS, wallTris: WALL.mesh.userData.tris };
 }

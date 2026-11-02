@@ -51,11 +51,11 @@ export async function makeMapFloor(renderer, url) {
   const noise = bakeNoise(), V = (k, n) => ST.map(s => new THREE.Vector3(...s[k].slice(0, 3)));
   const WX = MAP.W * MAP.SCALE, WZ = MAP.H * MAP.SCALE;
   const mat = new THREE.ShaderMaterial({ depthWrite: false, depthTest: false,
-    uniforms: { uT: { value: 0 }, uN: { value: noise }, uR: { value: regTex }, uRs: { value: regSoft },
+    uniforms: { uT: { value: 0 }, uN: { value: noise }, uR: { value: regTex }, uRs: { value: regSoft }, uWf: { value: regSoft },
       uA: { value: V('a') }, uB: { value: V('b') }, uG: { value: V('g') },
       uP: { value: ST.map(s => new THREE.Vector4(...s.p)) }, uQ: { value: ST.map(s => new THREE.Vector3(...s.q)) }, uWv: { value: ST.map(s => new THREE.Vector4(...s.wv)) } },
     vertexShader: 'varying vec3 vW; void main(){ vec4 w=modelMatrix*vec4(position,1.); vW=w.xyz; gl_Position=projectionMatrix*viewMatrix*w; }',
-    fragmentShader: `precision highp float; varying vec3 vW; uniform float uT; uniform sampler2D uN, uR, uRs;
+    fragmentShader: `precision highp float; varying vec3 vW; uniform float uT; uniform sampler2D uN, uR, uRs, uWf;
       uniform vec3 uA[18], uB[18], uG[18], uQ[18]; uniform vec4 uP[18], uWv[18];
       float h2(vec2 p){ p=fract(p*vec2(123.34,456.21)); p+=dot(p,p+45.32); return fract(p.x*p.y); }
       vec3 hue(float h){ return clamp(abs(mod(h*6.+vec3(0.,4.,2.),6.)-3.)-1.,0.,1.); }
@@ -67,7 +67,7 @@ export async function makeMapFloor(renderer, url) {
         vec2 uv = vW.xz/vec2(${WX.toFixed(1)}, ${WZ.toFixed(1)}) + .5;
         if (uv.x<0.||uv.y<0.||uv.x>1.||uv.y>1.) { gl_FragColor=vec4(.01,.012,.02,1.); return; }
         int id = int(floor(texture2D(uR, uv).r*255./12.+.5)); id = id<0?0:(id>17?17:id);
-        vec3 eg = texture2D(uRs, uv).rgb; float ridge = eg.g, road = eg.b;
+        vec3 eg = texture2D(uRs, uv).rgb; float ridge = texture2D(uWf, uv).r, road = eg.b;   /* 벽 자리 = 바위벽과 같은 벽 높이 지도 */
         vec4 P = uP[id]; vec3 Q = uQ[id]; vec4 Wv = uWv[id];
         float dens=P.x, speed=P.y, swirl=P.z, sc=P.w, t=uT*speed;
         vec2 L0=layer(vW.xz,sc,t,swirl), L1=layer(vW.xz*1.15+vec2(31.,17.),sc,t*.6,swirl);
@@ -86,7 +86,7 @@ export async function makeMapFloor(renderer, url) {
         /* 바위 능선(벽 자리): 바닥보다 확 밝은 돌 띠 + 짙은 그림자 테두리 + 윗면 빛 → 멀리서도 '못 지나가는 곳'이 보이게 */
         /* 벽 자리 그림은 막힘(1)/지나감(0) 둘뿐 → 보이는 돌 띠 = 실제로 부딪히는 자리. 경계 판정은 게임과 같은 .5 */
         float rk = smoothstep(.4,.6,ridge);
-        float sh = (texture2D(uRs,uv+vec2(.004,0.)).g + texture2D(uRs,uv-vec2(.004,0.)).g + texture2D(uRs,uv+vec2(0.,.004)).g + texture2D(uRs,uv-vec2(0.,.004)).g)*.25;
+        float sh = (texture2D(uWf,uv+vec2(.004,0.)).r + texture2D(uWf,uv-vec2(.004,0.)).r + texture2D(uWf,uv+vec2(0.,.004)).r + texture2D(uWf,uv-vec2(0.,.004)).r)*.25;
         float rim = smoothstep(0.,.5,sh)*(1.-rk)*(1.-smoothstep(.2,.45,road));   /* 벽 바로 바깥 그림자: 벽이 바닥에서 솟아 있다는 느낌 (벽 크기는 안 바뀜) */
         float tn = texture2D(uN,vW.xz*.06).b, tn2 = texture2D(uN,vW.xz*.18).r;
         vec3 rockC = vec3(.30,.31,.34)*(.65+.55*tn) + vec3(.14,.14,.15)*smoothstep(.55,.8,tn2);      /* 밝은 회색 돌, 군데군데 더 밝은 면 */
@@ -109,7 +109,7 @@ export async function makeMapFloor(renderer, url) {
     fragmentShader: 'precision highp float;varying vec2 vU;uniform sampler2D t;void main(){ gl_FragColor=vec4(texture2D(t,vU).rgb,1.); }' }));
   const cs = new THREE.Scene(); cs.add(comp); const oc = new THREE.Camera();
   let div = 3, W = 2, H = 2;
-  return { mat, ST,
+  return { mat, ST, noise,
     size(w, h) { W = w; H = h; rt.setSize(Math.max(2, W / div | 0), Math.max(2, H / div | 0)); },
     update(t) { mat.uniforms.uT.value = t; },
     render(camera, target) { renderer.setRenderTarget(rt); renderer.clear(); renderer.render(fs, camera); renderer.setRenderTarget(target); renderer.render(cs, oc); } };

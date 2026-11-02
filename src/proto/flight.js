@@ -10,21 +10,33 @@
    무게: 기체 한 대 + 불꽃 띠 몇 장 + 꼬리 띠 하나 + 불티 점 묶음 하나 + 그림자 판 하나 */
 import * as THREE from 'three';
 import { buildShip, engineSpots } from '../core/ships/build.js';
-import { flameMesh } from './sortie.js';
-import { MAP } from './mapfloor.js';
+import { flameMesh } from './sortie.js?v=11030801';
+import { MAP } from './mapfloor.js?v=11030801';
 
 export const FLY = { LEN: 2, HOVER: .7, R: .8, SPEEDS: [9, 12, 15, 18], TURN: 7, ACC: .22 };
 const AB = { transparent: true, depthWrite: false, blending: THREE.AdditiveBlending };
 
-/* 설계도 그림 → 막힘 판정 */
+/* 설계도 그림 → 막힘 판정
+   · 벽 그림(막힘 1/지나감 0)을 아주 살짝 번지게 한 '벽 높이 지도' F를 만들고, F가 .5 넘는 곳 = 벽
+   · 진짜 바위벽(walls.js)도 똑같은 F의 .5 선을 따라 세움 → 눈에 보이는 벽 밑동 = 부딪히는 자리 (한 지도에서 둘 다 나옴)
+   · 번지게 하는 까닭: 계단처럼 각진 픽셀 가장자리를 바위답게 둥근 선으로 (벽 두께·문 폭은 그대로) */
 export async function loadBlock(url) {
   const img = await new Promise((ok, no) => { const i = new Image(); i.onload = () => ok(i); i.onerror = no; i.src = url; });
   const c = document.createElement('canvas'); c.width = img.width; c.height = img.height; const g = c.getContext('2d', { willReadFrequently: true }); g.drawImage(img, 0, 0);
   const d = g.getImageData(0, 0, img.width, img.height).data, N = img.width, cell = MAP.W / N;
-  const blk = new Uint8Array(N * N), reg = new Uint8Array(N * N);
-  for (let i = 0; i < N * N; i++) { const id = Math.round(d[i * 4] / 12); reg[i] = id; blk[i] = (d[i * 4 + 1] > 127 || id === 17) ? 1 : 0; }
+  const reg = new Uint8Array(N * N), raw = new Float32Array(N * N), tmp = new Float32Array(N * N), F = new Float32Array(N * N);
+  for (let i = 0; i < N * N; i++) { const id = Math.round(d[i * 4] / 12); reg[i] = id; raw[i] = d[i * 4 + 1] > 127 ? 1 : 0; }
+  { const K = [], s = 1; let sum = 0; for (let k = -3; k <= 3; k++) { const w = Math.exp(-k * k / (2 * s * s)); K.push(w); sum += w; } K.forEach((w, i) => K[i] = w / sum);   /* 번지기: 가로 한 번, 세로 한 번 */
+    for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) { let a = 0; for (let k = -3; k <= 3; k++) a += raw[j * N + Math.min(N - 1, Math.max(0, i + k))] * K[k + 3]; tmp[j * N + i] = a; }
+    for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) { let a = 0; for (let k = -3; k <= 3; k++) a += tmp[Math.min(N - 1, Math.max(0, j + k)) * N + i] * K[k + 3]; F[j * N + i] = a; } }
+  const fx = x => (x / MAP.SCALE + MAP.W / 2) / cell - .5, fz = z => (z / MAP.SCALE + MAP.H / 2) / cell - .5;   /* 세상 좌표 → 지도 칸 (칸 가운데 = 정수) */
+  const field = (x, z) => { const u = fx(x), w = fz(z); if (u < 0 || w < 0 || u > N - 1 || w > N - 1) return 1;
+    const i = Math.min(N - 2, u | 0), j = Math.min(N - 2, w | 0), a = u - i, b = w - j, k = j * N + i;
+    return (F[k] * (1 - a) + F[k + 1] * a) * (1 - b) + (F[k + N] * (1 - a) + F[k + N + 1] * a) * b; };
   const at = (x, z) => { const i = Math.floor((x / MAP.SCALE + MAP.W / 2) / cell), j = Math.floor((z / MAP.SCALE + MAP.H / 2) / cell); return (i < 0 || j < 0 || i >= N || j >= N) ? -1 : j * N + i; };
-  return { blocked: (x, z) => { const k = at(x, z); return k < 0 || blk[k] === 1; }, region: (x, z) => { const k = at(x, z); return k < 0 ? 17 : reg[k]; } };
+  return { N, F, reg, cell, field,
+    blocked: (x, z) => { const k = at(x, z); return k < 0 || reg[k] === 17 || field(x, z) > .5; },
+    region: (x, z) => { const k = at(x, z); return k < 0 ? 17 : reg[k]; } };
 }
 
 export async function makeFlight(renderer, B, start, face) {
