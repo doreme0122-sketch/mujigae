@@ -6,7 +6,8 @@ import { buildShip, engineSpots } from '../core/ships/build.js';
 import { makeGlow } from '../preview/glow.js';
 import { planetShader } from '../core/planet.js';
 import { planetFor } from '../data/planets.js';
-import { makeFloor, FLOORS } from './floor.js?v=11021358';
+import { makeFloor, FLOORS } from './floor.js?v=11021429';
+import * as OLD from './floor_old.js?v=11021429';
 
 const $ = s => document.querySelector(s), clamp = THREE.MathUtils.clamp;
 const TIPS = { dust: '시작 지역의 잔잔한 회색 먼지예요. 띄엄띄엄 작은 반짝임이 있어요.', frost: '얼음 성운 지대의 푸른 서리 안개예요. 얼음 알갱이가 날카롭게 반짝여요.',
@@ -33,7 +34,7 @@ export async function start(canvas, onProgress = () => {}) {
     fragmentShader: 'precision highp float;varying vec2 vU;uniform sampler2D t;uniform vec2 uPx;void main(){ vec3 c=texture2D(t,vU).rgb*.4; c+=(texture2D(t,vU+uPx*1.5).rgb+texture2D(t,vU-uPx*1.5).rgb+texture2D(t,vU+vec2(uPx.x,-uPx.y)*1.5).rgb+texture2D(t,vU-vec2(uPx.x,-uPx.y)*1.5).rgb)*.15; gl_FragColor=vec4(c*.4,1.);}' });
   const bgScene = new THREE.Scene(); bgScene.add(new THREE.Mesh(new THREE.PlaneGeometry(2, 2), bgMat));
   const glow = makeGlow(); scene.add(glow.mesh);
-  const floor = makeFloor(); scene.add(floor.grp); let F = FLOORS[0]; floor.set(F);
+  const floor = makeFloor(renderer); let F = FLOORS[0]; floor.set(F);
   onProgress(.4);
   const ship = await buildShip(1, 1, 'ruby', { renderer, size: 2.0 }); const me = new THREE.Group(); me.add(ship.root); scene.add(me);
   const sm = ship.root.children[0], ENG = engineSpots(ship.ship, sm, new THREE.Box3().setFromObject(sm).getSize(new THREE.Vector3()));
@@ -50,17 +51,18 @@ export async function start(canvas, onProgress = () => {}) {
   let Wd = 2, Hd = 2;
   function size() { const r = canvas.getBoundingClientRect(), DPR = Math.min(1.75, devicePixelRatio || 1); Wd = Math.max(2, Math.round(r.width * DPR)); Hd = Math.max(2, Math.round(r.height * DPR));
     renderer.setSize(Wd, Hd, false); bloom.size(Wd, Hd); skyRT.setSize(Wd >> 1, Hd >> 1); bgMat.uniforms.uPx.value.set(2 / Wd, 2 / Hd); planetMat.uniforms.uRes.value.set(Wd >> 1, Hd >> 1);
-    camera.aspect = Wd / Hd; camera.updateProjectionMatrix(); glow.uRes.value.set(Wd, Hd); }
+    camera.aspect = Wd / Hd; camera.updateProjectionMatrix(); glow.uRes.value.set(Wd, Hd); floor.size(Wd, Hd); }
   addEventListener('resize', size); size();
-  let last = performance.now(), t = 0, fr = 0, ft = 0, py = 0; const v3 = new THREE.Vector3();
+  let last = performance.now(), t = 0, fr = 0, ft = 0, py = 0, slow = 0; const v3 = new THREE.Vector3();
   renderer.setAnimationLoop(now => { try {
     const dt = clamp((now - last) / 1000, 0, .05); last = now; t += dt;
-    fr++; ft += dt; if (ft > .5) { $('#fps').textContent = Math.round(fr / ft) + ' fps'; fr = 0; ft = 0; }
+    fr++; ft += dt; if (ft > .5) { const f = fr / ft; $('#fps').textContent = Math.round(f) + ' fps'; fr = 0; ft = 0;
+      slow = f < 45 ? slow + 1 : 0; if (slow >= 4 && floor.div < 6) { floor.setDiv(6); floor.mat.uniforms.uGlint.value = .6; } }   /* 느리면 바닥을 더 작게, 반짝임 줄임 */
     /* 8자 비행 */
     const k = t * .28, x = Math.sin(k) * 20, z = Math.sin(k * 2) * 8, vx = Math.cos(k) * 20 * .28, vz = Math.cos(k * 2) * 16 * .28;
     const yaw = Math.atan2(-vx, -vz), turn = THREE.MathUtils.euclideanModulo(yaw - py + Math.PI, Math.PI * 2) - Math.PI; py = yaw;
     me.position.set(x, .4, z); me.rotation.order = 'YXZ'; me.rotation.set(0, yaw, clamp(-turn / Math.max(dt, 1e-3) * .25, -.7, .7));
-    me.updateMatrixWorld(true); floor.update(t, x, z);
+    me.updateMatrixWorld(true); floor.update(t, dt, x, z);
     glow.begin(); const hx = -Math.sin(yaw), hz = -Math.cos(yaw);
     for (const p of ENG) { v3.copy(p).applyMatrix4(sm.matrixWorld); glow.add(v3.x, v3.y, v3.z, -hx * .9, 0, -hz * .9, .15, 1, [.4, .6, 1.4], .9); glow.add(v3.x - hx * .2, v3.y, v3.z - hz * .2, -hx * .6, 0, -hz * .6, .4, 3, [.25, .45, 1.3], .7); }
     glow.end(); glow.uT.value = t;
@@ -68,8 +70,17 @@ export async function start(canvas, onProgress = () => {}) {
     camera.position.set(cam.x, cam.h * Math.cos(cam.tilt), cam.z + cam.h * Math.sin(cam.tilt)); camera.lookAt(cam.x, 0, cam.z);
     planetMat.uniforms.uR.value = 450 / (cam.h + 400); planetMat.uniforms.uT.value = t; planetMat.uniforms.uYaw.value = PL.yaw0 + t * .006;
     renderer.setRenderTarget(skyRT); renderer.render(bgS, bgCam);
-    renderer.setRenderTarget(bloom.scene); renderer.clear(); renderer.render(bgScene, bgCam); renderer.clearDepth(); renderer.render(scene, camera);
+    renderer.setRenderTarget(bloom.scene); renderer.clear(); renderer.render(bgScene, bgCam); floor.render(camera, bloom.scene); renderer.clearDepth(); renderer.render(scene, camera);
     bloom.render(Wd, Hd); } catch (e) { console.error('[바닥 보기]', e); } });
   onProgress(1);
-  window.__fv = { cam, set: id => [...document.querySelectorAll('#tour .wall')][FLOORS.findIndex(f => f.id === id)].click() };
+  /* 무게 재기: 바닥만 여러 번 그려 걸린 시간 (예전 방식과 비교) */
+  const oldF = OLD.makeFloor(); const oldS = new THREE.Scene(); oldS.add(oldF.grp); oldF.set(F);
+  const px = new Uint8Array(4), sync = () => { const gl = renderer.getContext(); gl.readPixels(0, 0, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, px); };
+  const bench = (n = 40) => { const run = f => { for (let i = 0; i < 3; i++) f(); sync(); const a = performance.now(); for (let i = 0; i < n; i++) { f(); sync(); } return (performance.now() - a) / n; };
+    renderer.setRenderTarget(null);
+    oldF.set(F); for (const m of oldF.mats) m.uniforms.uT.value = t;
+    const o = run(() => { renderer.setRenderTarget(null); renderer.render(oldS, camera); }) - run(() => { renderer.setRenderTarget(null); renderer.clear(); });
+    const nw = run(() => floor.render(camera, null)) - run(() => { renderer.setRenderTarget(null); renderer.clear(); });
+    return { old: +o.toFixed(2), now: +nw.toFixed(2), ratio: +(o / nw).toFixed(1) }; };
+  window.__fv = { bench, cam, set: id => [...document.querySelectorAll('#tour .wall')][FLOORS.findIndex(f => f.id === id)].click() };
 }
