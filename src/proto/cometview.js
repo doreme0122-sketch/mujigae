@@ -89,7 +89,7 @@ export async function start(canvas, onProgress = () => {}) {
         float across=1.-vX*vX;
         float tw=.7+.3*fbm(vec2(vS*20.-uT*12., vW*30.));                                        /* 가닥 속에서 빛이 흐름 */
         float k=across*pow(max(1.-vS,0.),1.8)*tw*vA*uOn;
-        gl_FragColor=vec4(c*k*.5,1.); }` });
+        gl_FragColor=vec4(c*k*.32,1.); }` });
   const tail = new THREE.Mesh(tg, tailM); tail.frustumCulled = false; tail.renderOrder = 8; scene.add(tail);
   /* ── 머리: 타는 심 + 빛 안개(일렁이는 가장자리) ── */
   const headM = new THREE.ShaderMaterial({ ...AB, uniforms: { uI: { value: 0 }, uT: { value: 0 }, uC: { value: new THREE.Color() }, uTurb: { value: 0 } },
@@ -98,7 +98,7 @@ export async function start(canvas, onProgress = () => {}) {
       void main(){ float r=length(vU), a=atan(vU.y, vU.x+1e-5);
         float wob=(.25+uTurb*.6)*(fbm(vec2(a*2.5+uT*4., r*5.-uT*8.))-.5);
         float rr=max(0., r*(1.+wob));
-        float core=exp(-rr*rr*120.)*3., inner=exp(-rr*rr*28.)*1.1, coma=exp(-rr*rr*6.)*.4;
+        float core=exp(-rr*rr*160.)*1.8, inner=exp(-rr*rr*40.)*.55, coma=exp(-rr*rr*10.)*.14;   /* 번짐이 과하지 않게: 심은 작고 또렷하게, 안개는 옅게 */
         vec3 c=vec3(1.)*core + mix(vec3(1.),uC,.5)*inner + uC*coma;
         gl_FragColor=vec4(c*uI*(1.-smoothstep(.7,1.,r)),1.); }` });
   const head = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), headM); head.frustumCulled = false; head.renderOrder = 9; scene.add(head);
@@ -111,7 +111,7 @@ export async function start(canvas, onProgress = () => {}) {
   { const s = new Float32Array(NP); for (let i = 0; i < NP; i++) s[i] = .4 + Math.pow(Math.random(), 3) * 2.4; pg.setAttribute('aS', new THREE.BufferAttribute(s, 1)); }
   const pM = new THREE.ShaderMaterial({ ...AB, uniforms: { uPx: { value: 600 }, uWhite: { value: .5 }, uWarm: { value: 0 } },
     vertexShader: 'attribute float aA, aS, aW; uniform float uPx; varying float vA, vW; void main(){ vA=aA; vW=aW; vec4 mv=modelViewMatrix*vec4(position,1.); gl_Position=projectionMatrix*mv; gl_PointSize=aS*uPx*.1/max(.1,-mv.z); }',
-    fragmentShader: 'uniform float uWhite, uWarm; varying float vA, vW; void main(){ vec2 q=gl_PointCoord-.5; float r2=dot(q,q); float k=exp(-r2*40.)*1.4+exp(-r2*9.)*.3; vec3 spec=.5+.5*cos(6.2832*(vW+vec3(0.,.33,.67))); vec3 c=mix(spec, vec3(1.), uWhite); c=mix(c, vec3(1.25,.85,.55), uWarm); gl_FragColor=vec4(c*k*vA,1.); }' });
+    fragmentShader: 'uniform float uWhite, uWarm; varying float vA, vW; void main(){ vec2 q=gl_PointCoord-.5; float r2=dot(q,q); float k=exp(-r2*40.)*.9+exp(-r2*9.)*.12; vec3 spec=.5+.5*cos(6.2832*(vW+vec3(0.,.33,.67))); vec3 c=mix(spec, vec3(1.), uWhite); c=mix(c, vec3(1.25,.85,.55), uWarm); gl_FragColor=vec4(c*k*vA,1.); }' });
   const sparks = new THREE.Points(pg, pM); sparks.frustumCulled = false; sparks.renderOrder = 9; scene.add(sparks);
   const SP = Array.from({ length: NP }, () => ({ life: 0, max: 1, p: new THREE.Vector3(), v: new THREE.Vector3(), w: Math.random() }));
   onProgress(.8);
@@ -151,9 +151,9 @@ export async function start(canvas, onProgress = () => {}) {
     prevH.copy(H); H.lerpVectors(S0, C, Math.pow(f, 1.6));
     U.uH.value.copy(H); U.uD.value.copy(D); U.uT.value = t; U.uOn.value = on ? Math.min(1, f * 6) : 0; tail.visible = on;
     U.uLen.value = V[cur].len * Math.min(1, f * 3 + .2);
-    head.visible = on; head.position.copy(H); head.scale.setScalar(2.4 + f * .8); headM.uniforms.uI.value = on ? 1.5 : 0; headM.uniforms.uT.value = t;
+    head.visible = on; head.position.copy(H); head.scale.setScalar(1.8 + f * .5); headM.uniforms.uI.value = on ? 1 : 0; headM.uniforms.uT.value = t;
     crystal.position.copy(H); crystal.rotation.set(t * 3, t * 4.2, t * 1.7); crystal.visible = on && !!V[cur].crystal;
-    lightM.uniforms.uI.value = on ? Math.pow(f, 2.5) * 1.2 : 0; lightM.uniforms.uR.value = 1 + f * 2.5;
+    lightM.uniforms.uI.value = on ? Math.pow(f, 2.5) * .45 : 0; lightM.uniforms.uR.value = 1 + f * 2.5;
     /* 부스러기: 머리에서 떨어져 나가 뒤로 처지며 반짝이다 꺼짐 */
     if (on) for (let j = 0, k = 0; j < NP && k < V[cur].sparks; j++) if (SP[j].life <= 0) { const q = SP[j]; q.max = q.life = .35 + Math.random() * .6;
       q.p.copy(H).add(new THREE.Vector3((Math.random() - .5) * .4, (Math.random() - .5) * .4, (Math.random() - .5) * .4)); q.v.copy(D).multiplyScalar(-(2 + Math.random() * 6)).add(new THREE.Vector3((Math.random() - .5) * 3, (Math.random() - .5) * 3, (Math.random() - .5) * 3)); k++; }
