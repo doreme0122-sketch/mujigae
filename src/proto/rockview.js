@@ -6,13 +6,13 @@ import { buildShip, engineSpots } from '../core/ships/build.js';
 import { makeGlow } from '../preview/glow.js';
 import { planetShader } from '../core/planet.js';
 import { planetFor } from '../data/planets.js';
-import { makeRidge, updateRidge, hitWall } from './rocks.js?v=11021217';
+import { makeRidge, updateRidge, hitWall } from './rocks.js?v=11021229';
 
 const $ = s => document.querySelector(s), clamp = THREE.MathUtils.clamp, rnd = (a, b) => a + Math.random() * (b - a);
 const VIEWS = [
   { id: 'near', name: '가까이', h: 22, tilt: .62 },
   { id: 'game', name: '게임 시점', h: 44, tilt: .26 }];
-const TIP = { b: '용암 흑요석', s: '평소엔 빛나지 않는 검은 유리 바위예요. 탄에 맞으면 맞은 자리에서 속의 용암이 깨어나 빛이 틈을 따라 번졌다가 사그라들어요. 화면의 바위를 누르면 그쪽으로 쏴요.' };
+const TIP = { b: '용암 흑요석', s: '평소엔 빛나지 않는 검은 유리 바위예요. 탄에 맞으면 맞은 자리 둘레의 틈만 용암빛으로 짧게 반짝였다가 식어요. 화면의 바위를 누르면 그쪽으로 쏴요.' };
 
 export async function start(canvas, onProgress = () => {}) {
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: false, powerPreference: 'high-performance' });

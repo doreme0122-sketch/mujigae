@@ -67,27 +67,26 @@ const NOISE = `float rh(vec3 p){ return fract(sin(dot(p,vec3(127.1,311.7,74.7)))
 float rn(vec3 p){ vec3 i=floor(p),f=fract(p); f=f*f*(3.-2.*f); return mix(mix(mix(rh(i),rh(i+vec3(1,0,0)),f.x),mix(rh(i+vec3(0,1,0)),rh(i+vec3(1,1,0)),f.x),f.y),mix(mix(rh(i+vec3(0,0,1)),rh(i+vec3(1,0,1)),f.x),mix(rh(i+vec3(0,1,1)),rh(i+vec3(1,1,1)),f.x),f.y),f.z); }
 vec2 vcell(vec3 p){ vec3 i=floor(p),f=fract(p); float a=9.,b=9.; for(int z=-1;z<=1;z++)for(int y=-1;y<=1;y++)for(int x=-1;x<=1;x++){ vec3 g=vec3(x,y,z); vec3 o=vec3(rh(i+g),rh(i+g+5.3),rh(i+g+9.1)); float d=length(g+o-f); if(d<a){b=a;a=d;}else if(d<b)b=d; } return vec2(a,b-a); }`;
 /* 용암 흑요석: 용암이 식어 생긴 검은 유리. 깨진 면은 거울처럼 매끈해 주변 빛이 비친다.
-   평소엔 빛나지 않는다. 탄에 맞으면 맞은 자리에서 속의 용암이 깨어나 빛이 틈을 따라 번져 나갔다가 사그라든다.
-   틈 가장자리의 얇은 유리 막에서 빛이 갈라져 은은한 무지개가 잠깐 일렁인다(칠한 무지개가 아님). */
+   평소엔 빛나지 않는다. 탄에 맞으면 맞은 자리 둘레의 틈만 용암빛이 확 들어왔다가 0.4초쯤에 식는다(넓게 번지지 않음 — 가볍고 전투가 잘 보임).
+   맞는 순간 틈 옆 얇은 유리 막에서 빛이 갈라져 무지개가 아주 짧게 반짝인다(칠한 무지개가 아님). */
 export const NHIT = 16;
 export const HITS = { value: Array.from({ length: NHIT }, () => new THREE.Vector4(0, -99, 0, -99)) };   /* 맞은 자리 (x,y,z, 맞은 시각) — 모든 벽이 같이 씀 */
 /* 새로 맞으면: 바로 옆에 방금 맞은 자리가 있으면 합치고(쌍발 두 알), 아니면 이미 다 식은 칸 → 없으면 가장 오래된 칸에 넣는다.
    (차례대로 덮어쓰면 다른 곳에서 번지던 빛이 갑자기 사라짐) */
 export function hitWall(x, y, z, t) { const H = HITS.value; let best = 0, bestAge = -1;
   for (let i = 0; i < NHIT; i++) { const h = H[i], age = t - h.w;
-    if (age < .2 && Math.hypot(h.x - x, h.y - y, h.z - z) < 1.2) return;
-    if (age > 2.6) { best = i; bestAge = 99; break; }
+    if (age < .08 && Math.hypot(h.x - x, h.y - y, h.z - z) < .6) return;
+    if (age > .6) { best = i; bestAge = 99; break; }
     if (age > bestAge) { bestAge = age; best = i; } }
   H[best].set(x, y, z, t); }
 const WAVE = `uniform vec4 uHits[16];
-  /* 맞은 자리에서 번지는 빛: 앞머리(고리)가 바깥으로 달려가고, 지나간 자리는 천천히 식는다 */
-  vec3 hitWave(vec3 w, float t){ float near=0., spread=0., front=0.;
-    for(int i=0;i<16;i++){ float age=t-uHits[i].w; if(age<0.||age>2.6) continue; float d=distance(w,uHits[i].xyz);
-      float r=age*5.5;
-      spread+=smoothstep(r+.4,r-.6,d)*exp(-age*1.5)*exp(-d*.28);
-      front+=exp(-(d-r)*(d-r)*2.5)*exp(-age*1.1)*exp(-d*.2);
-      near+=exp(-d*d*2.)*exp(-age*4.); }
-    return vec3(near,spread,front); }`;
+  /* 맞은 자리 둘레만 짧게: 지름 1m 남짓, 0.4초쯤에 식는다 (x = 뜨거움, y = 맞는 순간의 번쩍) */
+  vec2 hitGlow(vec3 w, float t){ float h=0., f=0.;
+    for(int i=0;i<16;i++){ float age=t-uHits[i].w; if(age<0.||age>.6) continue; vec3 d3=w-uHits[i].xyz; float d2=dot(d3,d3); if(d2>2.) continue;
+      float fall=exp(-d2*3.2);
+      h+=fall*exp(-age*7.5);
+      f+=fall*exp(-age*28.); }
+    return vec2(h,f); }`;
 export function obsidianMaterial(uT) {
   const m = new THREE.MeshPhysicalMaterial({ vertexColors: true, roughness: .1, metalness: 0, clearcoat: .6, clearcoatRoughness: .05, envMapIntensity: .38, ior: 1.5, specularIntensity: 1 });
   m.onBeforeCompile = sh => { sh.uniforms.uT = uT; sh.uniforms.uHits = HITS;
@@ -104,18 +103,18 @@ export function obsidianMaterial(uT) {
         { vec3 q=vRp*3.; float e=.04; float h0=rn(q); vec3 gr=vec3(rn(q+vec3(e,0,0))-h0,rn(q+vec3(0,e,0))-h0,rn(q+vec3(0,0,e))-h0)/e;   /* 조개껍질처럼 물결진 깨진 면 */
           normal=normalize(normal-(mat3(viewMatrix)*gr)*.03); }`)
       .replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>
-        { vec3 hw=hitWave(vWq,uT); float on=hw.x+hw.y+hw.z;
-          if(on>.002){
+        { vec2 hg=hitGlow(vWq,uT);
+          if(hg.x>.003){
             vec3 wq=vRp+vec3(rn(vRp*1.5),rn(vRp*1.5+3.),rn(vRp*1.5+7.))*.7;
             vec2 c=vcell(wq*1.9); vec2 c2=vcell(wq*4.6+5.);
-            float crack=smoothstep(.045,.0,c.y)+smoothstep(.03,.0,c2.y)*.55;
-            float heat=crack*(hw.y*1.3+hw.z*2.2+hw.x*2.5);
-            totalEmissiveRadiance+=vec3(1.,.25,.03)*heat*2.4+vec3(1.,.6,.22)*pow(heat,2.2)*1.3;
-            totalEmissiveRadiance+=vec3(.9,.12,.02)*smoothstep(.22,0.,c.y)*(hw.y*.35+hw.x*.8);   /* 유리 밑으로 비치는 붉은 기운 */
-            totalEmissiveRadiance+=vec3(1.,.55,.25)*hw.x*.6;                                     /* 맞은 자리 자체가 달아오름 */
+            float crack=smoothstep(.05,.0,c.y)+smoothstep(.035,.0,c2.y)*.6;
+            float heat=crack*hg.x*3.;
+            vec3 hot=mix(vec3(.9,.12,.02),vec3(1.,.42,.08),clamp(hg.x*1.5,0.,1.));            /* 식으면서 주황 → 짙은 빨강 */
+            totalEmissiveRadiance+=hot*heat*2.4+vec3(1.,.75,.4)*pow(heat,2.2)*1.2*hg.y*2.;
+            totalEmissiveRadiance+=vec3(1.,.5,.2)*hg.y*1.2;                                      /* 맞는 순간 그 자리가 확 */
             float ct=abs(dot(normalize(normal),vec3(0.,0.,1.)));
-            float rim=smoothstep(.12,.05,c.y)-smoothstep(.05,.0,c.y);                              /* 틈 바로 옆의 얇은 막 */
-            totalEmissiveRadiance+=film(280.+260.*rn(vRp*4.),ct)*rim*(1.-ct)*(hw.z*1.4+hw.y*.4); } }`); };
+            float rim=smoothstep(.12,.05,c.y)-smoothstep(.05,.0,c.y);                              /* 틈 옆 얇은 막: 맞는 순간만 무지개 */
+            totalEmissiveRadiance+=film(280.+260.*rn(vRp*4.),ct)*rim*(1.-ct)*hg.y*1.6; } }`); };
   m.customProgramCacheKey = () => 'rock-obsidian-hit';
   return m;
 }
