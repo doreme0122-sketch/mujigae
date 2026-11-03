@@ -6,8 +6,8 @@
    단위 m */
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { metalMaterial, glowMaterial } from './wardbase.js?v=11031952';
-import { gem } from './guardian.js?v=11031952';
+import { stoneMaterial, glowMaterial } from './wardbase.js?v=11031953';
+import { gem } from './guardian.js?v=11031953';
 
 const AB = { transparent: true, depthWrite: false, blending: THREE.AdditiveBlending };
 const clean = g => { for (const k of Object.keys(g.attributes)) if (k !== 'position' && k !== 'normal') g.deleteAttribute(k); return g.index ? g.toNonIndexed() : g; };
@@ -34,7 +34,7 @@ function spireGeo() {
   return mergeGeometries(parts.map(clean));
 }
 export function makeWardSpires(uT, spots) {
-  const G = new THREE.Group(), metal = metalMaterial(uT), sg = spireGeo();
+  const G = new THREE.Group(), metal = stoneMaterial(uT), sg = spireGeo();   /* 양쪽 수정탑도 받침과 같은 돌 (사용자 2026-11-03) */
   const gemMat = new THREE.MeshPhysicalMaterial({ color: 0xffffff, metalness: 0, roughness: .05, transparent: true, opacity: .75, emissive: 0xffffff, emissiveIntensity: .6, flatShading: true, depthWrite: false });
   const units = spots.map(([x, y, z], i) => { const u = new THREE.Group(); u.position.set(x, y, z); G.add(u);
     u.add(new THREE.Mesh(sg, metal));
