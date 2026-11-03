@@ -11,7 +11,7 @@
    단위 m. 받침 높이 약 1.3m, 지름 약 4.4m. 돌은 한 재질, 빛은 한 재질 → 그리는 횟수 적게 */
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { ruinMaterial } from './ruins.js?v=11032306';
+import { ruinMaterial } from './ruins.js?v=11032313';
 
 const rng = seed => { let s = seed * 9301 + 49297; return () => (s = (s * 9301 + 49297) % 233280) / 233280; };
 const clean = g => { for (const k of Object.keys(g.attributes)) if (k !== 'position' && k !== 'normal') g.deleteAttribute(k); return g.index ? g.toNonIndexed() : g; };
@@ -103,15 +103,16 @@ export function metalMaterial(uT) {
 /* 빛 (틈·홈·테): 속에서 흐르는 힘. aK = 흐름 위치(아래 0 → 위 1) */
 export function glowMaterial() {
   return new THREE.ShaderMaterial({ transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide,
-    uniforms: { uCol: { value: new THREE.Vector3(.35, .85, 1) }, uI: { value: 1 }, uT: { value: 0 }, uFlow: { value: .4 }, uProg: { value: -1 }, uPCol: { value: new THREE.Vector3(1, 1, 1) }, uRise: { value: -9 }, uRiseI: { value: 0 }, uRun: { value: -1 } },
+    uniforms: { uCol: { value: new THREE.Vector3(.35, .85, 1) }, uI: { value: 1 }, uT: { value: 0 }, uFlow: { value: .4 }, uProg: { value: -1 }, uPCol: { value: new THREE.Vector3(1, 1, 1) }, uECol: { value: new THREE.Vector3(.35, .85, 1) }, uRise: { value: -9 }, uRiseI: { value: 0 }, uRun: { value: -1 } },
     vertexShader: 'attribute float aK, aA; varying float vK, vA, vY; varying vec2 vU; void main(){ vK = aK; vA = aA; vU = uv; vY = (modelMatrix * vec4(position, 1.)).y; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.); }',
-    fragmentShader: `uniform vec3 uCol, uPCol; uniform float uI, uT, uFlow, uProg, uRise, uRiseI, uRun; varying float vK, vA, vY; varying vec2 vU;
+    fragmentShader: `uniform vec3 uCol, uPCol, uECol; uniform float uI, uT, uFlow, uProg, uRise, uRiseI, uRun; varying float vK, vA, vY; varying vec2 vU;
       void main(){ float w = fract(vK * 3. - uT * uFlow); float pulse = .75 + .45 * exp(-(w - .5) * (w - .5) * 30.);
         float edge = 1. - abs(vU.y * 2. - 1.); float core = edge * edge;
         vec3 col = uCol, c;
         if (vA > 0. && uProg >= 0.) {                                                          /* 차지 고리: 차지한 만큼 그 사람 색으로 둘레를 따라 채워짐, 채움 끝이 하얗게 달림 */
-          float lit = smoothstep(uProg + .012, uProg - .012, vA) * smoothstep(0., .03, vA) * smoothstep(0., .03, uProg), hd = (vA - uProg) * 45.;   /* 끝이 딱 잘리지 않게 녹아들며 차오름 */ col = mix(uCol, uPCol, lit);
-          c = (col * col * 1.5 + vec3(.3) * core) * (.25 + core * .9) * mix(.25, 1.5, lit) + vec3(1.2) * exp(-hd * hd) * step(.001, uProg) * step(uProg, .999) * core; }
+          float lit = smoothstep(uProg + .03, uProg - .05, vA) * smoothstep(0., .04, vA) * smoothstep(0., .04, uProg); col = mix(uECol, uPCol, lit);   /* 차오르지 않은 쪽은 빈 와드 색 그대로 → 남은 만큼이 끝까지 보임 */
+          float bk = uProg - vA, glowH = bk > 0. ? exp(-bk * 14.) : exp(-bk * bk * 700.);                     /* 채움 끝: 하얀 막대 대신 뒤로 길게 끌리는 부드러운 빛 (날카로운 단면이 안 보이게 · 사용자) */
+          c = (col * col * 1.5 + vec3(.3) * core) * (.25 + core * .9) * mix(.2, 1.35, lit) + uPCol * uPCol * 1.3 * glowH * (.35 + core * .8) * step(.001, uProg) * step(uProg, .999); }
         else c = (col * col * 1.3 + vec3(.25) * core) * (.4 + core * .9) * pulse;
         if (vA > 0. && uRun >= 0.) { float rd = fract(vA - uRun + .5) - .5; rd *= 18.; c += vec3(1.6) * exp(-rd * rd) * (.5 + core); }   /* 원이 닫히는 순간: 하얀 빛이 원을 따라 한 바퀴 달림 */
         float rh = (vY - uRise) / .14, rise = smoothstep(uRise + .02, uRise - .3, vY) * uRiseI;     /* 순간 이동: 땅 고리에서 탑 위로 빛이 차오름 */
