@@ -93,15 +93,23 @@ function tentMat(uT) {
   return new THREE.ShaderMaterial({ ...AB, side: THREE.DoubleSide, uniforms: { uT, uC: { value: JCOL.body }, uW: { value: JCOL.core }, uR: { value: JCOL.alert } },
     vertexShader: GL_COMMON + `
       attribute vec4 aR; attribute vec3 aS; varying vec3 vS; varying vec4 vB, vC;
-      vec3 P(float s){ float ang = aR.x, len = aR.z * iA.w, c = iB.z, seed = iB.w; float rad = aR.y * ${JELLY.R.toFixed(2)} * iA.w * (1. - .2 * c);
-        vec3 root = vec3(cos(ang) * rad, -.05 * iA.w, sin(ang) * rad);
-        float sp = length(iB.xy); vec2 back = sp > 1e-3 ? -iB.xy / sp : vec2(0.); float k = clamp(sp * .22, 0., .8);     /* 빨리 갈수록 뒤로 끌려 흐름 */
+      attribute vec4 iD; attribute vec4 iE;   /* iD: 0.35초 전·0.8초 전 몸 자리(지금 자리 기준) · iE: 오므림 박자, 쏘기 신호 */
+      float sqz(float ph){ ph = fract(ph); if (ph < .25) { float k = ph / .25; return k * k * (3. - 2. * k); } float k = (ph - .25) / .75; return 1. - k * k * (3. - 2. * k); }
+      /* 촉수에 '기억'이 있음 (사용자: 너무 뻣뻣함):
+         ① 끝으로 갈수록 몸이 조금 전에 있던 자리를 따라감 → 방향을 틀면 밧줄처럼 휘며 뒤따라옴
+         ② 오므리는 힘이 뿌리에서 끝으로 시간 차를 두고 타고 내려감 → 오므릴 때마다 물결이 한 번씩 흘러내림
+         ③ 뿌리는 거의 안 움직이고 끝일수록 크고 느리게 너울거림 · 멈추면 천천히 아래로 처짐 */
+      vec3 P(float s){ float ang = aR.x, len = aR.z * iA.w, seed = iB.w, cS = iE.y > 0. ? iB.z : sqz(iE.x - s * .45), c0 = iB.z;
+        float rad = aR.y * ${JELLY.R.toFixed(2)} * iA.w * (1. - .2 * c0);
+        vec3 root = vec3(cos(ang) * rad, -.05 * iA.w, sin(ang) * rad), out_ = vec3(cos(ang), 0., sin(ang)), tang = vec3(-sin(ang), 0., cos(ang));
         float die = max(iC.z, 0.);
-        vec3 p = root + vec3(back.x, 0., back.y) * len * k * s * s * .9 + vec3(0., -1., 0.) * len * s * (1. - k * .55);
-        vec3 out_ = vec3(cos(ang), 0., sin(ang));
-        p += out_ * len * s * (.08 + .14 * c + .5 * die);                                                       /* 오므릴 때 살짝 퍼짐 · 쓰러지면 풀어 헤쳐짐 */
-        float w1 = sin(s * 5.5 - uT * 2.1 + seed * 6. + ang * 3.), w2 = sin(s * 9. - uT * 3.3 + ang * 5.);
-        p += vec3(-sin(ang), 0., cos(ang)) * (w1 * .13 + w2 * .05) * s * len * .45 + vec3(0., 1., 0.) * w2 * .03 * s;
+        vec2 lag = (2. * s * (1. - s) * iD.xy + s * s * iD.zw) * (aS.z < .5 ? 1. : .55);                     /* 끝일수록 더 오래전 자리 (입 팔은 짧고 굵어 덜 끌림) */
+        float s16 = pow(s, 1.6);
+        vec3 h = vec3(lag.x, 0., lag.y);
+        h += out_ * len * s * (.05 + .17 * cS + .5 * die);                                                        /* 오므림 물결이 지나가는 마디에서 살짝 퍼짐 */
+        h += tang * (sin(s * 3.2 - uT * 1.35 + seed * 6. + ang * 3.) * .2 + sin(s * 6.5 - uT * 2.3 + ang * 5.) * .06) * s16 * len;   /* 끝일수록 크고 느린 너울 */
+        float hl = length(h.xz), drop = len * s, vy = sqrt(max(drop * drop - hl * hl * .8, drop * drop * .12));  /* 옆으로 끌린 만큼 덜 내려옴 (길이가 늘지 않게) */
+        vec3 p = root + h + vec3(0., -vy, 0.) + vec3(0., 1., 0.) * sin(s * 6.5 - uT * 2.3 + ang * 5.) * .03 * s;
         p.y = max(p.y, -iA.y + .08 + s * .05);                                                                     /* 땅 아래로 파고들지 않음 */
         return p; }
       void main(){ vS = aS; vB = iB; vC = iC; float s = aS.x;
@@ -156,6 +164,7 @@ export function makeJellies(uT) {
   const mk = (geo, A, B, C) => { const g = new THREE.InstancedBufferGeometry(); g.index = geo.index; for (const k in geo.attributes) g.setAttribute(k, geo.attributes[k]);
     g.setAttribute('iA', new THREE.InstancedBufferAttribute(A, 4)); g.setAttribute('iB', new THREE.InstancedBufferAttribute(B, 4)); g.setAttribute('iC', new THREE.InstancedBufferAttribute(C, 4)); g.instanceCount = 0; return g; };
   const bg = mk(bellGeo(), iA, iB, iC), tg = mk(tentGeo(), iA, iB, iC), sg = mk(shellGeo(), sA, sB, sC);
+  const iD = new Float32Array(MAX * 4), iE = new Float32Array(MAX * 4); tg.setAttribute('iD', new THREE.InstancedBufferAttribute(iD, 4)); tg.setAttribute('iE', new THREE.InstancedBufferAttribute(iE, 4));
   const tent = new THREE.Mesh(tg, tentMat(uT)); tent.frustumCulled = false; tent.renderOrder = 6;
   const bell = new THREE.Mesh(bg, bellMat(uT)); bell.frustumCulled = false; bell.renderOrder = 7;
   const shell = new THREE.Mesh(sg, shellMat(uT)); shell.frustumCulled = false; shell.renderOrder = 8;
@@ -171,8 +180,13 @@ export function makeJellies(uT) {
     for (const j of list) { if (!j.on) continue; const c = j.tell > 0 ? -Math.min(1, (t - j.tell) / .6) * .5 : squeeze(j.ph), hitA = t - j.hitT, dieA = j.dieT > 0 ? (t - j.dieT) / 1.3 : -1;
       const yb = j.y + Math.sin(t * .7 + j.seed) * .12 + c * .1;
       const put = (A, B, C, k) => { A.set([j.x, yb, j.z, j.s], k * 4); B.set([j.vx, j.vz, c, j.seed], k * 4); C.set([j.alert, hitA < 2 ? hitA : -1, dieA, j.strong ? 1 : 0], k * 4); };
+      /* 몸이 지나온 자리 기억 (촉수가 따라감) */
+      const H = j.hist || (j.hist = []); H.push(t, j.x, j.z); while (H.length > 6 && H[0] < t - 1.1) H.splice(0, 3);
+      const at = d => { const tt = t - d; for (let i = H.length - 3; i >= 0; i -= 3) if (H[i] <= tt) { const i2 = Math.min(H.length - 3, i + 3), k = H[i2] > H[i] ? (tt - H[i]) / (H[i2] - H[i]) : 0; return [H[i + 1] + (H[i2 + 1] - H[i + 1]) * k - j.x, H[i + 2] + (H[i2 + 2] - H[i + 2]) * k - j.z]; } return [H[1] - j.x, H[2] - j.z]; };
+      const d1 = at(.35), d2 = at(.8), lim = 1.6 * j.s; const cl = v => { const l = Math.hypot(v[0], v[1]); return l > lim ? [v[0] / l * lim, v[1] / l * lim] : v; };
+      const [a1, b1] = cl(d1), [a2, b2] = cl(d2); iD.set([a1, b1, a2, b2], n * 4); iE.set([j.ph, j.tell > 0 ? 1 : 0, 0, 0], n * 4);
       put(iA, iB, iC, n++); if (j.strong) put(sA, sB, sC, m++); }
-    for (const g of [bg, tg]) { g.instanceCount = n; for (const k of ['iA', 'iB', 'iC']) g.attributes[k].needsUpdate = true; }
+    for (const g of [bg, tg]) { g.instanceCount = n; for (const k of ['iA', 'iB', 'iC']) g.attributes[k].needsUpdate = true; } tg.attributes.iD.needsUpdate = tg.attributes.iE.needsUpdate = true;
     sg.instanceCount = m; for (const k of ['iA', 'iB', 'iC']) sg.attributes[k].needsUpdate = true; };
   /* 움직임 한 걸음: 떼 짓기 · 오므려 헤엄 · 경계 · 쏘기 신호 · 맞음 · 쓰러짐
      ctx: { sx, sz (내 기체), blocked(x,z), spit(j, dx, dz) 빛 방울 뱉기, died(j) } */
