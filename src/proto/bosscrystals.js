@@ -1,18 +1,18 @@
-/* 보스 구역 수정 기둥 20개 (2026-11-03 음성 회의 확정)
-   · 자리: 보스 구역 바깥쪽(반지름 약 27~31m). 벽으로 막지 않고 기둥 사이로 드나듦
-     와드 옆 샛길이 안쪽 둥근 길로 들어오는 열 곳(MID 각도)마다 기둥 둘이 양옆에 서서 좁은 문을 만듦
-     → 샛길로 들어오는 사람은 기둥 뒤에 몸을 붙여 숨고, 문과 문 사이는 넓게 트여 흐름이 지나감
-   · 생김새: 땅에서 솟은 수정 무리 — 큰 육각 기둥 하나 + 바깥으로 기운 작은 기둥 둘~넷 + 밑동 부스러기
-     평소엔 조용한 차가운 투명 결정(무지개 없음 · 디자인 기준: 무지개는 만질 때만). 속에서 옅은 빛이 천천히 위로 올라감(살아 있는 결정)
-   · 탄이 맞으면: 그 자리에서 무지개 물결이 결정 표면을 따라 퍼지고 맑은 울림 → 탄은 튕겨 나감 (반사 = 무지개반사)
-   · 몸은 부딪힘(기체도 지나가지 못함)
+/* 보스방 테두리: 반사되는 결정 벽 + 벽 바로 안쪽 드문드문 수정 (2026-11-03 사용자 확정 — 처음의 '벽 없이 기둥 20개'를 바꿈)
+   · 벽: 보스 구역 둘레(반지름 약 31m)를 결정 기둥이 촘촘히 붙어 선 결정 벽으로 감쌈. 문 다섯 곳만 열림(너무 많으면 벽이 토막 나 보이고, 적으면 갇힌 느낌)
+     문은 와드 옆 샛길이 들어오는 열 곳 가운데 하나 걸러 하나 · 문 양옆엔 키 큰 결정 문기둥(여기가 문이라는 표시)
+     벽은 한 줄 곧은 담이 아니라 높낮이가 물결치고, 바깥·안쪽으로 작은 결정이 덧자라 두께가 생김. 문 쪽으로 갈수록 높아져 문기둥으로 이어짐
+   · 수정 일곱: 벽 바로 안쪽(반지름 약 25~27m)에 드문드문, 일부러 고르지 않게 — 문 들어서자마자 옆에 숨는 자리 · 벽에 등을 댄 구석. 가운데는 비움(보스와 싸우는 데 집중)
+   · 벽도 수정도 탄을 튕김 → 벽과 수정 사이로 탄이 이리저리 튕기는 구석이 생김. 튕긴 탄은 쏜 사람도 맞음
+   · 평소엔 조용한 어두운 결정(무지개 없음 · 무지개는 만질 때만). 탄이 맞으면 맞은 자리에서 무지개 물결이 결정을 따라 퍼지고 맑은 울림
+   · 기체는 부딪힘
    단위 m */
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import * as A from '../core/audio.js';
 
 const A0 = -Math.PI / 2, MID = Array.from({ length: 10 }, (_, k) => A0 + k * Math.PI / 5 + Math.PI / 10);
-export const CRY = { R: 29, SPREAD: .125, HITS: 8 };
+export const CRY = { WALL: 31, T: .95, GATE: .15, HITS: 8 };   /* WALL: 벽 반지름 · T: 벽 두께 절반 · GATE: 문 너비 절반(각도, 약 9m 문) */
 
 function rng(seed) { let s = seed * 9301 + 49297; return () => (s = (s * 9301 + 49297) % 233280) / 233280; }
 /* 육각 수정 기둥: 몸통(살짝 굵기가 다름) + 끝이 비스듬히 깎인 뾰족 머리. 면마다 방향을 따로 가짐(각진 결정) */
@@ -75,21 +75,47 @@ function ping(vol = .08) { if (!A.live()) return; const c = A.ctx, t0 = c.curren
   [[1, 1], [1.5, .45], [2.76, .25], [4.1, .12]].forEach(([k, v]) => { const o = c.createOscillator(), g = c.createGain(); o.type = 'sine'; o.frequency.value = f * k; o.connect(g); A.env(g, t0, .002, vol * v, .9 / Math.sqrt(k)); A.out(g, .5); o.start(t0); o.stop(t0 + 1); }); }
 
 export function makeBossCrystals(B, uT) {
-  const G = new THREE.Group(), list = [], geos = [];
-  MID.forEach((m, k) => { for (const s of [-1, 1]) { const a = m + s * CRY.SPREAD * (k % 2 ? 1.15 : .9), rr = CRY.R + (s * (k % 3 - 1)) * 1.1, big = (k + (s > 0)) % 2 === 0;
-    const x = Math.cos(a) * rr, z = Math.sin(a) * rr, c = cluster(31 + k * 7 + (s > 0 ? 3 : 0), big);
-    c.g.rotateY(-a + (s > 0 ? .4 : -.4)); c.g.translate(x, 0, z); geos.push(c.g); list.push({ x, z, r: c.r, h: c.h }); } });
+  const G = new THREE.Group(), list = [], geos = [], R = rng(5), W = CRY.WALL;
+  const gates = [0, 2, 4, 6, 8].map(k => MID[k]);
+  const angD = (a, b) => Math.atan2(Math.sin(a - b), Math.cos(a - b));
+  const gateD = a => Math.min(...gates.map(g => Math.abs(angD(a, g))));                 /* 가장 가까운 문까지 각도 */
+  /* 벽: 문과 문 사이 다섯 토막. 결정 기둥을 촘촘히 세움 */
+  const arcs = gates.map((g, i) => { const g2 = gates[(i + 1) % 5]; return [g + CRY.GATE, g + CRY.GATE + (((angD(g2, g) + Math.PI * 2) % (Math.PI * 2)) - CRY.GATE * 2)]; });
+  for (const [a0, a1] of arcs) { const L = (a1 - a0) * W, n = Math.round(L / 1.05);
+    for (let i = 0; i <= n; i++) { const a = a0 + (a1 - a0) * i / n + (R() - .5) * .008, ed = Math.min(i, n - i) / n;            /* ed: 토막 끝(문)에서 얼마나 떨어졌나 */
+      const rise = Math.exp(-ed * 16) * 1.6, wave = Math.sin(a * 7.3) * .35 + Math.sin(a * 17.1 + 1.3) * .2;                     /* 문 쪽으로 높아짐 + 높낮이 물결 */
+      const h = 2.3 + wave + rise + R() * .5, r = .55 + R() * .22, g = prism(r, h, .45 + R() * .35, R);
+      g.rotateX((R() - .5) * .12); g.rotateZ((R() - .5) * .1 - .05);
+      const rr = W + (R() - .5) * .35; g.rotateY(-a); g.translate(Math.cos(a) * rr, 0, Math.sin(a) * rr); geos.push(g);
+      if (R() < .55) { const side = R() < .5 ? -1 : 1, sh = h * (.3 + R() * .3), sg = prism(r * (.4 + R() * .25), sh, .3 + R() * .2, R);   /* 안팎으로 덧자란 작은 결정 */
+        sg.rotateZ(side * -(.3 + R() * .3)); sg.rotateY(-a); const d = rr + side * (r + .2); sg.translate(Math.cos(a) * d, 0, Math.sin(a) * d); geos.push(sg); }
+      if (R() < .4) { const s2 = .1 + R() * .14, rg = prism(s2, s2 * 1.2, s2 * .8, R); rg.rotateX(R() * 1.4); rg.rotateZ(R() * 1.4); const d = rr + (R() - .5) * 2.6, aa = a + (R() - .5) * .03; rg.translate(Math.cos(aa) * d, -.05, Math.sin(aa) * d); geos.push(rg); } } }   /* 밑동 부스러기 */
+  /* 문기둥: 문 양옆에 키 큰 결정 무리 */
+  gates.forEach((g, k) => { for (const s of [-1, 1]) { const a = g + s * (CRY.GATE + .02), x = Math.cos(a) * W, z = Math.sin(a) * W, c = cluster(70 + k * 5 + (s > 0 ? 2 : 0), true);
+    c.g.scale(1.15, 1.2, 1.15); c.g.rotateY(-a); c.g.translate(x, 0, z); geos.push(c.g); list.push({ x, z, r: c.r * 1.15, h: c.h * 1.2 }); } });
+  /* 안쪽 수정 일곱: [문 번호, 문에서 각도, 반지름, 큰 것] — 일부러 고르지 않게 */
+  [[0, .36, 26.6, 1], [1, -.27, 27.2, 0], [1, .64, 25.4, 1], [2, -.42, 26.2, 0], [3, .22, 27, 1], [3, .78, 26.4, 0], [4, -.33, 25.8, 1]].forEach(([k, da, rr, big], i) => {
+    const a = gates[k] + da, x = Math.cos(a) * rr, z = Math.sin(a) * rr, c = cluster(31 + i * 7, !!big);
+    c.g.rotateY(-a + (i % 2 ? .5 : -.4)); c.g.translate(x, 0, z); geos.push(c.g); list.push({ x, z, r: c.r, h: c.h }); });
+  const inWall = (x, z) => { const r = Math.hypot(x, z); return Math.abs(r - W) < CRY.T && gateD(Math.atan2(z, x)) > CRY.GATE; };
   const mat = crystalMat(uT), mesh = new THREE.Mesh(mergeGeometries(geos), mat); mesh.renderOrder = 2; G.add(mesh);
   /* 기둥 몸은 부딪힘 */
-  const blocked0 = B.blocked; B.blocked = (x, z) => { if (blocked0(x, z)) return true; for (const o of list) { const dx = x - o.x, dz = z - o.z; if (dx * dx + dz * dz < o.r * o.r) return true; } return false; };
+  const blocked0 = B.blocked; B.blocked = (x, z) => { if (blocked0(x, z) || inWall(x, z)) return true; for (const o of list) { const dx = x - o.x, dz = z - o.z; if (dx * dx + dz * dz < o.r * o.r) return true; } return false; };
   let hi = 0;
-  G.userData.list = list;
+  G.userData.list = list; G.userData.gates = gates;
   /* 탄이 지나간 한 걸음(ax,az → bx,bz) 사이에 기둥 테두리를 넘으면 [닿은 곳, 바깥 방향] */
   G.userData.cross = (ax, az, bx, bz, pad = .1) => { let best = null, bt = 2;
     for (const o of list) { const R = o.r + pad, dx = bx - ax, dz = bz - az, fx = ax - o.x, fz = az - o.z, a = dx * dx + dz * dz, b = 2 * (fx * dx + fz * dz), c = fx * fx + fz * fz - R * R;
       if (c < 0) { const l = Math.hypot(fx, fz) || 1; if (bt > 0) { bt = 0; best = { t: 0, x: ax, z: az, nx: fx / l, nz: fz / l, o }; } continue; }
       const disc = b * b - 4 * a * c; if (disc < 0 || a < 1e-9) continue; const t = (-b - Math.sqrt(disc)) / (2 * a); if (t < 0 || t > 1 || t >= bt) continue;
       const px = ax + dx * t, pz = az + dz * t, nx = (px - o.x) / R, nz = (pz - o.z) / R; bt = t; best = { t, x: px, z: pz, nx, nz, o }; }
+    /* 벽: 안쪽 면(반지름 W-T)이나 바깥 면(W+T)을 넘는 곳. 문 자리는 지나감 */
+    { const rA = Math.hypot(ax, az), dx = bx - ax, dz = bz - az, a = dx * dx + dz * dz;
+      for (const [Rf, sgn] of [[W - CRY.T - pad, -1], [W + CRY.T + pad, 1]]) { if (sgn < 0 ? rA > Rf : rA < Rf) continue;   /* 그 면 쪽에 있을 때만 */
+        const b = 2 * (ax * dx + az * dz), c = ax * ax + az * az - Rf * Rf, disc = b * b - 4 * a * c; if (disc < 0 || a < 1e-9) continue;
+        const sq = Math.sqrt(disc), t1 = (-b - sq) / (2 * a), t2 = (-b + sq) / (2 * a), t = sgn < 0 ? t2 : t1; if (t < 0 || t > 1 || t >= bt) continue;
+        const px = ax + dx * t, pz = az + dz * t; if (gateD(Math.atan2(pz, px)) <= CRY.GATE) continue;
+        const l = Math.hypot(px, pz); bt = t; best = { t, x: px, z: pz, nx: sgn * px / l, nz: sgn * pz / l, wall: true }; } }
     return best; };
   /* 맞은 자리 무지개 물결 */
   G.userData.flash = (t, x, y, z) => { mat.userData.hits[hi].set(x, y, z, t); hi = (hi + 1) % CRY.HITS; ping(); };
