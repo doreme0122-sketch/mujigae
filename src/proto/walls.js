@@ -9,12 +9,12 @@
      - 이웃 땅 색이 바위에 살짝 배어 있음(얼음 성운 옆 바위는 푸르스름, 용암 옆은 붉은 기)
    · 무게: 벽 전체가 한 덩어리 → 그리기 1번. 지도 칸마다 삼각형 몇 개(가장자리 칸만 옆면) */
 import * as THREE from 'three';
-import { MAP, toWorld } from './mapfloor.js?v=11030955';
-import { makeRidge, updateRidge, rockMaterial, chunk } from './rocks.js?v=11030955';
-import { makeIceRidge, iceMaterial, block } from './ice.js?v=11030955';
-import { makeCrystalRidge, crystalMaterial, prism } from './crystal.js?v=11030955';
-import { makeRuinRidge, updateRuins, ruinMaterial, pillar, arc } from './ruins.js?v=11030955';
-import { makeCoralRidge, coralMaterial, coral } from './coral.js?v=11030955';
+import { MAP, toWorld } from './mapfloor.js?v=11031055';
+import { makeRidge, updateRidge, rockMaterial, chunk } from './rocks.js?v=11031055';
+import { makeIceRidge, iceMaterial, block } from './ice.js?v=11031055';
+import { makeCrystalRidge, crystalMaterial, prism } from './crystal.js?v=11031055';
+import { makeRuinRidge, updateRuins, ruinMaterial, pillar, arc } from './ruins.js?v=11031055';
+import { makeCoralRidge, coralMaterial, coral } from './coral.js?v=11031055';
 
 export function makeFieldWall(B, floor, ridges = []) {
   const { N, F, cell } = B, S = MAP.SCALE, ISO = .5;
@@ -154,7 +154,7 @@ export function makeRealWalls(B, ridges, uT) {
   for (const r of ridges) { const K = KIND[r.k]; if (!K) continue;
     const pts = r.p.map(([x, y]) => toWorld(x, y));
     /* 얇은 벽(유적 담·자수정·산호)은 벽 띠가 더 넓어서 두 줄로: 옛 성벽은 두 겹 담 사이를 채운 구조, 결정·산호는 무리 지어 자람 */
-    const lines = K.off ? [-K.off, K.off].map(o => offsetLine(pts, o)) : [pts];
+    const lines = K.off && !r.fill ? [-K.off, K.off].map(o => offsetLine(pts, o)) : [pts];
     for (const line of lines) {
     const g = K.make(line, { uT, mat: K.mat, geos: K.geos, arcs: K.arcs, seed: seed++ * 13 + 5, noTaper: true });
     for (const ch of [...g.children]) { if (!ch.isInstancedMesh) continue;

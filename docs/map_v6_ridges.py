@@ -104,6 +104,46 @@ for p in paths:
         if len(q) < 3: continue
         pts = q[::3] + ([q[-1]] if (len(q) - 1) % 3 else [])
         out.append({'k': NAMES[k], 'p': [[int(x) * 2 + 1, int(y) * 2 + 1] for y, x in pts]})
+# ── 막힌 자리를 빠짐없이 덮기 (보이는 벽 = 막힌 곳) ──
+# ① 막다른 벽 끝: 뼈대 선은 벽 끝보다 반 두께쯤 모자람 → 벽 띠가 끝날 때까지 늘림
+from PIL import ImageDraw
+def extend(pts, at_start):
+    q = pts if at_start else pts[::-1]
+    (x0, y0), (x1, y1) = q[0], q[min(2, len(q) - 1)]
+    dx, dy = x0 - x1, y0 - y1; l = (dx * dx + dy * dy) ** .5
+    if l == 0: return pts
+    dx /= l; dy /= l; x, y = x0, y0; k = 0
+    while k < 12:
+        nx, ny = x + dx * 2, y + dy * 2          # 1000칸 기준 2 = 500칸 기준 1칸
+        if not (0 <= ny / 2 < N and 0 <= nx / 2 < N) or not M[int(ny / 2), int(nx / 2)]: break
+        x, y = nx, ny; k += 1
+    if k == 0: return pts
+    e = [int(x - dx), int(y - dy)]
+    return [e] + pts if at_start else pts + [e]
+for r in out:
+    p0 = (r['p'][0][1] // 2, r['p'][0][0] // 2); p1 = (r['p'][-1][1] // 2, r['p'][-1][0] // 2)
+    if sk[p0] and nb[p0] <= 1: r['p'] = extend(r['p'], True)
+    if sk[p1] and nb[p1] <= 1: r['p'] = extend(r['p'], False)
+# ② 아직 안 덮인 곳(외딴 작은 벽 조각 · 불룩한 곳): 그 조각의 긴 방향으로 짧은 능선을 더함. 두 번 반복
+for rep in range(3):
+    im = Image.new('L', (N, N), 0); d = ImageDraw.Draw(im)
+    for r in out: d.line([(x / 2, y / 2) for x, y in r['p']], fill=255, width=7)
+    for r in out:
+        for x, y in r['p']: d.ellipse([x / 2 - 3.5, y / 2 - 3.5, x / 2 + 3.5, y / 2 + 3.5], fill=255)
+    cov = np.array(im) > 0; bare = M & ~cov
+    lab_, n_ = nd.label(bare, np.ones((3, 3))); added = 0
+    for i in range(1, n_ + 1):
+        ys, xs = np.nonzero(lab_ == i)
+        if len(ys) < 3: continue
+        cy, cx = ys.mean(), xs.mean()
+        if len(ys) >= 4:
+            C = np.cov(np.stack([xs - cx, ys - cy])); w, v = np.linalg.eigh(C); ax = v[:, 1]
+            t = (xs - cx) * ax[0] + (ys - cy) * ax[1]; t0, t1 = t.min(), t.max()
+        else: ax = np.array([1., 0.]); t0, t1 = -.5, .5
+        if t1 - t0 < 2: t0, t1 = -1, 1
+        pts = [[int((cx + ax[0] * t) * 2 + 1), int((cy + ax[1] * t) * 2 + 1)] for t in np.linspace(t0, t1, max(2, int((t1 - t0) / 3) + 1))]
+        k = int(kind[int(cy), int(cx)]); out.append({'k': NAMES[k], 'p': pts, 'fill': 1}); added += 1
+    print('pass', rep, 'bare px', int(bare.sum()), 'added', added)
 J = json.load(open('../assets/map/v6.json')); J['ridges'] = out
 json.dump(J, open('../assets/map/v6.json', 'w'), ensure_ascii=False, separators=(',', ':'))
 from collections import Counter
