@@ -8,10 +8,23 @@
    · 모양·크기는 제각각: 작음(한 대가 겨우) · 중간 · 큼(여럿) × 둥긂 · 길쭉함(벽 따라) · 굽음
    · 규칙: 숨으면 바깥에서 안 보이고, 숨은 기체가 밀어내는 가스·돌 움직임도 바깥에선 안 보임(내 화면에서만).
            숨은 내 기체는 내 화면에서 반투명. 같은 숨을 곳 안이면 서로 반투명하게 보임. 안에서 쏘면 2초 드러남(적 붙일 때) */
-import { MAP, toWorld } from './mapfloor.js?v=11031401';
+import { MAP, toWorld } from './mapfloor.js?v=11031405';
+
+function fromMap(arr) {
+  const S = MAP.SCALE, N = 500, grid = new Uint8Array(N * N);
+  const toCell = (x, z) => [Math.floor((x / S + MAP.W / 2) / (MAP.W / N)), Math.floor((z / S + MAP.H / 2) / (MAP.H / N))];
+  const list = arr.map(b => { const lobes = b.lobes, cx = lobes.reduce((a, l) => a + l[0], 0) / lobes.length, cz = lobes.reduce((a, l) => a + l[1], 0) / lobes.length;
+    return { x: cx, z: cz, r: 3, lobes, k: b.k, size: 1, shape: 1, why: b.why }; });
+  list.forEach((b, id) => { for (const [lx, lz, lr] of b.lobes) { const [i0, j0] = toCell(lx - lr, lz - lr), [i1, j1] = toCell(lx + lr, lz + lr);
+    for (let j = Math.max(0, j0); j <= Math.min(N - 1, j1); j++) for (let i = Math.max(0, i0); i <= Math.min(N - 1, i1); i++) { const cx = ((i + .5) * MAP.W / N - MAP.W / 2) * S, cz = ((j + .5) * MAP.H / N - MAP.H / 2) * S;
+      if (Math.hypot(cx - lx, cz - lz) <= lr * .9) grid[j * N + i] = id + 1; } } });
+  const bushAt = (x, z) => { const [i, j] = toCell(x, z); return i < 0 || j < 0 || i >= N || j >= N ? 0 : grid[j * N + i]; };
+  return { list, bushAt, update: (t, dt, x, z) => bushAt(x, z) > 0 };
+}
 
 export function makeBushes(B, J, opt = {}) {
-  if (opt.off) return { list: [], bushAt: () => 0, update: () => false };   /* 7안: 평지 숨을 곳은 만들지 않음(사용자 2026-11-03) — 좁은 길 틈을 메우는 숨을 곳은 길을 만든 뒤에 */
+  if (opt.off && !J.bushes) return { list: [], bushAt: () => 0, update: () => false };
+  if (J.bushes) return fromMap(J.bushes);                                  /* 7안: 맵 설계에서 정해 준 숨을 곳 그대로 (보물 땅 양옆 틈) */   /* 7안: 평지 숨을 곳은 만들지 않음(사용자 2026-11-03) — 좁은 길 틈을 메우는 숨을 곳은 길을 만든 뒤에 */
   const S = MAP.SCALE, rnd = (() => { let s = 977; return () => (s = (s * 9301 + 49297) % 233280) / 233280; })();
   const spawns = J.spawns.map(([x, y]) => toWorld(x, y));
   const freeAt = (x, z) => B.region(x, z) !== 17 && B.field(x, z) < .2;
