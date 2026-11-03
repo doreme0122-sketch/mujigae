@@ -1,19 +1,19 @@
 /* 태어나서 스킬 고르기 보기 — 빛의 닻에서 태어남 → 공격·이동·방해 스킬 고르기 → 출격 (기지는 padringview와 같음) */
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
-import { makeBloom } from '../core/hangar/bloom.js?v=11031708';
-import { makePad } from '../core/hangar/pad.js?v=11031708';
-import { makeMag } from '../core/hangar/mag.js?v=11031708';
+import { makeBloom } from '../core/hangar/bloom.js?v=11031731';
+import { makePad } from '../core/hangar/pad.js?v=11031731';
+import { makeMag } from '../core/hangar/mag.js?v=11031731';
 import { buildShip, engineSpots } from '../core/ships/build.js';
-import { makeGoldStar } from './goldstar.js?v=11031708';
-import { makeArena, SPEED, WAVE_R0 } from './arena.js?v=11031708';
-import { makeGuardians, GUARD } from './guardian.js?v=11031708';
-import { makeFloor, FLOORS } from './floor.js?v=11031708';
-import { makePerf } from './perf.js?v=11031708';
-import { makeBirth, BIRTH } from './birth.js?v=11031708';
-import { makeSortie, SORTIE } from './sortie.js?v=11031708';
-import { makeSkillPick, PICK_CSS } from './skillpick.js?v=11031708';
-import { makeDemo } from './skilldemo.js?v=11031708';
+import { makeGoldStar } from './goldstar.js?v=11031731';
+import { makeArena, SPEED, WAVE_R0 } from './arena.js?v=11031731';
+import { makeGuardians, GUARD } from './guardian.js?v=11031731';
+import { makeFloor, FLOORS } from './floor.js?v=11031731';
+import { makePerf } from './perf.js?v=11031731';
+import { makeBirth, BIRTH } from './birth.js?v=11031731';
+import { makeSortie, SORTIE } from './sortie.js?v=11031731';
+import { makeSkillPick, PICK_CSS } from './skillpick.js?v=11031731';
+import { makeDemo } from './skilldemo.js?v=11031731';
 
 const $ = s => document.querySelector(s), clamp = THREE.MathUtils.clamp;
 const SHIPL = 2.9;     /* 기체 길이: 자기장 판(지름 3.2)보다 약간 작게 */
@@ -107,7 +107,7 @@ export async function start(canvas, onProgress = () => {}) {
     { const S = birth.userData.S; for (const o of [pad, mag, star, stand]) o.position.y = S.punch; star.userData.burst(S.burst); ring.userData.impact(S.impR, S.impK);
       sortie.userData.update(t, dt);
       if (SS.warpS > 0) { const sp = SS.warpP.clone().project(camera); bloom.warp(sp.x * .5 + .5, sp.y * .5 + .5, SS.warpR, SS.warpS, Wd / Hd); }
-      else { const sp = new THREE.Vector3(0, .2, 0).project(camera); bloom.warp(sp.x * .5 + .5, sp.y * .5 + .5, S.warpR, S.warpS, Wd / Hd); } } guards.userData.update(t, on); demo.userData.update(t, dt); pick.userData.update(t, dt, camera, Wd, Hd);
+      else { const sp = new THREE.Vector3(0, .2, 0).project(camera); bloom.warp(sp.x * .5 + .5, sp.y * .5 + .5, S.warpR, S.warpS, Wd / Hd); } } guards.userData.update(t, on); demo.userData.update(t, dt, camera); pick.userData.update(t, dt, camera, Wd, Hd);
     { const f = pick.userData.camFocus(); cam.fo = (cam.fo || 0) + (f - (cam.fo || 0)) * Math.min(1, dt * 1.6); }      /* 고를 때는 기체와 보석 쪽으로 다가감 */
     { const f = pick.userData.demoFocus(); cam.fd = (cam.fd || 0) + (f - (cam.fd || 0)) * Math.min(1, dt * 1.4); }   /* 맛보기 중: 기체와 연습 표적이 다 보이게 앞쪽으로 넓게 */
     const Hn = cam.H * (1 - .5 * cam.fo - .08 * cam.fd), Tn = cam.T + (.98 - cam.T) * cam.fo, ly = .35 + .75 * cam.fo;
@@ -115,7 +115,7 @@ export async function start(canvas, onProgress = () => {}) {
     /* 출격하면 화면이 기체를 따라감 */
     { const tx = SS.flying ? ship.position.x : 0, tz = SS.flying ? ship.position.z : 0; camT.x += (tx - camT.x) * Math.min(1, dt * (SS.flying ? 6 : 1.5)); camT.z += (tz - camT.z) * Math.min(1, dt * (SS.flying ? 6 : 1.5)); }
     const az = cam.az + (-.12 - cam.az) * cam.fd * .85;   /* 맛보기 중: 출격로(+x)가 화면 오른쪽으로 가게 돌아 봄 */
-    camera.position.set(camT.x + Math.sin(az) * cam.h * Math.sin(cam.tilt), cam.h * Math.cos(cam.tilt) + .3, camT.z + Math.cos(az) * cam.h * Math.sin(cam.tilt)); { const fx = -Math.sin(az), fz = -Math.cos(az), sh = .9 * cam.fo * (1 - cam.fd); camera.lookAt(camT.x + fx * sh + 1.15 * cam.fd, ly, camT.z + fz * sh); }   /* 고를 때 화면 가운데를 살짝 안쪽으로: 먼 쪽 보석 이름표가 위 안내와 겹치지 않게 */
+    camera.position.set(camT.x + Math.sin(az) * cam.h * Math.sin(cam.tilt), cam.h * Math.cos(cam.tilt) + .3, camT.z + Math.cos(az) * cam.h * Math.sin(cam.tilt)); { const fx = -Math.sin(az), fz = -Math.cos(az), sh = .9 * cam.fo * (1 - cam.fd); camera.lookAt(camT.x + fx * sh + .8 * cam.fd, ly, camT.z + fz * sh); }   /* 고를 때 화면 가운데를 살짝 안쪽으로: 먼 쪽 보석 이름표가 위 안내와 겹치지 않게 */
     fcam.position.copy(camera.position).multiplyScalar(BS); fcam.position.y += HOVER; fcam.quaternion.copy(camera.quaternion); floor.update(t, dt, SS.flying ? ship.position.x * BS : 0, SS.flying ? ship.position.z * BS : 0);
     renderer.setRenderTarget(bloom.scene); renderer.clear(); if (perf.st.bg) floor.render(fcam, bloom.scene); renderer.clearDepth(); renderer.render(scene, camera);
     bloom.render(Wd, Hd, !perf.st.bloom); perf.tick(dt);

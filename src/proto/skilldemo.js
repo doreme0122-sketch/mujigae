@@ -43,10 +43,40 @@ export function beamMesh() {
     fragmentShader: `uniform float uI, uT; uniform vec3 uCol; varying vec2 vU; varying float vL;
       void main(){ float x = abs(vU.x * 2. - 1.), y = vU.y;
         float flow = .75 + .25 * sin(y * vL * 9. - uT * 70.) * sin(y * vL * 3.1 - uT * 31.);
-        float core = exp(-x * x * 26.), body = exp(-x * x * 4.) * .7, ends = smoothstep(0., .03, y) * smoothstep(1., .9, y);
-        vec3 c = (vec3(1.2) * core + uCol * uCol * body * 1.4) * flow * ends;
+        float xs = vU.x * 2. - 1.;
+        float s1 = xs - .55 * sin(y * vL * 5. - uT * 40.), s2 = xs + .55 * sin(y * vL * 5. - uT * 40. + 1.2);       /* 심을 감아 도는 두 가닥 */
+        float strands = exp(-s1 * s1 * 60.) + exp(-s2 * s2 * 60.);
+        float core = exp(-x * x * 30.), body = exp(-x * x * 3.) * .7, haze = exp(-x * x * .8) * .25, ends = smoothstep(0., .03, y) * smoothstep(1., .9, y);
+        vec3 c = (vec3(1.25) * core + uCol * uCol * (body * 1.5 + haze) + mix(uCol, vec3(1.), .5) * strands * .9) * flow * ends;
         gl_FragColor = vec4(c * uI, 1.); }` });
   const o = new THREE.Mesh(new THREE.PlaneGeometry(1, 1, 1, 24).translate(.5, .5, 0), m); o.frustumCulled = false; o.renderOrder = 9; o.visible = false; return o;
+}
+/* 빛 띠 묶음 (탄 꼬리 · 번개): 지나온 자리를 따라 화면 쪽으로 눕는 띠. 머리는 굵고 하얗게, 꼬리로 갈수록 가늘고 색이 짙어지며 사라짐
+   점을 줄줄이 찍는 대신 이어진 면 하나로 그려 '점선'처럼 보이지 않게. 모든 띠를 한 번에 그림 */
+function makeRibbons(maxV = 2400) {
+  const g = new THREE.BufferGeometry(), P = new Float32Array(maxV * 3), C = new Float32Array(maxV * 4), UV = new Float32Array(maxV * 2), idx = new Uint16Array(maxV * 3);
+  g.setAttribute('position', new THREE.BufferAttribute(P, 3)); g.setAttribute('aC', new THREE.BufferAttribute(C, 4)); g.setAttribute('uv', new THREE.BufferAttribute(UV, 2)); g.setIndex(new THREE.BufferAttribute(idx, 1));
+  const m = new THREE.ShaderMaterial({ ...AB, side: THREE.DoubleSide, uniforms: { uT: { value: 0 } },
+    vertexShader: 'attribute vec4 aC; varying vec4 vC; varying vec2 vU; void main(){ vC = aC; vU = uv; gl_Position = projectionMatrix * viewMatrix * vec4(position, 1.); }',
+    fragmentShader: `uniform float uT; varying vec4 vC; varying vec2 vU;
+      void main(){ float x = abs(vU.x * 2. - 1.), h = vU.y;                                   /* h: 1 = 머리, 0 = 꼬리 */
+        float core = exp(-x * x * 18.) * (.35 + h * h * .9), body = exp(-x * x * 3.2) * .75;
+        float shimmer = .8 + .2 * sin(vU.y * 40. - uT * 30.);
+        vec3 c = (vec3(1.15) * core + vC.rgb * vC.rgb * body * 1.5) * shimmer;
+        gl_FragColor = vec4(c * vC.a, 1.); }` });
+  const mesh = new THREE.Mesh(g, m); mesh.frustumCulled = false; mesh.renderOrder = 9;
+  const strips = [];                                                     /* { pts:[V3], w:[], col, a, life, max } */
+  const side = new THREE.Vector3(), dir = new THREE.Vector3(), toC = new THREE.Vector3();
+  function build(cam) { let v = 0, ii = 0;
+    for (const sp of strips) { const n = sp.pts.length; if (n < 2 || v + n * 2 > maxV) continue; const k = sp.max ? Math.max(0, sp.life / sp.max) : 1;
+      for (let i = 0; i < n; i++) { const p = sp.pts[i], q = sp.pts[Math.min(n - 1, i + 1)], o = sp.pts[Math.max(0, i - 1)]; dir.subVectors(q, o); toC.subVectors(cam.position, p);
+        side.crossVectors(dir, toC); const L = side.length(); if (L > 1e-6) side.multiplyScalar(1 / L); else side.set(0, 1, 0);
+        const u = i / (n - 1), w = sp.w(u) * .5;
+        for (const sg of [-1, 1]) { P[v * 3] = p.x + side.x * w * sg; P[v * 3 + 1] = p.y + side.y * w * sg; P[v * 3 + 2] = p.z + side.z * w * sg;
+          C[v * 4] = sp.col.x; C[v * 4 + 1] = sp.col.y; C[v * 4 + 2] = sp.col.z; C[v * 4 + 3] = sp.a(u) * k; UV[v * 2] = sg < 0 ? 0 : 1; UV[v * 2 + 1] = u; v++; }
+        if (i < n - 1) { const b = v - 2; idx[ii++] = b; idx[ii++] = b + 1; idx[ii++] = b + 2; idx[ii++] = b + 1; idx[ii++] = b + 3; idx[ii++] = b + 2; } } }
+    g.setDrawRange(0, ii); g.attributes.position.needsUpdate = g.attributes.aC.needsUpdate = g.attributes.uv.needsUpdate = true; g.index.needsUpdate = true; mesh.visible = ii > 0; }
+  return { mesh, strips, build, add: sp => { strips.push(sp); return sp; }, tick(dt, t) { m.uniforms.uT.value = t; for (let i = strips.length - 1; i >= 0; i--) { const sp = strips[i]; if (sp.max) { sp.life -= dt; if (sp.life <= 0) strips.splice(i, 1); } } }, clear() { strips.length = 0; } };
 }
 /* 연습 표적: 홀로그램 과녁 (겹 고리 + 눈금 + 가운데 마름모), 화면을 봄 */
 function targetMesh() {
@@ -114,6 +144,7 @@ export function makeDemo(rig, ship) {
   const G = new THREE.Group();
   const trail = pointPool(700), spark = pointPool(400), smoke = pointPool(90, true); G.add(trail.pts, spark.pts, smoke.pts);
   const beam = beamMesh(), beam2 = beamMesh(); G.add(beam, beam2);
+  const rib = makeRibbons(); G.add(rib.mesh);
   const tg = [0, 1, 2].map(() => { const o = targetMesh(); G.add(o); return { o, home: V3(), p: V3(), hit: 0, a: 0, alive: 1 }; });
   const field = fieldMesh(), wall = wallMesh(); G.add(field, wall);
   const ghosts = [0, 1, 2].map(() => { const g = ghostOf(ship); G.add(g); return g; });
@@ -128,12 +159,18 @@ export function makeDemo(rig, ship) {
   const hitT = (i, col) => { const T = tg[i]; if (!T.alive) return; T.hit = 1; burst(T.p, col, 26, 2.2); burst(T.p, V3(1, .7, .4), 10, 1.5); zap(220, .12, .07); };
   const ENEMY = V3(1, .6, .3);
   function fire(p, v, col, o = {}) { bolts.push(Object.assign({ life: 1.6, home: -1, turn: 0, size: 1, split: 0, enemy: false, hitAny: true }, o, { p: p.clone(), v: v.clone(), col: col.clone(), age: 0 })); }
-  function lightning(a, b, col, life = .14, j = .35) { const n = Math.max(6, Math.floor(a.distanceTo(b) / .32)), pts = [a.clone()];
+  /* 번개: 갈지자로 꺾인 굵은 빛 띠(가운데 굵고 끝 가늘게) + 곁가지 + 닿는 자리 불꽃. 매번 모양이 새로 꺾여 지직거림 */
+  function lightning(a, b, col, life = .14, j = .35, w0 = .14, branch = true) { const n = Math.max(6, Math.floor(a.distanceTo(b) / .28)), pts = [a.clone()];
     const side = V3().subVectors(b, a).cross(V3(0, 1, 0)).normalize();
     for (let i = 1; i < n; i++) { const u = i / n, p = a.clone().lerp(b, u), w = Math.sin(u * Math.PI) * j; p.addScaledVector(side, (Math.random() - .5) * w * 2).add(V3(0, (Math.random() - .5) * w * 1.4, 0)); pts.push(p); } pts.push(b.clone());
-    for (let i = 0; i < pts.length - 1; i++) { const A_ = pts[i], B_ = pts[i + 1], m = Math.ceil(A_.distanceTo(B_) / .05);
-      for (let k = 0; k < m; k++) trail.emit(q => { q.p.copy(A_).lerp(B_, k / m); q.max = q.life = life * (.7 + Math.random() * .6); q.c.copy(col); q.s = 1.05; q.drag = 0; }, 1); } }
+    rib.add({ pts, col: col.clone(), life, max: life, w: u => w0 * (.35 + Math.sin(u * Math.PI) * .9) * (.7 + Math.random() * .6), a: () => 1.3 });
+    if (branch) for (let k = 0; k < 2; k++) { const i0 = 1 + Math.floor(Math.random() * (n - 2)), from = pts[i0], to = from.clone().add(V3().randomDirection().multiplyScalar(.5 + Math.random() * .6)); lightning(from, to, col, life * .8, .2, w0 * .5, false); }
+    if (branch) spark.emit(q => { q.p.copy(b); q.v.randomDirection().multiplyScalar(1 + Math.random() * 2); q.max = q.life = .2 + Math.random() * .2; q.c.copy(col); q.s = .8; }, 4); }
 
+  /* 잔상: 그 순간 기체 모양 그대로 유령을 남기고 서서히 흐려짐 */
+  function snap(i, e, at, col, fade) { const g = ghosts[i], U = g.userData;
+    if (once('snap' + i + '_' + at, e, at)) { g.visible = true; g.position.copy(rig.getWorldPosition(V3())); g.quaternion.copy(rig.getWorldQuaternion(new THREE.Quaternion())); g.scale.copy(rig.scale); U.at = e; U.key = at; U.m.uniforms.uCol.value.copy(col); }
+    if (g.visible && U.key === at) { const k = (e - U.at) / fade; U.m.uniforms.uA.value = Math.max(0, 1 - k) * 1.1; if (k > 1) g.visible = false; } }
   function placeTargets(list) { tg.forEach((T, i) => { const h = list[i]; T.alive = h ? 1 : 0; if (h) { T.home.set(h[0], h[1], h[2]); T.p.copy(T.home); } }); }
   const ATK_T = [[4.2, 1.05, -1.4], [5.2, 1.15, 0], [4.2, 1.05, 1.4]];   /* 기체 앞 4~5m: 화면 한 장에 기체와 표적이 함께 들어오게 */
 
@@ -167,7 +204,8 @@ export function makeDemo(rig, ship) {
     'mov1': { dur: 2.2, run(e, C) {                       /* 돌진: 웅크림(살짝 뒤로) → 확 밀고 나감(속도 선) → 미끄러지며 섬 → 천천히 돌아옴 */
       let x = 0; if (e < .2) x = -sm01(e / .2) * .35; else if (e < .45) { const u = (e - .2) / .25; x = -.35 + (4.1) * (1 - (1 - u) * (1 - u)); } else if (e < .7) x = 3.75 + Math.sin((e - .45) / .25 * Math.PI) * .12; else if (e < 1.7) x = 3.75 * (1 - sm01((e - .7) / 1));
       S.rigP.set(x, 0, 0); S.rigR = e > .2 && e < .5 ? -.12 : 0;
-      if (e > .2 && e < .5) { const p = shipW(); for (let k = 0; k < 5; k++) trail.emit(q => { q.p.copy(p).add(V3(-.6 - Math.random() * 1.2, (Math.random() - .5) * .6, (Math.random() - .5) * .9)); q.v.set(-9, 0, 0); q.max = q.life = .15 + Math.random() * .1; q.c.copy(C); q.s = .6; q.drag = 4; }, 1); }
+      [.24, .3, .36].forEach((at, i) => snap(i, e, at, C, .35));                                   /* 밀고 나가는 동안 기체 모양 잔상이 뒤에 남음 */
+      if (e > .2 && e < .45) spark.emit(q => { q.p.copy(shipW()).add(V3(-1.3, (Math.random() - .5) * .3, (Math.random() - .5) * .5)); q.v.set(-2 - Math.random() * 2, (Math.random() - .5), (Math.random() - .5) * 2); q.max = q.life = .3; q.c.copy(C); q.s = 1.2; q.drag = 3; }, 3);   /* 엔진 뒤 빛 뿜음 */
       if (once('a', e, .2)) { hiss(.3, 600, 5000, .14, 'lowpass'); thud(80, .25); } if (once('b', e, .45)) burst(shipW().addScaledVector(F, 1.3), C, 20, 1.6, 1); } },
     'mov2': { dur: 2.4, run(e, C) {                       /* 잔상 질주: 빨라져 S자로 휘어 달림 → 지나간 자리에 기체 모양 잔상이 남아 흐려짐 */
       const u = Math.min(1, e / 1.5), x = Math.sin(u * Math.PI) * 3.2, z = Math.sin(u * Math.PI * 2) * 1.5; S.rigP.set(x, 0, z); S.rigR = -Math.cos(u * Math.PI * 2) * .35 * (u < 1 ? 1 : 0);
@@ -175,7 +213,7 @@ export function makeDemo(rig, ship) {
       ghosts.forEach((g, i) => { const at = .25 + i * .38; if (once('g' + i, e, at)) { g.visible = true; g.position.copy(rig.getWorldPosition(V3())); g.quaternion.copy(rig.getWorldQuaternion(new THREE.Quaternion())); g.scale.copy(rig.scale);
           g.userData.at = e; g.userData.m.uniforms.uCol.value.copy(C); }
         if (g.visible) { const k = (e - g.userData.at) / .9; g.userData.m.uniforms.uA.value = Math.max(0, 1 - k) * 1.1; if (k > 1) g.visible = false; } });
-      if (e < 1.5) { const p = shipW(); trail.emit(q => { q.p.copy(p).add(V3((Math.random() - .5) * .8, (Math.random() - .5) * .3, (Math.random() - .5) * .8)); q.max = q.life = .4; q.c.copy(C); q.s = .7; }, 3); } } },
+      if (e < 1.5 && Math.random() < .6) spark.emit(q => { q.p.copy(shipW()).add(V3((Math.random() - .5) * .8, (Math.random() - .5) * .3, (Math.random() - .5) * .8)); q.max = q.life = .4; q.c.copy(C); q.s = .9; }, 1); } },
     'mov3': { dur: 2.4, run(e, C) {                       /* 반동 도약: 옆 벽으로 달려가 '찬' 순간 물결 → 비스듬히 튕겨 나감 → 돌아옴 */
       wall.visible = true; wall.position.set(1.2, 1.1, 2.6); wall.rotation.set(0, 0, 0); wall.material.uniforms.uCol.value.copy(C);
       wall.material.uniforms.uA.value = Math.min(1, e * 4) * (1 - sm01((e - 2) / .35)); wall.material.uniforms.uRise.value = sm01(e / .3);
@@ -187,7 +225,8 @@ export function makeDemo(rig, ship) {
       const u = Math.min(1, e / 1.8), a = sm01(u) * Math.PI * 2, P0 = V3(1.6, 0, 0), r = 1.6;
       field.visible = e < 2.2; field.position.set(1.6, .27, 0); field.scale.setScalar(.7); field.material.uniforms.uMode.value = 1; field.material.uniforms.uCol.value.copy(C); field.material.uniforms.uA.value = Math.min(1, e * 3) * (1 - sm01((e - 1.8) / .4)) * .7;
       S.rigP.set(P0.x - Math.cos(a) * r, 0, -Math.sin(a) * r); S.rigR = Math.sin(u * Math.PI) * .5; S.rigY = -a;
-      if (u < 1) { const p = shipW(); trail.emit(q => { q.p.copy(p).add(V3((Math.random() - .5) * .5, -.1, (Math.random() - .5) * .5)); q.max = q.life = .55; q.c.copy(C); q.s = .6; q.drag = 0; }, 3); }
+      [.35, .75, 1.15].forEach((at, i) => snap(i, e, at, C, .7));                                   /* 휘어 도는 길에 기울어진 잔상 */
+      if (u < 1 && Math.random() < .5) spark.emit(q => { q.p.copy(shipW()).add(V3((Math.random() - .5) * .8, -.2, (Math.random() - .5) * .8)); q.v.set(0, .4, 0); q.max = q.life = .5; q.c.copy(C); q.s = .9; }, 1);
       if (once('a', e, 0)) { hiss(1.8, 400, 1800, .06, 'lowpass'); } } },
     'dis0': { dur: 2.4, tg: ATK_T, run(e, C) {           /* 거울 벽: 앞에 벽이 솟음 → 표적이 쏜 탄이 벽에 맞아 되튕겨 표적으로 */
       wall.visible = true; wall.position.set(2.2, 1.1, 0); wall.rotation.set(0, Math.PI / 2, 0); wall.material.uniforms.uCol.value.copy(C);
@@ -218,20 +257,20 @@ export function makeDemo(rig, ship) {
       if (once('x', e, 1.7)) { burst(g.position.clone().add(V3(0, .9, 0)), C, 70, 3, 2); thud(130, .2); hiss(.3, 8000, 2500, .1, 'highpass'); } } },
   };
 
-  function reset() { bolts.length = 0; trail.clear(); spark.clear(); smoke.clear(); beam.visible = beam2.visible = false; field.visible = wall.visible = false; wall.material.uniforms.uHit.value.set(0, 0, -9);
+  function reset() { bolts.length = 0; rib.clear(); trail.clear(); spark.clear(); smoke.clear(); beam.visible = beam2.visible = false; field.visible = wall.visible = false; wall.material.uniforms.uHit.value.set(0, 0, -9);
     ghosts.forEach(g => g.visible = false); S.rigP.set(0, 0, 0); S.rigR = 0; S.rigY = 0; S.ghostDim = false; rig.position.set(0, 0, 0); rig.rotation.set(0, 0, 0); rig.scale.set(1, 1, 1); ship.visible = true; tg.forEach(T => { T.hit = 0; T.dim = 1; T.slow = 1; }); }
   G.userData.play = (cat, idx, t, col) => { reset(); S.cat = cat; S.idx = idx; S.key = ['atk', 'mov', 'dis'][cat] + idx; S.T0 = t + .25; S.col.copy(col); S.on = true; S.fired = {};
     const sc = SCRIPT[S.key]; placeTargets(sc.tg || []); };
   G.userData.stop = () => { S.on = false; reset(); tg.forEach(T => T.alive = 0); };
   G.userData.setPx = px => { trail.setPx(px); spark.setPx(px); smoke.setPx(px * 2.2); };
   G.userData.S = S;
-  G.userData.update = (t, dt) => {
-    trail.update(dt); spark.update(dt); smoke.update(dt);
+  G.userData.update = (t, dt, cam) => {
+    trail.update(dt); spark.update(dt); smoke.update(dt); rib.tick(dt, t);
     tg.forEach(T => { const U = T.o.material.uniforms; T.a += ((S.on && T.alive ? 1 : 0) - T.a) * Math.min(1, dt * 5); T.hit = Math.max(0, T.hit - dt * 3);
       const sl = T.slow ?? 1; T.o.position.copy(T.p).add(V3(0, Math.sin(t * 1.6 * sl + T.home.z) * .06 + (T.hit > 0 ? (Math.random() - .5) * T.hit * .15 : 0), 0));
       U.uA.value = T.a * (T.dim ?? 1); U.uHit.value = T.hit; U.uT.value = t * sl; T.o.visible = T.a > .01; });
     beam.material.uniforms.uT.value = t; field.material.uniforms.uT.value = t; wall.material.uniforms.uT.value = t;
-    if (!S.on) return;
+    if (!S.on) { if (cam) rib.build(cam); return; }
     const e = t - S.T0, sc = SCRIPT[S.key], C = S.col;
     if (e >= 0) sc.run(e, C);
     /* 탄 움직임 */
@@ -241,7 +280,11 @@ export function makeDemo(rig, ship) {
       if (b.slowZ && Math.hypot(b.p.x - b.slowZ[0], b.p.z) < b.slowZ[1]) sp = .12;
       if (b.grav) b.v.y -= 9.8 * dt;
       b.p.addScaledVector(b.v, dt * sp); b.age = (b.age || 0) + dt;
-      const tc = b.enemy ? ENEMY : b.col; trail.emit(q => { q.p.copy(b.p); q.max = q.life = (b.enemy ? .16 : .24) * (sp < 1 ? 2.5 : 1); q.c.copy(tc); q.s = 1.1 * b.size; q.drag = 0; }, sp < 1 ? 1 : 3);
+      const tc = b.enemy ? ENEMY : b.col;
+      if (!b.rb) b.rb = rib.add({ pts: [], col: tc.clone(), w: u => .42 * b.size * (u * .85 + .15), a: u => u * u * 1.2 });   /* 꼬리: 지나온 자리를 이은 빛 띠 */
+      b.rb.col.copy(tc); b.rb.pts.push(b.p.clone()); if (b.rb.pts.length > (sp < 1 ? 16 : 8)) b.rb.pts.shift();
+      spark.emit(q => { q.p.copy(b.p); q.max = q.life = .05; q.c.copy(tc); q.s = 4 * b.size; q.drag = 0; }, 1);                           /* 머리: 하얀 심 + 색 번짐 — 빛 덩어리로 보이게 크게 */
+      if (Math.random() < .35) trail.emit(q => { q.p.copy(b.p); q.v.randomDirection().multiplyScalar(.6); q.max = q.life = .25 + Math.random() * .2; q.c.copy(tc); q.s = .45; }, 1);   /* 꼬리에서 떨어지는 부스러기 */
       let dead = b.life <= 0;
       if (b.split && b.age >= b.split) { for (let k = 0; k < 6; k++) { const a = (k - 2.5) * .32; fire(b.p, V3(Math.cos(a), (Math.random() - .5) * .2, Math.sin(a)).multiplyScalar(7), b.col, { size: .9, life: 1 }); }
         burst(b.p, b.col, 30, 2.2, 0); zap(1400, .1, .06); crackle(3); dead = true; }
@@ -252,10 +295,11 @@ export function makeDemo(rig, ship) {
         b.v.x = -b.v.x; b.v.multiplyScalar(1.15); b.enemy = false; b.col = C.clone(); b.home = b.to; b.turn = 3; b.onWall = 0; burst(b.p, C, 16, 1.6, 0); zap(1500, .1, .06); }
       if (!dead && b.hitAny && !b.enemy) for (let k = 0; k < 3; k++) if (tg[k].alive && b.p.distanceTo(tg[k].p) < .42) { hitT(k, b.col); dead = true; break; }
       if (!dead && b.toGhost && b.p.distanceTo(b.toGhost.position.clone().add(V3(0, .9, 0))) < .5) { burst(b.p, ENEMY, 14, 1.4, 0); dead = true; }
-      if (dead) bolts.splice(i, 1); }
+      if (dead) { if (b.rb) { b.rb.max = b.rb.life = .12; b.rb.a = u => u * u; } bolts.splice(i, 1); } }
     /* 기체 움직임(맛보기용 받침) */
     rig.position.lerp(S.rigP, Math.min(1, dt * 30)); rig.rotation.x = S.rigR || 0; rig.rotation.y = S.rigY || 0;
     if (e > sc.dur + .9) { S.T0 = t + .2; S.fired = {}; reset(); placeTargets(sc.tg || []); }          /* 되풀이 */
+    if (cam) rib.build(cam);
   };
   return G;
 }

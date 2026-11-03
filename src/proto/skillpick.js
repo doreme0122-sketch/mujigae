@@ -12,7 +12,7 @@
    무게: 보석 하나 = 뒷면 · 앞면 · 둘레 빛 · 고리 4번 (+ 잔상 보석 2개는 쓸 때만) */
 import * as THREE from 'three';
 import * as A from '../core/audio.js';
-import { pointPool, beamMesh } from './skilldemo.js?v=11031708';
+import { pointPool, beamMesh } from './skilldemo.js?v=11031731';
 
 /* 기본 등급 스킬 (임시 이름 — 실제 스킬은 스킬 설계 때 바뀜). 분류마다 다섯 중 셋이 무작위로 나옴 */
 export const CATS = [
@@ -25,7 +25,7 @@ export const CATS = [
 ];
 export const PICK = {
   first: { rise: .9, spin: 1.5, gap: .42, time: 15, rest: .55 },     /* 처음 태어날 때 */
-  again: { rise: .5, spin: .7, gap: .22, time: 8, rest: .3 },        /* 다시 태어날 때: 같은 장면, 빠르게 */
+  again: { rise: .5, spin: .7, gap: .22, time: 15, rest: .3 },       /* 다시 태어날 때: 같은 장면을 빠르게, 고르는 시간은 같게 15초 (사용자) */
 };
 const AB = { transparent: true, depthWrite: false, blending: THREE.AdditiveBlending };
 const sm01 = x => { x = Math.min(1, Math.max(0, x)); return x * x * (3 - 2 * x); };
@@ -158,13 +158,11 @@ export function makeSkillPick(ship, opt = {}) {
   const ring = new THREE.Mesh(new THREE.CircleGeometry(4.5, 96), ringM); ring.rotation.x = -Math.PI / 2; ring.position.y = .26; ring.renderOrder = 7; G.add(ring);
   const gems = [0, 1, 2].map(i => {
     const o = new THREE.Group(), back = new THREE.Mesh(geo, gemMat(true)), front = new THREE.Mesh(geo, gemMat(false));
-    const halo = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), haloMat()), sh = new THREE.Mesh(geo, shardMat()), rg = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), ringMat()), bm = beamMesh();
-    back.renderOrder = 4; front.renderOrder = 6; halo.renderOrder = 3; sh.renderOrder = 6; rg.renderOrder = 7; [halo, sh, rg].forEach(m => m.frustumCulled = false);
-    const body = new THREE.Group(); body.add(back, front); body.scale.setScalar(GEMR); sh.scale.setScalar(GEMR); o.add(halo, body, sh, rg); G.add(o, bm);
-    /* 잔상 보석 둘 (잔상 질주 · 미끼 분신 때만) */
-    const ghosts = [0, 1].map(() => { const m = gemMat(false); m.blending = THREE.AdditiveBlending; const gm = new THREE.Mesh(geo, m); gm.renderOrder = 5; gm.visible = false; G.add(gm); return gm; });
+    const halo = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), haloMat()), sh = new THREE.Mesh(geo, shardMat());
+    back.renderOrder = 4; front.renderOrder = 6; halo.renderOrder = 3; sh.renderOrder = 6; [halo, sh].forEach(m => m.frustumCulled = false);
+    const body = new THREE.Group(); body.add(back, front); body.scale.setScalar(GEMR); sh.scale.setScalar(GEMR); o.add(halo, body, sh); G.add(o);
     const tag = document.createElement('div'); tag.className = 'gtag'; tag.innerHTML = '<b></b><span></span>'; ui?.appendChild(tag);
-    return { i, o, body, back, front, halo, sh, rg, bm, ghosts, tag, skill: 0, state: 'off', pos: 0, t0: 0, stopAt: 0, last: 0, P0: new THREE.Vector3(), flash: 0, popAt: 0, fxT: 0, off: new THREE.Vector3(), sc: 1, spin: 1, ang: 0, focus: 0, wp: new THREE.Vector3() };
+    return { i, o, body, back, front, halo, sh, tag, skill: 0, state: 'off', pos: 0, t0: 0, stopAt: 0, last: 0, P0: new THREE.Vector3(), flash: 0, popAt: 0, fxT: 0, off: new THREE.Vector3(), sc: 1, spin: 1, ang: 0, focus: 0, wp: new THREE.Vector3() };
   });
   /* 머리 위 안내 · 설명 판 · 고른 스킬 */
   const head = document.createElement('div'); head.id = 'pickhead'; head.innerHTML = '<div class="steps"></div><div class="row"><b></b><em class="sec"></em></div><span></span><div class="bar"><i></i></div>'; ui?.appendChild(head);
@@ -187,8 +185,8 @@ export function makeSkillPick(ship, opt = {}) {
     st.cat = c; st.phase = 'rise'; st.T = t; st.chose = -1; st.focus = -1; drawHead(); head.classList.add('on'); hint.classList.remove('on'); card.classList.remove('on');
     const pool = [0, 1, 2, 3, 4].sort(() => Math.random() - .5).slice(0, 3), C = col(c);
     gems.forEach((g, i) => { g.skill = pool[i]; g.state = 'rise'; g.t0 = t + i * .12; g.o.visible = true; g.sh.visible = false; g.body.visible = true; g.focus = 0; g.off.set(0, 0, 0); g.sc = 1; g.spin = 1;
-      for (const m of [g.back, g.front, g.halo, g.sh, g.rg, ...g.ghosts]) m.material.uniforms.uCol.value.copy(C); g.bm.material.uniforms.uCol.value.copy(C);
-      g.pos = 0; g.last = 0; g.stopAt = t + st.P.rise + st.P.spin + i * st.P.gap; g.tag.classList.remove('on', 'pick', 'gone', 'dim'); g.tag.style.setProperty('--c', CATS[c].css);
+      for (const m of [g.back, g.front, g.halo, g.sh]) m.material.uniforms.uCol.value.copy(C);
+      g.pos = 0; g.last = 0; g.stopAt = t + st.P.rise + st.P.spin + i * st.P.gap; g.tag.classList.remove('on', 'pick', 'gone', 'side'); g.tag.style.setProperty('--c', CATS[c].css);
       g.tag.querySelector('b').textContent = CATS[c].list[g.skill][0]; g.tag.querySelector('span').textContent = CATS[c].list[g.skill][1]; });
     st.phi = Math.random() * 6.28; st.w = 1.3; shimmer(st.P.rise + .2);
   }
@@ -197,17 +195,17 @@ export function makeSkillPick(ship, opt = {}) {
     if (st.phase !== 'pick' || st.focus === gi) return; st.focus = gi; const g = gems[gi], C = CATS[st.cat];
     card.querySelector('em').textContent = `${C.name} · 기본`; card.querySelector('b').textContent = C.list[g.skill][0]; card.querySelector('p').textContent = C.list[g.skill][1];
     card.classList.remove('on'); void card.offsetWidth; card.classList.add('on'); hint.classList.remove('on');
-    gems.forEach(o => o.tag.classList.toggle('dim', o !== g)); g.tag.classList.remove('on');
-    bell([1046.5, 1174.7, 1318.5][gi], .07, .8); demo?.userData.play(st.cat, g.skill, t, col(st.cat)); g.fxT = t;
+    gems.forEach(o => { o.tag.classList.toggle('side', o !== g); o.tag.classList.toggle('on', o !== g); });   /* 줄 선 보석은 위에 이름이 크게 */
+    bell([1046.5, 1174.7, 1318.5][gi], .07, .8); demo?.userData.play(st.cat, g.skill, t, col(st.cat));
   }
   function choose(t, gi, auto = false) {
     if (st.phase !== 'pick') return; st.phase = 'absorb'; st.chose = gi; hint.classList.remove('on'); card.classList.remove('on'); demo?.userData.stop();
-    const g = gems[gi]; g.state = 'chosen'; g.t0 = t; g.P0.copy(g.o.position); g.tag.classList.add('pick'); g.ghosts.forEach(m => m.visible = false); g.bm.visible = false;
-    gems.forEach(o => { if (o !== g) { o.state = 'break'; o.t0 = t + .12; o.tag.classList.add('gone'); o.ghosts.forEach(m => m.visible = false); o.bm.visible = false; } });
+    const g = gems[gi]; g.state = 'chosen'; g.t0 = t; g.P0.copy(g.o.position); g.tag.classList.add('pick');
+    gems.forEach(o => { if (o !== g) { o.state = 'break'; o.t0 = t + .12; o.tag.classList.add('gone'); } });
     bell(1318.5, .1, .9); st.picked[st.cat] = g.skill; if (auto) { hint.textContent = st.focus >= 0 ? '시간이 다 돼 살펴보던 스킬로 골랐어요' : '시간이 다 돼 무작위로 골랐어요'; hint.classList.add('on'); }
   }
   G.userData.start = (t, again = false, done = null) => { st.on = true; st.P = again ? PICK.again : PICK.first; st.picked = []; st.done = done; chips.innerHTML = ''; chips.classList.remove('on'); startCat(t, 0); };
-  G.userData.stop = () => { st.on = false; st.phase = 'idle'; demo?.userData.stop(); gems.forEach(g => { g.o.visible = false; g.bm.visible = false; g.ghosts.forEach(m => m.visible = false); g.tag.classList.remove('on', 'pick', 'gone', 'dim'); }); head.classList.remove('on'); hint.classList.remove('on'); card.classList.remove('on'); light.intensity = 0; st.hitT = 0; ringM.uniforms.uI.value = 0; };
+  G.userData.stop = () => { st.on = false; st.phase = 'idle'; demo?.userData.stop(); gems.forEach(g => { g.o.visible = false; g.tag.classList.remove('on', 'pick', 'gone', 'side'); }); head.classList.remove('on'); hint.classList.remove('on'); card.classList.remove('on'); light.intensity = 0; st.hitT = 0; ringM.uniforms.uI.value = 0; };
   G.userData.hideChips = () => chips.classList.remove('on');
   G.userData.setPx = px => { trail.setPx(px); sparks.setPx(px); };
   G.userData.st = st;
@@ -219,50 +217,6 @@ export function makeSkillPick(ship, opt = {}) {
   G.userData.camFocus = () => st.on ? 1 : 0;
   G.userData.demoFocus = () => st.on && st.focus >= 0 && st.phase === 'pick' ? 1 : 0;
 
-  /* 보석이 스킬처럼 움직임 (보석마다 1.9초 되풀이). R = 보석 반지름, cr/cu = 화면 오른쪽/위 */
-  function gemFX(g, t, dt, C, R, cr, cu) {
-    const P = 1.9, e = ((t - g.fxT) % P + P) % P, c = g.o.position, key = ['atk', 'mov', 'dis'][st.cat] + g.skill, U = g.front.material.uniforms, Ub = g.back.material.uniforms, Ur = g.rg.material.uniforms;
-    g.off.set(0, 0, 0); g.sc = 1; g.spin = 1; let sw = 0, swx = 0, dark = 0, ri = 0, rr = .5, rw = .05, bmOn = false; g.ghosts.forEach(m => m.visible = false);
-    const at = (a, w = dt) => e >= a && e < a + w * 1.01;
-    const spk = (p, v, life = .35, s = .7) => trail.emit(q => { q.p.copy(p); q.v.copy(v); q.max = q.life = life; q.c.copy(C); q.s = s; q.drag = 1; }, 1);
-    switch (key) {
-      case 'atk0': if (e < .3) spk(c.clone().add(V().randomDirection().multiplyScalar(R * 1.3)), V(), .12, .5);           /* 힘이 모였다가 부채꼴로 다섯 줄기 */
-        if (at(.3)) { g.flash = 1; for (let i = -2; i <= 2; i++) { const d = cr.clone().multiplyScalar(Math.cos(i * .28)).addScaledVector(cu, Math.sin(i * .28)); for (let k = 0; k < 7; k++) spk(c.clone().addScaledVector(d, R * (.2 + k * .05)), d.clone().multiplyScalar(5.5), .3 - k * .02, .8); } } break;
-      case 'atk1': if (e > .35 && e < .7) { bmOn = true; const k = (e - .35) / .35; g.bm.material.uniforms.uA.value.copy(c).addScaledVector(cr, -R * 2.6); g.bm.material.uniforms.uB.value.copy(c).addScaledVector(cr, R * 2.6 + R * 2 * k);
-          g.bm.material.uniforms.uW.value = R * .14; g.bm.material.uniforms.uI.value = 1.3 * (1 - k * k); } if (at(.35)) g.flash = .8; break;            /* 보석을 꿰뚫는 빛줄기 */
-      case 'atk2': { const a = e * 9, r = R * .45 * (e < 1.2 ? 1 : 1 + (e - 1.2) * 6), p = c.clone().addScaledVector(cr, Math.cos(a) * r).addScaledVector(cu, Math.sin(a) * r * .7);          /* 속에서 맴돌다 휘어 나감 */
-        if (e < 1.5) spk(p, V(), .3, .7); break; }
-      case 'atk3': if (e > .2 && e < 1 && Math.random() < .5) { const a = c.clone().add(V().randomDirection().multiplyScalar(R * .75)), b = c.clone().add(V().randomDirection().multiplyScalar(R * .75)), side = V().randomDirection().multiplyScalar(R * .18);   /* 속에서 튀는 번개 */
-          for (let k = 0; k <= 10; k++) { const u = k / 10; spk(a.clone().lerp(b, u).addScaledVector(side, Math.sin(u * Math.PI) * (Math.random() - .3)), V(), .09, .55); } if (Math.random() < .3) g.flash = Math.max(g.flash, .5); } break;
-      case 'atk4': if (e > .2 && e < .7) { const s = .6 + (e - .2) * 2; spk(c.clone().add(V().randomDirection().multiplyScalar(R * .12 * s)), V(), .1, 1.2); }     /* 한 덩이가 부풀다 여섯으로 갈라짐 */
-        if (at(.7)) { g.flash = .9; for (let i = 0; i < 6; i++) { const a = i / 6 * 6.283, d = cr.clone().multiplyScalar(Math.cos(a)).addScaledVector(cu, Math.sin(a)); for (let k = 0; k < 5; k++) spk(c.clone().addScaledVector(d, R * (.1 + k * .06)), d.clone().multiplyScalar(4), .28, .75); } } break;
-      case 'mov0': { const o = cr.clone().multiplyScalar(R * 1.6);                                                    /* 깜빡 사라졌다 옆에 나타남 */
-        if (e < .2) g.sc = 1 - sm01(e / .2) * .95; else if (e < .9) { g.off.copy(o); g.sc = sm01((e - .2) / .12); } else if (e < 1.05) { g.off.copy(o); g.sc = 1 - sm01((e - .9) / .15) * .95; } else g.sc = sm01((e - 1.05) / .12);
-        if (at(.2) || at(1.05)) { const from = at(.2) ? c.clone() : c.clone().add(o), to = at(.2) ? c.clone().add(o) : c.clone(); for (let k = 0; k <= 14; k++) spk(from.clone().lerp(to, k / 14), V().randomDirection().multiplyScalar(.4), .25, .6); g.flash = 1; } break; }
-      case 'mov1': { let x = 0; if (e < .15) x = -sm01(e / .15) * .25; else if (e < .3) x = -.25 + 1.6 * sm01((e - .15) / .15); else x = 1.35 * (1 - sm01((e - .5) / .7));          /* 웅크렸다 확 밀고 나감 */
-        g.off.copy(cr).multiplyScalar(x * R); if (e > .15 && e < .32) for (let k = 0; k < 3; k++) spk(c.clone().add(g.off).addScaledVector(cr, -R * (1 + Math.random())).addScaledVector(cu, (Math.random() - .5) * R), cr.clone().multiplyScalar(-4), .15, .5); break; }
-      case 'mov2': { const x = Math.sin(e / P * Math.PI * 4) * R * 1.1; g.off.copy(cr).multiplyScalar(x);            /* 좌우로 빠르게 흔들리며 잔상을 남김 */
-        g.ghosts.forEach((m, k) => { const lag = (k + 1) * .07, xl = Math.sin((e - lag) / P * Math.PI * 4) * R * 1.1; m.visible = true; m.position.copy(c).addScaledVector(cr, xl); m.quaternion.copy(g.body.quaternion); m.scale.copy(g.body.scale);
-          m.material.uniforms.uA.value = .5 - k * .2; m.material.uniforms.uT.value = t; }); break; }
-      case 'mov3': { const u = (e % .95) / .95, y = -Math.abs(Math.sin(u * Math.PI)) * 0 + (1 - 4 * (u - .5) * (u - .5)) * R * 1.1; g.off.copy(cu).multiplyScalar(y - R * .4);     /* 바닥 고리를 차고 튀어 오름 */
-        if (u < .08 || u > .92) { g.sc = 1 + (u < .5 ? -u : u - 1) * 2; ri = 1.2; rr = .9; } Ur.uS.value = R * 3; g.rg.position.copy(cu).multiplyScalar(-R * 1.35); if (e % .95 < dt * 1.5) g.flash = .5; break; }
-      case 'mov4': { const a = e / P * Math.PI * 2; g.off.copy(cr).multiplyScalar(Math.sin(a) * R * 1.2).addScaledVector(cu, (Math.cos(a) - 1) * R * .6);       /* 보이지 않는 중심을 축으로 휘어 돎 */
-        spk(c.clone().add(g.off).add(V().randomDirection().multiplyScalar(R * .3)), V(), .45, .55); break; }
-      case 'dis0': if (e < .9) { sw = 1; swx = (e / .9 * 2 - 1) * R * 1.3; } if (at(.45)) { g.flash = .4; } ri = e > .4 && e < 1.1 ? (1 - (e - .4) / .7) * 1.4 : 0; rr = .3 + (e - .4) * .9; rw = .03; Ur.uS.value = R * 3.2; g.rg.position.set(0, 0, 0); break;   /* 면을 타고 빛이 쓸고 감 → 되튕기는 물결 */
-      case 'dis1': dark = e < 1.4 ? sm01(e / .4) * (1 - sm01((e - 1.1) / .3)) : 0;                                   /* 속이 흐려지며 연기가 맴돎 */
-        if (dark > .1) { const a = t * 2 + Math.random() * 6.28; spk(c.clone().addScaledVector(cr, Math.cos(a) * R * .9).addScaledVector(cu, Math.sin(a) * R * .5), cr.clone().multiplyScalar(-Math.sin(a) * .8).addScaledVector(cu, Math.cos(a) * .5), .6, 1.4); } break;
-      case 'dis2': g.spin = .08; ri = 1; rr = .35 + (e / P) * .6; rw = .04; Ur.uS.value = R * 3.4; g.rg.position.set(0, 0, 0); { const e2 = (e + P / 2) % P; Ur.uR.value = rr; }   /* 느릿하게 번지는 물결 · 보석도 거의 멈춤 */
-        if (Math.random() < .1) spk(c.clone().add(V().randomDirection().multiplyScalar(R * 1.4)), V(0, .1, 0), 1.2, .5); break;
-      case 'dis3': { const a = Math.random() * 6.28, r = R * 3; spk(c.clone().addScaledVector(cr, Math.cos(a) * r).addScaledVector(cu, Math.sin(a) * r * .7), cr.clone().multiplyScalar(-Math.cos(a) * r * 2.3).addScaledVector(cu, -Math.sin(a) * r * 1.6), .42, .6); break; }   /* 둘레가 안으로 빨려 듦 */
-      case 'dis4': { const m = g.ghosts[0], show = e > .15 && e < 1.3; m.visible = show; if (show) { m.position.copy(c).addScaledVector(cr, R * 1.9 * sm01((e - .15) / .25)); m.quaternion.copy(g.body.quaternion); m.scale.copy(g.body.scale);   /* 옆에 가짜 보석이 나왔다 깨짐 */
-          m.material.uniforms.uA.value = .65 + .25 * Math.sin(t * 22); m.material.uniforms.uT.value = t; }
-        if (at(1.3)) { const p = c.clone().addScaledVector(cr, R * 1.9); for (let k = 0; k < 24; k++) spk(p, V().randomDirection().multiplyScalar(1.5 + Math.random() * 1.5), .45, .7); } break; }
-    }
-    U.uSw.value.set(swx, sw, 0); Ub.uSw.value.set(swx, sw, 0); U.uDark.value = Ub.uDark.value = dark; Ur.uI.value = ri; if (key !== 'dis2') Ur.uR.value = rr; Ur.uW.value = rw;
-    if (key !== 'dis0' && key !== 'dis2' && key !== 'mov3') g.rg.position.set(0, 0, 0);
-    g.bm.visible = bmOn; if (!bmOn) g.bm.material.uniforms.uI.value = 0; g.bm.material.uniforms.uT.value = t;
-  }
-
   G.userData.update = (t, dt, cam, W, H) => {
     st.tNow = t; trail.update(dt); sparks.update(dt);
     if (!st.on) return;
@@ -273,7 +227,7 @@ export function makeSkillPick(ship, opt = {}) {
     const allStop = gems.every(g => g.state !== 'rise' && g.state !== 'spin');
     st.w += ((allStop ? (st.focus >= 0 ? 0 : .1) : 1.25) - st.w) * Math.min(1, dt * (allStop ? 1.8 : 3)); st.phi += st.w * dt;
     /* 살펴보는 보석이 갈 자리: 화면 왼쪽 앞 (눈앞에 들어 올린 느낌) */
-    const fd = 8.5, hh = fd * Math.tan(THREE.MathUtils.degToRad(cam.fov / 2)), fpos = cam.position.clone().addScaledVector(cf, fd).addScaledVector(cr, -hh * cam.aspect * .74).addScaledVector(cu, hh * .38);   /* 화면 왼쪽 위: 가운데(기체)와 오른쪽(연습 표적)을 가리지 않게 */
+    const fd = 8.5, hh = fd * Math.tan(THREE.MathUtils.degToRad(cam.fov / 2)), fpos = cam.position.clone().addScaledVector(cf, fd).addScaledVector(cr, -hh * cam.aspect * .74).addScaledVector(cu, hh * .3);   /* 화면 왼쪽 위: 가운데(기체)와 오른쪽(연습 표적)을 가리지 않게 */
     const dimIdx = {}; { let k = 0; gems.forEach((g, i) => { if (i !== st.focus) dimIdx[i] = k++; }); }
     gems.forEach((g, i) => {
       const U = g.back.material.uniforms, Uf = g.front.material.uniforms, Uh = g.halo.material.uniforms;
@@ -285,8 +239,7 @@ export function makeSkillPick(ship, opt = {}) {
       const toCam = cam.position.clone().sub(g.o.position); toCam.y = 0; toCam.normalize().multiplyScalar(.55 + g.focus * .5).add(V(0, 1, 0)).normalize();
       g.ang += dt * (g.state === 'spin' ? 9 : .55 * g.spin); tmpQ.setFromUnitVectors(Y, toCam); tmpQ2.setFromAxisAngle(Y, g.ang + i * 2); g.body.quaternion.copy(tmpQ).multiply(tmpQ2); g.sh.quaternion.copy(g.body.quaternion);
       g.flash = Math.max(0, g.flash - dt * 3.2); let glow = 0, alpha = 1, S = 1;
-      g.off.set(0, 0, 0); g.sc = 1;
-      if (g.state === 'rise') {                        /* 판 가운데에서 나선으로 떠오름 */
+            if (g.state === 'rise') {                        /* 판 가운데에서 나선으로 떠오름 */
         const u = sm01((t - g.t0) / st.P.rise), aa = a - (1 - u) * 2.4, r = ORBIT * (.15 + .85 * u);
         g.o.position.set(Math.cos(aa) * r, .3 + (home.y - .3) * (1 - (1 - u) * (1 - u)), Math.sin(aa) * r);
         S = Math.max(.001, u); alpha = u; glow = 1 - u * .5;
@@ -299,11 +252,10 @@ export function makeSkillPick(ship, opt = {}) {
         if (left <= 0) { g.state = 'ready'; g.popAt = t; g.fxT = t + .35; g.flash = 1.2; bell([1318.5, 1661.2, 1975.5][i], .13, 1.4); g.tag.classList.add('on');
           sparks.emit(q => { q.p.copy(g.o.position); q.v.randomDirection().multiplyScalar(1.4 + Math.random()); q.max = q.life = .4 + Math.random() * .3; q.c.copy(C); q.s = .8; }, 26); }
       } else if (g.state === 'ready') {
-        const e = t - g.popAt, side = fpos.clone().addScaledVector(cr, hh * cam.aspect * (.2 + .17 * (dimIdx[i] || 0))).addScaledVector(cu, hh * .14);   /* 살펴보는 동안 나머지 둘은 왼쪽 위 보석 옆에 작게 줄 서서 기다림 → 기체·맛보기를 가리지 않음 */
+        const e = t - g.popAt, side = fpos.clone().addScaledVector(cr, hh * cam.aspect * (.2 + .17 * (dimIdx[i] || 0))).addScaledVector(cu, -hh * .02);   /* 살펴보는 동안 나머지 둘은 왼쪽 위 보석 옆에 작게 줄 서서 기다림 → 기체·맛보기를 가리지 않음 */
         g.o.position.copy(home).lerp(side, sm01(g.dim)).lerp(fpos, sm01(g.focus));
         const left = st.deadline - t; glow = .25 + .2 * Math.sin(t * 3 + i) + (st.phase === 'pick' && left < 4 && !dimmed ? .3 * (.5 + .5 * Math.sin(t * 12)) : 0);
         S = (1 + .07 * Math.exp(-e * 5)) * (1 + g.focus * .1) * (1 - .4 * g.dim); alpha = 1 - .35 * g.dim;
-        if (!dimmed && st.phase === 'pick' || st.phase === 'rise') gemFX(g, t, dt, C, GEMR * S, cr, cu); else { g.bm.visible = false; g.ghosts.forEach(m => m.visible = false); g.rg.material.uniforms.uI.value = 0; g.front.material.uniforms.uSw.value.set(0, 0, 0); g.back.material.uniforms.uSw.value.set(0, 0, 0); g.front.material.uniforms.uDark.value = g.back.material.uniforms.uDark.value = 0; }
       } else if (g.state === 'chosen') {               /* 살짝 부풀었다가 기체로 빨려 듦 (처음은 천천히, 닿을 때 가장 빠르게) */
         const e = t - g.t0, pre = .14, F = .5;
         if (e < pre) { g.o.position.copy(g.P0); S = (1 + g.focus * .1) * (1 + .22 * Math.sin(e / pre * Math.PI * .5)); glow = 1; g.flash = Math.max(g.flash, .6); if (e < dt * 1.5) whoosh(); }
@@ -314,10 +266,9 @@ export function makeSkillPick(ship, opt = {}) {
           if (u >= 1) { g.state = 'gone'; g.o.visible = false; st.hitT = t; absorb([523.25, 392, 466.16][st.cat]);
             sparks.emit(q => { const aa = Math.random() * 6.283, up = Math.random() * 2.4, out = .8 + Math.random() * 2.8; q.p.copy(sc); q.v.set(Math.cos(aa) * out, up, Math.sin(aa) * out); q.max = q.life = .5 + Math.random() * .7; q.g = 4; q.c.copy(C); q.s = 1; }, 120);
             const ch = document.createElement('div'); ch.className = 'chip'; ch.style.setProperty('--c', cs); ch.innerHTML = `<em>${CATS[st.cat].name}</em><b>${CATS[st.cat].list[g.skill][0]}</b>`; chips.appendChild(ch); chips.classList.add('on'); } }
-        g.front.material.uniforms.uSw.value.set(0, 0, 0); g.back.material.uniforms.uSw.value.set(0, 0, 0); g.front.material.uniforms.uDark.value = g.back.material.uniforms.uDark.value = 0; g.rg.material.uniforms.uI.value = 0;
       } else if (g.state === 'break') {                /* 깎인 면대로 부서짐 */
         const e = t - g.t0; S = 1 + g.focus * .1;
-        if (e >= 0) { if (g.body.visible) { g.body.visible = false; g.sh.visible = true; g.rg.material.uniforms.uI.value = 0; shatter();
+        if (e >= 0) { if (g.body.visible) { g.body.visible = false; g.sh.visible = true; shatter();
             sparks.emit(q => { const v = V().randomDirection(); q.p.copy(g.o.position).addScaledVector(v, .2); q.v.copy(v).multiplyScalar(.6 + Math.random() * 1.6); q.v.y += .6; q.max = q.life = .5 + Math.random() * .6; q.g = 2.5; q.c.copy(C); q.s = .7; }, 40); }
           const k = Math.min(1, e / 1.15); g.sh.material.uniforms.uK.value = k; glow = 0;
           if (k >= 1) { g.state = 'gone'; g.o.visible = false; } }
@@ -329,7 +280,7 @@ export function makeSkillPick(ship, opt = {}) {
       g.wp.copy(g.o.position).add(g.off);
       /* 이름표: 보석 위 */
       if (g.tag.classList.contains('on') && ui) { const p = g.o.position.clone().add(V(0, GEMR * S * 1.35, 0)).project(cam);
-        g.tag.style.transform = `translate(${(p.x * .5 + .5) * cw}px,${Math.max(118, (-p.y * .5 + .5) * chh)}px) translate(-50%,-100%)`; }   /* 위 안내와 겹치지 않게 */
+        g.tag.style.transform = `translate(${(p.x * .5 + .5) * cw}px,${g.dim > .5 ? (-p.y * .5 + .5) * chh : Math.max(118, (-p.y * .5 + .5) * chh)}px) translate(-50%,-100%)`; }   /* 둘레를 돌 땐 위 안내와 겹치지 않게 · 줄 섰을 땐 바로 위 */
     });
     /* 설명 판: 살펴보는 보석 오른쪽 아래 */
     if (st.focus >= 0 && card.classList.contains('on')) { const g = gems[st.focus], p = g.o.position.clone().addScaledVector(cu, -GEMR * 1.25).project(cam), r = { width: cw, height: chh };
@@ -374,7 +325,7 @@ export const PICK_CSS = `
 .gtag b{font-weight:500;font-size:13.5px;color:#fff;letter-spacing:.04em;text-shadow:0 0 10px rgba(var(--c),.9),0 0 2px rgba(var(--c),1)}
 .gtag span{font-size:10.5px;color:rgba(var(--c),.95);letter-spacing:.02em;text-shadow:0 0 8px rgba(0,0,0,.9)}
 .gtag.on{opacity:1;animation:gpop .35s cubic-bezier(.2,1.6,.4,1)}
-.gtag.dim{opacity:0;animation:none}
+.gtag.side{opacity:1;animation:none} .gtag.side b{font-size:14.5px} .gtag.side span{display:none}
 .gtag.pick{opacity:0;transition:opacity .2s .1s} .gtag.gone{opacity:0;transition:opacity .12s}
 @keyframes gpop{from{opacity:0;filter:blur(4px)}to{opacity:1;filter:none}}
 #pickhint{position:absolute;left:50%;bottom:calc(env(safe-area-inset-bottom,0px) + 62px);transform:translateX(-50%);font-size:12px;letter-spacing:.08em;color:rgba(230,236,250,.8);opacity:0;transition:opacity .4s;pointer-events:none;white-space:nowrap}
