@@ -98,7 +98,9 @@ export async function makeMapFloor(renderer, url) {
         c = mix(clr, c, uFog);
         if(Q.y>.5){ float hot=smoothstep(.55,.8,L1.x); c+=vec3(.5,.1,.02)*hot*(.6+.4*sin(uT*1.2+L0.x*9.))*(1.-L0.x*.6); }
         /* 길 그림은 그리지 않음 (사용자 결정 2026-11-03): 길은 벽 사이 열린 땅 그 자체 */
-        if (id==17) { float rb=texture2D(uN,vW.xz*.03).r; c = vec3(.035,.035,.04)*(.5+1.2*rb) + vec3(.06,.055,.05)*smoothstep(.55,.75,texture2D(uN,vW.xz*.11).b); }   /* 소행성 잔해: 울퉁불퉁 짙은 돌 */
+        { float dw = smoothstep(.35,.65,texture2D(uWf, uv).b);   /* 소행성 잔해 가장자리: 부드럽게 (칸칸이 계단지지 않게) */
+          float rb=texture2D(uN,vW.xz*.03).r; vec3 dc = vec3(.035,.035,.04)*(.5+1.2*rb) + vec3(.06,.055,.05)*smoothstep(.55,.75,texture2D(uN,vW.xz*.11).b);
+          c = mix(c, dc, dw); }   /* 소행성 잔해: 울퉁불퉁 짙은 돌 */
         /* 지역 경계 = 짙은 바위 능선 (나중에 벽이 섬) */
         /* 바위 능선(벽 자리): 바닥보다 확 밝은 돌 띠 + 짙은 그림자 테두리 + 윗면 빛 → 멀리서도 '못 지나가는 곳'이 보이게 */
         /* 벽 자리 그림은 막힘(1)/지나감(0) 둘뿐 → 보이는 돌 띠 = 실제로 부딪히는 자리. 경계 판정은 게임과 같은 .5 */

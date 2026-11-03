@@ -9,12 +9,12 @@
      - 이웃 땅 색이 바위에 살짝 배어 있음(얼음 성운 옆 바위는 푸르스름, 용암 옆은 붉은 기)
    · 무게: 벽 전체가 한 덩어리 → 그리기 1번. 지도 칸마다 삼각형 몇 개(가장자리 칸만 옆면) */
 import * as THREE from 'three';
-import { MAP, toWorld } from './mapfloor.js?v=11031106';
-import { makeRidge, updateRidge, rockMaterial, chunk } from './rocks.js?v=11031106';
-import { makeIceRidge, iceMaterial, block } from './ice.js?v=11031106';
-import { makeCrystalRidge, crystalMaterial, prism } from './crystal.js?v=11031106';
-import { makeRuinRidge, updateRuins, ruinMaterial, pillar, arc } from './ruins.js?v=11031106';
-import { makeCoralRidge, coralMaterial, coral } from './coral.js?v=11031106';
+import { MAP, toWorld } from './mapfloor.js?v=11031113';
+import { makeRidge, updateRidge, rockMaterial, chunk } from './rocks.js?v=11031113';
+import { makeIceRidge, iceMaterial, block } from './ice.js?v=11031113';
+import { makeCrystalRidge, crystalMaterial, prism } from './crystal.js?v=11031113';
+import { makeRuinRidge, updateRuins, ruinMaterial, pillar, arc } from './ruins.js?v=11031113';
+import { makeCoralRidge, coralMaterial, coral } from './coral.js?v=11031113';
 
 export function makeFieldWall(B, floor, ridges = []) {
   const { N, F, cell } = B, S = MAP.SCALE, ISO = .5;
@@ -109,7 +109,12 @@ export function makeFieldWall(B, floor, ridges = []) {
   mesh.userData.tris = tri.length / 3;
   /* 바닥에도 같은 지도를 줌: 바닥의 회색 띠·그림자가 바위벽 밑동과 꼭 맞게 */
   const KM = kindMap(ridges, N), td = new Uint8Array(F.length * 4);
-  for (let i = 0; i < F.length; i++) { td[i * 4] = Math.round(F[i] * 255); td[i * 4 + 1] = KM[i] * 50; td[i * 4 + 3] = 255; }
+  /* 파랑 = 소행성 잔해 자리를 번지게 한 것: 잔해 가장자리를 칸칸이 계단 없이 둥글게 */
+  const dm = new Float32Array(N * N), dt2 = new Float32Array(N * N); for (let i = 0; i < N * N; i++) dm[i] = B.reg[i] === 17 ? 1 : 0;
+  for (let rep = 0; rep < 2; rep++) for (const [sx, sy] of [[1, 0], [0, 1]]) { const src = rep || sy ? dm : dm, R = 3;
+    for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) { let a = 0; for (let k = -R; k <= R; k++) { const x = Math.min(N - 1, Math.max(0, i + k * sx)), y = Math.min(N - 1, Math.max(0, j + k * sy)); a += src[y * N + x]; } dt2[j * N + i] = a / (2 * R + 1); }
+    dm.set(dt2); }
+  for (let i = 0; i < F.length; i++) { td[i * 4] = Math.round(F[i] * 255); td[i * 4 + 1] = KM[i] * 50; td[i * 4 + 2] = Math.round(dm[i] * 255); td[i * 4 + 3] = 255; }
   const ft = new THREE.DataTexture(td, N, N);
   ft.magFilter = THREE.LinearFilter; ft.minFilter = THREE.LinearFilter; ft.flipY = false; ft.needsUpdate = true;
   return { mesh, fieldTex: ft };
@@ -138,11 +143,11 @@ export function kindMap(ridges, N) { const c = document.createElement('canvas');
 export function makeRealWalls(B, ridges, uT) {
   const S = MAP.SCALE;
   const KIND = {
-    obsidian: { mat: rockMaterial('obsidian', uT), geos: [0, 1, 2, 3, 4, 5].map(i => chunk('obsidian', i + 61, 3)), make: (p, o) => makeRidge('obsidian', p, { ...o, float: true, floatGap: 22, width: 2.6 }) },
-    ice: { mat: iceMaterial(uT), geos: [1, 2, 3, 4, 5, 6].map(block), make: makeIceRidge },
-    crystal: { mat: crystalMaterial(uT), geos: [1, 2, 3, 4, 5].map(prism), make: makeCrystalRidge, off: 1 },
-    ruins: { mat: ruinMaterial(uT), geos: [1, 2, 3, 4].map(pillar), arcs: [11, 12, 13].map(arc), make: makeRuinRidge, off: 1.15 },
-    coral: { mat: coralMaterial(uT), geos: [1, 2, 3, 4].map(i => coral(i, true)), make: makeCoralRidge, off: .9 } };
+    obsidian: { mat: rockMaterial('obsidian', uT), geos: [0, 1, 2, 3, 4, 5].map(i => chunk('obsidian', i + 61, 3)), make: (p, o) => makeRidge('obsidian', p, { ...o, float: true, floatGap: 22, width: 2.6 }), offs: [-.9, .9] },
+    ice: { mat: iceMaterial(uT), geos: [1, 2, 3, 4, 5, 6].map(block), make: makeIceRidge, offs: [-.7, .7] },
+    crystal: { mat: crystalMaterial(uT), geos: [1, 2, 3, 4, 5].map(prism), make: makeCrystalRidge, offs: [-1.1, 0, 1.1] },
+    ruins: { mat: ruinMaterial(uT), geos: [1, 2, 3, 4].map(pillar), arcs: [11, 12, 13].map(arc), make: makeRuinRidge, offs: [-1.15, 1.15] },
+    coral: { mat: coralMaterial(uT), geos: [1, 2, 3, 4].map(i => coral(i, true)), make: makeCoralRidge, offs: [-1.1, 0, 1.1] } };
   for (const k in KIND) { const K = KIND[k]; K.box = K.geos.map(g => { g.computeBoundingBox(); return g.boundingBox; }); }
   const root = new THREE.Group(), movers = [], bucket = new Map(), targets = [];
   const m4 = new THREE.Matrix4(), p = new THREE.Vector3(), q = new THREE.Quaternion(), sc = new THREE.Vector3(), c = new THREE.Vector3();
@@ -153,8 +158,8 @@ export function makeRealWalls(B, ridges, uT) {
   let seed = 1;
   for (const r of ridges) { const K = KIND[r.k]; if (!K) continue;
     const pts = r.p.map(([x, y]) => toWorld(x, y));
-    /* 얇은 벽(유적 담·자수정·산호)은 벽 띠가 더 넓어서 두 줄로: 옛 성벽은 두 겹 담 사이를 채운 구조, 결정·산호는 무리 지어 자람 */
-    const lines = K.off && !r.fill ? [-K.off, K.off].map(o => offsetLine(pts, o)) : [pts];
+    /* 지역 경계는 빼곡하게 (사용자 2026-11-03): 흑요석·빙하 두 줄, 자수정·산호 세 줄, 유적 두 겹 담 — 덩어리 사이로 건너편이 훤히 안 보이게 */
+    const lines = K.offs && !r.fill ? K.offs.map(o => o ? offsetLine(pts, o) : pts) : [pts];
     for (const line of lines) {
     const g = K.make(line, { uT, mat: K.mat, geos: K.geos, arcs: K.arcs, seed: seed++ * 13 + 5, noTaper: true });
     for (const ch of [...g.children]) { if (!ch.isInstancedMesh) continue;
