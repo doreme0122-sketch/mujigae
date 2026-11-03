@@ -7,7 +7,7 @@
    단위 m */
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { stoneMaterial, glowMaterial } from './wardbase.js?v=11032114';
+import { stoneMaterial, solid, glowMaterial } from './wardbase.js?v=11032127';
 
 const AB = { transparent: true, depthWrite: false, blending: THREE.AdditiveBlending };
 const clean = g => { for (const k of Object.keys(g.attributes)) if (k !== 'position' && k !== 'normal') g.deleteAttribute(k); return g.index ? g.toNonIndexed() : g; };
@@ -43,7 +43,7 @@ export function makeWardRing(uT, y) {
     for (const g of parts) { g.rotateY(Math.PI / 2 - a); g.translate(Math.cos(a) * R, 0, Math.sin(a) * R); st.push(g); }
     const ro = R + .19, ca = Math.cos(a), sa = Math.sin(a), tx = -sa, tz = ca, ww = w * .28, hh = h * .3, P = (o, yy) => [ca * ro + tx * o, yy, sa * ro + tz * o];
     gl.push([P(-ww, -hh), P(ww, -hh), P(ww, hh), P(-ww, hh)]); }
-  const stone = new THREE.Mesh(mergeGeometries(st.map(clean)), stoneMaterial(uT)); spin.add(stone);
+  const stone = new THREE.Mesh(solid(mergeGeometries(st.map(clean))), stoneMaterial(uT)); spin.add(stone);
   const p = [], uv = [], kk = []; for (const [A, B, C, D] of gl) { p.push(...A, ...B, ...C, ...A, ...C, ...D); uv.push(0, 0, 1, 0, 1, 1, 0, 0, 1, 1, 0, 1); kk.push(0, 0, 1, 0, 1, 1); }
   const gg = new THREE.BufferGeometry(); gg.setAttribute('position', new THREE.Float32BufferAttribute(p, 3)); gg.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2)); gg.setAttribute('aK', new THREE.Float32BufferAttribute(kk, 1));
   const gMat = glowMaterial(), gm = new THREE.Mesh(gg, gMat); gm.renderOrder = 5; spin.add(gm);

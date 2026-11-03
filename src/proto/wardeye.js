@@ -8,7 +8,7 @@
    단위 m */
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { glowMaterial, stoneMaterial } from './wardbase.js?v=11032114';
+import { glowMaterial, stoneMaterial, solid } from './wardbase.js?v=11032127';
 
 const AB = { transparent: true, depthWrite: false, blending: THREE.AdditiveBlending };
 const clean = g => { for (const k of Object.keys(g.attributes)) if (k !== 'position' && k !== 'normal') g.deleteAttribute(k); return g.index ? g.toNonIndexed() : g; };
@@ -58,7 +58,7 @@ export function makeWardEye(uT, y) {
     for (let i = 0; i < P.count; i++) { const yy = P.getY(i); const s = 1 + (yy < .3 ? .9 : .2); P.setZ(i, P.getZ(i) * s); }   /* 납작한 칼날처럼 */
     g.computeVertexNormals(); g.rotateY(-a); parts.push(g);
     const tip = new THREE.BoxGeometry(.12, .1, .16); tip.translate(.84, .55, 0); tip.rotateY(-a); parts.push(tip); }
-  G.add(new THREE.Mesh(mergeGeometries(parts.map(clean)), metal));
+  G.add(new THREE.Mesh(solid(mergeGeometries(parts.map(clean))), metal));
   /* 렌즈 빛 테 + 갈퀴 끝 빛 (주인 색) */
   const p = [], uv = [], kk = [], quad = (A, B, C, D) => { p.push(...A, ...B, ...C, ...A, ...C, ...D); uv.push(0, 0, 1, 0, 1, 1, 0, 0, 1, 1, 0, 1); kk.push(1, 1, 1, 1, 1, 1); };
   for (let i = 0; i < 40; i++) { const a0 = i / 40 * Math.PI * 2, a1 = (i + 1) / 40 * Math.PI * 2, Q = (a, r, yy) => [Math.cos(a) * r, yy, Math.sin(a) * r];

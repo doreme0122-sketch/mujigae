@@ -11,7 +11,7 @@
    단위 m. 받침 높이 약 1.3m, 지름 약 4.4m. 돌은 한 재질, 빛은 한 재질 → 그리는 횟수 적게 */
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { ruinMaterial } from './ruins.js?v=11032114';
+import { ruinMaterial } from './ruins.js?v=11032127';
 
 const rng = seed => { let s = seed * 9301 + 49297; return () => (s = (s * 9301 + 49297) % 233280) / 233280; };
 const clean = g => { for (const k of Object.keys(g.attributes)) if (k !== 'position' && k !== 'normal') g.deleteAttribute(k); return g.index ? g.toNonIndexed() : g; };
@@ -37,6 +37,16 @@ function wedge(r0, r1, a0, a1, h, slope, b = .06) {
   g.computeVertexNormals(); return g;
 }
 /* 돌: 오래된 회색 돌(살짝 누런 기). 결 · 얼룩 · 금 간 자리 · 모서리가 닳아 밝음 · 아래쪽은 그을려 어두움 */
+/* 돌 덩어리 다듬기: 넓이 없는 삼각형(가운데 한 점에 모인 면, 깎은 모서리의 접힌 면)을 빼고, 방향 없는 면 방향을 그 면의 실제 방향으로 채움
+   — 방향 없는 면은 폰 그래픽에서 빛 계산이 '숫자 아님'이 되어 번짐 단계에서 커다란 하얀/검은 얼룩으로 번졌음 (사용자 영상 2026-11-03) */
+export function solid(g) {
+  const P = g.attributes.position.array, N = g.attributes.normal.array, keep = [], a = new THREE.Vector3(), b = new THREE.Vector3(), c = new THREE.Vector3(), f = new THREE.Vector3();
+  for (let t = 0; t < P.length; t += 9) { a.fromArray(P, t); b.fromArray(P, t + 3); c.fromArray(P, t + 6); f.subVectors(c, b).cross(a.clone().sub(b));
+    const L = f.length(); if (L < 1e-9) continue; f.divideScalar(L);
+    for (let v = 0; v < 3; v++) { const o = t + v * 3, l = Math.hypot(N[o], N[o + 1], N[o + 2]); if (l > .5 && isFinite(l)) keep.push(P[o], P[o + 1], P[o + 2], N[o] / l, N[o + 1] / l, N[o + 2] / l); else keep.push(P[o], P[o + 1], P[o + 2], f.x, f.y, f.z); } }
+  const pos = [], nor = []; for (let i = 0; i < keep.length; i += 6) { pos.push(keep[i], keep[i + 1], keep[i + 2]); nor.push(keep[i + 3], keep[i + 4], keep[i + 5]); }
+  const o = new THREE.BufferGeometry(); o.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); o.setAttribute('normal', new THREE.Float32BufferAttribute(nor, 3)); return o;
+}
 export function stoneMaterial(uT) {
   const m = new THREE.MeshStandardMaterial({ color: 0x5e5a54, roughness: .86, metalness: .03, envMapIntensity: .5 });
   m.onBeforeCompile = sh => { sh.uniforms.uT = uT;
@@ -189,7 +199,7 @@ export function makeWardBase(uT) {
   /* 둘레에 떨어져 나간 돌 조각 */
   for (let i = 0; i < 7; i++) { const a = R() * TAU, r = 2.15 + R() * .7, s = .12 + R() * .14; const g = block(s * 1.6, s, s * 1.2, .02); g.rotateY(R() * 3); g.rotateZ((R() - .5) * .5); g.translate(Math.cos(a) * r, 0, Math.sin(a) * r); stone.push(g); }
   const sMat = stoneMaterial(uT), gMat = glowMaterial();   /* 받침 = 처음 만든 오래된 회색 돌 (사용자 2026-11-03: 원래 처음처럼 돌로) */
-  const sm = new THREE.Mesh(mergeGeometries(stone.map(clean)), sMat); G.add(sm);
+  const sm = new THREE.Mesh(solid(mergeGeometries(stone.map(clean))), sMat); G.add(sm);
   const gm = new THREE.Mesh(glowGeo(glow), gMat); gm.renderOrder = 4; G.add(gm);
   G.userData.top = 1.56;                                                    /* 다음 부품(유리 기둥)이 앉을 높이 */
   G.userData.glow = gMat;

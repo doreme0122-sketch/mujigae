@@ -6,8 +6,8 @@
    단위 m */
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { stoneMaterial, glowMaterial } from './wardbase.js?v=11032114';
-import { gem } from './guardian.js?v=11032114';
+import { stoneMaterial, solid, glowMaterial } from './wardbase.js?v=11032127';
+import { gem } from './guardian.js?v=11032127';
 
 const AB = { transparent: true, depthWrite: false, blending: THREE.AdditiveBlending };
 const clean = g => { for (const k of Object.keys(g.attributes)) if (k !== 'position' && k !== 'normal') g.deleteAttribute(k); return g.index ? g.toNonIndexed() : g; };
@@ -31,7 +31,7 @@ function spireGeo() {
   for (const [y0, y1, r0, r1] of segs) { parts.push(lathe([[0, y0], [r0, y0], [r1, y1], [0, y1]], 12)); parts.push(lathe([[0, y1 - .01], [r1 + .035, y1 - .01], [r1 + .04, y1 + .02], [r1 + .02, y1 + .04], [0, y1 + .04]], 12)); }   /* 마디 + 마디 고리 */
   for (let k = 0; k < 4; k++) { const a = k * Math.PI / 2, g = new THREE.BoxGeometry(.03, .22, .05); g.translate(0, .52, .09); g.rotateY(a); parts.push(g); }   /* 아래 마디 덧살 */
   parts.push(lathe([[0, 1.4], [.06, 1.4], [.085, 1.46], [.05, 1.5], [0, 1.5]], 12));                                               /* 결정 받침 컵 */
-  return mergeGeometries(parts.map(clean));
+  return solid(mergeGeometries(parts.map(clean)));
 }
 export function makeWardSpires(uT, spots) {
   const G = new THREE.Group(), metal = stoneMaterial(uT), sg = spireGeo();   /* 양쪽 수정탑도 받침과 같은 돌 (사용자 2026-11-03) */

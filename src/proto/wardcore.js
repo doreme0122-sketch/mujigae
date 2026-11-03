@@ -8,7 +8,7 @@
    단위 m, 받침 위(y = 받침 top)부터 높이 약 1.8m */
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { glowMaterial, stoneMaterial } from './wardbase.js?v=11032114';
+import { glowMaterial, stoneMaterial, solid } from './wardbase.js?v=11032127';
 
 const clean = g => { for (const k of Object.keys(g.attributes)) if (k !== 'position' && k !== 'normal') g.deleteAttribute(k); return g.index ? g.toNonIndexed() : g; };
 const AB = { transparent: true, depthWrite: false, blending: THREE.AdditiveBlending };
@@ -82,7 +82,7 @@ export function makeWardCore(uT, y0) {
   for (const [yy, r] of [[.1, .655], [H - .07, .675]]) for (let i = 0; i < 16; i++) { const a = i / 16 * Math.PI * 2, b = new THREE.CylinderGeometry(.028, .028, .03, 8); b.rotateZ(Math.PI / 2); b.rotateY(-a); b.translate(Math.cos(a) * r, yy, Math.sin(a) * r); stone.push(b); }
   /* 메탈 (사용자: 유리 기둥 틀은 금속): 짙은 건메탈 + 닳은 모서리는 은빛, 위아래 테는 같은 금속 */
   const sMat = stoneMaterial(uT);   /* 유리 뼈대도 처음처럼 받침과 같은 돌 (사용자 2026-11-03) */
-  const stoneMesh = new THREE.Mesh(mergeGeometries(stone.map(clean)), sMat); G.add(stoneMesh);
+  const stoneMesh = new THREE.Mesh(solid(mergeGeometries(stone.map(clean))), sMat); G.add(stoneMesh);
   /* 테 빛 (아래·위 물림 테 안쪽) + 버팀대 홈 빛 → 주인 색 */
   { const p = [], uv = [], kk = [];
     const quad = (A, B, C, D, k0, k1) => { p.push(...A, ...B, ...C, ...A, ...C, ...D); uv.push(0, 0, 1, 0, 1, 1, 0, 0, 1, 1, 0, 1); kk.push(k0, k0, k1, k0, k1, k1); };
