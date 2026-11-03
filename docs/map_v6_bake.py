@@ -18,7 +18,7 @@ G=np.where(wall&(ids<17),1.,0.)                 # 막힘 = 1, 지나감 = 0 (중
 img=np.stack([ids*12,(G*255).astype(np.uint8),(B*255).astype(np.uint8)],-1).astype(np.uint8)
 Image.fromarray(img,'RGB').save('../assets/map/v6.png')
 lab=[dict(x=round(s[0],1),y=round(s[1],1),n=s[2],l=s[3],k=s[5]) for s in seeds if s[5]!='yard']
-spawns=[[round(c,1) for c in pol(372,a)] for a in ANG]
+spawns=[[round(c,1) for c in pol(440,a)] for a in ANG]   # 태어나는 곳: 맨 바깥쪽(벽에서 10m 띄움, 열 곳 모두 가운데서 같은 거리)
 NAMES=[YARD[0]]+[j[0] for j in JUN]+[b[0] for b in BOSS]+[t[0] for t in TRE]+['무너진 중심부','소행성 잔해']
 json.dump(dict(W=W,H=H,labels=lab,spawns=spawns,gates=GATES,names=NAMES),open('../assets/map/v6.json','w'),ensure_ascii=False)
 print(img.shape,np.bincount(ids.ravel()))
