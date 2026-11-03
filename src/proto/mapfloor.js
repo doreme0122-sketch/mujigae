@@ -49,12 +49,12 @@ function fogTex(img) {
   const c = document.createElement('canvas'), N = img.width; c.width = c.height = N; const g = c.getContext('2d', { willReadFrequently: true }); g.drawImage(img, 0, 0);
   const d = g.getImageData(0, 0, N, N).data, A = new Float32Array(N * N * 3), B = new Float32Array(N * N * 3);
   for (let i = 0; i < N * N; i++) { const id = Math.min(17, Math.round(d[i * 4] / 12)), f = ST[id].b; A[i * 3] = f[0]; A[i * 3 + 1] = f[1]; A[i * 3 + 2] = f[2]; }
-  const R = 7, blur = (src, dst, dx, dy) => { for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) { let r = 0, gg = 0, b = 0;
+  const R = 3, blur = (src, dst, dx, dy) => { for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) { let r = 0, gg = 0, b = 0;
       for (let k = -R; k <= R; k++) { const x = Math.min(N - 1, Math.max(0, i + k * dx)), y = Math.min(N - 1, Math.max(0, j + k * dy)), o = (y * N + x) * 3; r += src[o]; gg += src[o + 1]; b += src[o + 2]; }
       const o = (j * N + i) * 3, w = 1 / (2 * R + 1); dst[o] = r * w; dst[o + 1] = gg * w; dst[o + 2] = b * w; } };
   blur(A, B, 1, 0); blur(B, A, 0, 1); blur(A, B, 1, 0); blur(B, A, 0, 1);              /* 두 번 번지기 = 부드러운 둥근 번짐 */
-  const out = new Uint8Array(N * N * 4); for (let i = 0; i < N * N; i++) { for (let k = 0; k < 3; k++) out[i * 4 + k] = Math.min(255, A[i * 3 + k] * 255 / .6); out[i * 4 + 3] = 255; }
-  const t = new THREE.DataTexture(out, N, N); t.magFilter = t.minFilter = THREE.LinearFilter; t.needsUpdate = true; t.userData.k = .6; return t;
+  const out = new Uint8Array(N * N * 4); for (let i = 0; i < N * N; i++) { const r = A[i * 3], gg = A[i * 3 + 1], b = A[i * 3 + 2], m = (r + gg + b) / 3; [r, gg, b].forEach((v, k) => out[i * 4 + k] = Math.min(255, Math.max(0, (m + (v - m) * 1.8) * 1.7) * 255));   /* 색을 또렷하게(채도 1.8배, 밝기 1.7배) → 땅마다 안개가 한눈에 구분 */ out[i * 4 + 3] = 255; }
+  const t = new THREE.DataTexture(out, N, N); t.magFilter = t.minFilter = THREE.LinearFilter; t.needsUpdate = true; return t;
 }
 
 export async function makeMapFloor(renderer, url) {
@@ -85,11 +85,13 @@ export async function makeMapFloor(renderer, url) {
         int id = int(floor(texture2D(uR, uv).r*255./12.+.5)); id = id<0?0:(id>17?17:id);
         vec3 eg = texture2D(uRs, uv).rgb; float road = eg.b;   /* 벽 자리 = 바위벽과 같은 벽 높이 지도 */
         vec4 P = uP[id]; vec3 Q = uQ[id]; vec4 Wv = uWv[id];
-        float dens=P.x, speed=P.y, swirl=P.z, sc=P.w, t=uT*speed;
+        /* 안개 결(흐름 빠르기·비틀림·결 크기)은 맵 전체가 하나: 땅마다 달리 하면 경계에서 값이 칸칸이 바뀌어 무늬가 찢어짐.
+           땅의 차이는 안개 색(부드러운 색 지도)으로만 → 경계에서 결은 이어지고 색만 넘어감 */
+        float dens=.8, speed=.016, swirl=.7, sc=.055, t=uT*speed;
         vec2 L0=layer(vW.xz,sc,t,swirl), L1=layer(vW.xz*1.15+vec2(31.,17.),sc,t*.6,swirl);
         float a0=smoothstep(.35,.85,L0.x)*dens, a1=smoothstep(.38,.85,L1.x)*dens*.6;
         vec3 base = uA[id]*(.55+.35*L1.x);                                                       /* 맨땅: 짙은 색 위에 먼 결 */
-        vec3 c0=mix(uA[id],texture2D(uFc,uv).rgb*.6,smoothstep(.4,.95,L0.x))*(.8+.4*L0.y);                      /* 안개는 땅마다 제 색 (바닥은 칠하지 않음): 얼음 성운 푸른 안개, 용암 붉은 안개… */
+        vec3 c0=mix(uA[id],texture2D(uFc,uv).rgb,smoothstep(.4,.95,L0.x))*(.8+.4*L0.y);                      /* 안개는 땅마다 제 색 (바닥은 칠하지 않음): 얼음 성운 푸른 안개, 용암 붉은 안개… */
         vec3 c = mix(base, c0, clamp(a0+a1*.5,0.,1.));
         /* 안개 끔: 흘러가는 구름 결 없이 땅 색 그대로 (서서히 걷힘) */
         vec3 clr = mix(uA[id],uB[id],.3)*(.72+.4*texture2D(uN,vW.xz*.05).r);
