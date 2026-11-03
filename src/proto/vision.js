@@ -6,7 +6,7 @@
    · 덮개는 화면 위 한 장: 화면 칸마다 '눈높이 1.5m 땅'의 보임 값을 읽어 어둡게 덮음 → 벽·바닥·알갱이 모두 한 번에 가려짐
    · 무게: 빛줄기 320가닥 × 60걸음 (가벼움) · 시야 지도 250×250 한 장 */
 import * as THREE from 'three';
-import { MAP } from './mapfloor.js?v=11032341';
+import { MAP } from './mapfloor.js?v=11032352';
 
 export const SIGHT = 30;
 export function makeVision(B, bushes, floorNoise) {
@@ -35,11 +35,18 @@ export function makeVision(B, bushes, floorNoise) {
     fragmentShader: `precision highp float; varying vec2 vS; uniform sampler2D uV, uN; uniform float uT, uOn; uniform vec3 uCam; uniform mat4 uInvPV;
       void main(){ vec4 f=uInvPV*vec4(vS,1.,1.); vec3 d=normalize(f.xyz/f.w-uCam);
         float t=(1.5-uCam.y)/min(d.y,-1e-3); vec3 p=uCam+d*t;
-        vec2 uv=p.xz/${W.toFixed(1)}+.5; vec2 v=texture2D(uV,uv).rg;
-        float drift=texture2D(uN,p.xz*.012+vec2(uT*.006,uT*.004)).r;                              /* 덮인 곳도 아주 천천히 일렁임 (멈춘 검은 판이 아님) */
-        float a=mix(mix(.9,.6,v.g)+(drift-.5)*.08, 0., v.r);
-        if(uv.x<0.||uv.y<0.||uv.x>1.||uv.y>1.) a=.9;
-        gl_FragColor=vec4(vec3(.004,.006,.014),a*uOn); }` });
+        float drift=texture2D(uN,p.xz*.012+vec2(uT*.006,uT*.004)).r, fine=texture2D(uN,p.xz*.09-vec2(uT*.01,0.)).r;   /* 덮인 곳도 아주 천천히 일렁임 (멈춘 검은 판이 아님) */
+        /* 시야 칸(약 1.4m)이 계단처럼 깨져 보이지 않게: 둘레 아홉 곳을 섞어 부드럽게 + 경계를 안개 결로 살짝 흔듦 (사용자: 안개 픽셀이 깨져 보임) */
+        vec2 uv=p.xz/${W.toFixed(1)}+.5, px=vec2(1./${N}.); uv+=(vec2(fine,drift)-.5)*px*1.6;
+        vec2 v=texture2D(uV,uv).rg*.24;
+        v+=(texture2D(uV,uv+vec2(px.x,0.)).rg+texture2D(uV,uv-vec2(px.x,0.)).rg+texture2D(uV,uv+vec2(0.,px.y)).rg+texture2D(uV,uv-vec2(0.,px.y)).rg)*.12;
+        v+=(texture2D(uV,uv+px*1.4).rg+texture2D(uV,uv-px*1.4).rg+texture2D(uV,uv+vec2(px.x,-px.y)*1.4).rg+texture2D(uV,uv+vec2(-px.x,px.y)*1.4).rg)*.07;
+        float see=smoothstep(.04,.9,v.r), mem=smoothstep(.1,.9,v.g);
+        /* 덮개: 시커먼 구멍이 아니라 짙은 안개 — 처음 보는 곳은 짙게, 본 적 있는 곳은 옅게, 결이 천천히 흐름 (사용자: 벽 뒤 검은 부분) */
+        float a=mix(mix(.8,.55,mem)+(drift-.5)*.1, 0., see);
+        if(uv.x<0.||uv.y<0.||uv.x>1.||uv.y>1.) a=.8;
+        vec3 fog=mix(vec3(.02,.03,.05),vec3(.045,.06,.09),drift)*(.85+.3*fine);
+        gl_FragColor=vec4(fog,a*uOn); }` });
   const quad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), mat); quad.frustumCulled = false; quad.renderOrder = 50;
   const scene = new THREE.Scene(); scene.add(quad); const cam0 = new THREE.Camera(), m4 = new THREE.Matrix4();
   let acc = 0;
