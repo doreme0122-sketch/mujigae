@@ -8,7 +8,7 @@
    · 규칙(나중에 적·몬스터 붙일 때 그대로 씀): 수풀 안은 바깥에서 안 보임 · 같은 수풀 안이면 서로 보임 · 수풀 안에서 쏘면 2초 드러남
    · 무게: 줄기 전부 한 묶음(그리기 1번). 수풀 자리는 칸 지도로 바로 찾음 */
 import * as THREE from 'three';
-import { MAP, toWorld } from './mapfloor.js?v=11031134';
+import { MAP, toWorld } from './mapfloor.js?v=11031142';
 
 export function makeBushes(B, J, ST) {
   const S = MAP.SCALE, rnd = (() => { let s = 977; return () => (s = (s * 9301 + 49297) % 233280) / 233280; })();
@@ -59,7 +59,7 @@ export function makeBushes(B, J, ST) {
       void main(){ float v=vU.y, e=1.-abs(vU.x*2.-1.);
         vec3 root=vec3(.012,.018,.016), tip=vC*1.25;
         vec3 c=mix(root, tip, smoothstep(.15,1.,v))*(.55+.45*e);                                  /* 뿌리 짙고 끝은 그 땅 빛 */
-        c+=vC*pow(v,6.)*.9 + vC*vG*.35;                                                            /* 줄기 끝 은은한 빛 · 숨은 덤불 */
+        float v2=clamp(v,0.,1.); v2*=v2; c+=vC*v2*v2*v2*.9 + vC*vG*.35;   /* 거듭제곱은 음수에서 휴대폰이 고장 값을 냄 → 곱셈으로 */                                                           /* 줄기 끝 은은한 빛 · 숨은 덤불 */
         gl_FragColor=vec4(c,1.); }` });
   /* 맵을 36m 칸으로 나눠 칸마다 한 묶음 → 화면 밖 칸의 수풀은 안 그림 */
   const mesh = new THREE.Group(), TL = 36, tiles = new Map(), cnt = F.length / 8;
