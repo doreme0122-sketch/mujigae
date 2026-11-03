@@ -11,7 +11,7 @@
    단위 m. 받침 높이 약 1.3m, 지름 약 4.4m. 돌은 한 재질, 빛은 한 재질 → 그리는 횟수 적게 */
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { ruinMaterial } from './ruins.js?v=11032157';
+import { ruinMaterial } from './ruins.js?v=11032217';
 
 const rng = seed => { let s = seed * 9301 + 49297; return () => (s = (s * 9301 + 49297) % 233280) / 233280; };
 const clean = g => { for (const k of Object.keys(g.attributes)) if (k !== 'position' && k !== 'normal') g.deleteAttribute(k); return g.index ? g.toNonIndexed() : g; };
@@ -110,7 +110,7 @@ export function glowMaterial() {
         float edge = 1. - abs(vU.y * 2. - 1.); float core = edge * edge;
         vec3 col = uCol, c;
         if (vA > 0. && uProg >= 0.) {                                                          /* 차지 고리: 차지한 만큼 그 사람 색으로 둘레를 따라 채워짐, 채움 끝이 하얗게 달림 */
-          float lit = step(vA, uProg), hd = (vA - uProg) * 60.; col = mix(uCol, uPCol, lit);
+          float lit = smoothstep(uProg + .012, uProg - .012, vA) * smoothstep(0., .03, vA) * smoothstep(0., .03, uProg), hd = (vA - uProg) * 45.;   /* 끝이 딱 잘리지 않게 녹아들며 차오름 */ col = mix(uCol, uPCol, lit);
           c = (col * col * 1.5 + vec3(.3) * core) * (.25 + core * .9) * mix(.25, 1.5, lit) + vec3(1.2) * exp(-hd * hd) * step(.001, uProg) * step(uProg, .999) * core; }
         else c = (col * col * 1.3 + vec3(.25) * core) * (.4 + core * .9) * pulse;
         if (vA > 0. && uRun >= 0.) { float rd = fract(vA - uRun + .5) - .5; rd *= 18.; c += vec3(1.6) * exp(-rd * rd) * (.5 + core); }   /* 원이 닫히는 순간: 하얀 빛이 원을 따라 한 바퀴 달림 */
