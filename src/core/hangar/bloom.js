@@ -14,6 +14,7 @@ export function makeBloom(renderer, bo = {}){
     vertexShader:'in vec3 position;in vec2 uv;out vec2 vU;void main(){vU=uv;gl_Position=vec4(position.xy,0.,1.);}',
     fragmentShader:`precision highp float;in vec2 vU;out vec4 o;uniform sampler2D t;uniform float th;
       void main(){ vec3 c=texture(t,vU).rgb; float l=max(c.r,max(c.g,c.b));
+        if(!(l<60.)) c=l<1e4?c*(60./l):vec3(0.); l=min(l,60.);   /* 한 점이 터무니없이 밝거나 '숫자 아님'이면(폰에서 아주 작은 면 하나가 이렇게 될 때가 있음) 그 한 점이 화면 넓게 번져 하얀 얼룩·검은 네모가 됨 → 번짐에 넣기 전에 한 점의 밝기를 끊음 */
         o=vec4(c*smoothstep(th,th+.5,l),1.); }`});
   const blur=new THREE.RawShaderMaterial({glslVersion:THREE.GLSL3,uniforms:{t:{value:null},dir:{value:new THREE.Vector2()}},
     vertexShader:'in vec3 position;in vec2 uv;out vec2 vU;void main(){vU=uv;gl_Position=vec4(position.xy,0.,1.);}',

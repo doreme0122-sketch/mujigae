@@ -6,8 +6,8 @@
    단위 m */
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { stoneMaterial, solid, glowMaterial } from './wardbase.js?v=11032127';
-import { gem } from './guardian.js?v=11032127';
+import { stoneMaterial, solid, glowMaterial } from './wardbase.js?v=11032137';
+import { gem } from './guardian.js?v=11032137';
 
 const AB = { transparent: true, depthWrite: false, blending: THREE.AdditiveBlending };
 const clean = g => { for (const k of Object.keys(g.attributes)) if (k !== 'position' && k !== 'normal') g.deleteAttribute(k); return g.index ? g.toNonIndexed() : g; };
@@ -35,10 +35,10 @@ function spireGeo() {
 }
 export function makeWardSpires(uT, spots) {
   const G = new THREE.Group(), metal = stoneMaterial(uT), sg = spireGeo();   /* 양쪽 수정탑도 받침과 같은 돌 (사용자 2026-11-03) */
-  const gemMat = new THREE.MeshPhysicalMaterial({ color: 0xffffff, metalness: 0, roughness: .05, transparent: true, opacity: .75, emissive: 0xffffff, emissiveIntensity: .6, flatShading: true, depthWrite: false });
+  const gemMat = new THREE.MeshPhysicalMaterial({ color: 0xffffff, metalness: 0, roughness: .05, transparent: true, opacity: .75, emissive: 0xffffff, emissiveIntensity: .6, depthWrite: false });   /* 각진 면은 면 방향을 미리 넣어 표현 (화면에서 면 방향을 구하는 방식은 아주 작게 보일 때 폰에서 빛 계산이 고장 나 번짐 얼룩이 됨) */
   const units = spots.map(([x, y, z], i) => { const u = new THREE.Group(); u.position.set(x, y, z); G.add(u);
     u.add(new THREE.Mesh(sg, metal));
-    const cg = gem(91 + i * 3, .05); cg.scale(1, .2, 1); const cr = new THREE.Mesh(cg, gemMat); cr.position.y = 1.46; cr.renderOrder = 5; u.add(cr);
+    const cg = gem(91 + i * 3, .05); cg.scale(1, .2, 1); cg.deleteAttribute('normal'); cg.computeVertexNormals(); const cr = new THREE.Mesh(cg, gemMat); cr.position.y = 1.46; cr.renderOrder = 5; u.add(cr);
     /* 마디 고리 빛 */
     const p = [], uv = [], kk = []; for (const yy of [.72, 1.06, 1.36]) for (let j = 0; j < 20; j++) { const a0 = j / 20 * Math.PI * 2, a1 = (j + 1) / 20 * Math.PI * 2, r = .1, Q = (a, y_) => [Math.cos(a) * r, y_, Math.sin(a) * r];
       const A = Q(a0, yy + .005), B = Q(a1, yy + .005), C = Q(a1, yy + .025), D = Q(a0, yy + .025); p.push(...A, ...B, ...C, ...A, ...C, ...D); uv.push(0, 0, 1, 0, 1, 1, 0, 0, 1, 1, 0, 1); kk.push(yy, yy, yy, yy, yy, yy); }
