@@ -8,7 +8,8 @@
    단위 m */
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { metalMaterial, glowMaterial } from './wardbase.js?v=11031931';
+import { glowMaterial } from './wardbase.js?v=11031947';
+import { ruinMaterial } from './ruins.js?v=11031947';
 
 const AB = { transparent: true, depthWrite: false, blending: THREE.AdditiveBlending };
 const clean = g => { for (const k of Object.keys(g.attributes)) if (k !== 'position' && k !== 'normal') g.deleteAttribute(k); return g.index ? g.toNonIndexed() : g; };
@@ -47,7 +48,7 @@ const coneMat = () => new THREE.ShaderMaterial({ ...AB, side: THREE.DoubleSide, 
 
 export function makeWardEye(uT, y) {
   const G = new THREE.Group(); G.position.y = y;
-  const metal = metalMaterial(uT), parts = [];
+  const metal = ruinMaterial(uT), parts = [];   /* 덮개(투사기 머리·갈퀴) = 고대 벽 돌 (사용자) */
   const lathe = (pts, seg = 32) => new THREE.LatheGeometry(pts.map(([r, yy]) => new THREE.Vector2(r, yy)), seg);
   /* 투사기: 기둥 머리 위 단 → 접시 → 렌즈 테 */
   parts.push(lathe([[0, 0], [.6, 0], [.62, .05], [.5, .12], [.36, .16], [.34, .26], [.42, .3], [.44, .36], [.3, .38], [0, .38]]));
@@ -69,13 +70,17 @@ export function makeWardEye(uT, y) {
   const CH = 1.25;
   const cone = new THREE.Mesh(new THREE.CylinderGeometry(1.0, .16, CH, 48, 1, true).translate(0, .4 + CH / 2, 0), coneMat()); cone.renderOrder = 8; G.add(cone);
   const disc = new THREE.Mesh(new THREE.CircleGeometry(1.08, 96), discMat()); disc.rotation.x = -Math.PI / 2; disc.position.y = .4 + CH; disc.renderOrder = 9; G.add(disc);
-  let open = 0, rot = 0, glitch = 0;
+  let open = 0, rot = 0, glitch = 0, snapT = -9;
+  G.userData.snap = t => { snapT = t; open = 1; };                                         /* 완성: 눈이 번쩍 떠짐 */
   G.userData.glow = gMat;
   G.userData.update = (t, dt, col, power = .4, want = 0) => {
     open += (want - open) * Math.min(1, dt * (want > open ? 2.5 : 4));
     rot += dt * (.15 + power * .35);
     if (Math.random() < dt * .6) glitch = .25 + Math.random() * .25; glitch = Math.max(0, glitch - dt * 3);   /* 홀로그램이 가끔 지직 */
-    const on = Math.max(.04, open) * (1 - glitch * (Math.random() < .5 ? 1 : 0));
+    const se = t - snapT, flash = se >= 0 && se < 1 ? Math.exp(-se * 4) : 0;
+    if (flash > 0) glitch = 0;
+    const on = Math.max(.04, open) * (1 - glitch * (Math.random() < .5 ? 1 : 0)) + flash * 1.6;
+    { const k = se >= 0 && se < .7 ? se / .7 : 1, sc = se >= 0 && se < .7 ? .55 + .6 * (1 - Math.pow(1 - k, 3)) - .15 * Math.sin(k * Math.PI) * (1 - k) * 0 + .12 * Math.sin(k * Math.PI) : 1; disc.scale.setScalar(sc); }   /* 원판이 오므렸다 활짝 펼쳐짐 */
     const D = disc.material.uniforms; D.uCol.value.copy(col); D.uT.value = t; D.uOpen.value = open; D.uRot.value = rot; D.uI.value = (.25 + .9 * on);
     D.uLook.value.set(Math.sin(t * .37) + .4 * Math.sin(t * 1.3), Math.cos(t * .29) * .5);                               /* 둘레를 둘러봄 */
     disc.position.y = .4 + CH + Math.sin(t * 1.2) * .03;

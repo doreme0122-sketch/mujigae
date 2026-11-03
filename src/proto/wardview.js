@@ -4,15 +4,15 @@
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { makeBloom } from '../core/hangar/bloom.js?v=11031931';
-import { chunk, obsidianMaterial } from './rocks.js?v=11031931';
-import { makeWardBase } from './wardbase.js?v=11031931';
-import { makeWardCore } from './wardcore.js?v=11031931';
-import { makeWardRing } from './wardring.js?v=11031931';
-import { makeWardSpires } from './wardspire.js?v=11031931';
-import { makeWardEye } from './wardeye.js?v=11031931';
-import { pointPool } from './skilldemo.js?v=11031931';
-import { makePerf } from './perf.js?v=11031931';
+import { makeBloom } from '../core/hangar/bloom.js?v=11031947';
+import { chunk, obsidianMaterial } from './rocks.js?v=11031947';
+import { makeWardBase } from './wardbase.js?v=11031947';
+import { makeWardCore } from './wardcore.js?v=11031947';
+import { makeWardRing } from './wardring.js?v=11031947';
+import { makeWardSpires } from './wardspire.js?v=11031947';
+import { makeWardEye } from './wardeye.js?v=11031947';
+import { pointPool } from './skilldemo.js?v=11031947';
+import { makePerf } from './perf.js?v=11031947';
 import * as A from '../core/audio.js';
 
 const $ = s => document.querySelector(s), clamp = THREE.MathUtils.clamp, V = (x = 0, y = 0, z = 0) => new THREE.Vector3(x, y, z);
@@ -117,7 +117,7 @@ export async function start(canvas, onProgress = () => {}) {
           vec3 c = (uCol * uCol + .2) * (below * (.06 + rim * .55) * wave + front * (.35 + rim * 1.2));
           gl_FragColor = vec4(c * uI, 1.); }` }));
   sheath.renderOrder = 10; scene.add(sheath);
-  const S = { own: 'none', col: COL.none.clone(), power: .4, fill: .12, cap: -1, tp: -1 };
+  const S = { own: 'none', col: COL.none.clone(), power: .4, fill: .12, cap: -1, tp: -1, done: -9, doneStep: 0 };
   const stEl = $('#state'); const names = { none: '빈 와드 — 푸른 빛', mine: '내 와드 — 연두 빛', foe: '남의 와드 — 붉은 주황 빛' };
   const tour = $('#tour'); [['빈 와드', 'none'], ['내 와드', 'mine'], ['남의 와드', 'foe'], ['내가 차지(10초)', 'cap'], ['순간 이동(5초)', 'tp']].forEach(([n, k]) => { const b = document.createElement('button'); b.type = 'button'; b.textContent = n;
     b.onclick = () => { if (k === 'tp') { S.cap = -1; if (S.own !== 'mine') { S.own = 'mine'; S.fill = 1; } S.tp = t; stEl.textContent = '순간 이동 중 — 빛 원에서 탑 위로 빛이 차오름'; } else if (k === 'cap') { S.tp = -1; S.own = 'none'; S.cap = t; stEl.textContent = '② 유리 기둥 · 차지하는 중 — 에너지가 아래부터 차오름'; } else { S.own = k; S.cap = -1; S.fill = k === 'none' ? .12 : 1; stEl.textContent = '와드 완성 · ' + names[k]; } tour.querySelectorAll('button').forEach(x => x.classList.toggle('on', x === b)); };
@@ -138,16 +138,26 @@ export async function start(canvas, onProgress = () => {}) {
   let last = performance.now(), t = 0; motes.setPx(Hd);
   renderer.setAnimationLoop(now => { try {
     const dt = clamp((now - last) / 1000, 0, .05); last = now; t += dt; uT.value = t;
-    if (S.cap >= 0) { const k = Math.min(1, (t - S.cap) / 10); S.fill = .12 + .88 * k; if (k >= 1) { S.cap = -1; S.own = 'mine'; stEl.textContent = '와드 완성 · ' + names.mine; } }
+    if (S.cap >= 0) { const k = Math.min(1, (t - S.cap) / 10); S.fill = .12 + .88 * k; if (k >= 1) { S.cap = -1; S.own = 'mine'; S.done = t; S.doneStep = 0; stEl.textContent = '차지 완료 — ' + names.mine; } }
     const capping = S.cap >= 0, wantCol = capping ? COL.none.clone().lerp(COL.mine, .3 + .7 * (S.fill - .12) / .88) : COL[S.own];
     S.col.lerp(wantCol, Math.min(1, dt * 4)); S.power += ((S.own === 'none' ? (capping ? .35 + .5 * S.fill : .35) : 1) - S.power) * Math.min(1, dt * 2);
-    base.userData.update(t, S.col, S.power); core.userData.update(t, S.col, S.power, S.fill);
-    spires.userData.update(t, S.col, S.power, S.own !== 'none' && !capping);
+    base.userData.update(t, S.col, S.power); core.userData.update(t, S.col, S.power + (t - S.done > .25 && t - S.done < 1.2 ? 1.2 : 0), S.fill);
+    spires.userData.update(t, S.col, S.power, S.own !== 'none' && !capping, S.boost || 0);
     eye.userData.update(t, dt, S.col, S.power, capping ? (S.fill - .12) / .88 : S.own !== 'none' ? 1 : 0);
-    ring.userData.update(t, dt, S.col, S.power, S.tp >= 0 ? 3.2 : capping ? .08 + (S.fill - .12) * 1.1 : S.own !== 'none' ? .5 : .06);
+    ring.userData.update(t, dt, S.col, S.power, S.tp >= 0 || (t - S.done > .25 && t - S.done < .9) ? 3.2 : capping ? .08 + (S.fill - .12) * 1.1 : S.own !== 'none' ? .5 : .06);
+    /* 차지 완료 효과 (원인 → 결과, 약 1.5초): ① 빛 원이 닫혀 하얀 빛이 한 바퀴 → ② 그 힘이 받침 틈·홈을 타고 위로 치솟음(기둥이 끓고 고리가 휘돎)
+       → ③④ 꼭대기에 닿는 순간 한꺼번에: 눈이 번쩍 떠지며 원판이 펼쳐지고 · 첨탑 불꽃이 솟고 · 땅을 따라 빛 물결이 둘레로 퍼짐 → ⑤ 소리 */
+    const de = t - S.done, run = de >= 0 && de < .3 ? de / .3 : -1, surge = de >= .25 && de < .75 ? (de - .25) / .5 : -1, hit = de >= .75 && de < 2.4;
+    if (de >= 0 && S.doneStep === 0) { S.doneStep = 1; [784, 987.8, 1174.7, 1568].forEach((f, i) => bell(f, .07, 1.2, i * .1)); }
+    if (de >= .75 && S.doneStep === 1) { S.doneStep = 2; eye.userData.snap(t); GU.uR.value = 2.25; S.pulse = 0; boom(); bell(2093, .1, 2.4, .02); bell(1318.5, .08, 2.6, .05);
+      motes.emit(q => { q.p.set(0, base.userData.top + core.userData.height + 1.6, 0); q.v.randomDirection().multiplyScalar(1.5 + Math.random() * 2.5); q.max = q.life = .7 + Math.random() * .5; q.c.copy(COL.mine); q.s = 1.1; q.g = 1.5; }, 90); }
+    S.pulse = (S.pulse ?? 99) + dt; GU.uPulse.value = S.pulse;
+    S.boost = hit ? Math.exp(-(de - .75) * 3) : 0;
     { const bg = base.userData.glow.uniforms, cg = core.userData.glow.uniforms;                 /* 차지 고리 · 순간 이동 빛 */
       bg.uProg.value = capping ? (t - S.cap) / 10 : S.own !== 'none' ? 1 : 0; bg.uPCol.value.copy(capping ? COL.mine : COL[S.own]);
       let rise = -9, ri = 0; if (S.tp >= 0) { const k = (t - S.tp) / 5; rise = -.2 + k * 3.9; ri = Math.min(1, k * 4); if (k >= 1) { const e = (t - S.tp - 5) / .6; ri = Math.max(0, 1 - e); rise = 9; if (e >= 1) { S.tp = -1; stEl.textContent = '도착 — ' + names.mine; } } }
+      if (surge >= 0) { rise = -.2 + surge * 3.9; ri = 1; } else if (hit && S.tp < 0) { rise = 9; ri = Math.max(0, 1 - (de - .75) * 1.5); }
+      bg.uRun.value = run;
       for (const u of [bg, cg, ring.userData.glow.uniforms, eye.userData.glow.uniforms, ...spires.userData.glows.map(g => g.uniforms)]) { u.uRise.value = rise; u.uRiseI.value = ri; }
       { const U = sheath.material.uniforms; U.uRise.value = rise; U.uI.value = ri; U.uCol.value.copy(COL.mine); U.uT.value = t; sheath.visible = ri > .01; }
       if (S.tp >= 0 && rise < 4) { const top = Math.max(.1, rise);                                            /* 빛 원에서 떠오른 빛 알갱이가 차오르는 높이까지 탑을 타고 오름 */
@@ -155,7 +165,7 @@ export async function start(canvas, onProgress = () => {}) {
           q.v.set(-Math.cos(a) * (r - tr) / .9, top / .9, -Math.sin(a) * (r - tr) / .9); q.drag = 0; q.max = q.life = .9; q.c.copy(COL.mine); q.s = .8; }, 4); }
       if (S.tp >= 0 && rise === 9 && ri > .97) motes.emit(q => { q.p.set(0, 3.3, 0); q.v.randomDirection().multiplyScalar(2 + Math.random() * 2); q.max = q.life = .6; q.c.copy(COL.mine); q.s = 1.2; q.g = 2; }, 60); }
     motes.update(dt);
-    GU.uT.value = t; GU.uCol.value.copy(S.col); GU.uProg.value = 0; GU.uOwn.value = 0; GU.uPulse.value = 99;
+    GU.uT.value = t; GU.uCol.value.copy(S.col); GU.uProg.value = 0; GU.uOwn.value = 0;
     cam.h += (cam.H - cam.h) * Math.min(1, dt * 3); cam.tilt += (cam.T - cam.tilt) * Math.min(1, dt * 3);
     camera.position.set(Math.sin(cam.az) * cam.h * Math.sin(cam.tilt), cam.h * Math.cos(cam.tilt) + .6, Math.cos(cam.az) * cam.h * Math.sin(cam.tilt)); camera.lookAt(0, 2.1, 0);
     renderer.setRenderTarget(bloom.scene); renderer.clear(); renderer.render(scene, camera); bloom.render(Wd, Hd, !perf.st.bloom); perf.tick(dt);

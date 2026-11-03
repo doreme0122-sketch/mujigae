@@ -11,6 +11,7 @@
    단위 m. 받침 높이 약 1.3m, 지름 약 4.4m. 돌은 한 재질, 빛은 한 재질 → 그리는 횟수 적게 */
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+import { ruinMaterial } from './ruins.js?v=11031947';
 
 const rng = seed => { let s = seed * 9301 + 49297; return () => (s = (s * 9301 + 49297) % 233280) / 233280; };
 const clean = g => { for (const k of Object.keys(g.attributes)) if (k !== 'position' && k !== 'normal') g.deleteAttribute(k); return g.index ? g.toNonIndexed() : g; };
@@ -92,9 +93,9 @@ export function metalMaterial(uT) {
 /* 빛 (틈·홈·테): 속에서 흐르는 힘. aK = 흐름 위치(아래 0 → 위 1) */
 export function glowMaterial() {
   return new THREE.ShaderMaterial({ transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide,
-    uniforms: { uCol: { value: new THREE.Vector3(.35, .85, 1) }, uI: { value: 1 }, uT: { value: 0 }, uFlow: { value: .4 }, uProg: { value: -1 }, uPCol: { value: new THREE.Vector3(1, 1, 1) }, uRise: { value: -9 }, uRiseI: { value: 0 } },
+    uniforms: { uCol: { value: new THREE.Vector3(.35, .85, 1) }, uI: { value: 1 }, uT: { value: 0 }, uFlow: { value: .4 }, uProg: { value: -1 }, uPCol: { value: new THREE.Vector3(1, 1, 1) }, uRise: { value: -9 }, uRiseI: { value: 0 }, uRun: { value: -1 } },
     vertexShader: 'attribute float aK, aA; varying float vK, vA, vY; varying vec2 vU; void main(){ vK = aK; vA = aA; vU = uv; vY = (modelMatrix * vec4(position, 1.)).y; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.); }',
-    fragmentShader: `uniform vec3 uCol, uPCol; uniform float uI, uT, uFlow, uProg, uRise, uRiseI; varying float vK, vA, vY; varying vec2 vU;
+    fragmentShader: `uniform vec3 uCol, uPCol; uniform float uI, uT, uFlow, uProg, uRise, uRiseI, uRun; varying float vK, vA, vY; varying vec2 vU;
       void main(){ float w = fract(vK * 3. - uT * uFlow); float pulse = .75 + .45 * exp(-(w - .5) * (w - .5) * 30.);
         float edge = 1. - abs(vU.y * 2. - 1.); float core = edge * edge;
         vec3 col = uCol, c;
@@ -102,6 +103,7 @@ export function glowMaterial() {
           float lit = step(vA, uProg), hd = (vA - uProg) * 60.; col = mix(uCol, uPCol, lit);
           c = (col * col * 1.5 + vec3(.3) * core) * (.25 + core * .9) * mix(.25, 1.5, lit) + vec3(1.2) * exp(-hd * hd) * step(.001, uProg) * step(uProg, .999) * core; }
         else c = (col * col * 1.3 + vec3(.25) * core) * (.4 + core * .9) * pulse;
+        if (vA > 0. && uRun >= 0.) { float rd = fract(vA - uRun + .5) - .5; rd *= 18.; c += vec3(1.6) * exp(-rd * rd) * (.5 + core); }   /* 원이 닫히는 순간: 하얀 빛이 원을 따라 한 바퀴 달림 */
         float rh = (vY - uRise) / .14, rise = smoothstep(uRise + .02, uRise - .3, vY) * uRiseI;     /* 순간 이동: 땅 고리에서 탑 위로 빛이 차오름 */
         c += (uCol * uCol * 2.2 + .5) * rise * (1. + core) + vec3(2.) * exp(-rh * rh) * uRiseI * (.5 + core);
         gl_FragColor = vec4(c * uI, 1.); }` });
@@ -186,7 +188,7 @@ export function makeWardBase(uT) {
     const rp = new THREE.Mesh(new THREE.PlaneGeometry(.36, .92), runeMat(tex)); rp.position.set(0, .66, .113); grp.add(rp); rp.renderOrder = 5; G.add(grp); runes.push(rp); }
   /* 둘레에 떨어져 나간 돌 조각 */
   for (let i = 0; i < 7; i++) { const a = R() * TAU, r = 2.15 + R() * .7, s = .12 + R() * .14; const g = block(s * 1.6, s, s * 1.2, .02); g.rotateY(R() * 3); g.rotateZ((R() - .5) * .5); g.translate(Math.cos(a) * r, 0, Math.sin(a) * r); stone.push(g); }
-  const sMat = metalMaterial(uT), gMat = glowMaterial();   /* 받침은 은빛 금속 + 판 선 (사용자) */
+  const sMat = ruinMaterial(uT), gMat = glowMaterial();   /* 받침은 맵 벽 '고대 유적'과 같은 돌 (사용자 2026-11-03: 받침대·덮개는 고대 벽) */
   const sm = new THREE.Mesh(mergeGeometries(stone.map(clean)), sMat); G.add(sm);
   const gm = new THREE.Mesh(glowGeo(glow), gMat); gm.renderOrder = 4; G.add(gm);
   G.userData.top = 1.56;                                                    /* 다음 부품(유리 기둥)이 앉을 높이 */

@@ -6,8 +6,8 @@
    단위 m */
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { metalMaterial, glowMaterial } from './wardbase.js?v=11031931';
-import { gem } from './guardian.js?v=11031931';
+import { metalMaterial, glowMaterial } from './wardbase.js?v=11031947';
+import { gem } from './guardian.js?v=11031947';
 
 const AB = { transparent: true, depthWrite: false, blending: THREE.AdditiveBlending };
 const clean = g => { for (const k of Object.keys(g.attributes)) if (k !== 'position' && k !== 'normal') g.deleteAttribute(k); return g.index ? g.toNonIndexed() : g; };
@@ -47,10 +47,10 @@ export function makeWardSpires(uT, spots) {
     const fl = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), flameMat()); fl.position.y = 1.72; fl.renderOrder = 8; fl.frustumCulled = false; fl.material.uniforms.uPh.value = i * 2.3; u.add(fl);
     return { u, gm, fl, cr }; });
   G.userData.glows = units.map(o => o.gm);
-  G.userData.update = (t, col, power = .4, owned = false) => {
+  G.userData.update = (t, col, power = .4, owned = false, boost = 0) => {
     units.forEach((o, i) => { const blinkSp = 1.2 + power * 4, blink = owned ? 1 : .35 + .65 * Math.pow(.5 + .5 * Math.sin(t * blinkSp + i * 1.7), 3.);   /* 빈 와드: 느리게 깜빡 → 차지할수록 빨라지고 또렷 */
       const flick = .88 + .12 * Math.sin(t * 17 + i * 3) * Math.sin(t * 5.3 + i);
-      o.fl.material.uniforms.uCol.value.copy(col); o.fl.material.uniforms.uT.value = t; o.fl.material.uniforms.uI.value = (.35 + power * .8) * blink * flick;
+      o.fl.material.uniforms.uCol.value.copy(col); o.fl.material.uniforms.uT.value = t; o.fl.material.uniforms.uI.value = (.35 + power * .8) * blink * flick + boost * 2.2; o.fl.scale.setScalar(1 + boost * 1.4);   /* 완성 순간 불꽃이 확 솟음 */
       o.gm.uniforms.uT.value = t; o.gm.uniforms.uCol.value.copy(col); o.gm.uniforms.uI.value = .7 + power;
       o.cr.material.emissive.setRGB(col.x * col.x, col.y * col.y, col.z * col.z); o.cr.material.emissiveIntensity = .4 + power * .9 * blink; o.cr.rotation.y = t * .6; }); };
   return G;
