@@ -13,7 +13,7 @@ import * as THREE from 'three';
 import * as A from '../core/audio.js';
 
 const AB = { transparent: true, depthWrite: false, blending: THREE.AdditiveBlending };
-export const BH = { ZONE: 30, RING: 46, FLOW: 11, CORE: 2.2, GRAB: 12, CATCH: 4.5 };   /* CATCH: 여기까지 들어오면 못 빠져나가고 감겨 들어감 */
+export const BH = { ZONE: 30, RING: 46, FLOW: 9, CORE: 1.25, GRAB: 7.5, CATCH: 2.8, SC: .57 };   /* 사용자 2026-11-03: 블랙홀이 너무 커서 보스방 주인공 같음 → 생김새·끌어당김 모두 약 0.57배 (SC: 생김새 크기)   /* CATCH: 여기까지 들어오면 못 빠져나가고 감겨 들어감 */
 
 function whoom(up) { if (!A.live()) return; const c = A.ctx, t0 = c.currentTime, o = c.createOscillator(), g = c.createGain(); o.type = 'sine';
   o.frequency.setValueAtTime(up ? 50 : 220, t0); o.frequency.exponentialRampToValueAtTime(up ? 260 : 40, t0 + .7); o.connect(g); A.env(g, t0, .02, .3, .8); A.out(g, .5); o.start(t0); o.stop(t0 + .9);
@@ -23,7 +23,7 @@ export function makeBlackHole(B, opt = {}) {
   const G = new THREE.Group();
   /* 검은 가운데: 화면을 보는 원판. 가장자리에 빛이 감겨 얇게 빛남(빛이 휘어 도는 자리) */
   const core = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.ShaderMaterial({ transparent: true, depthWrite: false, uniforms: { uT: { value: 0 }, uS: { value: 1 } },
-    vertexShader: 'uniform float uS; varying vec2 vP; void main(){ vP = position.xy * 2.; vec4 c = modelViewMatrix * vec4(0.,0.,0.,1.); c.xy += position.xy * 9. * uS; gl_Position = projectionMatrix * c; }',
+    vertexShader: `uniform float uS; varying vec2 vP; void main(){ vP = position.xy * 2.; vec4 c = modelViewMatrix * vec4(0.,0.,0.,1.); c.xy += position.xy * 9. * ${BH.SC.toFixed(3)} * uS; gl_Position = projectionMatrix * c; }`,
     fragmentShader: `uniform float uT; varying vec2 vP; void main(){ float r = length(vP) * 2.05;                      /* 반지름 1 = 2.2m (빨려 드는 한가운데와 같은 크기) */
       float hole = 1. - smoothstep(.92, 1.02, r); float d = (r - 1.06) / .07, ring = exp(-d * d);
       float a = atan(vP.y, vP.x + 1e-5), flick = .8 + .2 * sin(a * 7. + uT * 5.);
@@ -45,7 +45,7 @@ export function makeBlackHole(B, opt = {}) {
         float side = .65 + .35 * sin(a + .6);                                                                    /* 다가오는 쪽이 더 밝음 */
         vec3 hot = mix(vec3(1.3, 1.15, 1.), vec3(1.1, .45, .12), smoothstep(.05, .5, u)); hot = mix(hot, vec3(.45, .08, .05), smoothstep(.5, 1., u));
         gl_FragColor = vec4(hot * lit * (.15 + streak) * side * 1.5, 1.); }` }));
-  disk.rotation.x = -Math.PI / 2; disk.position.y = .6; disk.renderOrder = 11; G.add(disk);
+  disk.rotation.x = -Math.PI / 2; disk.position.y = .6; disk.scale.setScalar(BH.SC); disk.renderOrder = 11; G.add(disk);
   /* 나오는 구멍: 같은 블랙홀이 작게 열렸다 닫힘 (사용자: 블랙홀 같은 일그러짐이 열리며 나옴) */
   const core2 = new THREE.Mesh(core.geometry, core.material.clone()), disk2 = new THREE.Mesh(disk.geometry, disk.material.clone());
   core2.renderOrder = 12; core2.frustumCulled = false; disk2.rotation.x = -Math.PI / 2; disk2.renderOrder = 11; core2.visible = disk2.visible = false; G.add(core2, disk2);
@@ -67,7 +67,7 @@ export function makeBlackHole(B, opt = {}) {
       vec3 c = mix(vec3(.5, .6, 1.1), vec3(1.2, .9, .7), vA) * (head * 1.2 + .25) * w * (1. - vU);
       gl_FragColor = vec4(c * vA, 1.); }` }));
   dust.frustumCulled = false; dust.renderOrder = 10; G.add(dust);
-  const spawnDust = i => { let x, z; if (i % 2) { const a = Math.random() * 6.283, r = 5 + Math.random() * 16; x = P.x + Math.cos(a) * r; z = P.z + Math.sin(a) * r; }
+  const spawnDust = i => { let x, z; if (i % 2) { const a = Math.random() * 6.283, r = 3 + Math.random() * 11; x = P.x + Math.cos(a) * r; z = P.z + Math.sin(a) * r; }
     else { for (let k = 0; k < 6; k++) { const a = Math.random() * 6.283, r = 6 + Math.sqrt(Math.random()) * 34; x = P.x + Math.cos(a) * r; z = P.z + Math.sin(a) * r; if (Math.hypot(x, z) < BH.RING) break; } }   /* 블랙홀 둘레에 퍼져 있다가 휘감겨 들어감 */
     dP[i * 3] = x; dP[i * 3 + 1] = .3 + Math.random() * 1.2; dP[i * 3 + 2] = z; dl[i] = 2 + Math.random() * 4; };
   const P = new THREE.Vector3();
@@ -76,7 +76,7 @@ export function makeBlackHole(B, opt = {}) {
   function flow(x, z, out) {                                                 /* 소용돌이의 중심 = 블랙홀 (사용자: 블랙홀이 빨아들이는 중심) — 맵 가운데가 아님 */
     const r = Math.hypot(x, z), dx = P.x - x, dz = P.z - z, d = Math.hypot(dx, dz) + 1e-4, ux = dx / d, uz = dz / d;
     const mask = 1 - THREE.MathUtils.smoothstep(r, BH.RING - 3, BH.RING + 4);                         /* 보스 구역 + 안쪽 둥근 길 안에서만 */
-    const swirl = BH.FLOW * 1.7 * Math.exp(-d / 17) * (d / (d + 2.5)) * mask, pull = 3.2 * Math.exp(-d / 13) * mask;   /* 블랙홀에 가까울수록 세게 돎 + 조금씩 끌려 듦 */
+    const swirl = BH.FLOW * 1.7 * Math.exp(-d / 12) * (d / (d + 1.6)) * mask, pull = 2.6 * Math.exp(-d / 9) * mask;   /* 블랙홀에 가까울수록 세게 돎 + 조금씩 끌려 듦 */
     let fx = -uz * swirl + ux * pull, fz = ux * swirl + uz * pull;
     if (d < BH.GRAB) { const k = 1 - d / BH.GRAB; fx += ux * 16 * k * k - uz * 10 * k; fz += uz * 16 * k * k + ux * 10 * k; }
     out[0] = fx; out[1] = fz; return d; }
@@ -106,7 +106,7 @@ export function makeBlackHole(B, opt = {}) {
     if (S.phase === 0) { const d = flow(fs.x, fs.z, tmp); fs.ex = tmp[0]; fs.ez = tmp[1];
       if (d < BH.CATCH) { S.phase = 1; S.t0 = t; S.r0 = d; S.ang = Math.atan2(fs.z - P.z, fs.x - P.x); S.dest = pickDest(); whoom(false); } }
     else fs.ex = fs.ez = 0;
-    let lensK = .3, veilA = 0;
+    let lensK = .22, veilA = 0;
     if (S.phase === 1) {                                                   /* ① 감겨 듦: 빛 원반을 따라 점점 빠르게 두세 바퀴 돌며 가운데로, 블랙홀 쪽으로 길게 늘어나며 빛 꼬리로 풀림 */
       const k = Math.min(1, (t - S.t0) / 1.3), w = 2.5 + 16 * k * k; S.ang += w * dt; const r = S.r0 * Math.pow(1 - k, 1.4);
       fs.x = P.x + Math.cos(S.ang) * r; fs.z = P.z + Math.sin(S.ang) * r; fs.vx = fs.vz = 0;
@@ -120,7 +120,7 @@ export function makeBlackHole(B, opt = {}) {
       if (k >= 1) { S.phase = 3; S.t0 = t; fs.x = S.dest[0]; fs.z = S.dest[1]; S.out = Math.atan2(-S.dest[1], -S.dest[0]) + (Math.random() - .5) * 1.2;   /* 가운데 쪽(트인 쪽)으로 튀어나옴 */ core2.visible = disk2.visible = true; whoom(true); } }
     else if (S.phase === 3) {                                              /* ③ 나옴: 그 자리에 작은 블랙홀이 열림 → 기체가 늘어난 채 튀어나와 원래 크기로 → 구멍이 닫힘 */
       const e = t - S.t0, open = e < .35 ? Math.sin(e / .35 * Math.PI / 2) : e < .7 ? 1 : Math.max(0, 1 - (e - .7) / .6), hs = .55 * open;
-      core2.position.set(S.dest[0], 1.6, S.dest[1]); disk2.position.set(S.dest[0], .6, S.dest[1]); core2.material.uniforms.uS.value = Math.max(.001, hs); disk2.scale.setScalar(Math.max(.001, hs));
+      core2.position.set(S.dest[0], 1.6, S.dest[1]); disk2.position.set(S.dest[0], .6, S.dest[1]); core2.material.uniforms.uS.value = Math.max(.001, hs); disk2.scale.setScalar(Math.max(.001, hs) * BH.SC);
       veilA = Math.max(0, .92 * (1 - e / .35));
       if (e > .35) { const u = Math.min(1, (e - .35) / .5), ease = 1 - Math.pow(1 - u, 3); shipM.visible = true;
         fs.x = S.dest[0] + Math.cos(S.out) * 4.5 * ease; fs.z = S.dest[1] + Math.sin(S.out) * 4.5 * ease; fs.vx = fs.vz = 0; fs.head = Math.atan2(-Math.cos(S.out), -Math.sin(S.out));
@@ -130,7 +130,7 @@ export function makeBlackHole(B, opt = {}) {
     veil.style.opacity = veilA.toFixed(3);
     /* 화면: 블랙홀 둘레가 휘어 보임 + 나오는 자리에서 공간이 일그러지며 열림 */
     if (bloom && cam) { const v = P.clone().setY(1.2).project(cam); const vis = v.z < 1 && Math.abs(v.x) < 1.4 && Math.abs(v.y) < 1.4;
-      const pr = new THREE.Vector3(P.x + 6, 1.2, P.z).project(cam), R = Math.abs(pr.x - v.x) * .5 * (Wd / Hd);
+      const pr = new THREE.Vector3(P.x + 6 * BH.SC, 1.2, P.z).project(cam), R = Math.abs(pr.x - v.x) * .5 * (Wd / Hd);
       bloom.lens(v.x * .5 + .5, v.y * .5 + .5, Math.min(.5, R), vis ? lensK : 0, Wd / Hd);
       if (S.phase === 3) { const w = new THREE.Vector3(S.dest[0], 1, S.dest[1]).project(cam), e = t - S.t0; bloom.warp(w.x * .5 + .5, w.y * .5 + .5, .05 + e * .55, .04 * Math.max(0, 1 - e / 1.2), Wd / Hd); }   /* 나오는 자리 공간이 일그러지며 열림 */
       else if (S.phase === 1 && t - S.t0 > 1.1) { const e = (t - S.t0 - 1.1) / .2; bloom.warp(v.x * .5 + .5, v.y * .5 + .5, .02 + e * .2, .05, Wd / Hd); }   /* 검은 가운데에 닿는 순간 번쩍 일그러짐 */

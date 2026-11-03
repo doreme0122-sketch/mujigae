@@ -7,7 +7,7 @@
      걷힌 곳은 계속 보임(그 와드가 내 것인 동안) · 그 안의 숨을 곳 속도 보임
    무게: 길 거리 계산은 와드마다 처음 한 번(250×250 칸) · 물결 그림은 바닥 위 한 장 */
 import * as THREE from 'three';
-import { makeWard, WCOL } from './ward.js?v=11032313';
+import { makeWard, WCOL } from './ward.js?v=11032318';
 
 const A0 = -Math.PI / 2, ANG = Array.from({ length: 10 }, (_, k) => A0 + k * Math.PI / 5), MID = ANG.map(a => a + Math.PI / 10);
 const angD = (a, b) => Math.abs(Math.atan2(Math.sin(a - b), Math.cos(a - b)));
@@ -87,8 +87,8 @@ export function makeWardsOnMap(B, vision, uT) {
         vec3 bc = uCol; float lit = 0.;
         if (uCap >= 0.) {                                                                                          /* 차오름: 칼로 자른 듯한 끝 대신 물이 번지듯 — 끝은 띠 가운데가 앞서 나간 둥근 혀 모양으로 부드럽게 녹아들고, 시작점도 서서히 짙어짐 (사용자) */
           float hp = uCap + .018 * exp(-e * e * .8) - .009, soft = .04 + .02 * (1. - exp(-e * e));
-          lit = smoothstep(hp + soft * .5, hp - soft * .5, along) * smoothstep(-.005, .05, along) * smoothstep(0., .04, uCap);
-          bc = mix(uCol, uPCol, lit); float bk = hp - along, gh = bk > 0. ? exp(-bk * 9.) : exp(-bk * bk * 500.); band += gh * exp(-e * e * 1.3) * .7 * step(.001, uCap) * step(uCap, .999); }   /* 채움 끝은 뒤로 끌리는 부드러운 빛 */   /* 차오름은 가장자리 띠에만 */
+          float done = smoothstep(.86, 1., uCap); lit = max(smoothstep(hp + soft * .5, hp - soft * .5, along) * mix(smoothstep(-.005, .05, along), 1., done) * smoothstep(0., .04, uCap), done * done);   /* 다 차 갈수록 이음매가 녹아 한 바퀴로 닫힘 */
+          bc = mix(uCol, uPCol, lit); float bk = hp - along, gh = bk > 0. ? exp(-bk * 9.) : exp(-bk * bk * 500.); band += gh * exp(-e * e * 1.3) * .7 * step(.001, uCap) * (1. - done); }   /* 채움 끝은 뒤로 끌리는 부드러운 빛 */   /* 차오름은 가장자리 띠에만 */
         vec3 c = (bc * bc * 1.3 + .12) * band * (.3 + uIn * .4 + lit * .3) + (uCol * uCol * 1.2 + .06) * (pull + fill);
         gl_FragColor = vec4(c * uI, 1.); }` });
   for (const o of list) { const m = new THREE.Mesh(new THREE.PlaneGeometry(WARDS.NEAR * 2.3, WARDS.NEAR * 2.3), zoneMat()); m.rotation.x = -Math.PI / 2; m.position.set(o.x, .06, o.z); m.rotation.z = o.w.rotation.y; m.renderOrder = 3; G.add(m); o.zone = m; o.inS = 0; }
