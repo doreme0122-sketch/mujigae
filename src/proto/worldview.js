@@ -2,18 +2,20 @@
    날아 보기: 1번 기지에서 기체를 조이스틱으로 몰아 맵 크기·길·문을 몸으로 확인(지금 있는 땅 이름 · 출발 뒤 걸린 시간 · 속도 바꾸기)
    보기: 날아 보기·지역 보기는 기체를 따라감, 맵 전체는 가운데 고정(끌어서 이동). 두 손가락(휠)로 확대. 시작 기지 자리는 빛 고리(다음 단계에서 진짜 기지) */
 import * as THREE from 'three';
-import { makeBloom } from '../core/hangar/bloom.js?v=11032217';
-import { makeMapFloor, MAP, toWorld } from './mapfloor.js?v=11032217';
-import { makePerf } from './perf.js?v=11032217';
+import { makeBloom } from '../core/hangar/bloom.js?v=11032231';
+import { makeMapFloor, MAP, toWorld } from './mapfloor.js?v=11032231';
+import { makePerf } from './perf.js?v=11032231';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
-import { makeFlight, loadBlock, FLY } from './flight.js?v=11032217';
-import { makeWalls } from './walls.js?v=11032217';
-import { makeMotes } from './motes.js?v=11032217';
-import { makeBushes } from './bushes.js?v=11032217';
-import { makeVision } from './vision.js?v=11032217';
-import { makeHide } from './hideviz.js?v=11032217';
-import { makeWardsOnMap, WARDS } from './wardsight.js?v=11032217';
-import { makeBlackHole } from './blackhole.js?v=11032217';
+import { makeFlight, loadBlock, FLY } from './flight.js?v=11032231';
+import { makeWalls } from './walls.js?v=11032231';
+import { makeMotes } from './motes.js?v=11032231';
+import { makeBushes } from './bushes.js?v=11032231';
+import { makeVision } from './vision.js?v=11032231';
+import { makeHide } from './hideviz.js?v=11032231';
+import { makeWardsOnMap, WARDS } from './wardsight.js?v=11032231';
+import { makeBlackHole } from './blackhole.js?v=11032231';
+import { makeBossCrystals } from './bosscrystals.js?v=11032231';
+import { makeShots } from './shots.js?v=11032231';
 
 const $ = s => document.querySelector(s), clamp = THREE.MathUtils.clamp;
 const VIEWS = [{ name: '날아 보기', h: 42, tilt: .38 }, { name: '지역 보기', h: 160, tilt: .25 }, { name: '맵 전체', h: 520, tilt: .02 }];
@@ -23,9 +25,9 @@ export async function start(canvas, onProgress = () => {}) {
   renderer.toneMapping = THREE.NoToneMapping; renderer.autoClear = false; renderer.setClearColor(0, 1);
   const scene = new THREE.Scene(), camera = new THREE.PerspectiveCamera(40, 1, 1, 3000), bloom = makeBloom(renderer, { samples: 0 });
   onProgress(.2);
-  const floor = await makeMapFloor(renderer, './assets/map/v7.png?v=11032217');
-  const J = await (await fetch('./assets/map/v7.json?v=11032217')).json();
-  const BLK = await loadBlock('./assets/map/v7.png?v=11032217');                  /* 벽 판정 = 바닥에 그린 벽 그림 그대로 */
+  const floor = await makeMapFloor(renderer, './assets/map/v7.png?v=11032231');
+  const J = await (await fetch('./assets/map/v7.json?v=11032231')).json();
+  const BLK = await loadBlock('./assets/map/v7.png?v=11032231');                  /* 벽 판정 = 바닥에 그린 벽 그림 그대로 */
   const UT = { value: 0 }, WALL = makeWalls(BLK, floor, J.ridges, UT); floor.mat.uniforms.uWf.value = WALL.fieldTex;   /* 바닥도 같은 벽 지도로 */
   scene.add(WALL.real); scene.add(WALL.mesh); WALL.mesh.visible = false;   /* 승인된 벽 5종 · 맵 전체 보기에서만 가벼운 한 덩어리 벽(멀리서 보는 지도) */
   { const pm = new THREE.PMREMGenerator(renderer); scene.environment = pm.fromScene(new RoomEnvironment(), .04).texture; scene.environmentIntensity = .6; pm.dispose(); }
@@ -61,6 +63,8 @@ export async function start(canvas, onProgress = () => {}) {
   const bh = makeBlackHole(BLK, { rooms: SPAWN.map(p => toWorld(...p)), mine: 0 }); scene.add(bh);   /* 보스 구역 블랙홀: 떠돌며 둘레 공간을 끌고 돎 → 안쪽 둥근 길이 소용돌이 흐름, 한가운데에 빨려 들면 맵 아무 곳으로 */
   const toast = document.createElement('div'); toast.style.cssText = 'position:fixed;left:50%;top:calc(env(safe-area-inset-top,0px) + 150px);transform:translateX(-50%);padding:7px 16px;border-radius:14px;background:rgba(20,6,30,.7);border:1px solid rgba(200,140,255,.45);color:#f2e6ff;font-size:13px;letter-spacing:.04em;pointer-events:none;opacity:0;transition:opacity .4s;white-space:nowrap'; document.body.appendChild(toast);
   let toastT = 0; const say = m => { toast.textContent = m; toast.style.opacity = 1; toastT = 2.6; };                              /* 와드 10개: 5m 안에 10초 머물면 차지 → 물결이 밝히는 땅만 퍼지며 안개 시야가 차례로 걷힘 */
+  const crystals = makeBossCrystals(BLK, UT); scene.add(crystals);                                   /* 보스 구역 수정 기둥 20개: 탄을 튕김 · 기체는 부딪힘 */
+  const shots = makeShots({ B: BLK, crystals, bh, FS, say }); scene.add(shots);                          /* 기본탄: 오른쪽 아래 버튼에서 끌어 조준 · 누르는 동안 쏨 · 과열 */
   const hideEl = document.createElement('div'); hideEl.id = 'hide'; hideEl.innerHTML = '<i></i><b>숨음</b>'; document.body.appendChild(hideEl);
   const motes = makeMotes(BLK, J.labels.map(o => { const [x, z] = toWorld(o.x, o.y); return [J.names.indexOf(o.n), x, z]; })); scene.add(motes.mesh);   /* 땅마다 떠다니는 알갱이 */
   /* 땅 이름: 경계를 넘으면 화면 위쪽에 잠깐 떴다 사라짐 (그 땅 안개 색 한 줄과 함께)
@@ -108,6 +112,7 @@ export async function start(canvas, onProgress = () => {}) {
   renderer.setAnimationLoop(now => { try { renderer.info.reset();
     const dt = clamp((now - last) / 1000, 0, .05); last = now; t += dt;
     fly.userData.update(t, dt);
+    shots.userData.update(t, dt, Hd / (2 * Math.tan(camera.fov * Math.PI / 360)));
     motes.update(t, dt, FS.x, FS.z); wards.userData.update(t, dt, FS.x, FS.z);
     if (toastT > 0 && (toastT -= dt) <= 0) toast.style.opacity = 0;
     const inBush = bushes.update(t, dt, FS.x, FS.z); hide.update(t, dt, FS.x, FS.z, inBush); fly.userData.setGhost(inBush);   /* 숨으면 내 화면에서 내 기체 반투명 */
@@ -131,5 +136,5 @@ export async function start(canvas, onProgress = () => {}) {
   { const v = (import.meta.url.match(/v=(\d+)/) || [])[1] || '개발'; const el = document.createElement('div'); el.textContent = '7안 · 판 번호 ' + v;   /* 어떤 버전이 열렸는지 바로 확인 */
     el.style.cssText = 'position:fixed;left:max(18px,env(safe-area-inset-left,0px));bottom:calc(env(safe-area-inset-bottom,0px) + 14px);font-size:11px;color:rgba(185,255,74,.7);pointer-events:none'; document.body.appendChild(el); }
   onProgress(1);
-  window.__wv = { get t() { return t; }, cam, fly: FS, wards, bh, wallTris: WALL.mesh.userData.tris, real: WALL.real.userData, wallRoot: WALL.real, info: renderer.info, vision, hide: () => [bushes.list.length, ...hide.count], spots: () => bushes.list.map(b => [b.why, b.size, b.shape, +b.x.toFixed(0), +b.z.toFixed(0)]), dbg: () => { const o = {}; const ex = []; scene.traverse(m => { if (m.isMesh && !m.isInstancedMesh && !m.material.customProgramCacheKey && ex.length < 3) { const w = new THREE.Vector3(); m.getWorldPosition(w); ex.push([m.geometry.type, m.parent && m.parent.type, w.x.toFixed(1), w.z.toFixed(1), m.material.type]); } }); o.ex = ex; scene.traverse(m => { if (!m.isMesh && !m.isPoints) return; const k = (m.isInstancedMesh ? 'I:' : 'M:') + (m.material.customProgramCacheKey ? m.material.customProgramCacheKey() : m.material.type); const tri = (m.geometry.index ? m.geometry.index.count : m.geometry.attributes.position.count) / 3; o[k] = o[k] || [0, 0, 0]; o[k][0]++; o[k][1] += tri * (m.count || 1); o[k][2] = tri; }); return o; } };
+  window.__wv = { get t() { return t; }, cam, fly: FS, wards, bh, crystals, shots, wallTris: WALL.mesh.userData.tris, real: WALL.real.userData, wallRoot: WALL.real, info: renderer.info, vision, hide: () => [bushes.list.length, ...hide.count], spots: () => bushes.list.map(b => [b.why, b.size, b.shape, +b.x.toFixed(0), +b.z.toFixed(0)]), dbg: () => { const o = {}; const ex = []; scene.traverse(m => { if (m.isMesh && !m.isInstancedMesh && !m.material.customProgramCacheKey && ex.length < 3) { const w = new THREE.Vector3(); m.getWorldPosition(w); ex.push([m.geometry.type, m.parent && m.parent.type, w.x.toFixed(1), w.z.toFixed(1), m.material.type]); } }); o.ex = ex; scene.traverse(m => { if (!m.isMesh && !m.isPoints) return; const k = (m.isInstancedMesh ? 'I:' : 'M:') + (m.material.customProgramCacheKey ? m.material.customProgramCacheKey() : m.material.type); const tri = (m.geometry.index ? m.geometry.index.count : m.geometry.attributes.position.count) / 3; o[k] = o[k] || [0, 0, 0]; o[k][0]++; o[k][1] += tri * (m.count || 1); o[k][2] = tri; }); return o; } };
 }

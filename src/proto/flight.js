@@ -10,8 +10,8 @@
    무게: 기체 한 대 + 불꽃 띠 몇 장 + 꼬리 띠 하나 + 불티 점 묶음 하나 + 그림자 판 하나 */
 import * as THREE from 'three';
 import { buildShip, engineSpots } from '../core/ships/build.js';
-import { flameMesh } from './sortie.js?v=11032217';
-import { MAP } from './mapfloor.js?v=11032217';
+import { flameMesh } from './sortie.js?v=11032231';
+import { MAP } from './mapfloor.js?v=11032231';
 
 export const FLY = { LEN: 2, HOVER: .7, R: .8, SPEEDS: [9, 12, 15, 18], TURN: 7, ACC: .22,
   BASE: 9, SHIELD: 3, BOOST: 5, BOOSTK: 1.5 };   /* 기지 고리(반지름 9m)를 벗어나는 순간: 보호막 3초 · 가속 5초(1.5배) — 기지 출구 앞 매복에 바로 당하지 않게 */
@@ -78,7 +78,7 @@ export async function makeFlight(renderer, B, start, face) {
   const up = e => { if (e.pointerId !== pid) return; pid = null; inp.x = inp.y = 0; pad.style.display = 'none'; }; addEventListener('pointerup', up); addEventListener('pointercancel', up);
   addEventListener('keydown', e => keys.add(e.key.toLowerCase())); addEventListener('keyup', e => keys.delete(e.key.toLowerCase()));
 
-  const S = { x: start[0], z: start[1], vx: 0, vz: 0, head: face, bank: 0, speed: FLY.SPEEDS[1], thr: 0, hit: 0, armed: true, shield: 0, boost: 0, pop: 0 };
+  const S = { x: start[0], z: start[1], vx: 0, vz: 0, head: face, mh: face, aim: null, aimK: 0, bank: 0, speed: FLY.SPEEDS[1], thr: 0, hit: 0, armed: true, shield: 0, boost: 0, pop: 0 };
   const fw = new THREE.Vector3(), v = new THREE.Vector3(), c = new THREE.Vector3();
   const free = (x, z) => { if (B.blocked(x, z)) return false; for (let k = 0; k < 8; k++) { const a = k * Math.PI / 4; if (B.blocked(x + Math.cos(a) * FLY.R, z + Math.sin(a) * FLY.R)) return false; } return true; };
   /* 닿은 벽이 보는 쪽: 기체 둘레 16곳 중 막힌 곳들의 반대쪽 평균 */
@@ -100,7 +100,7 @@ export async function makeFlight(renderer, B, start, face) {
   const applyGhost = dt => { const g0 = ghost; ghost += (ghostT - ghost) * Math.min(1, dt * 6); if (Math.abs(ghost - g0) < 1e-4 && (ghost < .001 || ghost > .999)) return;
     const op = 1 - ghost * .62; for (const m of mats) { m.transparent = op < .999; m.opacity = op; m.depthWrite = op > .999; } flames.forEach(f => f.visible = op > .6); };
   G.userData.S = S;
-  G.userData.reset = () => { S.x = start[0]; S.z = start[1]; S.vx = S.vz = 0; S.head = face; hist.length = 0; S.armed = true; S.shield = S.boost = S.pop = 0; };
+  G.userData.reset = () => { S.x = start[0]; S.z = start[1]; S.vx = S.vz = 0; S.head = S.mh = face; hist.length = 0; S.armed = true; S.shield = S.boost = S.pop = 0; };
   G.userData.setPx = px => { sparks.material.uniforms.uPx.value = px; };
   G.userData.update = (t, dt) => {
     let ix = inp.x, iy = inp.y;
@@ -108,7 +108,11 @@ export async function makeFlight(renderer, B, start, face) {
     const m = Math.hypot(ix, iy) > .15 ? 1 : 0;                        /* 조이스틱: 조금만 밀어도 항상 같은 속도 (방향만 정함) */
     /* 머리 돌리기: 미는 쪽으로, 무게 때문에 한 번에 다 돌지 않음 */
     let turn = 0;
-    if (m > .08) { const want = Math.atan2(-ix, -iy); let d = want - S.head; d = Math.atan2(Math.sin(d), Math.cos(d)); S.head = want; turn = d / Math.max(dt, .05); }   /* 미는 쪽으로 바로 돎 (사용자 2026-11-03). 꺾은 크기만큼 짧게 기울어 꺾었다는 느낌만 남김 */
+    if (m > .08) S.mh = Math.atan2(-ix, -iy);                                                          /* 가는 쪽 (조이스틱) */
+    S.aimK += ((S.aim != null ? 1 : 0) - S.aimK) * Math.min(1, dt * 8);
+    { const want = S.aim != null ? S.aim : (m > .08 ? S.mh : S.head); let d = want - S.head; d = Math.atan2(Math.sin(d), Math.cos(d));
+      if (S.aim != null) { const k = Math.min(1, dt * 16); S.head += d * k; turn = d * k / Math.max(dt, .05); }   /* 쏘는 동안: 쏘는 쪽을 바라봄 (이동은 조이스틱 쪽 그대로) */
+      else if (m > .08) { S.head = want; turn = d / Math.max(dt, .05); } }   /* 미는 쪽으로 바로 돎 (사용자 2026-11-03). 꺾은 크기만큼 짧게 기울어 꺾었다는 느낌만 남김 */   /* 미는 쪽으로 바로 돎 (사용자 2026-11-03). 꺾은 크기만큼 짧게 기울어 꺾었다는 느낌만 남김 */
     S.bank += (THREE.MathUtils.clamp(-turn * .05, -.45, .45) - S.bank) * Math.min(1, dt * 9);
     /* 속도: 바라보는 쪽 x 민 만큼. 바로 붙지 않고 스르륵 (ACC초) */
     /* 기지를 벗어나는 순간 보호막·가속 시작. 가속은 끝나기 0.6초 전부터 스르륵 풀림(갑자기 뚝 느려지지 않게) */
@@ -116,7 +120,7 @@ export async function makeFlight(renderer, B, start, face) {
     if (S.shield > 0 && (S.shield -= dt) <= 0) { S.shield = 0; S.pop = .3; }
     if (S.boost > 0) S.boost = Math.max(0, S.boost - dt);
     const bk = Math.min(1, S.boost / .6), spd = S.speed * (1 + (FLY.BOOSTK - 1) * bk * bk * (3 - 2 * bk));
-    const tx = -Math.sin(S.head) * spd * m * (m > .08), tz = -Math.cos(S.head) * spd * m * (m > .08), a = Math.min(1, dt / FLY.ACC);
+    const sl = 1 - .45 * S.aimK, tx = -Math.sin(S.mh) * spd * sl * m * (m > .08), tz = -Math.cos(S.mh) * spd * sl * m * (m > .08)   /* 쏘는 동안 느려짐 */, a = Math.min(1, dt / FLY.ACC);
     S.vx += (tx - S.vx) * a; S.vz += (tz - S.vz) * a; S.thr += (m - S.thr) * Math.min(1, dt * 8);
     /* 벽: 벽을 파고드는 힘만 없애고 벽을 따라가는 힘은 남김 → 비스듬히 닿으면 벽을 타고 미끄러짐, 정면이면 거의 멈춤
        ① 가려던 곳이 막혔으면 닿기 직전까지 감 ② 닿은 벽이 보는 쪽(바깥 방향)을 구함 ③ 그 방향 속도만 빼고 남은 시간만큼 다시 감 (꺾인 벽은 세 번까지)
