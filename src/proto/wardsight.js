@@ -7,7 +7,7 @@
      걷힌 곳은 계속 보임(그 와드가 내 것인 동안) · 그 안의 숨을 곳 속도 보임
    무게: 길 거리 계산은 와드마다 처음 한 번(250×250 칸) · 물결 그림은 바닥 위 한 장 */
 import * as THREE from 'three';
-import { makeWard, WCOL } from './ward.js?v=11032148';
+import { makeWard, WCOL } from './ward.js?v=11032157';
 
 const A0 = -Math.PI / 2, ANG = Array.from({ length: 10 }, (_, k) => A0 + k * Math.PI / 5), MID = ANG.map(a => a + Math.PI / 10);
 const angD = (a, b) => Math.abs(Math.atan2(Math.sin(a - b), Math.cos(a - b)));
@@ -76,11 +76,13 @@ export function makeWardsOnMap(B, vision, uT) {
       float n(vec2 p){ vec2 i = floor(p), f = fract(p); f = f * f * (3. - 2. * f); return mix(mix(h(i), h(i + vec2(1, 0)), f.x), mix(h(i + vec2(0, 1)), h(i + vec2(1, 1)), f.x), f.y); }
       void main(){ float R = ${WARDS.NEAR.toFixed(1)}, d = length(vP), r = d / R; if (r > 1.12) discard;
         vec2 u = vP / max(d, 1e-3); float a = atan(-vP.y, vP.x + 1e-5), along = fract((1.5707963 - a) / 6.2831853);   /* 정면(가운데 쪽)부터 시계 방향 0→1 */
-        float mist = n(u * 3. + vec2(uT * .25, -uT * .18)) * .6 + n(u * 7. - uT * .4) * .4;                                  /* 띠 굵기·밝기가 흔들림 */
-        float w = .03 + .035 * mist + uIn * .015, e = (r - 1.) / w, band = exp(-e * e) * (.55 + .7 * mist);
-        float sp = .6 + uIn * 1.6, ph = r * 14. + uT * sp * 3. + n(u * 4. + r * 3.) * 4.;                                          /* 물결 앞머리가 고르지 않게 흔들림 (둥근 줄무늬가 아니라 밀려 드는 안개 결) */
-        float wave = .5 + .5 * sin(ph), clump = smoothstep(.35, .85, n(vP * .9 + u * uT * .3));
-        float pull = wave * wave * wave * clump * smoothstep(.4, .95, r) * smoothstep(1.02, .9, r) * (.025 + uIn * .05);           /* 가장자리 → 와드 쪽으로 옅게 밀려 듦 */
+        /* 둘레를 따라 이어지는 흔들림: 각도의 정수배 물결만 써서 한 바퀴가 끊김 없이 이어짐 (폰에서 무작위 무늬 계산은 칸이 져 띠가 끊겨 보였음 · 사용자) */
+        float A = along * 6.2831853;
+        float mist = .5 + .22 * sin(A * 3. + uT * .5) + .16 * sin(A * 5. - uT * .8 + 1.7) + .12 * sin(A * 8. + uT * 1.1 + .6);
+        float w = .03 + .03 * mist + uIn * .015, e = (r - 1.) / w, band = exp(-e * e) * (.6 + .6 * mist);
+        float sp = .6 + uIn * 1.6, ph = r * 12. + uT * sp * 3. + sin(A * 4. + uT * .3) * .9 + sin(A * 7. - uT * .4) * .5;       /* 밀려 드는 결: 앞머리가 고르지 않게 */
+        float wave = .5 + .5 * sin(ph);
+        float pull = wave * wave * smoothstep(.45, .95, r) * smoothstep(1.02, .9, r) * (.02 + uIn * .04);
         float fill = smoothstep(.5, 1., r) * smoothstep(1.03, .97, r) * (.006 + uIn * .012);
         vec3 bc = uCol; float lit = 0.;
         if (uCap >= 0.) { lit = step(along, uCap); bc = mix(uCol, uPCol, lit); float hd = (along - uCap) * 40.; band += exp(-hd * hd) * exp(-e * e) * 1.2 * step(.001, uCap); }   /* 차오름은 가장자리 띠에만 */
