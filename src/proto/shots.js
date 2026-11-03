@@ -11,8 +11,9 @@
    무게: 꼬리 한 장 · 머리 한 장 · 부스러기 한 장 · 조준 빛 한 장 = 그리기 4번 */
 import * as THREE from 'three';
 import * as A from '../core/audio.js';
-import { FLY } from './flight.js?v=11032330';
-import { BH } from './blackhole.js?v=11032330';
+import { FLY } from './flight.js?v=11032341';
+import { BH } from './blackhole.js?v=11032341';
+import { hitWall } from './rocks.js?v=11032341';
 
 export const SHOT = {
   basic: { name: '기본탄', rate: 7, speed: 44, life: 1.1, heat: .07, cool: .42, coolWait: .3, lock: .3, tail: 3.4, W: .27, col: [.62, 1, .32], spread: .012, bounces: 3 }
@@ -149,7 +150,7 @@ export function makeShots({ B, crystals, bh, FS, say }) {
         crystals.userData.flash(t, hit.x - hit.nx * .1, FLY.HOVER, hit.z - hit.nz * .1); hitSparks(b.x, b.z, hit.nx, hit.nz, 10, true); continue; }
       /* 벽·와드: 불티 튀며 사라짐 */
       if (B.blocked(nx, nz)) { let lo = 0, hi = 1; for (let k = 0; k < 6; k++) { const m = (lo + hi) / 2; if (B.blocked(b.x + (nx - b.x) * m, b.z + (nz - b.z) * m)) hi = m; else lo = m; }
-        b.x += (nx - b.x) * lo; b.z += (nz - b.z) * lo; const l = Math.hypot(b.vx, b.vz) || 1; hitSparks(b.x, b.z, -b.vx / l, -b.vz / l, 8, b.bo > 0); thud(.03); b.dead = 0; continue; }
+        b.x += (nx - b.x) * lo; b.z += (nz - b.z) * lo; const l = Math.hypot(b.vx, b.vz) || 1; hitSparks(b.x, b.z, -b.vx / l, -b.vz / l, 8, b.bo > 0); hitWall(b.x + b.vx / l * .3, FLY.HOVER, b.z + b.vz / l * .3, t); thud(.03); b.dead = 0; continue; }   /* 벽마다 만들어 둔 맞음 빛(흑요석 무늬가 달아오름·산호 동그라미·유적 문양…)을 깨움 */
       b.x = nx; b.z = nz;
       /* 튕긴 탄은 쏜 사람도 맞음 */
       if (b.bo > 0 && Math.hypot(b.x - FS.x, b.z - FS.z) < FLY.R + .35) { const l = Math.hypot(b.vx, b.vz) || 1; hitSparks(FS.x, FS.z, -b.vx / l, -b.vz / l, 16, true); thud(.09); b.dead = 0; say?.('내가 쏜 탄에 맞음! (튕겨 돌아옴)'); FS.hurt = t; continue; }

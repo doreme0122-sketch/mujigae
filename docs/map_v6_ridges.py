@@ -2,12 +2,12 @@
 # · 벽 지도는 게임과 똑같이 번지게(가우스 1칸) 한 뒤 .5 넘는 곳 = 벽 (flight.js loadBlock과 같음)
 # · 길마다 벽 종류: 그 벽이 닿은 땅을 보고 정함 (얼음 성운 → 빙하 얼음, 결정 협곡 → 자수정, 폭풍 고원 → 고대 유적, 안개 늪 → 성운 산호, 나머지 → 용암 흑요석)
 # · 갈림길에서는 가장 곧게 이어지는 가지끼리 한 길로 이음(갈림길마다 벽이 끊겨 가늘어지지 않게)
-import json, numpy as np
+import json, os, numpy as np
 from PIL import Image
 from scipy import ndimage as nd
 from skimage.morphology import skeletonize
 
-a = np.array(Image.open('../assets/map/v6.png')).astype(float)
+a = np.array(Image.open('../assets/map/'+__import__('os').environ.get('MAPV','v6')+'.png')).astype(float)
 raw = (a[..., 1] > 127).astype(float); reg = np.round(a[..., 0] / 12).astype(int)
 F = nd.gaussian_filter(raw, 1, truncate=3, mode='nearest'); M = F > .5
 N = M.shape[0]
@@ -18,6 +18,10 @@ TK = list(THEME.keys())
 cnt = np.stack([nd.uniform_filter((reg == k).astype(float), 13) for k in TK])
 best = cnt.argmax(0); has = cnt.max(0) > .02
 kind = np.where(has, best + 1, 0)
+# 보물 땅(지역 11~15)을 둘러싼 벽은 모두 고대 유적 (사용자 2026-11-03: 보물방은 유적 벽으로) — 옆이 정글(산호)이어도 보물 땅에 닿으면 유적이 이김
+if os.environ.get('MAPV', 'v6') == 'v7':
+    tre = nd.uniform_filter(((reg >= 11) & (reg <= 15)).astype(float), 19)
+    kind = np.where(tre > .012, TK.index(10) + 1, kind)
 NAMES = ['obsidian'] + [THEME[k] for k in TK]
 
 sk = skeletonize(M)
@@ -144,7 +148,7 @@ for rep in range(3):
         pts = [[int((cx + ax[0] * t) * 2 + 1), int((cy + ax[1] * t) * 2 + 1)] for t in np.linspace(t0, t1, max(2, int((t1 - t0) / 3) + 1))]
         k = int(kind[int(cy), int(cx)]); out.append({'k': NAMES[k], 'p': pts, 'fill': 1}); added += 1
     print('pass', rep, 'bare px', int(bare.sum()), 'added', added)
-J = json.load(open('../assets/map/v6.json')); J['ridges'] = out
-json.dump(J, open('../assets/map/v6.json', 'w'), ensure_ascii=False, separators=(',', ':'))
+J = json.load(open('../assets/map/'+__import__('os').environ.get('MAPV','v6')+'.json')); J['ridges'] = out
+json.dump(J, open('../assets/map/'+__import__('os').environ.get('MAPV','v6')+'.json', 'w'), ensure_ascii=False, separators=(',', ':'))
 from collections import Counter
 print(len(out), 'ridges', Counter(r['k'] for r in out), 'pts', sum(len(r['p']) for r in out))

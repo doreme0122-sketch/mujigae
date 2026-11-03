@@ -8,7 +8,7 @@
    단위 m, 받침 위(y = 받침 top)부터 높이 약 1.8m */
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { glowMaterial, stoneMaterial, solid } from './wardbase.js?v=11032330';
+import { glowMaterial, stoneMaterial, solid } from './wardbase.js?v=11032341';
 
 const clean = g => { for (const k of Object.keys(g.attributes)) if (k !== 'position' && k !== 'normal') g.deleteAttribute(k); return g.index ? g.toNonIndexed() : g; };
 const AB = { transparent: true, depthWrite: false, blending: THREE.AdditiveBlending };
@@ -36,8 +36,9 @@ function plasmaMat() {
         float sw = sin(a * 2. + y * 11. - uT * 2.6) * .5 + .5, sw2 = sin(-a * 3. + y * 7. - uT * 1.7 + 1.3) * .5 + .5;        /* 두 갈래가 엇갈려 휘감아 오름 */
         float n = f3(vec3(cos(a) * 1.6, y * 4. - uT * .9, sin(a) * 1.6));
         float band = smoothstep(.55, .95, sw) * .9 + smoothstep(.7, 1., sw2) * .55 + n * .45;
-        float lev = smoothstep(uFill + .04, uFill - .04, y);                                                            /* 차오른 만큼만 진하게 */
-        float sy = (y - uFill) * 28., surf = exp(-sy * sy) * step(.02, uFill) * step(uFill, .98) * 1.6;                     /* 차오르는 물낯이 반짝 */
+        float lvl = uFill + .035 * sin(a * 2. + uT * 1.9) + .022 * sin(a * 5. - uT * 2.7 + 1.1) + (n - .5) * .06;             /* 물낯이 평평하게 잘린 면이 아니라 일렁이는 결 (사용자: 탑에 칼날 경계선) */
+        float lev = smoothstep(lvl + .14, lvl - .1, y);                                                                    /* 차오른 만큼 진하게 — 경계는 넓게 녹아듦 */
+        float sy = (y - lvl) / .07, surf = exp(-sy * sy) * smoothstep(.02, .12, uFill) * smoothstep(1., .85, uFill) * .55;   /* 물낯은 옅은 빛 띠로만, 처음·끝엔 스르르 */
         vec3 V = normalize(cameraPosition - vW); float edge = 1. - abs(dot(normalize(vN), V)); edge = .35 + edge * edge * .9;
         vec3 deep = vec3(.42, .12, .95), hot = vec3(.95, .55, 1.25);
         vec3 c = mix(deep, hot, smoothstep(.6, 1.2, band)) * band * edge * (.18 + lev * .95) + hot * surf;
