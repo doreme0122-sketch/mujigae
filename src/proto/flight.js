@@ -10,8 +10,8 @@
    무게: 기체 한 대 + 불꽃 띠 몇 장 + 꼬리 띠 하나 + 불티 점 묶음 하나 + 그림자 판 하나 */
 import * as THREE from 'three';
 import { buildShip, engineSpots } from '../core/ships/build.js';
-import { flameMesh } from './sortie.js?v=11031055';
-import { MAP } from './mapfloor.js?v=11031055';
+import { flameMesh } from './sortie.js?v=11031101';
+import { MAP } from './mapfloor.js?v=11031101';
 
 export const FLY = { LEN: 2, HOVER: .7, R: .8, SPEEDS: [9, 12, 15, 18], TURN: 7, ACC: .22 };
 const AB = { transparent: true, depthWrite: false, blending: THREE.AdditiveBlending };
@@ -80,6 +80,10 @@ export async function makeFlight(renderer, B, start, face) {
   const S = { x: start[0], z: start[1], vx: 0, vz: 0, head: face, bank: 0, speed: FLY.SPEEDS[1], thr: 0, hit: 0 };
   const fw = new THREE.Vector3(), v = new THREE.Vector3(), c = new THREE.Vector3();
   const free = (x, z) => { if (B.blocked(x, z)) return false; for (let k = 0; k < 8; k++) { const a = k * Math.PI / 4; if (B.blocked(x + Math.cos(a) * FLY.R, z + Math.sin(a) * FLY.R)) return false; } return true; };
+  /* 닿은 벽이 보는 쪽: 기체 둘레 16곳 중 막힌 곳들의 반대쪽 평균 */
+  const wallN = (x, z) => { let nx = 0, nz = 0, h = 0; const r = FLY.R + .2;
+    for (let k = 0; k < 16; k++) { const a = k * Math.PI / 8, c = Math.cos(a), sn = Math.sin(a); if (B.blocked(x + c * r, z + sn * r)) { nx -= c; nz -= sn; h++; } }
+    const l = Math.hypot(nx, nz); return h && l > 1e-3 ? [nx / l, nz / l] : null; };
   G.userData.S = S;
   G.userData.reset = () => { S.x = start[0]; S.z = start[1]; S.vx = S.vz = 0; S.head = face; hist.length = 0; };
   G.userData.setPx = px => { sparks.material.uniforms.uPx.value = px; };
@@ -94,10 +98,20 @@ export async function makeFlight(renderer, B, start, face) {
     /* 속도: 바라보는 쪽 x 민 만큼. 바로 붙지 않고 스르륵 (ACC초) */
     const tx = -Math.sin(S.head) * S.speed * m * (m > .08), tz = -Math.cos(S.head) * S.speed * m * (m > .08), a = Math.min(1, dt / FLY.ACC);
     S.vx += (tx - S.vx) * a; S.vz += (tz - S.vz) * a; S.thr += (m - S.thr) * Math.min(1, dt * 8);
-    /* 벽: 가로·세로 따로 막아 벽을 따라 미끄러짐. 들이받은 세기만큼 불티 */
-    const nx = S.x + S.vx * dt, nz = S.z + S.vz * dt; let hitV = 0;
-    if (free(nx, S.z)) S.x = nx; else { hitV += Math.abs(S.vx); S.vx *= -.15; }
-    if (free(S.x, nz)) S.z = nz; else { hitV += Math.abs(S.vz); S.vz *= -.15; }
+    /* 벽: 벽을 파고드는 힘만 없애고 벽을 따라가는 힘은 남김 → 비스듬히 닿으면 벽을 타고 미끄러짐, 정면이면 거의 멈춤
+       ① 가려던 곳이 막혔으면 닿기 직전까지 감 ② 닿은 벽이 보는 쪽(바깥 방향)을 구함 ③ 그 방향 속도만 빼고 남은 시간만큼 다시 감 (꺾인 벽은 세 번까지)
+       들이받은 세기(벽 쪽 속도)만큼 불티 */
+    let hitV = 0, rem = dt;
+    for (let it = 0; it < 3 && rem > 1e-5; it++) {
+      const tx2 = S.x + S.vx * rem, tz2 = S.z + S.vz * rem;
+      if (free(tx2, tz2)) { S.x = tx2; S.z = tz2; break; }
+      let lo = 0, hi = 1; for (let k = 0; k < 7; k++) { const m = (lo + hi) / 2; if (free(S.x + S.vx * rem * m, S.z + S.vz * rem * m)) lo = m; else hi = m; }
+      S.x += S.vx * rem * lo; S.z += S.vz * rem * lo; rem *= 1 - lo;
+      const n = wallN(S.x, S.z); if (!n) { S.vx = S.vz = 0; break; }
+      const vn = S.vx * n[0] + S.vz * n[1];
+      if (vn < 0) { hitV += -vn; S.vx -= vn * n[0]; S.vz -= vn * n[1]; }
+      /* 벽에서 아주 조금(3cm) 떼어 놓음: 울퉁불퉁한 벽에 걸려 미끄러지다 멈추지 않게 */
+      for (const e of [.03, .08, .15]) if (free(S.x + n[0] * e, S.z + n[1] * e)) { S.x += n[0] * e; S.z += n[1] * e; break; } }
     if (hitV > 3 && t - S.hit > .08) { S.hit = t; const n = Math.min(14, 4 + hitV | 0);
       for (let i = 0; i < n; i++) { const s = SP[spI = (spI + 1) % NS]; s.l = .4 + Math.random() * .4; s.p.set(S.x - Math.sin(S.head) * FLY.R, FLY.HOVER * .6, S.z - Math.cos(S.head) * FLY.R);
         s.v.set((Math.random() - .5) * 6, 2 + Math.random() * 3, (Math.random() - .5) * 6).add(v.set(Math.sin(S.head) * hitV * .4, 0, Math.cos(S.head) * hitV * .4)); } }
