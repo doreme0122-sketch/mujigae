@@ -4,15 +4,15 @@
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { makeBloom } from '../core/hangar/bloom.js?v=11032107';
-import { chunk, obsidianMaterial } from './rocks.js?v=11032107';
-import { makeWardBase } from './wardbase.js?v=11032107';
-import { makeWardCore } from './wardcore.js?v=11032107';
-import { makeWardRing } from './wardring.js?v=11032107';
-import { makeWardSpires } from './wardspire.js?v=11032107';
-import { makeWardEye } from './wardeye.js?v=11032107';
-import { pointPool } from './skilldemo.js?v=11032107';
-import { makePerf } from './perf.js?v=11032107';
+import { makeBloom } from '../core/hangar/bloom.js?v=11032114';
+import { chunk, obsidianMaterial } from './rocks.js?v=11032114';
+import { makeWardBase } from './wardbase.js?v=11032114';
+import { makeWardCore } from './wardcore.js?v=11032114';
+import { makeWardRing } from './wardring.js?v=11032114';
+import { makeWardSpires } from './wardspire.js?v=11032114';
+import { makeWardEye } from './wardeye.js?v=11032114';
+import { pointPool } from './skilldemo.js?v=11032114';
+import { makePerf } from './perf.js?v=11032114';
 import * as A from '../core/audio.js';
 
 const $ = s => document.querySelector(s), clamp = THREE.MathUtils.clamp, V = (x = 0, y = 0, z = 0) => new THREE.Vector3(x, y, z);
@@ -46,7 +46,7 @@ function groundMat() {
       float h(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
       float n(vec2 p){ vec2 i = floor(p), f = fract(p); f = f * f * (3. - 2. * f); return mix(mix(h(i), h(i + vec2(1, 0)), f.x), mix(h(i + vec2(0, 1)), h(i + vec2(1, 1)), f.x), f.y); }
       float fbm(vec2 p){ float s = 0., a = .5; for (int i = 0; i < 5; i++) { s += n(p) * a; p *= 2.03; a *= .5; } return s; }
-      void main(){ float r = length(vP), a = atan(vP.y, vP.x), u = fract((a / 6.2832) + .25);            /* u: 고리를 12시부터 시계 방향으로 */
+      void main(){ float r = length(vP), a = atan(vP.y, vP.x + 1e-5), u = fract((a / 6.2832) + .25);            /* u: 고리를 12시부터 시계 방향으로 */
         float g = fbm(vP * .45), g2 = fbm(vP * 2.1 + 7.);
         vec3 c = mix(vec3(.028, .03, .038), vec3(.06, .062, .075), g) + vec3(.02) * smoothstep(.62, .8, g2);
         c *= .7 + .3 * smoothstep(30., 6., r); c *= c * 4.;                                                 /* 바닥 바탕은 화면에 보이는 밝기로 맞춤(들뜬 회색 → 짙은 현무암) */
@@ -113,7 +113,7 @@ export async function start(canvas, onProgress = () => {}) {
       fragmentShader: `uniform float uRise, uI, uT; uniform vec3 uCol; varying vec3 vW, vN;
         void main(){ vec3 Vd = normalize(cameraPosition - vW); float q = 1. - abs(dot(normalize(vN), Vd)), rim = q * q;
           float below = smoothstep(uRise + .02, uRise - .5, vW.y), d = (vW.y - uRise) / .1, front = exp(-d * d);
-          float a = atan(vW.z, vW.x), wave = .7 + .3 * sin(a * 9. + vW.y * 6. - uT * 5.);
+          float a = atan(vW.z, vW.x + 1e-5), wave = .7 + .3 * sin(a * 9. + vW.y * 6. - uT * 5.);
           vec3 c = (uCol * uCol + .2) * (below * (.06 + rim * .55) * wave + front * (.35 + rim * 1.2));
           gl_FragColor = vec4(c * uI, 1.); }` }));
   sheath.renderOrder = 10; scene.add(sheath);

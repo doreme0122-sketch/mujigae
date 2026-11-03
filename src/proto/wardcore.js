@@ -8,7 +8,7 @@
    단위 m, 받침 위(y = 받침 top)부터 높이 약 1.8m */
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { glowMaterial, stoneMaterial } from './wardbase.js?v=11032107';
+import { glowMaterial, stoneMaterial } from './wardbase.js?v=11032114';
 
 const clean = g => { for (const k of Object.keys(g.attributes)) if (k !== 'position' && k !== 'normal') g.deleteAttribute(k); return g.index ? g.toNonIndexed() : g; };
 const AB = { transparent: true, depthWrite: false, blending: THREE.AdditiveBlending };
@@ -32,7 +32,7 @@ function plasmaMat() {
   return new THREE.ShaderMaterial({ ...AB, side: THREE.DoubleSide, uniforms: { uT: { value: 0 }, uFill: { value: .3 }, uI: { value: 1 }, uH: { value: 1.3 } },
     vertexShader: 'varying vec3 vP; varying vec3 vN, vW; void main(){ vP = position; vec4 w = modelMatrix * vec4(position, 1.); vW = w.xyz; vN = normalize(mat3(modelMatrix) * normal); gl_Position = projectionMatrix * viewMatrix * w; }',
     fragmentShader: `uniform float uT, uFill, uI, uH; varying vec3 vP; varying vec3 vN, vW; ${NOISE}
-      void main(){ float a = atan(vP.z, vP.x), y = vP.y / uH;
+      void main(){ float a = atan(vP.z, vP.x + 1e-5), y = vP.y / uH;
         float sw = sin(a * 2. + y * 11. - uT * 2.6) * .5 + .5, sw2 = sin(-a * 3. + y * 7. - uT * 1.7 + 1.3) * .5 + .5;        /* 두 갈래가 엇갈려 휘감아 오름 */
         float n = f3(vec3(cos(a) * 1.6, y * 4. - uT * .9, sin(a) * 1.6));
         float band = smoothstep(.55, .95, sw) * .9 + smoothstep(.7, 1., sw2) * .55 + n * .45;
@@ -101,17 +101,17 @@ export function makeWardCore(uT, y0) {
   const heart = new THREE.Group(); heart.position.y = H * .52; G.add(heart);
   const orb = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.ShaderMaterial({ ...AB, uniforms: { uI: { value: 1 }, uT: { value: 0 } },
     vertexShader: 'varying vec2 vP; void main(){ vP = position.xy * 2.; vec4 c = modelViewMatrix * vec4(0.,0.,0.,1.); c.xy += position.xy * .7; gl_Position = projectionMatrix * c; }',
-    fragmentShader: 'uniform float uI, uT; varying vec2 vP; void main(){ float r = length(vP), a = atan(vP.y, vP.x); float core = exp(-r * r * 60.) * 2.2, glow = exp(-r * r * 9.) * .7, rays = pow(max(0., cos(a * 4. + uT)), 18.) * exp(-r * 5.) * .4; gl_FragColor = vec4(vec3(.95, .7, 1.3) * (core + glow + rays) * uI, 1.); }' }));
+    fragmentShader: 'uniform float uI, uT; varying vec2 vP; void main(){ float r = length(vP), a = atan(vP.y, vP.x + 1e-5); float core = exp(-r * r * 60.) * 2.2, glow = exp(-r * r * 9.) * .7, rays = pow(max(0., cos(a * 4. + uT)), 18.) * exp(-r * 5.) * .4; gl_FragColor = vec4(vec3(.95, .7, 1.3) * (core + glow + rays) * uI, 1.); }' }));
   orb.renderOrder = 7; orb.frustumCulled = false; heart.add(orb);
   const orbits = [[.95, 0], [.95, 2.09], [.95, 4.19]].map(([tilt, yaw], i) => { const m = new THREE.Mesh(ribbonRing(.26, .028), orbitMat()); m.rotation.set(tilt, yaw, 0, 'YXZ'); m.material.uniforms.uPh.value = i / 3; m.renderOrder = 7; heart.add(m); return m; });
   G.userData.height = H + .06;
   G.userData.update = (t, col, power = .4, fill = .3) => {
-    gMat.uniforms.uT.value = t; gMat.uniforms.uCol.value.copy(col); gMat.uniforms.uI.value = .9 + power * 1.2; gMat.uniforms.uFlow.value = .3 + power;
+    gMat.uniforms.uT.value = t; gMat.uniforms.uCol.value.copy(col); gMat.uniforms.uI.value = .5 + power * .55; gMat.uniforms.uFlow.value = .3 + power;
     for (const m of [gb, gf]) m.material.uniforms.uT.value = t;
-    for (const p of [plasma, pl2]) { const U = p.material.uniforms; U.uT.value = t * (.7 + power * .8); U.uFill.value = fill; U.uI.value = (p === pl2 ? .6 : 1) * (.7 + power * .6); }
+    for (const p of [plasma, pl2]) { const U = p.material.uniforms; U.uT.value = t * (.7 + power * .8); U.uFill.value = fill; U.uI.value = (p === pl2 ? .6 : 1) * (.55 + power * .35); }
     const beat = 1 + .08 * Math.sin(t * 3.1) * Math.sin(t * 1.3);
-    orb.material.uniforms.uI.value = (.5 + fill * .6 + power * .5) * beat; orb.material.uniforms.uT.value = t;
-    orbits.forEach((m, i) => { m.rotateY(.004 * (1 + power * 2.5) * (i % 2 ? -1 : 1)); m.material.uniforms.uT.value = t; m.material.uniforms.uSp.value = .6 + power * 1.6; m.material.uniforms.uI.value = .5 + power * .7; });
+    orb.material.uniforms.uI.value = (.3 + fill * .35 + power * .25) * beat; orb.material.uniforms.uT.value = t;
+    orbits.forEach((m, i) => { m.rotateY(.004 * (1 + power * 2.5) * (i % 2 ? -1 : 1)); m.material.uniforms.uT.value = t; m.material.uniforms.uSp.value = .6 + power * 1.6; m.material.uniforms.uI.value = .35 + power * .4; });
     heart.rotation.y = t * (.2 + power * .5); heart.position.y = H * .52 + Math.sin(t * 1.1) * .02; };
   return G;
 }

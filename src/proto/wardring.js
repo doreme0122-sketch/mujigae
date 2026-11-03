@@ -7,7 +7,7 @@
    단위 m */
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { stoneMaterial, glowMaterial } from './wardbase.js?v=11032107';
+import { stoneMaterial, glowMaterial } from './wardbase.js?v=11032114';
 
 const AB = { transparent: true, depthWrite: false, blending: THREE.AdditiveBlending };
 const clean = g => { for (const k of Object.keys(g.attributes)) if (k !== 'position' && k !== 'normal') g.deleteAttribute(k); return g.index ? g.toNonIndexed() : g; };
@@ -52,7 +52,7 @@ export function makeWardRing(uT, y) {
   G.userData.update = (t, dt, col, power = .4, want = .1) => {
     sp += (want - sp) * Math.min(1, dt * 2); ang += sp * dt; spin.rotation.y = ang;
     spin.rotation.x = Math.sin(t * .7) * .035; spin.rotation.z = Math.cos(t * .55) * .035; spin.position.y = Math.sin(t * .9) * .03;   /* 떠 있는 고리: 살짝 기울며 흔들림 */
-    for (const m of [t1, t2]) { const U = m.material.uniforms; U.uT.value = t; U.uSp.value = .3 + sp * 2.5; U.uI.value = .45 + power * .75; }
-    gMat.uniforms.uT.value = t; gMat.uniforms.uCol.value.copy(col); gMat.uniforms.uI.value = .8 + power; };
+    for (const m of [t1, t2]) { const U = m.material.uniforms; U.uT.value = t; U.uSp.value = .3 + sp * 2.5; U.uI.value = .3 + power * .4; }
+    gMat.uniforms.uT.value = t; gMat.uniforms.uCol.value.copy(col); gMat.uniforms.uI.value = .5 + power * .5; };
   return G;
 }

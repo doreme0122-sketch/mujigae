@@ -8,7 +8,7 @@
    단위 m */
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { glowMaterial, stoneMaterial } from './wardbase.js?v=11032107';
+import { glowMaterial, stoneMaterial } from './wardbase.js?v=11032114';
 
 const AB = { transparent: true, depthWrite: false, blending: THREE.AdditiveBlending };
 const clean = g => { for (const k of Object.keys(g.attributes)) if (k !== 'position' && k !== 'normal') g.deleteAttribute(k); return g.index ? g.toNonIndexed() : g; };
@@ -17,7 +17,7 @@ const discMat = () => new THREE.ShaderMaterial({ ...AB, side: THREE.DoubleSide, 
   vertexShader: 'varying vec2 vP; void main(){ vP = position.xy; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.); }',
   fragmentShader: `uniform vec3 uCol; uniform float uI, uOpen, uT, uRot; uniform vec2 uLook; varying vec2 vP;
     float band(float r, float c, float w){ float d = (r - c) / w; return exp(-d * d); }
-    void main(){ float r = length(vP), a = atan(vP.y, vP.x);
+    void main(){ float r = length(vP), a = atan(vP.y, vP.x + 1e-5);
       /* 바깥 띠: 넓고 부드러운 둥근 띠를 넷으로 끊음, 천천히 돎 · 띠 위로 빛이 흐름 */
       float seg = smoothstep(.06, .16, abs(fract((a + uRot) / 6.2832 * 4.) - .5) * 2.);
       float outer = band(r, .9, .055) * seg * (.75 + .25 * sin(a * 3. - uT * 2.));
@@ -29,7 +29,7 @@ const discMat = () => new THREE.ShaderMaterial({ ...AB, side: THREE.DoubleSide, 
       float edgeE = almond * (1. - smoothstep(0., .12, lid * (1. - q.x * q.x) - abs(q.y))) * .9;          /* 눈 테두리가 더 밝음(채운 면의 가장자리) */
       vec2 ip = vP - uLook * .12 * uOpen; float ir = length(ip);
       float iris = (1. - smoothstep(.13, .16, ir)) * almond, pupil = 1. - smoothstep(.04, .06, ir);
-      float eye = almond * .25 + edgeE + iris * (.65 + .35 * sin(atan(ip.y, ip.x) * 14. + uT)) * (1. - pupil * .85);
+      float eye = almond * .25 + edgeE + iris * (.65 + .35 * sin(atan(ip.y, ip.x + 1e-5) * 14. + uT)) * (1. - pupil * .85);
       float scan = .85 + .15 * sin(vP.y * 90. - uT * 8.);                                                 /* 홀로그램 결 */
       float k = (outer + outer2 + inner) * (.35 + .65 * uOpen) + eye * smoothstep(0., .25, uOpen);
       vec3 c = (uCol * uCol * 1.4 + vec3(.15)) * k * scan;
@@ -80,10 +80,10 @@ export function makeWardEye(uT, y) {
     if (flash > 0) glitch = 0;
     const on = Math.max(.04, open) * (1 - glitch * (Math.random() < .5 ? 1 : 0)) + flash * 1.6;
     { const k = se >= 0 && se < .7 ? se / .7 : 1, sc = se >= 0 && se < .7 ? .55 + .6 * (1 - Math.pow(1 - k, 3)) - .15 * Math.sin(k * Math.PI) * (1 - k) * 0 + .12 * Math.sin(k * Math.PI) : 1; disc.scale.setScalar(sc); }   /* 원판이 오므렸다 활짝 펼쳐짐 */
-    const D = disc.material.uniforms; D.uCol.value.copy(col); D.uT.value = t; D.uOpen.value = open; D.uRot.value = rot; D.uI.value = (.25 + .9 * on);
+    const D = disc.material.uniforms; D.uCol.value.copy(col); D.uT.value = t; D.uOpen.value = open; D.uRot.value = rot; D.uI.value = (.18 + .55 * on);
     D.uLook.value.set(Math.sin(t * .37) + .4 * Math.sin(t * 1.3), Math.cos(t * .29) * .5);                               /* 둘레를 둘러봄 */
     disc.position.y = .4 + CH + Math.sin(t * 1.2) * .03;
-    const C = cone.material.uniforms; C.uCol.value.copy(col); C.uT.value = t; C.uI.value = .2 + on * .9;
-    gMat.uniforms.uT.value = t; gMat.uniforms.uCol.value.copy(col); gMat.uniforms.uI.value = .7 + power; };
+    const C = cone.material.uniforms; C.uCol.value.copy(col); C.uT.value = t; C.uI.value = .12 + on * .45;
+    gMat.uniforms.uT.value = t; gMat.uniforms.uCol.value.copy(col); gMat.uniforms.uI.value = .45 + power * .5; };
   return G;
 }

@@ -12,7 +12,7 @@
    무게: 보석 하나 = 뒷면 · 앞면 · 둘레 빛 · 고리 4번 (+ 잔상 보석 2개는 쓸 때만) */
 import * as THREE from 'three';
 import * as A from '../core/audio.js';
-import { pointPool, beamMesh } from './skilldemo.js?v=11032107';
+import { pointPool, beamMesh } from './skilldemo.js?v=11032114';
 
 /* 기본 등급 스킬 (임시 이름 — 실제 스킬은 스킬 설계 때 바뀜). 분류마다 다섯 중 셋이 무작위로 나옴 */
 export const CATS = [
@@ -63,7 +63,7 @@ const ENV = `vec3 env(vec3 d){
     float a = max(dot(d, normalize(vec3(-.45,.82,-.35))), 0.), b = max(dot(d, normalize(vec3(.72,.48,.42))), 0.), e = max(dot(d, normalize(vec3(.05,.25,.97))), 0.);
     float a2=a*a, a4=a2*a2, a8=a4*a4, a16=a8*a8; float b2=b*b, b4=b2*b2, b8=b4*b4, b16=b8*b8; float e2=e*e, e4=e2*e2, e8=e4*e4;
     c += vec3(4.2) * a16 * a16 + vec3(2.8) * b16 * b16 + vec3(1.8) * e8 * e8 * e4;
-    float s = abs(sin(atan(d.z, d.x) * 3.));
+    float s = abs(sin(atan(d.z, d.x + 1e-5) * 3.));
     c += vec3(.9,.95,1.1) * smoothstep(.965, .995, s) * smoothstep(-.15, .35, d.y) * smoothstep(.9, .5, d.y);
     return c; }`;
 export function gemMat(back) {

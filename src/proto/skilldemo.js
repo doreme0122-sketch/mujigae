@@ -83,7 +83,7 @@ function targetMesh() {
   const m = new THREE.ShaderMaterial({ ...AB, uniforms: { uA: { value: 0 }, uHit: { value: 0 }, uT: { value: 0 }, uS: { value: .62 } },
     vertexShader: `uniform float uS; varying vec2 vP; void main(){ vP = position.xy * 2.; vec4 c = modelViewMatrix * vec4(0.,0.,0.,1.); c.xy += position.xy * uS * 2.; gl_Position = projectionMatrix * c; }`,
     fragmentShader: `uniform float uA, uHit, uT; varying vec2 vP;
-      void main(){ float r = length(vP), a = atan(vP.y, vP.x);
+      void main(){ float r = length(vP), a = atan(vP.y, vP.x + 1e-5);
         float ring = exp(-pow(abs(r - .82) / .035, 2.)) + exp(-pow(abs(r - .56) / .025, 2.)) * .7;
         float tick = step(.9, fract(a / 6.2832 * 16.)) * smoothstep(.95, .9, r) * smoothstep(.62, .68, r) * .8;
         float spin = smoothstep(.0, .3, sin(a * 3. + uT * 2.)) * exp(-pow(abs(r - .7) / .02, 2.)) * .8;
@@ -98,7 +98,7 @@ function fieldMesh() {
   const m = new THREE.ShaderMaterial({ ...AB, uniforms: { uA: { value: 0 }, uT: { value: 0 }, uMode: { value: 0 }, uCol: { value: V3(1, 1, 1) } },
     vertexShader: 'varying vec2 vP; void main(){ vP = position.xy; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.); }',
     fragmentShader: `uniform float uA, uT, uMode; uniform vec3 uCol; varying vec2 vP;
-      void main(){ float r = length(vP), a = atan(vP.y, vP.x), edge = exp(-pow(abs(r - .97) / .025, 2.)) * 1.2, fill = smoothstep(1., .2, r) * .12;
+      void main(){ float r = length(vP), a = atan(vP.y, vP.x + 1e-5), edge = exp(-pow(abs(r - .97) / .025, 2.)) * 1.2, fill = smoothstep(1., .2, r) * .12;
         float k;
         if (uMode < .5) { float w = (fract(r * 3.5 - uT * .35) - .5) / .06; k = exp(-w * w) * smoothstep(1., .1, r) * .8 + step(.92, fract(a / 6.2832 * 24.)) * smoothstep(.9, .86, r) * smoothstep(.8, .84, r) * .6; }
         else { float sw = sin(a * 4. + r * 9. + uT * 6.); k = smoothstep(.55, 1., sw) * smoothstep(1., .15, r) * .9 + exp(-r * r * 30.) * 1.4; }

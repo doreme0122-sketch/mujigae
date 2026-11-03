@@ -2,8 +2,8 @@
    · 블랙홀: 보스 구역(반지름 약 30m) 안을 천천히 떠돌아다님 → 싸우는 자리가 계속 바뀜
      생김새: 빛도 못 빠져나오는 검은 가운데 + 그 둘레를 휘감아 도는 뜨거운 빛 원반(블랙홀에 가까운 쪽이 더 밝고 빠름) + 둘레 공간이 휘어 보임(화면 일그러짐)
    · 흐름 (왜 빨라지나 = 블랙홀이 돌며 둘레 공간을 끌고 돎):
-     - 보스 구역과 안쪽 둥근 길(반지름 ~46m)의 공간이 한 방향(위에서 보아 시계 반대)으로 빙글빙글 흐름. 바닥에 선을 긋지 않고 별빛 먼지가 흘러가는 걸로 보여 줌
-     - 블랙홀에 가까울수록 물살이 셈 → 블랙홀이 움직이면 센 구간도 따라 옮겨 감 (끊겼다 이어지는 게 아니라 부드럽게)
+     - 블랙홀을 중심으로 둘레 공간이 빙글빙글 돌며 빨려 듦(사용자: 중심은 블랙홀). 보스 구역 + 안쪽 둥근 길(반지름 ~46m) 안에서만. 바닥에 선을 긋지 않고 혜성 먼지가 흘러가는 걸로 보여 줌
+     - 블랙홀에 가까울수록 물살이 셈 → 블랙홀이 움직이면 소용돌이 전체가 같이 옮겨 감
      - 흐름을 따라가면 빨라지고 거슬러 가면 느려짐
      - 블랙홀 바로 둘레(약 12m): 가운데로 끌려 듦 + 휘감아 돎 → 스치듯 지나가면 휙 빨라지며 튕겨 나감
    · 한가운데(약 2.2m)까지 빨려 들면: 기체가 빙글빙글 작아지며 사라짐 → 카메라가 맵 아무 곳으로 날아감 → 그곳 공간이 일그러지며 열리고 튀어나옴 (체력 약 20% 깎임)
@@ -26,7 +26,7 @@ export function makeBlackHole(B, opt = {}) {
     vertexShader: 'uniform float uS; varying vec2 vP; void main(){ vP = position.xy * 2.; vec4 c = modelViewMatrix * vec4(0.,0.,0.,1.); c.xy += position.xy * 9. * uS; gl_Position = projectionMatrix * c; }',
     fragmentShader: `uniform float uT; varying vec2 vP; void main(){ float r = length(vP) * 2.05;                      /* 반지름 1 = 2.2m (빨려 드는 한가운데와 같은 크기) */
       float hole = 1. - smoothstep(.92, 1.02, r); float d = (r - 1.06) / .07, ring = exp(-d * d);
-      float a = atan(vP.y, vP.x), flick = .8 + .2 * sin(a * 7. + uT * 5.);
+      float a = atan(vP.y, vP.x + 1e-5), flick = .8 + .2 * sin(a * 7. + uT * 5.);
       vec3 c = vec3(1.2, .95, .8) * ring * 1.6 * flick; float al = max(hole, 0.);
       gl_FragColor = vec4(c, al + ring * .8); }` }));
   core.renderOrder = 12; core.frustumCulled = false; G.add(core);
@@ -36,7 +36,7 @@ export function makeBlackHole(B, opt = {}) {
     fragmentShader: `uniform float uT; varying vec2 vP;
       float h(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
       float n(vec2 p){ vec2 i = floor(p), f = fract(p); f = f * f * (3. - 2. * f); return mix(mix(h(i), h(i + vec2(1, 0)), f.x), mix(h(i + vec2(0, 1)), h(i + vec2(1, 1)), f.x), f.y); }
-      void main(){ float r = length(vP), a = atan(vP.y, vP.x), u = (r - 2.3) / 6.7;
+      void main(){ float r = length(vP), a = atan(vP.y, vP.x + 1e-5), u = (r - 2.3) / 6.7;
         float spin = a - uT * (3.4 / (r * .3 + .2)) - log(r) * 3.;                                              /* 흐름과 같은 쪽으로 돌며, 나선 팔이 안쪽으로 감겨 들어감 (안쪽일수록 빠름) */
         vec2 q = vec2(cos(spin), sin(spin));                                                                     /* 각도를 돌린 자리로 결을 뜸 → 한 바퀴 이음매가 없음 */
         float arms = pow(max(0., .5 + .5 * cos(spin * 3.)), 3.);                                                  /* 또렷한 나선 팔 셋: 빨려 드는 방향이 보임 */
@@ -68,17 +68,17 @@ export function makeBlackHole(B, opt = {}) {
       gl_FragColor = vec4(c * vA, 1.); }` }));
   dust.frustumCulled = false; dust.renderOrder = 10; G.add(dust);
   const spawnDust = i => { let x, z; if (i % 2) { const a = Math.random() * 6.283, r = 5 + Math.random() * 16; x = P.x + Math.cos(a) * r; z = P.z + Math.sin(a) * r; }
-    else { const a = Math.random() * 6.283, r = Math.sqrt(Math.random()) * (BH.RING + 2); x = Math.cos(a) * r; z = Math.sin(a) * r; }
+    else { for (let k = 0; k < 6; k++) { const a = Math.random() * 6.283, r = 6 + Math.sqrt(Math.random()) * 34; x = P.x + Math.cos(a) * r; z = P.z + Math.sin(a) * r; if (Math.hypot(x, z) < BH.RING) break; } }   /* 블랙홀 둘레에 퍼져 있다가 휘감겨 들어감 */
     dP[i * 3] = x; dP[i * 3 + 1] = .3 + Math.random() * 1.2; dP[i * 3 + 2] = z; dl[i] = 2 + Math.random() * 4; };
   const P = new THREE.Vector3();
   for (let i = 0; i < ND; i++) { spawnDust(i); dl[i] *= Math.random(); }
   /* 흐름: 가운데 둘레 소용돌이 + 블랙홀 둘레 끌림 (세상 좌표 x,z에서의 바람) */
-  function flow(x, z, out) {
-    const r = Math.hypot(x, z); let fx = 0, fz = 0;
-    if (r < BH.RING + 4) { const near = .35 + .65 * Math.exp(-Math.hypot(x - P.x, z - P.z) / 22), edge = 1 - THREE.MathUtils.smoothstep(r, BH.RING - 3, BH.RING + 4);
-      const v = BH.FLOW * near * edge * Math.min(1, r / 8); fx += -z / (r + 1e-3) * v; fz += x / (r + 1e-3) * v; }                   /* 시계 반대로 빙글 */
-    const dx = P.x - x, dz = P.z - z, d = Math.hypot(dx, dz);
-    if (d < BH.GRAB) { const k = 1 - d / BH.GRAB, pull = 16 * k * k, swirl = 12 * k; fx += dx / d * pull - dz / d * swirl; fz += dz / d * pull + dx / d * swirl; }
+  function flow(x, z, out) {                                                 /* 소용돌이의 중심 = 블랙홀 (사용자: 블랙홀이 빨아들이는 중심) — 맵 가운데가 아님 */
+    const r = Math.hypot(x, z), dx = P.x - x, dz = P.z - z, d = Math.hypot(dx, dz) + 1e-4, ux = dx / d, uz = dz / d;
+    const mask = 1 - THREE.MathUtils.smoothstep(r, BH.RING - 3, BH.RING + 4);                         /* 보스 구역 + 안쪽 둥근 길 안에서만 */
+    const swirl = BH.FLOW * 1.7 * Math.exp(-d / 17) * (d / (d + 2.5)) * mask, pull = 3.2 * Math.exp(-d / 13) * mask;   /* 블랙홀에 가까울수록 세게 돎 + 조금씩 끌려 듦 */
+    let fx = -uz * swirl + ux * pull, fz = ux * swirl + uz * pull;
+    if (d < BH.GRAB) { const k = 1 - d / BH.GRAB; fx += ux * 16 * k * k - uz * 10 * k; fz += uz * 16 * k * k + ux * 10 * k; }
     out[0] = fx; out[1] = fz; return d; }
   const tmp = [0, 0];
   let wanderT = Math.random() * 100;

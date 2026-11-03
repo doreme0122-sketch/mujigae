@@ -32,7 +32,7 @@ export function makeBloom(renderer, bo = {}){
     vertexShader:'in vec3 position;in vec2 uv;out vec2 vU;void main(){vU=uv;gl_Position=vec4(position.xy,0.,1.);}',
     fragmentShader:`precision highp float;in vec2 vU;out vec4 o;uniform sampler2D t,b1,b2,b3;uniform float k,asp;uniform vec4 warp,lens;
       void main(){ vec2 uv=vU;
-        if(lens.w>0.){ vec2 d=(uv-lens.xy)*vec2(asp,1.); float r=length(d)+1e-5, R=lens.z;   /* 블랙홀: 둘레 공간이 휘감기며(소용돌이) 가운데로 끌려 보임 */
+        if(lens.w>0.){ vec2 d=(uv-lens.xy)*vec2(asp,1.); float r=length(d)+1e-5, R=max(lens.z,1e-3);   /* 블랙홀: 둘레 공간이 휘감기며(소용돌이) 가운데로 끌려 보임 */
           float sw=lens.w*2.4*exp(-r/(R*1.3)), cs=cos(sw), sn=sin(sw); d=mat2(cs,-sn,sn,cs)*d;
           float rr=r*(1.-lens.w*.55*exp(-r/R)); uv=lens.xy+d/r*rr/vec2(asp,1.); }   /* 가운데 쪽을 끌어 와 넓혀 보임 → 검은 가운데가 커 보이고 둘레 빛이 휘감김 */
         if(warp.w>0.){ vec2 d=(vU-warp.xy)*vec2(asp,1.); float r=length(d)+1e-5, R=warp.z;      /* 공간이 일그러지는 파동: 센 첫 물결 + 뒤따르는 약한 물결 둘 */

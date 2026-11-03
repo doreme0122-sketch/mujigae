@@ -11,7 +11,7 @@
    단위 m. 받침 높이 약 1.3m, 지름 약 4.4m. 돌은 한 재질, 빛은 한 재질 → 그리는 횟수 적게 */
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { ruinMaterial } from './ruins.js?v=11032107';
+import { ruinMaterial } from './ruins.js?v=11032114';
 
 const rng = seed => { let s = seed * 9301 + 49297; return () => (s = (s * 9301 + 49297) % 233280) / 233280; };
 const clean = g => { for (const k of Object.keys(g.attributes)) if (k !== 'position' && k !== 'normal') g.deleteAttribute(k); return g.index ? g.toNonIndexed() : g; };
@@ -193,8 +193,8 @@ export function makeWardBase(uT) {
   const gm = new THREE.Mesh(glowGeo(glow), gMat); gm.renderOrder = 4; G.add(gm);
   G.userData.top = 1.56;                                                    /* 다음 부품(유리 기둥)이 앉을 높이 */
   G.userData.glow = gMat;
-  G.userData.update = (t, col, power = .5) => { gMat.uniforms.uT.value = t; gMat.uniforms.uCol.value.copy(col); gMat.uniforms.uI.value = .9 + power * 1.2; gMat.uniforms.uFlow.value = .25 + power * .9;
-    runes.forEach(r => { const U = r.material.uniforms; U.uT.value = t; U.uCol.value.copy(col); U.uI.value = .8 + power * .8; });
+  G.userData.update = (t, col, power = .5) => { gMat.uniforms.uT.value = t; gMat.uniforms.uCol.value.copy(col); gMat.uniforms.uI.value = .5 + power * .55;   /* 빛 번짐 줄임 (사용자: 너무 번짐) */ gMat.uniforms.uFlow.value = .25 + power * .9;
+    runes.forEach(r => { const U = r.material.uniforms; U.uT.value = t; U.uCol.value.copy(col); U.uI.value = .5 + power * .45; });
     G.userData.emblem.material.opacity = .8 + .2 * Math.sin(t * 1.4); };
   return G;
 }
