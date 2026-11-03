@@ -1,0 +1,57 @@
+/* 시야 가림 — 내 기체 둘레만 보이고, 벽 뒤는 안 보임 (매복의 무서움)
+   · 보이는 곳: 기체에서 사방으로 빛줄기를 쏴서 30m까지, 벽(벽 지도 .5 넘는 곳)에 닿으면 그 뒤는 못 봄. 벽 앞면까지는 보임
+   · 한 번 본 땅·벽은 흐리게 남음(지형은 기억함). 처음 보는 곳은 짙게 덮임
+   · 수풀: 바깥에서 수풀 '안'은 안 보임(수풀 자체는 보임). 같은 수풀 안이면 보임 → canSee(x,z)로 나중에 적·몬스터 숨길 때 씀
+   · 보이는 곳이 바뀔 때 칸칸이 탁 바뀌지 않고 서서히 밝아지고 어두워짐(눈이 적응하듯)
+   · 덮개는 화면 위 한 장: 화면 칸마다 '눈높이 1.5m 땅'의 보임 값을 읽어 어둡게 덮음 → 벽·바닥·알갱이 모두 한 번에 가려짐
+   · 무게: 빛줄기 320가닥 × 60걸음 (가벼움) · 시야 지도 250×250 한 장 */
+import * as THREE from 'three';
+import { MAP } from './mapfloor.js?v=11031134';
+
+export const SIGHT = 30;
+export function makeVision(B, bushes, floorNoise) {
+  const N = 250, S = MAP.SCALE, W = MAP.W * S, cellM = W / N;
+  const vis = new Float32Array(N * N), seen = new Uint8Array(N * N), now = new Uint8Array(N * N), tex8 = new Uint8Array(N * N * 2);
+  const BN = B.N, F = B.F, bcell = MAP.W / BN;
+  const wallAt = (x, z) => { const i = Math.floor((x / S + MAP.W / 2) / bcell), j = Math.floor((z / S + MAP.H / 2) / bcell); return i < 0 || j < 0 || i >= BN || j >= BN || F[j * BN + i] > .5 || B.reg[j * BN + i] === 17; };
+  const ci = x => Math.floor((x + W / 2) / cellM);
+  const tex = new THREE.DataTexture(tex8, N, N, THREE.RGFormat); tex.magFilter = tex.minFilter = THREE.LinearFilter; tex.needsUpdate = true;
+  let myBush = 0, touched = [];
+  function cast(sx, sz) {
+    for (const k of touched) now[k] = 0; touched = [];
+    myBush = bushes.bushAt(sx, sz);
+    const RAYS = 320, step = .5, n = Math.ceil(SIGHT / step);
+    for (let r = 0; r < RAYS; r++) { const a = r / RAYS * 6.2832, dx = Math.cos(a), dz = Math.sin(a);
+      for (let k = 0; k <= n; k++) { const x = sx + dx * k * step, z = sz + dz * k * step, i = ci(x), j = ci(z); if (i < 0 || j < 0 || i >= N || j >= N) break;
+        const c = j * N + i; if (!now[c]) { now[c] = 1; touched.push(c); seen[c] = 1; }
+        if (wallAt(x, z)) { /* 벽 앞면까지 보이고 그 뒤는 안 보임: 벽 속으로 한 칸 더 보고 멈춤 */
+          const x2 = x + dx * cellM, z2 = z + dz * cellM, i2 = ci(x2), j2 = ci(z2); if (i2 >= 0 && j2 >= 0 && i2 < N && j2 < N) { const c2 = j2 * N + i2; if (!now[c2]) { now[c2] = 1; touched.push(c2); seen[c2] = 1; } } break; } } }
+  }
+  /* 덮개: 화면 앞 한 장. 화면 칸마다 카메라에서 그 칸을 지나는 줄이 눈높이(1.5m)와 만나는 땅 자리의 시야 값을 읽음 */
+  const mat = new THREE.ShaderMaterial({ transparent: true, depthTest: false, depthWrite: false,
+    uniforms: { uV: { value: tex }, uN: { value: floorNoise }, uT: { value: 0 }, uOn: { value: 1 }, uCam: { value: new THREE.Vector3() }, uInvPV: { value: new THREE.Matrix4() } },
+    vertexShader: 'varying vec2 vS; void main(){ vS=position.xy; gl_Position=vec4(position.xy,0.,1.); }',
+    fragmentShader: `precision highp float; varying vec2 vS; uniform sampler2D uV, uN; uniform float uT, uOn; uniform vec3 uCam; uniform mat4 uInvPV;
+      void main(){ vec4 f=uInvPV*vec4(vS,1.,1.); vec3 d=normalize(f.xyz/f.w-uCam);
+        float t=(1.5-uCam.y)/min(d.y,-1e-3); vec3 p=uCam+d*t;
+        vec2 uv=p.xz/${W.toFixed(1)}+.5; vec2 v=texture2D(uV,uv).rg;
+        float drift=texture2D(uN,p.xz*.012+vec2(uT*.006,uT*.004)).r;                              /* 덮인 곳도 아주 천천히 일렁임 (멈춘 검은 판이 아님) */
+        float a=mix(mix(.9,.6,v.g)+(drift-.5)*.08, 0., v.r);
+        if(uv.x<0.||uv.y<0.||uv.x>1.||uv.y>1.) a=.9;
+        gl_FragColor=vec4(vec3(.004,.006,.014),a*uOn); }` });
+  const quad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), mat); quad.frustumCulled = false; quad.renderOrder = 50;
+  const scene = new THREE.Scene(); scene.add(quad); const cam0 = new THREE.Camera(), m4 = new THREE.Matrix4();
+  let acc = 0;
+  return { scene, cam0, mat,
+    /* 매 장면: 빛줄기 쏘기 → 보이는 값을 서서히 따라감(둘레 45m 안만) → 시야 지도 올림 */
+    update(t, dt, sx, sz, camera) {
+      cast(sx, sz);
+      const k = Math.min(1, dt * 6), R = Math.ceil(45 / cellM), i0 = Math.max(0, ci(sx) - R), i1 = Math.min(N - 1, ci(sx) + R), j0 = Math.max(0, ci(sz) - R), j1 = Math.min(N - 1, ci(sz) + R);
+      for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) { const c = j * N + i; vis[c] += (now[c] - vis[c]) * k; tex8[c * 2] = vis[c] * 255; tex8[c * 2 + 1] = seen[c] * 255; }
+      if ((acc += dt) > 1 / 30) { acc = 0; tex.needsUpdate = true; }                                /* 1초에 30번만 올림 (충분히 부드럽고 가벼움) */
+      mat.uniforms.uT.value = t; mat.uniforms.uCam.value.copy(camera.position);
+      mat.uniforms.uInvPV.value.copy(m4.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse).invert()); },
+    /* 적·몬스터가 보이는지: 시야 안 + (수풀 안이면 같은 수풀일 때만) */
+    canSee(x, z) { const i = ci(x), j = ci(z); if (i < 0 || j < 0 || i >= N || j >= N || !now[j * N + i]) return false; const b = bushes.bushAt(x, z); return !b || b === myBush; },
+    set on(v) { mat.uniforms.uOn.value = v ? 1 : 0; } };
+}
