@@ -60,20 +60,26 @@ export function stoneMaterial(uT) {
 /* 빛 (틈·홈·테): 속에서 흐르는 힘. aK = 흐름 위치(아래 0 → 위 1) */
 export function glowMaterial() {
   return new THREE.ShaderMaterial({ transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide,
-    uniforms: { uCol: { value: new THREE.Vector3(.35, .85, 1) }, uI: { value: 1 }, uT: { value: 0 }, uFlow: { value: .4 } },
-    vertexShader: 'attribute float aK; varying float vK; varying vec2 vU; void main(){ vK = aK; vU = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.); }',
-    fragmentShader: `uniform vec3 uCol; uniform float uI, uT, uFlow; varying float vK; varying vec2 vU;
+    uniforms: { uCol: { value: new THREE.Vector3(.35, .85, 1) }, uI: { value: 1 }, uT: { value: 0 }, uFlow: { value: .4 }, uProg: { value: -1 }, uPCol: { value: new THREE.Vector3(1, 1, 1) }, uRise: { value: -9 }, uRiseI: { value: 0 } },
+    vertexShader: 'attribute float aK, aA; varying float vK, vA, vY; varying vec2 vU; void main(){ vK = aK; vA = aA; vU = uv; vY = (modelMatrix * vec4(position, 1.)).y; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.); }',
+    fragmentShader: `uniform vec3 uCol, uPCol; uniform float uI, uT, uFlow, uProg, uRise, uRiseI; varying float vK, vA, vY; varying vec2 vU;
       void main(){ float w = fract(vK * 3. - uT * uFlow); float pulse = .75 + .45 * exp(-(w - .5) * (w - .5) * 30.);
         float edge = 1. - abs(vU.y * 2. - 1.); float core = edge * edge;
-        vec3 c = (uCol * uCol * 1.3 + vec3(.25) * core) * (.4 + core * .9) * pulse;
+        vec3 col = uCol, c;
+        if (vA > 0. && uProg >= 0.) {                                                          /* 차지 고리: 차지한 만큼 그 사람 색으로 둘레를 따라 채워짐, 채움 끝이 하얗게 달림 */
+          float lit = step(vA, uProg), hd = (vA - uProg) * 60.; col = mix(uCol, uPCol, lit);
+          c = (col * col * 1.5 + vec3(.3) * core) * (.25 + core * .9) * mix(.25, 1.5, lit) + vec3(1.2) * exp(-hd * hd) * step(.001, uProg) * step(uProg, .999) * core; }
+        else c = (col * col * 1.3 + vec3(.25) * core) * (.4 + core * .9) * pulse;
+        float rh = (vY - uRise) / .14, rise = smoothstep(uRise + .02, uRise - .3, vY) * uRiseI;     /* 순간 이동: 땅 고리에서 탑 위로 빛이 차오름 */
+        c += (uCol * uCol * 2.2 + .5) * rise * (1. + core) + vec3(2.) * exp(-rh * rh) * uRiseI * (.5 + core);
         gl_FragColor = vec4(c * uI, 1.); }` });
 }
 /* 빛 띠 조각: 네모 판 (u 가로 · v 세로) + 흐름 값 */
-function glowQuad(list, A, B, C, D, k0, k1) {          /* A B 아래, C D 위 */
-  list.push({ p: [...A, ...B, ...C, ...A, ...C, ...D], uv: [0, 0, 1, 0, 1, 1, 0, 0, 1, 1, 0, 1], k: [k0, k0, k1, k0, k1, k1] });
+function glowQuad(list, A, B, C, D, k0, k1, a0 = 0, a1 = 0) {          /* A B 아래, C D 위 · a = 차지 고리 둘레 위치(0 = 아님) */
+  list.push({ p: [...A, ...B, ...C, ...A, ...C, ...D], uv: [0, 0, 1, 0, 1, 1, 0, 0, 1, 1, 0, 1], k: [k0, k0, k1, k0, k1, k1], a: [a0, a1, a1, a0, a1, a0] });
 }
-function glowGeo(list) { const p = [], uv = [], k = []; for (const q of list) { p.push(...q.p); uv.push(...q.uv); k.push(...q.k); }
-  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(p, 3)); g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2)); g.setAttribute('aK', new THREE.Float32BufferAttribute(k, 1)); return g; }
+function glowGeo(list) { const p = [], uv = [], k = [], aa = []; for (const q of list) { p.push(...q.p); uv.push(...q.uv); k.push(...q.k); aa.push(...(q.a || [0, 0, 0, 0, 0, 0])); }
+  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(p, 3)); g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2)); g.setAttribute('aK', new THREE.Float32BufferAttribute(k, 1)); g.setAttribute('aA', new THREE.Float32BufferAttribute(aa, 1)); return g; }
 
 /* 문양 돌판 앞면 그림: 네모 소용돌이 · 꺾쇠 · 대괄호 (그림의 "回 · 己" 같은 각진 고대 문양) */
 function runeTex(seed) {
@@ -113,7 +119,11 @@ export function makeWardBase(uT) {
     const ga = c + TAU / 16; for (const [rA, rB, y0, y1] of [[1.0, 1.0, .2, .14 + (big ? .62 : .62)], [1.72, 1.72, .18, .52]]) glowQuad(glow, at(ga - .03, rA, y0), at(ga + .03, rB, y0), at(ga + .03, rB, y1), at(ga - .03, rA, y1), 0, .4);
     glowQuad(glow, at(ga, .98, .19), at(ga, 1.75, .19), at(ga, 1.75, .26), at(ga, .98, .26), 0, .2); }   /* 틈 바닥 빛 */
   /* 바닥 단 위 빛 테 (둘레 한 바퀴) */
-  for (let i = 0; i < 64; i++) { const a0 = i / 64 * TAU, a1 = (i + 1) / 64 * TAU; glowQuad(glow, at(a0, 1.96, .155), at(a1, 1.96, .155), at(a1, 1.92, .175), at(a0, 1.92, .175), 0, 0); }
+  /* 차지 고리 = 와드를 두른 빛 원 (바닥 단 둘레 세로 테 + 땅에 깔린 빛 띠). 차지하는 10초 동안 정면부터 시계 방향으로 그 사람 색으로 채워짐
+     — 따로 땅에 눈금 선을 그리지 않고 와드 몸에 붙은 빛 원 하나로 보여 줌 (사용자) */
+  for (let i = 0; i < 96; i++) { const a0 = FR - i / 96 * TAU, a1 = FR - (i + 1) / 96 * TAU, u0 = Math.max(.0005, i / 96), u1 = (i + 1) / 96;
+    glowQuad(glow, at(a0, 2.0, .02), at(a1, 2.0, .02), at(a1, 1.99, .16), at(a0, 1.99, .16), 0, 0, u0, u1);
+    glowQuad(glow, at(a0, 2.26, .012), at(a1, 2.26, .012), at(a1, 2.02, .012), at(a0, 2.02, .012), 0, 0, u0, u1); }
   /* 정면 표식: 거꾸로 세모 (정면 장갑판 위) */
   { const c = FR, tilt = .32, s = .26, T = [[0, -s], [s * 1.05, s * .75], [-s * 1.05, s * .75]], I = T.map(([x, y]) => [x * .6, y * .6]);
     const P = []; for (let e = 0; e < 3; e++) { const a = T[e], b = T[(e + 1) % 3], c2 = I[(e + 1) % 3], d = I[e]; P.push(a[0], a[1], 0, b[0], b[1], 0, c2[0], c2[1], 0, a[0], a[1], 0, c2[0], c2[1], 0, d[0], d[1], 0); }
@@ -148,6 +158,7 @@ export function makeWardBase(uT) {
   const sm = new THREE.Mesh(mergeGeometries(stone.map(clean)), sMat); G.add(sm);
   const gm = new THREE.Mesh(glowGeo(glow), gMat); gm.renderOrder = 4; G.add(gm);
   G.userData.top = 1.56;                                                    /* 다음 부품(유리 기둥)이 앉을 높이 */
+  G.userData.glow = gMat;
   G.userData.update = (t, col, power = .5) => { gMat.uniforms.uT.value = t; gMat.uniforms.uCol.value.copy(col); gMat.uniforms.uI.value = .9 + power * 1.2; gMat.uniforms.uFlow.value = .25 + power * .9;
     runes.forEach(r => { const U = r.material.uniforms; U.uT.value = t; U.uCol.value.copy(col); U.uI.value = .8 + power * .8; });
     G.userData.emblem.material.opacity = .8 + .2 * Math.sin(t * 1.4); };

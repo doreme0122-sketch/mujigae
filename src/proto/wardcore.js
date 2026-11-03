@@ -8,7 +8,7 @@
    단위 m, 받침 위(y = 받침 top)부터 높이 약 1.8m */
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { glowMaterial } from './wardbase.js?v=11031910';
+import { glowMaterial } from './wardbase.js?v=11031919';
 
 const clean = g => { for (const k of Object.keys(g.attributes)) if (k !== 'position' && k !== 'normal') g.deleteAttribute(k); return g.index ? g.toNonIndexed() : g; };
 const AB = { transparent: true, depthWrite: false, blending: THREE.AdditiveBlending };
@@ -90,6 +90,7 @@ export function makeWardCore(uT, y0) {
     for (const yy of [.2, H - .2]) for (let i = 0; i < 48; i++) { const a0 = i / 48 * Math.PI * 2, a1 = (i + 1) / 48 * Math.PI * 2, r = .455, Q = (a, y) => [Math.cos(a) * r, y, Math.sin(a) * r]; quad(Q(a0, yy - .02), Q(a1, yy - .02), Q(a1, yy + .025), Q(a0, yy + .025), 1, 1); }
     const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(p, 3)); g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2)); g.setAttribute('aK', new THREE.Float32BufferAttribute(kk, 1));
     var gMat = glowMaterial(); const gm = new THREE.Mesh(g, gMat); gm.renderOrder = 4; G.add(gm); }
+  G.userData.glow = gMat;
   /* 유리 원통 (뒷면 → 에너지 → 알맹이·궤도 → 앞면 순서로 그림: 유리 속에 든 것처럼) */
   const tube = new THREE.CylinderGeometry(RG, RG, H - .36, 48, 1, true); tube.translate(0, .18 + (H - .36) / 2, 0);
   const gb = new THREE.Mesh(tube, glassMat(true)), gf = new THREE.Mesh(tube, glassMat(false)); gb.renderOrder = 3; gf.renderOrder = 9; G.add(gb, gf);

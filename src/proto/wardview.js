@@ -4,11 +4,12 @@
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { makeBloom } from '../core/hangar/bloom.js?v=11031910';
-import { chunk, obsidianMaterial } from './rocks.js?v=11031910';
-import { makeWardBase } from './wardbase.js?v=11031910';
-import { makeWardCore } from './wardcore.js?v=11031910';
-import { makePerf } from './perf.js?v=11031910';
+import { makeBloom } from '../core/hangar/bloom.js?v=11031919';
+import { chunk, obsidianMaterial } from './rocks.js?v=11031919';
+import { makeWardBase } from './wardbase.js?v=11031919';
+import { makeWardCore } from './wardcore.js?v=11031919';
+import { pointPool } from './skilldemo.js?v=11031919';
+import { makePerf } from './perf.js?v=11031919';
 import * as A from '../core/audio.js';
 
 const $ = s => document.querySelector(s), clamp = THREE.MathUtils.clamp, V = (x = 0, y = 0, z = 0) => new THREE.Vector3(x, y, z);
@@ -52,8 +53,8 @@ function groundMat() {
         float fill = step(u, uProg) * exp(-d2 * d2);
         float head = uProg > 0. && uProg < 1. ? exp(-pow(abs(u - uProg) * 40., 2.)) * exp(-d2 * d2 * .5) * 2. : 0.;
         vec3 rc = uCol * uCol;
-        c += rc * (exp(-d1 * d1) * (.35 + .5 * uOwn) + tick * (.25 + .35 * uOwn)) + rc * fill * 1.4 + vec3(1.) * head;
-        c += vec3(1., .35, .2) * uHurt * exp(-d2 * d2 * .3) * (.6 + .4 * sin(u * 80. + uT * 40.));               /* 끊길 때: 붉게 지직거리며 흩어짐 */
+        /* 땅에 눈금·선 고리는 그리지 않음 (사용자: 빛 시계 같은 선 금지) — 차지는 와드 몸의 빛 원으로 */
+
         /* 등대 빛이 쓰는 자리 (내 와드·남의 와드일 때) */
         float da = abs(atan(sin(a - uPhi), cos(a - uPhi)));
         c += rc * uOwn * smoothstep(.32, 0., da) * smoothstep(uR, uR + 2., r) * smoothstep(22., 6., r) * (.35 + .25 * g2);
@@ -62,7 +63,7 @@ function groundMat() {
         c += rc * exp(-dp * dp) * max(0., 1. - uPulse / 2.4) * smoothstep(uR - 1., uR + 1., r) * (.6 + .6 * g2);
         /* 순간 이동: 고리 앞 도착 자리에 빛이 모임 */
         vec2 q = vP - uArr; float dq = length(q), dr = (dq - 1.6 * (1. - uTp)) / .08;      /* 도착 자리 = 화면 쪽(+z) 고리 앞 */
-        c += rc * uTp * (exp(-dq * dq * .6) * .8 + exp(-dr * dr) * 1.2);
+
         gl_FragColor = vec4(c, 1.); }` });
 }
 /* 꽃잎 속 빛 (흑요석 칼날 속으로 흐르는 상태 색) */
@@ -98,10 +99,22 @@ export async function start(canvas, onProgress = () => {}) {
   const base = makeWardBase(uT); scene.add(base);
   const core = makeWardCore(uT, base.userData.top); scene.add(core);
   onProgress(.8);
-  const S = { own: 'none', col: COL.none.clone(), power: .4, fill: .12, cap: -1 };
+  const motes = pointPool(400, false, .12); scene.add(motes.pts);
+  /* 순간 이동 빛: 와드 몸을 감싸는 얇은 빛 껍질이 땅의 빛 원에서 탑 꼭대기까지 차오름 (기둥처럼 세우지 않고 와드 모양을 따라 감쌈) */
+  const sheath = new THREE.Mesh(new THREE.LatheGeometry([[2.16, 0], [2.05, .3], [1.55, .85], [1.15, 1.25], [.78, 1.6], [.7, 2.2], [.72, 3.0], [.6, 3.45]].map(([r, y]) => new THREE.Vector2(r, y)), 64),
+    new THREE.ShaderMaterial({ transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide, uniforms: { uRise: { value: -9 }, uI: { value: 0 }, uCol: { value: V() }, uT: { value: 0 } },
+      vertexShader: 'varying vec3 vW, vN; void main(){ vec4 w = modelMatrix * vec4(position, 1.); vW = w.xyz; vN = normalize(mat3(modelMatrix) * normal); gl_Position = projectionMatrix * viewMatrix * w; }',
+      fragmentShader: `uniform float uRise, uI, uT; uniform vec3 uCol; varying vec3 vW, vN;
+        void main(){ vec3 Vd = normalize(cameraPosition - vW); float q = 1. - abs(dot(normalize(vN), Vd)), rim = q * q;
+          float below = smoothstep(uRise + .02, uRise - .5, vW.y), d = (vW.y - uRise) / .1, front = exp(-d * d);
+          float a = atan(vW.z, vW.x), wave = .7 + .3 * sin(a * 9. + vW.y * 6. - uT * 5.);
+          vec3 c = (uCol * uCol + .2) * (below * (.06 + rim * .55) * wave + front * (.35 + rim * 1.2));
+          gl_FragColor = vec4(c * uI, 1.); }` }));
+  sheath.renderOrder = 10; scene.add(sheath);
+  const S = { own: 'none', col: COL.none.clone(), power: .4, fill: .12, cap: -1, tp: -1 };
   const stEl = $('#state'); const names = { none: '빈 와드 — 푸른 빛', mine: '내 와드 — 연두 빛', foe: '남의 와드 — 붉은 주황 빛' };
-  const tour = $('#tour'); [['빈 와드', 'none'], ['내 와드', 'mine'], ['남의 와드', 'foe'], ['내가 차지(10초)', 'cap']].forEach(([n, k]) => { const b = document.createElement('button'); b.type = 'button'; b.textContent = n;
-    b.onclick = () => { if (k === 'cap') { S.own = 'none'; S.cap = t; stEl.textContent = '② 유리 기둥 · 차지하는 중 — 에너지가 아래부터 차오름'; } else { S.own = k; S.cap = -1; S.fill = k === 'none' ? .12 : 1; stEl.textContent = '② 유리 기둥 · ' + names[k]; } tour.querySelectorAll('button').forEach(x => x.classList.toggle('on', x === b)); };
+  const tour = $('#tour'); [['빈 와드', 'none'], ['내 와드', 'mine'], ['남의 와드', 'foe'], ['내가 차지(10초)', 'cap'], ['순간 이동(5초)', 'tp']].forEach(([n, k]) => { const b = document.createElement('button'); b.type = 'button'; b.textContent = n;
+    b.onclick = () => { if (k === 'tp') { S.cap = -1; if (S.own !== 'mine') { S.own = 'mine'; S.fill = 1; } S.tp = t; stEl.textContent = '순간 이동 중 — 빛 원에서 탑 위로 빛이 차오름'; } else if (k === 'cap') { S.tp = -1; S.own = 'none'; S.cap = t; stEl.textContent = '② 유리 기둥 · 차지하는 중 — 에너지가 아래부터 차오름'; } else { S.own = k; S.cap = -1; S.fill = k === 'none' ? .12 : 1; stEl.textContent = '② 유리 기둥 · ' + names[k]; } tour.querySelectorAll('button').forEach(x => x.classList.toggle('on', x === b)); };
     if (k === 'none') b.classList.add('on'); tour.appendChild(b); });
   stEl.textContent = '② 유리 기둥 · ' + names.none;
   const cam = { h: 10, H: 10, tilt: 1.15, T: 1.15, az: .35 };
@@ -116,13 +129,23 @@ export async function start(canvas, onProgress = () => {}) {
   const perf = makePerf(st => { bloom.setSamples(st.aa ? 4 : 0); size(); });
   function size() { const r = canvas.getBoundingClientRect(); [Wd, Hd] = perf.size(r.width, r.height); renderer.setSize(Wd, Hd, false); bloom.size(Wd, Hd); camera.aspect = Wd / Hd; camera.updateProjectionMatrix(); }
   addEventListener('resize', size); size(); bloom.setSamples(perf.st.aa ? 4 : 0);
-  let last = performance.now(), t = 0;
+  let last = performance.now(), t = 0; motes.setPx(Hd);
   renderer.setAnimationLoop(now => { try {
     const dt = clamp((now - last) / 1000, 0, .05); last = now; t += dt; uT.value = t;
     if (S.cap >= 0) { const k = Math.min(1, (t - S.cap) / 10); S.fill = .12 + .88 * k; if (k >= 1) { S.cap = -1; S.own = 'mine'; stEl.textContent = '② 유리 기둥 · ' + names.mine; } }
     const capping = S.cap >= 0, wantCol = capping ? COL.none.clone().lerp(COL.mine, .3 + .7 * (S.fill - .12) / .88) : COL[S.own];
     S.col.lerp(wantCol, Math.min(1, dt * 4)); S.power += ((S.own === 'none' ? (capping ? .35 + .5 * S.fill : .35) : 1) - S.power) * Math.min(1, dt * 2);
     base.userData.update(t, S.col, S.power); core.userData.update(t, S.col, S.power, S.fill);
+    { const bg = base.userData.glow.uniforms, cg = core.userData.glow.uniforms;                 /* 차지 고리 · 순간 이동 빛 */
+      bg.uProg.value = capping ? (t - S.cap) / 10 : S.own !== 'none' ? 1 : 0; bg.uPCol.value.copy(capping ? COL.mine : COL[S.own]);
+      let rise = -9, ri = 0; if (S.tp >= 0) { const k = (t - S.tp) / 5; rise = -.2 + k * 3.9; ri = Math.min(1, k * 4); if (k >= 1) { const e = (t - S.tp - 5) / .6; ri = Math.max(0, 1 - e); rise = 9; if (e >= 1) { S.tp = -1; stEl.textContent = '도착 — ' + names.mine; } } }
+      for (const u of [bg, cg]) { u.uRise.value = rise; u.uRiseI.value = ri; }
+      { const U = sheath.material.uniforms; U.uRise.value = rise; U.uI.value = ri; U.uCol.value.copy(COL.mine); U.uT.value = t; sheath.visible = ri > .01; }
+      if (S.tp >= 0 && rise < 4) { const top = Math.max(.1, rise);                                            /* 빛 원에서 떠오른 빛 알갱이가 차오르는 높이까지 탑을 타고 오름 */
+        motes.emit(q => { const a = Math.random() * 6.283, r = 2.05 - Math.random() * .2; q.p.set(Math.cos(a) * r, .05, Math.sin(a) * r); const tr = .5 + Math.random() * .3;
+          q.v.set(-Math.cos(a) * (r - tr) / .9, top / .9, -Math.sin(a) * (r - tr) / .9); q.drag = 0; q.max = q.life = .9; q.c.copy(COL.mine); q.s = .8; }, 4); }
+      if (S.tp >= 0 && rise === 9 && ri > .97) motes.emit(q => { q.p.set(0, 3.3, 0); q.v.randomDirection().multiplyScalar(2 + Math.random() * 2); q.max = q.life = .6; q.c.copy(COL.mine); q.s = 1.2; q.g = 2; }, 60); }
+    motes.update(dt);
     GU.uT.value = t; GU.uCol.value.copy(S.col); GU.uProg.value = 0; GU.uOwn.value = 0; GU.uPulse.value = 99;
     cam.h += (cam.H - cam.h) * Math.min(1, dt * 3); cam.tilt += (cam.T - cam.tilt) * Math.min(1, dt * 3);
     camera.position.set(Math.sin(cam.az) * cam.h * Math.sin(cam.tilt), cam.h * Math.cos(cam.tilt) + .6, Math.cos(cam.az) * cam.h * Math.sin(cam.tilt)); camera.lookAt(0, 1.55, 0);
