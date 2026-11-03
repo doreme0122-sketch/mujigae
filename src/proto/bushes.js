@@ -8,9 +8,10 @@
    · 모양·크기는 제각각: 작음(한 대가 겨우) · 중간 · 큼(여럿) × 둥긂 · 길쭉함(벽 따라) · 굽음
    · 규칙: 숨으면 바깥에서 안 보이고, 숨은 기체가 밀어내는 가스·돌 움직임도 바깥에선 안 보임(내 화면에서만).
            숨은 내 기체는 내 화면에서 반투명. 같은 숨을 곳 안이면 서로 반투명하게 보임. 안에서 쏘면 2초 드러남(적 붙일 때) */
-import { MAP, toWorld } from './mapfloor.js?v=11031355';
+import { MAP, toWorld } from './mapfloor.js?v=11031401';
 
-export function makeBushes(B, J) {
+export function makeBushes(B, J, opt = {}) {
+  if (opt.off) return { list: [], bushAt: () => 0, update: () => false };   /* 7안: 평지 숨을 곳은 만들지 않음(사용자 2026-11-03) — 좁은 길 틈을 메우는 숨을 곳은 길을 만든 뒤에 */
   const S = MAP.SCALE, rnd = (() => { let s = 977; return () => (s = (s * 9301 + 49297) % 233280) / 233280; })();
   const spawns = J.spawns.map(([x, y]) => toWorld(x, y));
   const freeAt = (x, z) => B.region(x, z) !== 17 && B.field(x, z) < .2;
