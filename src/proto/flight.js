@@ -10,8 +10,8 @@
    무게: 기체 한 대 + 불꽃 띠 몇 장 + 꼬리 띠 하나 + 불티 점 묶음 하나 + 그림자 판 하나 */
 import * as THREE from 'three';
 import { buildShip, engineSpots } from '../core/ships/build.js';
-import { flameMesh } from './sortie.js?v=11040816';
-import { MAP } from './mapfloor.js?v=11040816';
+import { flameMesh } from './sortie.js?v=11040846';
+import { MAP } from './mapfloor.js?v=11040846';
 
 export const FLY = { LEN: 2, HOVER: .7, R: .8, SPEEDS: [9, 12, 15, 18], TURN: 7, ACC: .22,
   BASE: 9, SHIELD: 3, BOOST: 5, BOOSTK: 1.5 };   /* 기지 고리(반지름 9m)를 벗어나는 순간: 보호막 3초 · 가속 5초(1.5배) — 기지 출구 앞 매복에 바로 당하지 않게 */
@@ -119,7 +119,7 @@ export async function makeFlight(renderer, B, start, face) {
     if (S.armed && Math.hypot(S.x - start[0], S.z - start[1]) > FLY.BASE) { S.armed = false; S.shield = FLY.SHIELD; S.boost = FLY.BOOST; }
     if (S.shield > 0 && (S.shield -= dt) <= 0) { S.shield = 0; S.pop = .3; }
     if (S.boost > 0) S.boost = Math.max(0, S.boost - dt);
-    const bk = Math.min(1, S.boost / .6), spd = S.speed * (1 + (FLY.BOOSTK - 1) * bk * bk * (3 - 2 * bk));
+    const bk = Math.min(1, S.boost / .6), spd = S.speed * (1 + (FLY.BOOSTK - 1) * bk * bk * (3 - 2 * bk)) * (1 - .3 * (S.goo || 0));   /* 해파리 점액 위: 30% 느려짐 */
     const sl = 1 - .45 * S.aimK, tx = -Math.sin(S.mh) * spd * sl * m * (m > .08), tz = -Math.cos(S.mh) * spd * sl * m * (m > .08)   /* 쏘는 동안 느려짐 */, a = Math.min(1, dt / FLY.ACC);
     S.vx += (tx - S.vx) * a; S.vz += (tz - S.vz) * a; S.thr += (m - S.thr) * Math.min(1, dt * 8);
     /* 벽: 벽을 파고드는 힘만 없애고 벽을 따라가는 힘은 남김 → 비스듬히 닿으면 벽을 타고 미끄러짐, 정면이면 거의 멈춤
@@ -153,7 +153,7 @@ export async function makeFlight(renderer, B, start, face) {
     shadow.position.set(S.x, .05, S.z); shadow.rotation.z = S.head; shM.uniforms.uA.value = .55 - bob;
     ship.updateMatrixWorld(true); fw.set(0, 0, -1).transformDirection(ship.matrixWorld);
     /* 불꽃: 미는 힘만큼 */
-    const I = (.35 + S.thr * 1.1) * (1 + .5 * bk), len = (.35 + S.thr * 1.1) * K * (1 + .8 * bk);   /* 가속 중엔 불꽃이 길고 밝음 (힘을 더 냄) */
+    const gf = (S.goo || 0) * (.5 + .5 * Math.sin(t * 23) * Math.sin(t * 7.3)), I = (.35 + S.thr * 1.1) * (1 + .5 * bk) * (1 - .45 * gf),   /* 점액에 붙잡히면 불꽃이 힘겹게 깜빡임 */ len = (.35 + S.thr * 1.1) * K * (1 + .8 * bk);   /* 가속 중엔 불꽃이 길고 밝음 (힘을 더 냄) */
     flames.forEach((f, i) => { v.copy(ENG[i]).applyMatrix4(sm.matrixWorld); const u = f.material.uniforms; u.uA.value.copy(v); u.uB.value.copy(v).addScaledVector(fw, -len * (.9 + .1 * Math.sin(t * 50 + i))); u.uW.value = .1 * K * (1 + S.thr * .4); u.uI.value = I; u.uT.value = t; });
     /* 꼬리 */
     c.set(0, 0, 0); ENG.forEach(p => c.add(v.copy(p).applyMatrix4(sm.matrixWorld))); c.divideScalar(ENG.length);

@@ -11,9 +11,9 @@
    무게: 꼬리 한 장 · 머리 한 장 · 부스러기 한 장 · 조준 빛 한 장 = 그리기 4번 */
 import * as THREE from 'three';
 import * as A from '../core/audio.js';
-import { FLY } from './flight.js?v=11040816';
-import { BH } from './blackhole.js?v=11040816';
-import { hitWall } from './rocks.js?v=11040816';
+import { FLY } from './flight.js?v=11040846';
+import { BH } from './blackhole.js?v=11040846';
+import { hitWall } from './rocks.js?v=11040846';
 
 export const SHOT = {
   basic: { name: '기본탄', rate: 7, speed: 44, life: 1.1, heat: .07, cool: .42, coolWait: .3, lock: .3, tail: 3.4, W: .27, col: [.62, 1, .32], spread: .012, bounces: 3 }
@@ -28,7 +28,7 @@ function thud(vol = .05) { if (!A.live()) return; const c = A.ctx, t0 = c.curren
 function hiss() { if (!A.live()) return; const c = A.ctx, t0 = c.currentTime, n = A.noise(1.1), f = c.createBiquadFilter(), g = c.createGain(); f.type = 'bandpass'; f.frequency.setValueAtTime(5200, t0); f.frequency.exponentialRampToValueAtTime(1600, t0 + 1); f.Q.value = .7; n.connect(f); f.connect(g); A.env(g, t0, .03, .07, 1); A.out(g, .2); n.start(t0); }
 function clunk() { if (!A.live()) return; const c = A.ctx, t0 = c.currentTime, o = c.createOscillator(), g = c.createGain(); o.type = 'sine'; o.frequency.setValueAtTime(300, t0); o.frequency.exponentialRampToValueAtTime(120, t0 + .12); o.connect(g); A.env(g, t0, .003, .06, .14); A.out(g, .1); o.start(t0); o.stop(t0 + .2); }
 
-export function makeShots({ B, crystals, bh, FS, say }) {
+export function makeShots({ B, crystals, bh, FS, say, mobs, onKill }) {
   const G = new THREE.Group(), cfg = SHOT.basic;
   const C = new THREE.Vector3(...cfg.col);
   /* ── 꼬리: 탄마다 NT점 띠. 머리 쪽에서 굵어졌다가 끝으로 가늘어짐 ── */
@@ -106,6 +106,7 @@ export function makeShots({ B, crystals, bh, FS, say }) {
   const BU = Array.from({ length: MAXB }, () => ({ on: false, x: 0, z: 0, vx: 0, vz: 0, age: 0, life: 1, bo: 0, dead: -1, hist: [] })); let bI = 0;
   const S = { heat: 0, over: false, acc: 0, lastShot: -9, aimA: 0 };
   G.userData.S = S;
+  G.userData.sparks = (x, z, r, g, b, n) => { for (let i = 0; i < n; i++) { const a = Math.random() * 6.283, sp = 2 + Math.random() * 4; emit(x, FLY.HOVER, z, Math.cos(a) * sp, 1 + Math.random() * 2, Math.sin(a) * sp, r, g, b, .09, .3 + Math.random() * .3); } };
   const hitSparks = (x, z, nx, nz, n, rainbow) => { for (let i = 0; i < n; i++) { const a = Math.atan2(nz, nx) + (Math.random() - .5) * 2.2, sp = 4 + Math.random() * 7, [r, g, b] = rainbow ? spec(Math.random()) : [1.4, .7 + Math.random() * .4, .25];
     emit(x, FLY.HOVER, z, Math.cos(a) * sp, 1.5 + Math.random() * 3, Math.sin(a) * sp, r * 1.2, g * 1.2, b * 1.2, .09 + Math.random() * .06, .25 + Math.random() * .3); }
     emit(x, FLY.HOVER, z, 0, 0, 0, 1.2, 1.15, 1, .8, .09, 4, 0); };                                       /* 닿은 순간 번쩍 */
@@ -143,6 +144,13 @@ export function makeShots({ B, crystals, bh, FS, say }) {
       if (P) { const dx = P.x - b.x, dz = P.z - b.z, d2 = dx * dx + dz * dz; if (d2 < 900) { const d = Math.sqrt(d2), g = 650 / (d2 + 9); b.vx += dx / d * g * dt; b.vz += dz / d * g * dt;
         if (d < BH.CORE) { b.dead = 0; emit(b.x, FLY.HOVER, b.z, 0, 0, 0, .6, .5, 1, .6, .2, -2, 0); continue; } } }
       const nx = b.x + b.vx * dt, nz = b.z + b.vz * dt;
+      /* 몹(해파리): 지나온 한 걸음이 몸에 닿으면 맞음 */
+      if (mobs) { let hj = null; const sx = nx - b.x, sz = nz - b.z, L2 = sx * sx + sz * sz || 1e-9;
+        for (const j of mobs.userData.list) { if (!j.on || j.dieT > 0) continue; const R = .62 * j.s * 1.15, ox = j.x - b.x, oz = j.z - b.z; if (Math.abs(ox) > 6 || Math.abs(oz) > 6) continue;
+          const k = Math.max(0, Math.min(1, (ox * sx + oz * sz) / L2)), ex = ox - sx * k, ez = oz - sz * k; if (ex * ex + ez * ez < R * R) { hj = j; break; } }
+        if (hj) { const l = Math.hypot(b.vx, b.vz) || 1, killed = mobs.userData.hit(hj, t, b.vx / l, b.vz / l);
+          for (let i = 0; i < 10; i++) { const a = Math.atan2(-b.vz, -b.vx) + (Math.random() - .5) * 2.4, sp = 2 + Math.random() * 4; emit(hj.x, hj.y - .2, hj.z, Math.cos(a) * sp, Math.random() * 2.5, Math.sin(a) * sp, .3, .85, 1, .08 + Math.random() * .05, .3 + Math.random() * .3); }   /* 맞은 자리 몸빛이 튐 */
+          thud(.025); onKill?.(hj, killed, t); b.dead = 0; continue; } }
       /* 수정 기둥: 튕김 */
       const hit = b.bo < cfg.bounces && crystals ? crystals.userData.cross(b.x, b.z, nx, nz, .12) : null;
       if (hit) { const vn = b.vx * hit.nx + b.vz * hit.nz; if (vn < 0) { b.vx -= 2 * vn * hit.nx; b.vz -= 2 * vn * hit.nz; }

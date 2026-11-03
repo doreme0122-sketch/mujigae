@@ -3,11 +3,12 @@
    맵에 넣기 전에 생김새·움직임·맞음·쓰러짐·경험치를 한자리에서 봄 */
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
-import { makeBloom } from '../core/hangar/bloom.js?v=11040816';
+import { makeBloom } from '../core/hangar/bloom.js?v=11040846';
 import { buildShip } from '../core/ships/build.js';
-import { makeJellies, JELLY, JCOL } from './jelly.js?v=11040816';
-import { pointPool } from './skilldemo.js?v=11040816';
-import { makePerf } from './perf.js?v=11040816';
+import { makeJellies, JELLY, JCOL } from './jelly.js?v=11040846';
+import { pointPool } from './skilldemo.js?v=11040846';
+import { makeMobFx } from './mobfx.js?v=11040846';
+import { makePerf } from './perf.js?v=11040846';
 import * as A from '../core/audio.js';
 
 const $ = s => document.querySelector(s), clamp = THREE.MathUtils.clamp;
@@ -40,20 +41,6 @@ function groundMat(uT) {
         gl_FragColor = vec4(c, 1.); }` });
 }
 
-/* 빛 방울 (해파리가 뱉는 느린 탄): 비눗방울처럼 테두리가 밝고 속이 비치며 울렁임 */
-function bubblePool(n) {
-  const p = new Float32Array(n * 3), a = new Float32Array(n * 2), g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(p, 3)); g.setAttribute('aA', new THREE.BufferAttribute(a, 2));
-  const m = new THREE.ShaderMaterial({ ...AB, uniforms: { uPx: { value: 600 }, uT: { value: 0 }, uC: { value: JCOL.alert } },
-    vertexShader: 'attribute vec2 aA; uniform float uPx; varying vec2 vA; void main(){ vA = aA; vec4 mv = modelViewMatrix * vec4(position, 1.); gl_Position = projectionMatrix * mv; gl_PointSize = aA.x > 0. ? uPx * .75 / max(.1, -mv.z) : 0.; }',
-    fragmentShader: `uniform float uT; uniform vec3 uC; varying vec2 vA;
-      void main(){ vec2 q = gl_PointCoord - .5; float a = atan(q.y, q.x + 1e-5), r = length(q) * 2. * (1. + .06 * sin(a * 3. + uT * 7. + vA.y * 9.));
-        float ring = exp(-(r - .72) * (r - .72) * 90.), inner = exp(-r * r * 3.) * .25, core = exp(-r * r * 30.) * .6;
-        vec3 c = (uC * uC * 1.3 + .15) * (ring + inner) + vec3(1., .9, .8) * core;
-        gl_FragColor = vec4(c * vA.x * step(r, 1.), 1.); }` });
-  const pts = new THREE.Points(g, m); pts.frustumCulled = false; pts.renderOrder = 9;
-  return { pts, m, list: Array.from({ length: n }, () => ({ on: false, x: 0, y: 0, z: 0, vx: 0, vz: 0, life: 0, seed: 0 })), draw() { const L = this.list; L.forEach((b, i) => { p.set([b.x, b.y, b.z], i * 3); a[i * 2] = b.on ? Math.min(1, b.life * 3, (4 - b.life) * 4) : 0; a[i * 2 + 1] = b.seed; }); g.attributes.position.needsUpdate = g.attributes.aA.needsUpdate = true; } };
-}
-
 export async function start(canvas, onProgress = () => {}) {
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: false, powerPreference: 'high-performance' });
   renderer.toneMapping = THREE.NoToneMapping; renderer.autoClear = false; renderer.setClearColor(0x020308, 1);
@@ -66,7 +53,7 @@ export async function start(canvas, onProgress = () => {}) {
   const ground = new THREE.Mesh(new THREE.CircleGeometry(60, 96), groundMat(uT)); ground.rotation.x = -Math.PI / 2; scene.add(ground);
   onProgress(.2);
   const J = makeJellies(uT); scene.add(J);
-  const flock = () => { J.userData.list.length = 0; for (let i = 0; i < 9; i++) { const a = i * 2.4, r = 1.5 + (i % 4) * 1.1; J.userData.add(Math.cos(a) * r - 2, Math.sin(a) * r - 6); } };
+  const flock = () => { J.userData.list.length = 0; for (let i = 0; i < 9; i++) { const a = i * 2.4, r = 1.5 + (i % 4) * 1.1; J.userData.add(Math.cos(a) * r - 2, Math.sin(a) * r - 6, { group: 1 }); } };
   flock();
   let strong = null;
   /* 기체 */
@@ -74,14 +61,7 @@ export async function start(canvas, onProgress = () => {}) {
   const SH = { x: 0, z: 16, tz: 16, head: 0, hurt: -9 };
   onProgress(.7);
   const motes = pointPool(500, false, .14); scene.add(motes.pts);
-  const bub = bubblePool(40); scene.add(bub.pts);
-  /* 경험치 알갱이: 터진 자리에서 퍼졌다가 기체로 휘어 빨려 들어감 */
-  const OR = Array.from({ length: 80 }, () => ({ on: false, x: 0, y: 0, z: 0, vx: 0, vy: 0, vz: 0, age: 0 }));
-  const orbG = new THREE.BufferGeometry(), op = new Float32Array(80 * 3), oa = new Float32Array(80); orbG.setAttribute('position', new THREE.BufferAttribute(op, 3)); orbG.setAttribute('aA', new THREE.BufferAttribute(oa, 1));
-  const orbM = new THREE.ShaderMaterial({ ...AB, uniforms: { uPx: { value: 600 } },
-    vertexShader: 'attribute float aA; uniform float uPx; varying float vA; void main(){ vA = aA; vec4 mv = modelViewMatrix * vec4(position, 1.); gl_Position = projectionMatrix * mv; gl_PointSize = aA > 0. ? uPx * .42 / max(.1, -mv.z) : 0.; }',
-    fragmentShader: 'varying float vA; void main(){ vec2 q = gl_PointCoord - .5; float r2 = dot(q, q) * 4.; vec3 c = vec3(1.2, 1.15, .9) * exp(-r2 * 22.) + vec3(.55, 1., .35) * exp(-r2 * 4.) * .6; gl_FragColor = vec4(c * vA, 1.); }' });
-  const orbs = new THREE.Points(orbG, orbM); orbs.frustumCulled = false; orbs.renderOrder = 10; scene.add(orbs);
+  const FX = makeMobFx(); scene.add(FX);
   let exp = 0; const expEl = $('#exp');
   /* 쏘기 */
   const BL = []; let shooting = false, shotAcc = 0;
@@ -89,7 +69,7 @@ export async function start(canvas, onProgress = () => {}) {
   const tips = {
     watch: ['지켜보기', '평소엔 떼 지어 천천히 떠다님. 빠르게 오므렸다 천천히 펴며 헤엄치고, 저마다 박자가 조금씩 달라 살아 있는 떼처럼 보임. 촉수는 가는 반대쪽으로 끌려 흐름.'],
     near: ['다가가기 — 경계', '기체가 가까이 오면 몸빛이 붉은 주황으로 물들고 기체 쪽을 향해 알맞은 거리를 둠. 쏘기 직전 몸이 부풀며 밝아지고(신호) 느린 빛 방울을 뱉음.'],
-    shoot: ['쏘기 — 맞음 · 쓰러짐', '맞으면 움찔 오그라들며 하얗게 번쩍, 맞은 반대쪽으로 밀려남. 세 번 맞으면 몸이 꽃잎처럼 벌어지며 녹아 사라지고 빛 알갱이(경험치)가 기체로 빨려 들어감.'],
+    shoot: ['쏘기 — 떼가 같이 화냄', '한 마리가 맞으면 빛 신호가 떼 동무에게 차례로 날아가고, 닿는 순간 몸 가운데서 붉은 빛 고리가 번지며 같이 덤벼듦. 세 번 맞으면 꽃잎처럼 벌어지며 녹아 사라지고 빛 알갱이(경험치)가 기체로 빨려 들어감.'],
     strong: ['센 몹', '가운데 통로 쪽의 센 해파리: 더 크고 몸 위에 어두운 결정 껍질이 덮임. 아홉 번 맞아야 쓰러지고 경험치도 많음.'] };
   const tour = $('#tour'), btns = {};
   const show = k => { tipBox.hidden = false; tipB.textContent = tips[k][0]; tipS.textContent = tips[k][1]; for (const x in btns) btns[x].classList.toggle('on', x === k || (x === 'shoot' && shooting) || (x === 'strong' && !!strong)); };
@@ -97,7 +77,7 @@ export async function start(canvas, onProgress = () => {}) {
     bt.onclick = () => { if (k === 'watch') { SH.tz = 16; shooting = false; }
       else if (k === 'near') { SH.tz = 4; }
       else if (k === 'shoot') { shooting = !shooting; if (shooting && SH.tz > 8) SH.tz = 5; }
-      else if (k === 'strong') { if (!strong || !strong.on) { strong = J.userData.add(7, -9, { strong: true }); } }
+      else if (k === 'strong') { if (!strong || !strong.on) { strong = J.userData.add(5.5, -8.5, { strong: true, group: 1 }); } }
       else if (k === 'reset') { flock(); strong = null; shooting = false; SH.tz = 16; exp = 0; expEl.textContent = ''; k = 'watch'; }
       show(k === 'reset' ? 'watch' : k); };
     tour.appendChild(bt); });
@@ -120,7 +100,7 @@ export async function start(canvas, onProgress = () => {}) {
   const near = () => { let best = null, bd = 1e9; for (const j of J.userData.list) { if (!j.on || j.dieT > 0) continue; const d = Math.hypot(j.x - SH.x, j.z - SH.z); if (d < bd) { bd = d; best = j; } } return best; };
   renderer.setAnimationLoop(now => { try {
     const dt = clamp((now - last) / 1000, 0, .05); last = now; t += dt; uT.value = t;
-    const px = Hd / (2 * Math.tan(camera.fov * Math.PI / 360)); motes.setPx(Hd); bub.m.uniforms.uPx.value = px; bub.m.uniforms.uT.value = t; orbM.uniforms.uPx.value = px;
+    const px = Hd / (2 * Math.tan(camera.fov * Math.PI / 360)); motes.setPx(Hd);
     /* 기체: 정한 자리로 스르르, 가장 가까운 해파리를 바라봄 */
     SH.z += (SH.tz - SH.z) * Math.min(1, dt * 1.2);
     const tg = near(); { const want = tg && (shooting || SH.tz < 8) ? Math.atan2(-(tg.x - SH.x), -(tg.z - SH.z)) : 0; let d = want - SH.head; d = Math.atan2(Math.sin(d), Math.cos(d)); SH.head += d * Math.min(1, dt * 6); }
@@ -128,14 +108,12 @@ export async function start(canvas, onProgress = () => {}) {
     ship.position.set(SH.x + Math.sin(t * 40) * .05 * hurtK, .7 + Math.sin(t * 2.1) * .06, SH.z); ship.rotation.set(0, SH.head, 0);
     /* 해파리 */
     J.userData.step(t, dt, { sx: SH.x, sz: SH.z,
-      spit: (j, dx, dz) => { const q = bub.list.find(b => !b.on); if (!q) return; Object.assign(q, { on: true, x: j.x + dx * j.s * .7, y: j.y - .2, z: j.z + dz * j.s * .7, vx: dx * 6.5, vz: dz * 6.5, life: 0, seed: Math.random() }); bloop(); },
+      spit: (j, dx, dz) => { FX.userData.spit(j.x + dx * j.s * .7, j.y - .2, j.z + dz * j.s * .7, dx, dz); bloop(); },
       died: j => { if (j === strong) strong = null; } });
     J.userData.draw(t);
-    /* 빛 방울: 천천히 날아와 기체에 닿으면 터짐 */
-    for (const q of bub.list) { if (!q.on) continue; q.life += dt; q.x += q.vx * dt; q.z += q.vz * dt; q.y += (.75 - q.y) * Math.min(1, dt * 1.5);
-      if (Math.hypot(q.x - SH.x, q.z - SH.z) < 1.1) { q.on = false; SH.hurt = t; plip(260); motes.emit(m => { m.p.set(q.x, q.y, q.z); m.v.randomDirection().multiplyScalar(2 + Math.random() * 3); m.max = m.life = .35 + Math.random() * .3; m.c.copy(JCOL.alert); m.s = .9; }, 14); }
-      else if (q.life > 4) q.on = false; }
-    bub.draw();
+    for (const sg of J.userData.signals.splice(0)) FX.userData.signal(sg);
+    FX.userData.update(t, dt, px, SH, q => { SH.hurt = t; plip(260); motes.emit(m => { m.p.set(q.x, q.y, q.z); m.v.randomDirection().multiplyScalar(2 + Math.random() * 3); m.max = m.life = .35 + Math.random() * .3; m.c.copy(JCOL.alert); m.s = .9; }, 14); },
+      () => { exp++; expEl.textContent = '경험치 +' + exp; expEl.classList.remove('pop'); void expEl.offsetWidth; expEl.classList.add('pop'); tick(t); motes.emit(m => { m.p.set(SH.x, .9, SH.z); m.v.randomDirection().multiplyScalar(1.5); m.max = m.life = .25; m.c.set(.62, 1, .32); m.s = 1.2; }, 3); });
     /* 쏘기 */
     if (shooting && tg) { shotAcc += dt * 6; while (shotAcc >= 1) { shotAcc -= 1; const dx = tg.x - SH.x, dz = tg.z - SH.z, l = Math.hypot(dx, dz) || 1; BL.push({ x: SH.x + dx / l * 1.1, z: SH.z + dz / l * 1.1, vx: dx / l * 40, vz: dz / l * 40, life: .9 }); pew(); } }
     for (let i = BL.length - 1; i >= 0; i--) { const bl = BL[i]; bl.life -= dt; const ox = bl.x, oz = bl.z; bl.x += bl.vx * dt; bl.z += bl.vz * dt; let dead = bl.life <= 0;
@@ -145,19 +123,10 @@ export async function start(canvas, onProgress = () => {}) {
           motes.emit(m => { m.p.set(bl.x, j.y - .1, bl.z); m.v.set(-dx * 3 + (Math.random() - .5) * 4, Math.random() * 2.5, -dz * 3 + (Math.random() - .5) * 4); m.max = m.life = .3 + Math.random() * .35; m.c.copy(JCOL.body); m.s = .8; }, 10);   /* 맞은 자리 몸빛이 튐 */
           if (killed) { sigh(); const n = j.strong ? 14 : 5;
             motes.emit(m => { const a = Math.random() * 6.283, r = Math.random() * JELLY.R * j.s; m.p.set(j.x + Math.cos(a) * r, j.y, j.z + Math.sin(a) * r); m.v.set(Math.cos(a) * 1.5, (Math.random() - .3) * 1.5, Math.sin(a) * 1.5); m.max = m.life = .8 + Math.random() * .7; m.c.copy(Math.random() < .3 ? JCOL.core : JCOL.body); m.s = 1; m.drag = 1.2; }, 40);   /* 몸이 풀리며 흩어지는 빛 */
-            for (let k = 0, c = 0; k < OR.length && c < n; k++) if (!OR[k].on) { const a = Math.random() * 6.283, sp = 2 + Math.random() * 3; Object.assign(OR[k], { on: true, x: j.x, y: j.y, z: j.z, vx: Math.cos(a) * sp, vy: 1.5 + Math.random() * 2, vz: Math.sin(a) * sp, age: -c * .04 }); c++; } } } }
+            FX.userData.burst(j.x, j.y, j.z, n); } } }
       if (dead) { BL.splice(i, 1); continue; }
       motes.emit(m => { m.p.set(bl.x, .7, bl.z); m.v.set(0, 0, 0); m.max = m.life = .12; m.c.set(.62, 1, .32); m.s = .9; m.drag = 0; }, 1);
       motes.emit(m => { m.p.set((bl.x + ox) / 2, .7, (bl.z + oz) / 2); m.v.set(0, 0, 0); m.max = m.life = .09; m.c.set(.8, 1, .6); m.s = .6; m.drag = 0; }, 1); }
-    /* 경험치 알갱이 */
-    for (let i = 0; i < OR.length; i++) { const o = OR[i]; if (o.on) { o.age += dt; if (o.age > 0) {
-        const dx = SH.x - o.x, dy = .9 - o.y, dz = SH.z - o.z, d = Math.hypot(dx, dy, dz), pull = Math.max(0, o.age - .35) * 60;   /* 퍼졌다가 잠시 뒤 기체로 휘어 들어감 */
-        o.vx += dx / d * pull * dt; o.vy += dy / d * pull * dt; o.vz += dz / d * pull * dt; const dr = Math.exp(-dt * 2.5); o.vx *= dr; o.vy *= dr; o.vz *= dr; o.vy -= dt * 2 * (o.age < .35);
-        o.x += o.vx * dt; o.y += o.vy * dt; o.z += o.vz * dt;
-        if (d < .8) { o.on = false; exp++; expEl.textContent = '경험치 +' + exp; expEl.classList.remove('pop'); void expEl.offsetWidth; expEl.classList.add('pop'); tick(t);
-          motes.emit(m => { m.p.set(SH.x, .9, SH.z); m.v.randomDirection().multiplyScalar(1.5); m.max = m.life = .25; m.c.set(.62, 1, .32); m.s = 1.2; }, 3); } } }
-      op.set([o.x, o.y, o.z], i * 3); oa[i] = o.on && o.age > 0 ? 1 : 0; }
-    orbG.attributes.position.needsUpdate = orbG.attributes.aA.needsUpdate = true;
     motes.update(dt);
     { const alive = J.userData.list.filter(j => j.on && j.dieT < 0), al = alive.filter(j => j.alert > .5).length; stEl.textContent = `해파리 ${alive.length}마리${al ? ' · 경계 ' + al : ''}`; }
     cam.h += (cam.H - cam.h) * Math.min(1, dt * 3); cam.tilt += (cam.T - cam.tilt) * Math.min(1, dt * 3);
