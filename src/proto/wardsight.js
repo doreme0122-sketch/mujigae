@@ -2,12 +2,12 @@
    · 자리: 샛길과 바깥 둥근 길이 만나는 길목, 보물 땅 앞문 바로 앞 (보물 땅 줄 MID 각도, 반지름 약 96m)
    · 차지: 내 기체가 와드 둘레 5m 안에 10초 머묾 → 빛 원이 차오름. 벗어나면 빠르게 줄어 처음부터 (맞으면 끊김은 적이 생기면 연결)
    · 차지 완료: 와드 효과(빛 원 닫힘 → 힘이 치솟음 → 꼭대기에서 눈 뜸) → 그 순간 땅을 따라 빛 물결이 퍼짐
-     물결은 그 와드가 밝히는 땅에만 퍼짐 = 앞 보물 땅 + 양옆 정글 둘 + 와드 둘레 길목 (사용자: 파동이 밝히는 지역만)
+     물결은 그 와드가 밝히는 땅에만 퍼짐 = 앞 보물 땅 + 양옆 정글 둘 + 와드 둘레 길목 + 와드 옆 샛길 끝까지(안쪽 둥근 길까지) (사용자: 파동이 밝히는 지역만)
      벽을 돌아 실제로 갈 수 있는 길을 따라 빠르게 번지고(초속 약 45m), 물결이 지나간 칸부터 차례로 안개 시야가 걷힘 (사용자: 순서대로 보이게)
      걷힌 곳은 계속 보임(그 와드가 내 것인 동안) · 그 안의 숨을 곳 속도 보임
    무게: 길 거리 계산은 와드마다 처음 한 번(250×250 칸) · 물결 그림은 바닥 위 한 장 */
 import * as THREE from 'three';
-import { makeWard, WCOL } from './ward.js?v=11032008';
+import { makeWard, WCOL } from './ward.js?v=11032018';
 
 const A0 = -Math.PI / 2, ANG = Array.from({ length: 10 }, (_, k) => A0 + k * Math.PI / 5), MID = ANG.map(a => a + Math.PI / 10);
 const angD = (a, b) => Math.abs(Math.atan2(Math.sin(a - b), Math.cos(a - b)));
@@ -28,9 +28,10 @@ export function makeWardsOnMap(B, vision, uT) {
   function build(o) {
     const D = new Float64Array(N * N).fill(Infinity)   /* 64비트: 32비트면 저장할 때 반올림돼 '더 먼 길'로 잘못 보고 못 퍼짐 */, H = heap(), inR = new Uint8Array(N * N), pass = new Uint8Array(N * N);
     for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) { const x = cx(i), z = cx(j), c = j * N + i, r = Math.hypot(x, z), dm = angD(Math.atan2(z, x), o.m);
-      if (dm > Math.PI / 5 + .05 || r < 36 || r > 160) continue; const free = !B.blocked(x, z), rg = B.region(x, z);
+      if (dm > Math.PI / 5 + .05 || r < 30 || r > 160) continue; const free = !B.blocked(x, z), rg = B.region(x, z);
       if (free) pass[c] = 1;
-      if ((rg >= 11 && rg <= 15 && dm < Math.PI / 10) || (rg === 3 && dm < Math.PI / 5) || Math.hypot(x - o.x, z - o.z) < 26) inR[c] = 1; }
+      const side = Math.abs(-x * Math.sin(o.m) + z * Math.cos(o.m)), along = x * Math.cos(o.m) + z * Math.sin(o.m);     /* 와드 옆 샛길: 와드가 그 길 위에 서 있으니 안쪽 둥근 길까지 끝까지 보임 (사용자) */
+      if ((rg >= 11 && rg <= 15 && dm < Math.PI / 10) || (rg === 3 && dm < Math.PI / 5) || Math.hypot(x - o.x, z - o.z) < 26 || (side < 6.5 && along > 30 && along < 100)) inR[c] = 1; }
     const si = Math.floor((o.x + W / 2) / cm), sj = Math.floor((o.z + W / 2) / cm), s = sj * N + si; D[s] = 0; H.push(s, 0);
     const NB = [[1, 0, 1], [-1, 0, 1], [0, 1, 1], [0, -1, 1], [1, 1, 1.414], [1, -1, 1.414], [-1, 1, 1.414], [-1, -1, 1.414]];
     while (H.size) { const [c, d] = H.pop(); if (d > D[c]) continue; const i = c % N, j = (c / N) | 0;
