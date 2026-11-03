@@ -12,7 +12,7 @@
    무게: 보석 하나 = 뒷면 · 앞면 · 둘레 빛 · 고리 4번 (+ 잔상 보석 2개는 쓸 때만) */
 import * as THREE from 'three';
 import * as A from '../core/audio.js';
-import { pointPool, beamMesh } from './skilldemo.js?v=11031904';
+import { pointPool, beamMesh } from './skilldemo.js?v=11031908';
 
 /* 기본 등급 스킬 (임시 이름 — 실제 스킬은 스킬 설계 때 바뀜). 분류마다 다섯 중 셋이 무작위로 나옴 */
 export const CATS = [
