@@ -8,8 +8,7 @@
    단위 m */
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { glowMaterial } from './wardbase.js?v=11031947';
-import { ruinMaterial } from './ruins.js?v=11031947';
+import { glowMaterial, stoneMaterial } from './wardbase.js?v=11031951';
 
 const AB = { transparent: true, depthWrite: false, blending: THREE.AdditiveBlending };
 const clean = g => { for (const k of Object.keys(g.attributes)) if (k !== 'position' && k !== 'normal') g.deleteAttribute(k); return g.index ? g.toNonIndexed() : g; };
@@ -48,7 +47,7 @@ const coneMat = () => new THREE.ShaderMaterial({ ...AB, side: THREE.DoubleSide, 
 
 export function makeWardEye(uT, y) {
   const G = new THREE.Group(); G.position.y = y;
-  const metal = ruinMaterial(uT), parts = [];   /* 덮개(투사기 머리·갈퀴) = 고대 벽 돌 (사용자) */
+  const metal = stoneMaterial(uT), parts = [];   /* 덮개(투사기 머리·갈퀴) = 받침과 같은 처음의 돌 (사용자) */
   const lathe = (pts, seg = 32) => new THREE.LatheGeometry(pts.map(([r, yy]) => new THREE.Vector2(r, yy)), seg);
   /* 투사기: 기둥 머리 위 단 → 접시 → 렌즈 테 */
   parts.push(lathe([[0, 0], [.6, 0], [.62, .05], [.5, .12], [.36, .16], [.34, .26], [.42, .3], [.44, .36], [.3, .38], [0, .38]]));
