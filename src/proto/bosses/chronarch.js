@@ -11,8 +11,8 @@
    · 재질 효과(무늬·빛 새어 나옴·흐르는 에너지)는 모두 재질 쪽 계산이라 합쳐도 그대로 돎 */
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
-import { enhanceChron } from './chronfx.js?v=11031311';
-import { slim, countDraws } from './slim.js?v=11031311';
+import { enhanceChron } from './chronfx.js?v=11031318';
+import { slim, countDraws } from './slim.js?v=11031318';
 
 export async function makeChronarch(url = './assets/bosses/chronarch.glb', opt = {}) {
   const g = await new GLTFLoader().loadAsync(url), root = g.scene;
@@ -20,6 +20,6 @@ export async function makeChronarch(url = './assets/bosses/chronarch.glb', opt =
   const before = countDraws(root);
   slim(root, fx);
   const after = countDraws(root);
-  return { root, fx, update: t => fx.update(t), setAlly: a => fx.setAlly(a), stats: { before, after } };
+  return { root, fx, update: t => fx.update(t), stats: { before, after } };
 }
 

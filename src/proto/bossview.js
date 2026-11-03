@@ -4,11 +4,11 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
-import { makeBloom } from '../core/hangar/bloom.js?v=11031311';
-import { makePerf } from './perf.js?v=11031311';
-import { enhanceChron } from './bosses/chronfx.js?v=11031311';
-import { makeChronarch } from './bosses/chronarch.js?v=11031311';
-import { makeHive } from './bosses/hive.js?v=11031311';
+import { makeBloom } from '../core/hangar/bloom.js?v=11031318';
+import { makePerf } from './perf.js?v=11031318';
+import { enhanceChron } from './bosses/chronfx.js?v=11031318';
+import { makeChronarch } from './bosses/chronarch.js?v=11031318';
+import { makeHive } from './bosses/hive.js?v=11031318';
 
 const $ = s => document.querySelector(s), clamp = THREE.MathUtils.clamp;
 export async function start(canvas, onProgress = () => {}) {
@@ -20,11 +20,11 @@ export async function start(canvas, onProgress = () => {}) {
   onProgress(.2);
   /* 보스마다: 줄인 판(적) · 줄인 판(우리 편) · 원본 — 처음 볼 때 만듦 */
   const BOSSES = [
-    { name: '크로나크', stage: '2스테이지 보스', make: async (sl, al) => { if (sl) { const b = await makeChronarch('./assets/bosses/chronarch.glb'); b.setAlly(al); b.root.scale.setScalar(1.4); return b; }
-        const g = await new GLTFLoader().loadAsync('./assets/bosses/chronarch.glb'), f = enhanceChron(THREE, g.scene, { ally: al }); g.scene.scale.setScalar(1.4); return { root: g.scene, update: f.update }; } },
-    { name: '크리스탈 하이브', stage: '3스테이지 보스', make: async (sl, al) => makeHive({ ally: al, noSlim: !sl, size: 14 }) }];
-  const cache = new Map(); let bi = 0, useSlim = true, ally = false, cur = null;
-  async function show() { const key = bi + '|' + useSlim + '|' + ally; let b = cache.get(key); if (!b) { b = await BOSSES[bi].make(useSlim, ally); cache.set(key, b); scene.add(b.root); }
+    { name: '크로나크', stage: '2스테이지 보스', make: async (sl, al) => { if (sl) { const b = await makeChronarch('./assets/bosses/chronarch.glb'); b.root.scale.setScalar(1.4); return b; }
+        const g = await new GLTFLoader().loadAsync('./assets/bosses/chronarch.glb'), f = enhanceChron(THREE, g.scene, {}); g.scene.scale.setScalar(1.4); return { root: g.scene, update: f.update }; } },
+    { name: '크리스탈 하이브', stage: '3스테이지 보스', make: async (sl, al) => makeHive({ noSlim: !sl, size: 14 }) }];
+  const cache = new Map(); let bi = 0, useSlim = true, cur = null;
+  async function show() { const key = bi + '|' + useSlim; let b = cache.get(key); if (!b) { b = await BOSSES[bi].make(useSlim); cache.set(key, b); scene.add(b.root); }
     for (const v of cache.values()) v.root.visible = v === b; cur = b; $('#head b').textContent = BOSSES[bi].stage + ' · ' + BOSSES[bi].name; }
   await show(); onProgress(.9);
   const tour = $('#tour'), info = document.createElement('div');
@@ -32,7 +32,6 @@ export async function start(canvas, onProgress = () => {}) {
   const btn = (txt, fn) => { const b = document.createElement('button'); b.type = 'button'; b.textContent = txt(); b.onclick = () => { fn(); b.textContent = txt(); }; tour.appendChild(b); };
   btn(() => '보스: ' + BOSSES[bi].name, () => { bi = (bi + 1) % BOSSES.length; show(); });
   btn(() => useSlim ? '줄인 판 (누르면 원본)' : '원본 (누르면 줄인 판)', () => { useSlim = !useSlim; show(); });
-  btn(() => ally ? '우리 편 빛 (누르면 적)' : '적 (누르면 우리 편 빛)', () => { ally = !ally; show(); });
   const cam = { az: 0, tilt: .35, h: 26, H: 26 }, ptr = new Map(); let pin = 0;
   addEventListener('pointerdown', e => { if (e.target.closest('#ui')) return; ptr.set(e.pointerId, [e.clientX, e.clientY]); if (ptr.size === 2) { const [a, c] = [...ptr.values()]; pin = Math.hypot(a[0] - c[0], a[1] - c[1]); } });
   addEventListener('pointermove', e => { if (!ptr.has(e.pointerId)) return; const o = ptr.get(e.pointerId); if (ptr.size === 1) { cam.az -= (e.clientX - o[0]) * .006; cam.tilt = clamp(cam.tilt + (e.clientY - o[1]) * .004, .02, 1.2); }

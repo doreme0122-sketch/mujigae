@@ -1,6 +1,6 @@
 /* 크리스탈 하이브(3스테이지 보스) 생김새 코드 — 사용자의 예전 게임(rainbow_reflect_game_FULL, v0.33.2)에서 그대로 옮김
    · buildB03: 보스 본체 (3단계: 재질 마감·페이즈 상태) — 렌즈 코어·수정 칼날·바깥 링·구슬·연결 팔·위아래 창
-   · buildB03FX: 둘레에 떠 도는 보조 거울(팔각 보석)·반사 드론 등 겉모습
+   · buildB03FX: 둘레에 떠 도는 보조 거울(팔각 보석)·반사 드론 겉모습만 (스킬 물체는 뺌)
    · 바꾼 것: 휴대폰 고장 방지로 음수가 될 수 있는 거듭제곱만 막음 (2026-11-03). 예전 게임 좌표 그대로(바닥 XY · 위 Z) */
 export function buildB03(THREE,opt){opt=opt||{};const ally=!!opt.ally;const TAU=Math.PI*2;
   /* ---- 재질 ---- */
@@ -263,44 +263,7 @@ export function buildB03FX(THREE,opt){opt=opt||{};const ally=!!opt.ally;const TA
     for(let k=0;k<4;k++){const a=k/4*TAU+TAU/8;const b=facet([[0.75,0.16,0.22,0.3],[1.3,0.24,0.3,0.42],[2.2,0,0,0]],ringV8,crystal,2);b.rotation.z=a;g.add(b);}
     for(let k=0;k<4;k++){const a=k/4*TAU;const b=facet([[0.75,0.1,0.15,0.2],[1.6,0,0,0]],ringV8,crystal2,2);b.rotation.z=a;g.add(b);}
     O.drone=g;anim.push(t=>{g.rotation.z=t*0.6;});}
-  /* 03 미러 볼트 — 길쭉한 크리스탈 파편탄 + 꼬리 */
-  {const g=grp('bolt');g.add(shard(1.6,0.22));const core=shard(1.2,0.07,GH);core.position.z=0.02;g.add(core);
-    const tl=M(new THREE.PlaneGeometry(3.2,ally?0.7:0.5),addM(ally?0xffffff:0x9b7bff,0.95,ally?rbTail:gradTex));tl.position.x=-1.9;g.add(tl);const tl2=M(new THREE.PlaneGeometry(2.4,0.16),addM(0xffffff,1,gradTex));tl2.position.x=-1.5;g.add(tl2);const tl3=tl.clone();tl3.rotation.x=Math.PI/2;g.add(tl3);
-    g.userData.tails=[tl,tl2,tl3];O.bolt=g;anim.push(t=>{g.children[0].rotation.x=t*6;});}
-  /* 04 프리즘 오브 — 다면 크리스탈 구 속에서 심이 빛나고, 빛이 결정 밖으로 번짐 + 공전 파편 (선 없음) */
-  {const g=grp('orb');const body=M(new THREE.IcosahedronGeometry(0.9,1),crystal);g.add(body);const c=M(new THREE.OctahedronGeometry(0.42,0),GH);g.add(c);
-    const hl=halo(ally?3.6:3.0,ally?1:0.75,null,1);g.add(hl);const hl2=halo(ally?0.8:1.3,0.9,0xffffff,1);g.add(hl2);
-    const sh=grp();for(let k=0;k<6;k++){const s=shard(0.55,0.1);const a=k/6*TAU;s.position.set(Math.cos(a)*1.35,Math.sin(a)*1.35,(k%2?0.25:-0.25));s.rotation.z=a+Math.PI/2;const sg=halo(0.6,0.5);sg.position.copy(s.position);sh.add(s);sh.add(sg);}g.add(sh);
-    O.orb=g;anim.push(t=>{body.rotation.set(t*0.7,t*0.5,0);c.rotation.set(t*2,t*1.5,0);sh.rotation.z=t*2.2;const k=0.5+0.5*Math.sin(t*4);hl.material.opacity=0.55+0.3*k;hl.scale.setScalar(2.8+0.4*k);});}
-  /* 05 미러 노드 — 체인 볼트가 튕기는 공중 크리스탈: 속에서 빛나는 심 + 주위를 도는 작은 결정 3 (선 없음) */
-  {const g=grp('node');const o=M(new THREE.OctahedronGeometry(0.6,1),crystal);o.scale.z=1.7;g.add(o);const cc=M(new THREE.OctahedronGeometry(0.2,0),GH);cc.scale.z=1.6;g.add(cc);
-    const hl=halo(ally?3.0:2.4,ally?1:0.7,null,1);g.add(hl);const hl2n=halo(ally?0.55:0.9,0.85,0xffffff,1);g.add(hl2n);const orbit=grp();for(let k=0;k<3;k++){const s=shard(0.42,0.08);const a=k/3*TAU;s.position.set(Math.cos(a)*1.0,Math.sin(a)*1.0,0);s.rotation.z=a+Math.PI/2;orbit.add(s);const sg=halo(0.5,0.45);sg.position.copy(s.position);orbit.add(sg);}orbit.rotation.x=0.45;g.add(orbit);
-    O.node=g;anim.push(t=>{o.rotation.z=t*1.4;orbit.rotation.z=t*1.8;hl.material.opacity=0.5+0.25*Math.sin(t*5);});}
-  /* 06 미러 마인 — 검은 핵 + 방사형 크리스탈 가시 8, 핵이 빛나며 가시 사이로 빛이 새어 나옴 (경고 = 맥동이 빨라짐) */
-  {const g=grp('mine');const shell=M(new THREE.IcosahedronGeometry(0.45,1),obs);g.add(shell);const core=M(new THREE.IcosahedronGeometry(0.3,1),GH);g.add(core);
-    const dirs=[[1,1,1],[1,-1,1],[-1,1,1],[-1,-1,1],[1,1,-1],[1,-1,-1],[-1,1,-1],[-1,-1,-1]];
-    dirs.forEach(d=>{const v=new THREE.Vector3(...d).normalize();const s=facet([[0.3,0.16,0.16,0.16],[0.7,0.2,0.2,0.2],[1.25,0,0,0]],ringD8,crystal,-1);s.quaternion.setFromUnitVectors(new THREE.Vector3(1,0,0),v);g.add(s);});
-    const MC=ally?null:0xff5a9a;const hl=halo(3.2,0.8,MC,1);g.add(hl);const hl2=halo(ally?0.6:1.1,1,0xffffff,1);g.add(hl2);if(!ally){hl.userData.fixed=1;}
-    const holes=[];[[1,0,0],[-1,0,0],[0,1,0],[0,-1,0],[0,0,1],[0,0,-1]].forEach(d=>{const v=new THREE.Vector3(...d);const b=halo(0.9,0.6,MC);b.position.copy(v.multiplyScalar(0.55));if(!ally)b.userData.fixed=1;g.add(b);holes.push(b);});
-    O.mine=g;anim.push(t=>{const sp=6+4*((t*0.25)%1);const k=0.5+0.5*Math.sin(t*sp);core.scale.setScalar(0.85+0.35*k);hl.material.opacity=0.35+0.6*k;hl.scale.setScalar(2.6+1.2*k);hl2.material.opacity=0.6+0.4*k;holes.forEach(b=>b.material.opacity=0.25+0.55*k);g.rotation.z=t*0.5;});}
-  /* 07 미러 게이트 — 크리스탈 반사벽 (양끝 육각 기둥 + 윗면 발광 능선) */
-  {const g=grp('gate');const L=5.2;const wall=facet([[-L/2,0.12,0.75,0.75],[-L/2+0.5,0.16,0.85,0.85],[L/2-0.5,0.16,0.85,0.85],[L/2,0.12,0.75,0.75]],ringD8,crystal,2);g.add(wall);
-    [0.86,-0.86].forEach(z=>{const sm=neon([new THREE.Vector3(-(L-0.6)/2,0,z),new THREE.Vector3((L-0.6)/2,0,z)],false,0.022,0.15,G1,0.9);g.add(sm);});
-    [1,-1].forEach(s=>{const pl=M(new THREE.CylinderGeometry(0.32,0.36,2.2,6),dark);pl.rotation.x=Math.PI/2;pl.position.x=s*(L/2+0.1);g.add(pl);
-      const tip=facet([[0,0.22,0.22,0.22],[0.8,0,0,0]],ringD8,crystal2,-1);tip.rotation.y=-Math.PI/2;tip.position.set(s*(L/2+0.1),0,1.1);g.add(tip);
-      const tip2=tip.clone();tip2.rotation.y=Math.PI/2;tip2.position.z=-1.1;g.add(tip2);const gl=neon(circ(0.42,6,0),true,0.02,0.12,G2,0.8,0.05);gl.position.set(s*(L/2+0.1),0,0);g.add(gl);});
-    const sheen=M(new THREE.PlaneGeometry(L-0.8,1.4),addM(ally?0xffffff:0xc8b6ff,0.12));sheen.rotation.x=Math.PI/2;g.add(sheen);
-        O.gate=g;anim.push(t=>{sheen.material.opacity=(ally?0.18:0.12)*(0.6+0.4*Math.sin(t*3));});}
-  /* 08 대형 거울 — 크리스탈 하이브의 결정 군집: 넓은 판 결정(반사면) + 양옆 보조 결정 + 육각 받침 + 받침 속 빛나는 심 */
-  {const g=grp('giant');/* 내부 좌표: Y = 위, Z = 반사면 앞 */
-    const big=facet([[0,1.45,0.34,0.34],[2.6,1.95,0.48,0.48],[5.6,1.35,0.38,0.38],[7.8,0,0,0]],ringD8,crystal,-1);big.rotation.z=Math.PI/2;big.position.y=-3.2;g.add(big);
-    [[1,0.5,5.4,0.95,0.35],[-1,0.5,5.4,0.95,0.35],[1,1.0,3.8,0.72,-0.3],[-1,1.0,3.8,0.72,-0.3]].forEach(([s,ang,L,w,z])=>{const c=facet([[0,w*0.7,w*0.4,w*0.4],[L*0.35,w,w*0.5,w*0.5],[L,0,0,0]],ringD8,crystal2,-1);c.rotation.z=Math.PI/2+s*ang;c.position.set(s*1.2,-3.0,z);g.add(c);});
-    const ped=M(new THREE.CylinderGeometry(1.7,2.1,0.9,6),dark);ped.position.y=-3.5;g.add(ped);
-    for(let k=0;k<6;k++){const a=k/6*TAU+TAU/12;const t=M(new THREE.CylinderGeometry(0.42,0.45,0.18,6),dark);t.position.set(Math.cos(a)*1.25,-3.0,Math.sin(a)*1.25);g.add(t);}
-    const cd=facet([[-0.55,0,0,0],[0,0.3,0.3,0.3],[0.55,0,0,0]],ringD8,obs,-1);cd.rotation.z=Math.PI/2;cd.position.set(0,-2.7,0.95);g.add(cd);const ch=halo(2.2,0.9,null,1);ch.position.set(0,-2.7,1.1);g.add(ch);
-    if(ally){const sh=M(new THREE.PlaneGeometry(2.6,7.0),addM(0xffffff,0.5,rbBand));sh.position.set(0,0.4,0.62);g.add(sh);const sh2=sh.clone();sh2.position.z=-0.62;g.add(sh2);anim.push(t=>{sh.material.opacity=0.38+0.14*Math.sin(t*2.4);});}
-    const flare=M(new THREE.PlaneGeometry(4.2,7.6),addM(ally?0xffffff:0xb79bff,0));flare.position.set(0,0.6,0.6);g.add(flare);g.userData.flare=flare;
-    const W=grp('giant');g.rotation.x=Math.PI/2;W.add(g);O.giant=W;var giantInner=g;}
+  /* 03~08 스킬 물체(미러 볼트·프리즘 오브·미러 노드·미러 마인·미러 게이트·대형 거울)는 뺌 — 스킬은 새로 만듦 (사용자 2026-11-03) */
 
   function update(t){UT.value=t;anim.forEach(f=>f(t));sprites.forEach(sp=>{if(sp.userData.rb)sp.material.rotation=-t*1.2+sp.userData.k;});}
-  return{O,giantInner,update,glows,neon,shellMat,shard,halo,rbTail,gradTex,mats:{crystal,crystal2,dark,glow:G1,glowH:GH,white,addM,gradTex}};}
+  return{O,update,glows,neon,shellMat,shard,halo,rbTail,gradTex,mats:{crystal,crystal2,dark,glow:G1,glowH:GH,white,addM,gradTex}};}

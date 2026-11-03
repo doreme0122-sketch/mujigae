@@ -2,15 +2,15 @@
    · 예전 게임에서 보스를 꾸민 방식 그대로: 본체(buildB03) + 둘레에 12개의 보조 거울(팔각 보석)이 고리로 떠 돎 + 양옆 반사 드론 둘
      - 보조 거울 고리는 천천히 돌고, 거울 하나하나는 제자리에서 앞뒤로 살짝 흔들림(떠 있는 것)
      - 드론은 제자리에서 둥실 오르내림
-   · 적 = 은색·보라 / 우리 편(획득 기체) = 무지개 (예전 게임과 같음)
+   · 은색·보라 (우리 편 무지개 모드는 뺌, 사용자 2026-11-03)
    · 예전 게임은 바닥 XY · 위 Z → 이 게임(위 Y)에 맞게 통째로 눕힘
    · 그리는 횟수는 크로나크와 같은 공용 방법(slim.js)으로 줄임 */
 import * as THREE from 'three';
-import { buildB03, buildB03FX } from './hivecode.js?v=11031311';
-import { slim, countDraws } from './slim.js?v=11031311';
+import { buildB03, buildB03FX } from './hivecode.js?v=11031318';
+import { slim, countDraws } from './slim.js?v=11031318';
 
 export function makeHive(opt = {}) {
-  const ally = !!opt.ally, SIZE = opt.size || 12;                                  /* SIZE: 이 게임에서의 지름(m) */
+  const ally = false, SIZE = opt.size || 12;                                  /* SIZE: 이 게임에서의 지름(m) */
   const B = buildB03(THREE, { ally }), FX = buildB03FX(THREE, { ally });
   const W = new THREE.Group(); W.name = 'HiveWorld';                               /* 예전 게임 좌표(위 Z) 그대로 조립하는 판 */
   const R = 2.75, k = R / 16.4; B.root.scale.setScalar(k); B.root.position.z = .3; W.add(B.root);
