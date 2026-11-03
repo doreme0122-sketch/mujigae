@@ -65,7 +65,7 @@ window.__ver = fetch('ver.json?t=' + Date.now(), { cache: 'no-store' }).then(r =
 </head><body>
 <canvas id="cv"></canvas>
 <div id="ui">
-  <div id="head"><b>와드 · 부품 하나씩</b><span>① 받침 · ② 가운데 유리 기둥 (보라 에너지 · 심장)</span></div>
+  <div id="head"><b>와드 · 부품 하나씩</b><span>① 받침 · ② 유리 기둥 · ③ 도는 고리</span></div>
   <div id="st"><b id="state"></b><em id="sec"></em><div id="bar"><i></i></div></div>
   <div id="fps"></div>
   <div id="tip" hidden><b></b><span></span></div>
@@ -74,7 +74,7 @@ window.__ver = fetch('ver.json?t=' + Date.now(), { cache: 'no-store' }).then(r =
 <div id="load"><p>와드를 세우는 중</p><div class="b"><i></i></div></div>
 <div id="rot">기기를 가로로 돌려 주세요</div>
 <script type="module">
-import { start } from './src/proto/wardview.js?v=11031919';
+import { start } from './src/proto/wardview.js?v=11031923';
 await window.__ver;
 const bar = document.querySelector('#load i');
 start(document.querySelector('#cv'), p => { bar.style.transform = `scaleX(${p})`; })
