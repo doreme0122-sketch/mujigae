@@ -2,16 +2,16 @@
    날아 보기: 1번 기지에서 기체를 조이스틱으로 몰아 맵 크기·길·문을 몸으로 확인(지금 있는 땅 이름 · 출발 뒤 걸린 시간 · 속도 바꾸기)
    보기: 날아 보기·지역 보기는 기체를 따라감, 맵 전체는 가운데 고정(끌어서 이동). 두 손가락(휠)로 확대. 시작 기지 자리는 빛 고리(다음 단계에서 진짜 기지) */
 import * as THREE from 'three';
-import { makeBloom } from '../core/hangar/bloom.js?v=11031147';
-import { makeMapFloor, MAP, toWorld } from './mapfloor.js?v=11031147';
-import { makePerf } from './perf.js?v=11031147';
+import { makeBloom } from '../core/hangar/bloom.js?v=11031157';
+import { makeMapFloor, MAP, toWorld } from './mapfloor.js?v=11031157';
+import { makePerf } from './perf.js?v=11031157';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
-import { makeFlight, loadBlock, FLY } from './flight.js?v=11031147';
-import { makeWalls } from './walls.js?v=11031147';
-import { makeMotes } from './motes.js?v=11031147';
-import { makeBushes } from './bushes.js?v=11031147';
-import { makeVision } from './vision.js?v=11031147';
-import { makeGas, makeSwarm } from './hideviz.js?v=11031147';
+import { makeFlight, loadBlock, FLY } from './flight.js?v=11031157';
+import { makeWalls } from './walls.js?v=11031157';
+import { makeMotes } from './motes.js?v=11031157';
+import { makeBushes } from './bushes.js?v=11031157';
+import { makeVision } from './vision.js?v=11031157';
+import { makeHide } from './hideviz.js?v=11031157';
 
 const $ = s => document.querySelector(s), clamp = THREE.MathUtils.clamp;
 const VIEWS = [{ name: '날아 보기', h: 42, tilt: .38 }, { name: '지역 보기', h: 160, tilt: .25 }, { name: '맵 전체', h: 520, tilt: .02 }];
@@ -21,9 +21,9 @@ export async function start(canvas, onProgress = () => {}) {
   renderer.toneMapping = THREE.NoToneMapping; renderer.autoClear = false; renderer.setClearColor(0, 1);
   const scene = new THREE.Scene(), camera = new THREE.PerspectiveCamera(40, 1, 1, 3000), bloom = makeBloom(renderer, { samples: 0 });
   onProgress(.2);
-  const floor = await makeMapFloor(renderer, './assets/map/v6.png?v=11031147');
-  const J = await (await fetch('./assets/map/v6.json?v=11031147')).json();
-  const BLK = await loadBlock('./assets/map/v6.png?v=11031147');                  /* 벽 판정 = 바닥에 그린 벽 그림 그대로 */
+  const floor = await makeMapFloor(renderer, './assets/map/v6.png?v=11031157');
+  const J = await (await fetch('./assets/map/v6.json?v=11031157')).json();
+  const BLK = await loadBlock('./assets/map/v6.png?v=11031157');                  /* 벽 판정 = 바닥에 그린 벽 그림 그대로 */
   const UT = { value: 0 }, WALL = makeWalls(BLK, floor, J.ridges, UT); floor.mat.uniforms.uWf.value = WALL.fieldTex;   /* 바닥도 같은 벽 지도로 */
   scene.add(WALL.real); scene.add(WALL.mesh); WALL.mesh.visible = false;   /* 승인된 벽 5종 · 맵 전체 보기에서만 가벼운 한 덩어리 벽(멀리서 보는 지도) */
   { const pm = new THREE.PMREMGenerator(renderer); scene.environment = pm.fromScene(new RoomEnvironment(), .04).texture; scene.environmentIntensity = .6; pm.dispose(); }
@@ -51,9 +51,9 @@ export async function start(canvas, onProgress = () => {}) {
   /* 날아 보기: 1번 기지에서 가운데를 보고 출발 */
   const [sx, sz] = toWorld(...SPAWN[0]);
   const fly = await makeFlight(renderer, BLK, [sx, sz], Math.atan2(sx, sz)); scene.add(fly); const FS = fly.userData.S;
-  const bushes = makeBushes(BLK, J, floor.ST); scene.add(bushes.mesh);                        /* 수풀 */
+  const bushes = makeBushes(BLK, J);                                                           /* 숨을 곳: 자리·모양·규칙 */
   /* 숨을 곳 생김새 후보: ① 가스 구름 ② 돌 부스러기 무리 (자리·규칙은 같음, 버튼으로 바꿔 봄). 수풀 생김새는 우주에 안 어울려 숨김 */
-  bushes.mesh.visible = false; const gas = makeGas(bushes, floor.ST, floor.noise), swarm = makeSwarm(bushes, floor.ST); scene.add(gas.mesh, swarm.mesh); swarm.mesh.visible = false; let hideKind = 0;
+  const hide = makeHide(bushes, floor.ST, floor.noise); scene.add(hide.mesh);                    /* 생김새: 가스 구름 + 돌 부스러기 */
   const vision = makeVision(BLK, bushes, floor.noise); let sightOn = true;                     /* 시야 가림: 둘레 30m · 벽 뒤 안 보임 */
   const hideEl = document.createElement('div'); hideEl.id = 'hide'; hideEl.innerHTML = '<i></i><b>숨음</b>'; document.body.appendChild(hideEl);
   const motes = makeMotes(BLK, J.labels.map(o => { const [x, z] = toWorld(o.x, o.y); return [J.names.indexOf(o.n), x, z]; })); scene.add(motes.mesh);   /* 땅마다 떠다니는 알갱이 */
@@ -80,8 +80,6 @@ export async function start(canvas, onProgress = () => {}) {
     b.onclick = () => { spI = (spI + 1) % FLY.SPEEDS.length; FS.speed = FLY.SPEEDS[spI]; lab(); }; tour.appendChild(b);
     const fg = document.createElement('button'); fg.type = 'button'; const fl = () => fg.textContent = fogOn ? '땅 안개 끄기' : '땅 안개 켜기'; fl();
     fg.onclick = () => { fogOn = !fogOn; fl(); }; tour.appendChild(fg);
-    const hk = document.createElement('button'); hk.type = 'button'; const hl = () => hk.textContent = hideKind ? '숨을 곳: ② 돌 무리' : '숨을 곳: ① 가스 구름'; hl();
-    hk.onclick = () => { hideKind = 1 - hideKind; gas.mesh.visible = !hideKind; swarm.mesh.visible = !!hideKind; hl(); }; tour.appendChild(hk);
     const sg = document.createElement('button'); sg.type = 'button'; const sl = () => sg.textContent = sightOn ? '시야 가림 끄기' : '시야 가림 켜기'; sl();
     sg.onclick = () => { sightOn = !sightOn; sl(); }; tour.appendChild(sg);
     const h = document.createElement('button'); h.type = 'button'; h.textContent = '기지로'; h.onclick = () => { fly.userData.reset(); clock = -1; }; tour.appendChild(h); }
@@ -105,7 +103,7 @@ export async function start(canvas, onProgress = () => {}) {
     const dt = clamp((now - last) / 1000, 0, .05); last = now; t += dt;
     fly.userData.update(t, dt);
     motes.update(t, dt, FS.x, FS.z);
-    const inBush = bushes.update(t, dt, FS.x, FS.z); (hideKind ? swarm : gas).update(t, dt, FS.x, FS.z, inBush);
+    const inBush = bushes.update(t, dt, FS.x, FS.z); hide.update(t, dt, FS.x, FS.z, inBush); fly.userData.setGhost(inBush);   /* 숨으면 내 화면에서 내 기체 반투명 */
     { const k = BLK.region(FS.x, FS.z); if (k !== banCand) { banCand = k; banSince = t; } if (k !== banReg && k !== 17 && t - banSince > .35) { banReg = k; showBan(k); }
       if (banHide > 0 && (banHide -= dt) <= 0) { ban.style.opacity = 0; banL.forEach(l => l.style.width = '0'); } }
     if (view < 2) { const lx = FS.x + FS.vx * .35, lz = FS.z + FS.vz * .35, k = Math.min(1, dt * 5); cam.x += (lx - cam.x) * k; cam.z += (lz - cam.z) * k; }   /* 기체를 따라감: 가는 쪽을 조금 더 보여줌 */
@@ -124,5 +122,5 @@ export async function start(canvas, onProgress = () => {}) {
   { const v = (import.meta.url.match(/v=(\d+)/) || [])[1] || '개발'; const el = document.createElement('div'); el.textContent = '6안 · 판 번호 ' + v;   /* 어떤 버전이 열렸는지 바로 확인 */
     el.style.cssText = 'position:fixed;left:max(18px,env(safe-area-inset-left,0px));bottom:calc(env(safe-area-inset-bottom,0px) + 14px);font-size:11px;color:rgba(185,255,74,.7);pointer-events:none'; document.body.appendChild(el); }
   onProgress(1);
-  window.__wv = { get t() { return t; }, cam, fly: FS, wallTris: WALL.mesh.userData.tris, real: WALL.real.userData, wallRoot: WALL.real, info: renderer.info, bushes: bushes.count, vision, hide: () => [gas.count, swarm.count], dbg: () => { const o = {}; const ex = []; scene.traverse(m => { if (m.isMesh && !m.isInstancedMesh && !m.material.customProgramCacheKey && ex.length < 3) { const w = new THREE.Vector3(); m.getWorldPosition(w); ex.push([m.geometry.type, m.parent && m.parent.type, w.x.toFixed(1), w.z.toFixed(1), m.material.type]); } }); o.ex = ex; scene.traverse(m => { if (!m.isMesh && !m.isPoints) return; const k = (m.isInstancedMesh ? 'I:' : 'M:') + (m.material.customProgramCacheKey ? m.material.customProgramCacheKey() : m.material.type); const tri = (m.geometry.index ? m.geometry.index.count : m.geometry.attributes.position.count) / 3; o[k] = o[k] || [0, 0, 0]; o[k][0]++; o[k][1] += tri * (m.count || 1); o[k][2] = tri; }); return o; } };
+  window.__wv = { get t() { return t; }, cam, fly: FS, wallTris: WALL.mesh.userData.tris, real: WALL.real.userData, wallRoot: WALL.real, info: renderer.info, vision, hide: () => [bushes.list.length, ...hide.count], spots: () => bushes.list.map(b => [b.why, b.size, b.shape, +b.x.toFixed(0), +b.z.toFixed(0)]), dbg: () => { const o = {}; const ex = []; scene.traverse(m => { if (m.isMesh && !m.isInstancedMesh && !m.material.customProgramCacheKey && ex.length < 3) { const w = new THREE.Vector3(); m.getWorldPosition(w); ex.push([m.geometry.type, m.parent && m.parent.type, w.x.toFixed(1), w.z.toFixed(1), m.material.type]); } }); o.ex = ex; scene.traverse(m => { if (!m.isMesh && !m.isPoints) return; const k = (m.isInstancedMesh ? 'I:' : 'M:') + (m.material.customProgramCacheKey ? m.material.customProgramCacheKey() : m.material.type); const tri = (m.geometry.index ? m.geometry.index.count : m.geometry.attributes.position.count) / 3; o[k] = o[k] || [0, 0, 0]; o[k][0]++; o[k][1] += tri * (m.count || 1); o[k][2] = tri; }); return o; } };
 }

@@ -10,8 +10,8 @@
    무게: 기체 한 대 + 불꽃 띠 몇 장 + 꼬리 띠 하나 + 불티 점 묶음 하나 + 그림자 판 하나 */
 import * as THREE from 'three';
 import { buildShip, engineSpots } from '../core/ships/build.js';
-import { flameMesh } from './sortie.js?v=11031147';
-import { MAP } from './mapfloor.js?v=11031147';
+import { flameMesh } from './sortie.js?v=11031157';
+import { MAP } from './mapfloor.js?v=11031157';
 
 export const FLY = { LEN: 2, HOVER: .7, R: .8, SPEEDS: [9, 12, 15, 18], TURN: 7, ACC: .22,
   BASE: 9, SHIELD: 3, BOOST: 5, BOOSTK: 1.5 };   /* 기지 고리(반지름 9m)를 벗어나는 순간: 보호막 3초 · 가속 5초(1.5배) — 기지 출구 앞 매복에 바로 당하지 않게 */
@@ -93,6 +93,12 @@ export async function makeFlight(renderer, B, start, face) {
         vec3 c=mix(vec3(.55,1.,.35),vec3(.9,1.,.85),f)*.6;
         gl_FragColor=vec4(c*(f*1.3+.012+band*.022)*uA,1.); }` });
   const shieldMesh = new THREE.Mesh(new THREE.SphereGeometry(FLY.LEN * .85, 28, 18), shieldM); shieldMesh.scale.y = .7; shieldMesh.visible = false; shieldMesh.renderOrder = 10; G.add(shieldMesh);
+  /* 숨었을 때 반투명: 기체 재질을 비치게 (내 화면에서만) */
+  const mats = []; ship.traverse(o => { if (o.isMesh) (Array.isArray(o.material) ? o.material : [o.material]).forEach(m => { if (!mats.includes(m)) mats.push(m); }); });
+  let ghost = 0, ghostT = 0;
+  G.userData.setGhost = on => { ghostT = on ? 1 : 0; };
+  const applyGhost = dt => { const g0 = ghost; ghost += (ghostT - ghost) * Math.min(1, dt * 6); if (Math.abs(ghost - g0) < 1e-4 && (ghost < .001 || ghost > .999)) return;
+    const op = 1 - ghost * .62; for (const m of mats) { m.transparent = op < .999; m.opacity = op; m.depthWrite = op > .999; } flames.forEach(f => f.visible = op > .6); };
   G.userData.S = S;
   G.userData.reset = () => { S.x = start[0]; S.z = start[1]; S.vx = S.vz = 0; S.head = face; hist.length = 0; S.armed = true; S.shield = S.boost = S.pop = 0; };
   G.userData.setPx = px => { sparks.material.uniforms.uPx.value = px; };
@@ -102,8 +108,8 @@ export async function makeFlight(renderer, B, start, face) {
     const m = Math.hypot(ix, iy) > .15 ? 1 : 0;                        /* 조이스틱: 조금만 밀어도 항상 같은 속도 (방향만 정함) */
     /* 머리 돌리기: 미는 쪽으로, 무게 때문에 한 번에 다 돌지 않음 */
     let turn = 0;
-    if (m > .08) { const want = Math.atan2(-ix, -iy); let d = want - S.head; d = Math.atan2(Math.sin(d), Math.cos(d)); const st = Math.sign(d) * Math.min(Math.abs(d), FLY.TURN * dt); S.head += st; turn = st / Math.max(dt, 1e-4); }
-    S.bank += (THREE.MathUtils.clamp(-turn * .09, -.5, .5) - S.bank) * Math.min(1, dt * 6);
+    if (m > .08) { const want = Math.atan2(-ix, -iy); let d = want - S.head; d = Math.atan2(Math.sin(d), Math.cos(d)); S.head = want; turn = d / Math.max(dt, .05); }   /* 미는 쪽으로 바로 돎 (사용자 2026-11-03). 꺾은 크기만큼 짧게 기울어 꺾었다는 느낌만 남김 */
+    S.bank += (THREE.MathUtils.clamp(-turn * .05, -.45, .45) - S.bank) * Math.min(1, dt * 9);
     /* 속도: 바라보는 쪽 x 민 만큼. 바로 붙지 않고 스르륵 (ACC초) */
     /* 기지를 벗어나는 순간 보호막·가속 시작. 가속은 끝나기 0.6초 전부터 스르륵 풀림(갑자기 뚝 느려지지 않게) */
     if (S.armed && Math.hypot(S.x - start[0], S.z - start[1]) > FLY.BASE) { S.armed = false; S.shield = FLY.SHIELD; S.boost = FLY.BOOST; }
@@ -129,6 +135,7 @@ export async function makeFlight(renderer, B, start, face) {
     if (hitV > 3 && t - S.hit > .08) { S.hit = t; const n = Math.min(14, 4 + hitV | 0);
       for (let i = 0; i < n; i++) { const s = SP[spI = (spI + 1) % NS]; s.l = .4 + Math.random() * .4; s.p.set(S.x - Math.sin(S.head) * FLY.R, FLY.HOVER * .6, S.z - Math.cos(S.head) * FLY.R);
         s.v.set((Math.random() - .5) * 6, 2 + Math.random() * 3, (Math.random() - .5) * 6).add(v.set(Math.sin(S.head) * hitV * .4, 0, Math.cos(S.head) * hitV * .4)); } }
+    applyGhost(dt);
     /* 기체 자세 */
     const bob = Math.sin(t * 2.1) * .06 + Math.sin(t * 3.7) * .025;
     ship.position.set(S.x, FLY.HOVER + bob, S.z); ship.rotation.set(0, S.head, 0); ship.rotateZ(S.bank); ship.rotateX(-Math.min(.12, Math.hypot(S.vx, S.vz) / S.speed * .08));

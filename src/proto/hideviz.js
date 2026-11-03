@@ -1,4 +1,5 @@
-/* 숨을 곳 생김새 후보 두 가지 (자리·규칙은 bushes.js와 같음 — 고르면 하나만 남김)
+/* 숨을 곳 생김새 — 가스 구름 속에 돌 부스러기가 맴돎 (사용자 2026-11-03: 두 후보를 합침)
+   가스는 안을 가려 주고, 돌은 움직임과 무게를 줌. 밀려나는 움직임은 내 기체가 들어갔을 때 내 화면에서만
    ① 가스 구름: 바닥에서 솟은 짙은 성운 가스 뭉치. 속은 짙어 안이 안 보이고, 위쪽 가장자리는 그 땅 안개 색으로 빛을 받음
       - 뭉게뭉게 천천히 부풀었다 가라앉으며 안에서 굴러감(가스가 살아 있는 것)
       - 기체가 들어가면 둘레 가스가 밀려 벌어지고 소용돌이침, 나오면 천천히 다시 메워짐
@@ -61,7 +62,7 @@ export function makeGas(bushes, ST, noise) {
 export function makeSwarm(bushes, ST) {
   const R = (() => { let s = 777; return () => (s = (s * 9301 + 49297) % 233280) / 233280; })(), D = [];   /* x, z: 덩이 가운데 · 돌 반지름 · 높이 · 크기 · 처음 각 · 도는 빠르기 · 구름 축 위상 · r,g,b */
   bushes.list.forEach(b => { const c = ST[b.k].b;
-    for (const [lx, lz, lr] of b.lobes) { const n = Math.round(lr * lr * 9) + 20;
+    for (const [lx, lz, lr] of b.lobes) { const n = Math.round(lr * lr * 4) + 10;   /* 가스 속에 섞이니 반쯤만 */
       for (let i = 0; i < n; i++) { const rr = Math.sqrt(R()) * lr * .95, h = .25 + R() * 2.6 * (1 - rr / lr * .5);
         D.push(lx, lz, rr, h, (.12 + Math.pow(R(), 2.5) * .45), R() * 6.28, (.08 + R() * .12) / Math.max(.6, rr * .5) * (R() < .5 ? 1 : -1), R() * 6.28, c[0], c[1], c[2]); } } });
   const geo = new THREE.IcosahedronGeometry(1, 0); { const P = geo.attributes.position; for (let i = 0; i < P.count; i++) { const s = .7 + .45 * Math.abs(Math.sin(P.getX(i) * 7 + P.getY(i) * 3)); P.setXYZ(i, P.getX(i) * s, P.getY(i) * s * .8, P.getZ(i) * s); } geo.computeVertexNormals(); }
@@ -87,4 +88,9 @@ export function makeSwarm(bushes, ST) {
     return new THREE.Mesh(g, mat); });
   let push = 0;
   return { mesh: grp, count: D.length / 11, update(t, dt, sx, sz, inB) { const tg = inB ? 1 : 0; push += (tg - push) * Math.min(1, dt * (tg > push ? 4 : 1)); mat.uniforms.uT.value = t; mat.uniforms.uShip.value.set(sx, push, sz); } };
+}
+
+export function makeHide(bushes, ST, noise) {
+  const gas = makeGas(bushes, ST, noise), swarm = makeSwarm(bushes, ST), mesh = new THREE.Group(); mesh.add(swarm.mesh, gas.mesh);
+  return { mesh, count: [gas.count, swarm.count], update(t, dt, x, z, inB) { gas.update(t, dt, x, z, inB); swarm.update(t, dt, x, z, inB); } };
 }

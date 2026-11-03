@@ -1,89 +1,59 @@
-/* 수풀 — 들어가면 바깥에서 안 보이는 곳 (매복·기습의 긴장)
-   · 어디에: 벽 틈(문) 바로 앞뒤 · 무너진 중심부 잔해 사이. 문을 지나는 순간이 가장 무서운 곳이 되게
-   · 생김새: 성운 덤불 — 가늘고 휜 빛 줄기 수백 가닥이 한 뿌리에서 뻗은 덤불. 뿌리는 짙고 끝으로 갈수록 그 땅 안개 색으로 은은히 빛남
-   · 움직임마다 이유:
-     - 바람에 천천히 물결치며 흔들림(덤불 전체가 한쪽으로 쓸렸다 돌아옴 — 살아 있는 것)
-     - 기체가 지나가면 그 둘레 줄기가 밀려 눕고, 지나가면 천천히 일어섬(밀고 들어간 자국)
-     - 안에 숨으면 둘레 줄기가 살짝 더 밝아짐(내가 숨은 덤불이 어딘지 내게만 알려 줌)
-   · 규칙(나중에 적·몬스터 붙일 때 그대로 씀): 수풀 안은 바깥에서 안 보임 · 같은 수풀 안이면 서로 보임 · 수풀 안에서 쏘면 2초 드러남
-   · 무게: 줄기 전부 한 묶음(그리기 1번). 수풀 자리는 칸 지도로 바로 찾음 */
-import * as THREE from 'three';
-import { MAP, toWorld } from './mapfloor.js?v=11031147';
+/* 숨을 곳 — 자리·모양·규칙 (생김새는 hideviz.js: 가스 구름 속에 돌 부스러기가 맴돎)
+   · 자리는 전략으로 정함 (아무 데나 두지 않음):
+     ① 문 매복: 벽 틈(문) 바로 안쪽, 벽을 따라 길쭉하게 → 문을 지나 꺾는 순간 옆에서 기습. 문 하나에 한쪽만(양쪽 다 두면 문이 함정만 됨)
+     ② 보스 둘레: 중간 보스 땅 가장자리 두 곳 → 보스 잡는 사람을 노리거나, 보스를 피해 숨음
+     ③ 빈 들판 피난처: 벽에서 먼 넓은 땅 한가운데 → 쫓길 때 몸을 숨기고 방향을 틀 곳
+     ④ 무너진 중심부: 잔해 사이에 흩어져 숨고 피하고 기습
+     빼는 곳: 기지 둘레 30m(태어나자마자 매복 금지) · 막다른 구석
+   · 모양·크기는 제각각: 작음(한 대가 겨우) · 중간 · 큼(여럿) × 둥긂 · 길쭉함(벽 따라) · 굽음
+   · 규칙: 숨으면 바깥에서 안 보이고, 숨은 기체가 밀어내는 가스·돌 움직임도 바깥에선 안 보임(내 화면에서만).
+           숨은 내 기체는 내 화면에서 반투명. 같은 숨을 곳 안이면 서로 반투명하게 보임. 안에서 쏘면 2초 드러남(적 붙일 때) */
+import { MAP, toWorld } from './mapfloor.js?v=11031157';
 
-export function makeBushes(B, J, ST) {
+export function makeBushes(B, J) {
   const S = MAP.SCALE, rnd = (() => { let s = 977; return () => (s = (s * 9301 + 49297) % 233280) / 233280; })();
-  const ok = (x, z, r) => { if (B.region(x, z) === 17) return false; for (let k = 0; k < 8; k++) { const a = k * Math.PI / 4; if (B.field(x + Math.cos(a) * r, z + Math.sin(a) * r) > .3) return false; } return B.field(x, z) < .2; };
+  const spawns = J.spawns.map(([x, y]) => toWorld(x, y));
+  const freeAt = (x, z) => B.region(x, z) !== 17 && B.field(x, z) < .2;
+  /* 막힌 방향 세기: 사방 16방향 중 r m 앞이 막힌 수 → 막다른 구석 거름 */
+  const open = (x, z, r) => { let blocked = 0; for (let k = 0; k < 16; k++) { const a = k * Math.PI / 8; if (!freeAt(x + Math.cos(a) * r, z + Math.sin(a) * r)) blocked++; } return blocked; };
   const list = [];
-  const add = (x, z, r) => { if (list.some(b => Math.hypot(b.x - x, b.z - z) < b.r + r + 6)) return false;
-    const lobes = []; const n = 3 + Math.floor(rnd() * 2);
-    for (let i = 0; i < n; i++) { const a = rnd() * 6.28, d = r * .45 * rnd(); lobes.push([x + Math.cos(a) * d, z + Math.sin(a) * d, r * (.55 + rnd() * .35)]); }
-    list.push({ x, z, r, lobes, k: B.region(x, z) }); return true; };
-  /* 문 앞뒤: 문을 지나는 길 한쪽 옆에 (길을 막지 않게 옆으로 비켜) */
-  (J.gates || []).forEach((g, i) => { const [x, z] = toWorld(g.x, g.y), dx = Math.cos(g.a), dz = Math.sin(g.a), px = -dz, pz = dx;
-    const side = i % 2 ? 1 : -1, w = g.w / 2 * S;
-    for (const along of [7.5, -7.5, 10, -10]) { const bx = x + dx * along + px * side * (w + 2.5), bz = z + dz * along + pz * side * (w + 2.5), r = 3 + rnd() * 1.5; if (ok(bx, bz, r) && add(bx, bz, r)) break; } });
-  /* 무너진 중심부: 잔해 사이에 흩어져 숨고 피하고 기습 */
-  for (let i = 0, tries = 0; i < 9 && tries < 200; tries++) { const a = rnd() * 6.28, d = 14 + rnd() * 34, x = Math.cos(a) * d, z = Math.sin(a) * d, r = 3.2 + rnd() * 1.8; if (B.region(x, z) === 16 && ok(x, z, r) && add(x, z, r)) i++; }
-  /* 칸 지도: 칸마다 몇 번 수풀인지 (0 = 없음) */
-  const N = 500, cell = MAP.W / N * S, grid = new Uint8Array(N * N);
+  /* 모양: 가운데 선을 따라 덩이를 늘어놓음 (둥긂 = 한자리에 뭉침, 길쭉함 = 곧은 선, 굽음 = 휜 선) */
+  function add(x, z, size, shape, dir, why) {
+    const r = size === 0 ? 2.1 + rnd() * .4 : size === 1 ? 3 + rnd() * .7 : 4.2 + rnd() * 1;
+    const len = shape === 0 ? r * .6 : r * (shape === 1 ? 2.4 : 2.1), bend = shape === 2 ? (rnd() < .5 ? -1 : 1) * .9 : 0;
+    const n = shape === 0 ? 3 : 5, lobes = [], tx = Math.cos(dir), tz = Math.sin(dir);
+    for (let i = 0; i < n; i++) { const u = i / (n - 1) - .5, along = u * len, side = bend * (1 - u * u * 4) * r * .55 + (rnd() - .5) * r * .3;
+      const lx = x + tx * along - tz * side, lz = z + tz * along + tx * side, lr = r * (shape === 0 ? .62 + rnd() * .3 : (1 - Math.abs(u) * .8) * (.6 + rnd() * .25));
+      if (!freeAt(lx, lz) || B.field(lx, lz) > .1) continue; lobes.push([lx, lz, lr]); }
+    if (lobes.length < 2) return false;
+    for (const b of list) for (const l of b.lobes) for (const m of lobes) if (Math.hypot(l[0] - m[0], l[1] - m[1]) < l[2] + m[2] + 7) return false;   /* 숨을 곳끼리 붙지 않게 */
+    for (const [sx, sz] of spawns) if (Math.hypot(sx - x, sz - z) < 30) return false;
+    list.push({ x, z, r, lobes, k: B.region(x, z), size, shape, why }); return true; }
+  /* ① 문 매복: 문 안쪽 벽에 붙여 벽 따라 길쭉하게 */
+  (J.gates || []).forEach((g, i) => { const [x, z] = toWorld(g.x, g.y), dx = Math.cos(g.a), dz = Math.sin(g.a), px = -dz, pz = dx, w = g.w / 2 * S;
+    const side = (i * 7919 % 3) ? 1 : -1, size = g.k === 'road' ? 1 + (rnd() < .5 ? 1 : 0) : rnd() < .5 ? 0 : 1;
+    for (const inward of [1, -1]) for (const s of [side, -side]) { const off = 3.2 + rnd() * 1.5, sd = w + 4.5 + size * 1.4;
+      const bx = x + dx * inward * off + px * s * sd, bz = z + dz * inward * off + pz * s * sd;
+      if (open(bx, bz, 3) < 6 && add(bx, bz, size, 1, Math.atan2(pz * s, px * s) + (rnd() - .5) * .3, '문 매복')) return; } });
+  /* ② 보스 둘레 */
+  J.labels.filter(o => /Lv 8/.test(o.l)).forEach(o => { const [cx, cz] = toWorld(o.x, o.y), rk = B.region(cx, cz); let put = 0;
+    for (let tries = 0; tries < 60 && put < 2; tries++) { const a = rnd() * 6.28, d = 14 + rnd() * 12, x = cx + Math.cos(a) * d, z = cz + Math.sin(a) * d;
+      if (B.region(x, z) === rk && open(x, z, 4) <= 2 && add(x, z, rnd() < .5 ? 1 : 2, rnd() < .5 ? 2 : 0, a + Math.PI / 2, '보스 둘레')) put++; } });
+  /* ③ 빈 들판 피난처: 정글·보물 땅에서 벽이 가장 먼 곳 하나씩 */
+  const fields = [];
+  for (let z = -170; z <= 170; z += 4) for (let x = -170; x <= 170; x += 4) { const k = B.region(x, z); if (k < 1 || k > 15 || (k >= 6 && k <= 10)) continue;
+    let d = 2; for (; d < 20; d += 2) if (open(x, z, d) > 0) break; if (d >= 10) fields.push([d + rnd(), x, z]); }
+  fields.sort((a, b) => b[0] - a[0]);
+  const perReg = {}; for (const [, x, z] of fields) { const k = B.region(x, z); if (perReg[k]) continue; if (add(x, z, Math.floor(rnd() * 3), Math.floor(rnd() * 3), rnd() * 6.28, '빈 들판')) perReg[k] = 1; }
+  /* ④ 무너진 중심부 */
+  for (let i = 0, tries = 0; i < 9 && tries < 300; tries++) { const a = rnd() * 6.28, d = 12 + rnd() * 38, x = Math.cos(a) * d, z = Math.sin(a) * d;
+    if (B.region(x, z) === 16 && add(x, z, Math.floor(rnd() * 3), Math.floor(rnd() * 3), rnd() * 6.28, '중심부')) i++; }
+  /* 칸 지도: 칸마다 몇 번 숨을 곳인지 (0 = 없음) */
+  const N = 500, grid = new Uint8Array(N * N);
   const toCell = (x, z) => [Math.floor((x / S + MAP.W / 2) / (MAP.W / N)), Math.floor((z / S + MAP.H / 2) / (MAP.H / N))];
   list.forEach((b, id) => { for (const [lx, lz, lr] of b.lobes) { const [i0, j0] = toCell(lx - lr, lz - lr), [i1, j1] = toCell(lx + lr, lz + lr);
     for (let j = Math.max(0, j0); j <= Math.min(N - 1, j1); j++) for (let i = Math.max(0, i0); i <= Math.min(N - 1, i1); i++) { const cx = ((i + .5) * MAP.W / N - MAP.W / 2) * S, cz = ((j + .5) * MAP.H / N - MAP.H / 2) * S;
-      if (Math.hypot(cx - lx, cz - lz) <= lr) grid[j * N + i] = id + 1; } } });
+      if (Math.hypot(cx - lx, cz - lz) <= lr * .9) grid[j * N + i] = id + 1; } } });
   const bushAt = (x, z) => { const [i, j] = toCell(x, z); return i < 0 || j < 0 || i >= N || j >= N ? 0 : grid[j * N + i]; };
-
-  /* 줄기 하나: 휜 빛 잎 (3마디, 뿌리 넓고 끝 가늘게, 바깥으로 휨) */
-  const seg = 3, pos = [], uvs = [], idx = [];
-  for (let i = 0; i <= seg; i++) { const v = i / seg, w = .17 * (1 - v * .88), bend = v * v * .7;
-    pos.push(-w, v, bend, w, v, bend); uvs.push(0, v, 1, v); if (i < seg) { const o = i * 2; idx.push(o, o + 1, o + 2, o + 1, o + 3, o + 2); } }
-  const geo = new THREE.InstancedBufferGeometry(); geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); geo.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2)); geo.setIndex(idx);
-  const F = [];
-  list.forEach(b => { const area = b.lobes.reduce((a, l) => a + Math.PI * l[2] * l[2], 0), n = Math.min(520, Math.round(area * 7.5));
-    for (let k = 0, t = 0; k < n && t < n * 4; t++) { const L = b.lobes[Math.floor(rnd() * b.lobes.length)], a = rnd() * 6.28, d = Math.sqrt(rnd()) * L[2], x = L[0] + Math.cos(a) * d, z = L[1] + Math.sin(a) * d;
-      if (B.field(x, z) > .35) continue; k++;
-      const dl = Math.hypot(x - L[0], z - L[1]) / L[2], edge = 1 - Math.min(1, dl);                     /* 덩이 가운데가 높고 가장자리가 낮음 → 둥근 덤불 */
-      const out = Math.atan2(x - L[0], z - L[1]);                                                     /* 덩이 가운데서 바깥으로 뻗음 → 분수처럼 퍼진 덤불 */
-      F.push(x, z, (.55 + edge * 1.5) * (.8 + rnd() * .4), out + (rnd() - .5) * (.9 + edge * 2.6), ...ST[b.k].b, rnd()); } });
-  const mat = new THREE.ShaderMaterial({ side: THREE.DoubleSide, uniforms: { uT: { value: 0 }, uShip: { value: new THREE.Vector3(0, 0, -1e4) }, uIn: { value: 0 } },
-    vertexShader: `attribute vec4 iP, iC; uniform float uT, uIn; uniform vec3 uShip; varying vec2 vU; varying vec3 vC; varying float vG;
-      void main(){ vec3 p=position; float h=iP.z, v=uv.y;
-        float c=cos(iP.w), s=sin(iP.w); vec3 q=vec3(p.x*c+p.z*s, p.y*h, -p.x*s+p.z*c);
-        vec2 wv=vec2(sin(uT*.8+iP.x*.15+iP.y*.07), cos(uT*.6+iP.y*.13))*.35;                  /* 바람: 덤불 전체가 천천히 물결 */
-        vec2 away=vec2(iP.x,iP.y)-uShip.xz; float d=length(away);
-        float push=uShip.y*smoothstep(2.6,.6,d);                                                    /* 기체가 밀고 지나간 자리: 둘레 줄기가 바깥으로 눕음 */
-        vec2 off=(wv+normalize(away+1e-4)*push*1.6)*v*v*h;
-        q.xz+=off; q.y*=1.-push*.55*v;
-        vec3 w=vec3(iP.x,0.,iP.y)+q; vU=uv; vC=iC.rgb;         vG=(1.-smoothstep(1.5,3.5,d))*uIn;                                                          /* 내가 숨은 덤불 둘레가 살짝 밝아짐 */
-        gl_Position=projectionMatrix*viewMatrix*vec4(w,1.); }`,
-    fragmentShader: `uniform float uT; varying vec2 vU; varying vec3 vC; varying float vG;
-      void main(){ float v=vU.y, e=1.-abs(vU.x*2.-1.);
-        vec3 root=vec3(.012,.018,.016), tip=vC*1.25;
-        vec3 c=mix(root, tip, smoothstep(.15,1.,v))*(.55+.45*e);                                  /* 뿌리 짙고 끝은 그 땅 빛 */
-        float v2=clamp(v,0.,1.); v2*=v2; c+=vC*v2*v2*v2*.9 + vC*vG*.35;   /* 거듭제곱은 음수에서 휴대폰이 고장 값을 냄 → 곱셈으로 */                                                           /* 줄기 끝 은은한 빛 · 숨은 덤불 */
-        gl_FragColor=vec4(c,1.); }` });
-  /* 맵을 36m 칸으로 나눠 칸마다 한 묶음 → 화면 밖 칸의 수풀은 안 그림 */
-  const mesh = new THREE.Group(), TL = 36, tiles = new Map(), cnt = F.length / 8;
-  for (let i = 0; i < cnt; i++) { const key = Math.floor(F[i * 8] / TL) + ',' + Math.floor(F[i * 8 + 1] / TL); if (!tiles.has(key)) tiles.set(key, []); tiles.get(key).push(i); }
-  for (const [key, ids] of tiles) { const g = new THREE.InstancedBufferGeometry(); g.index = geo.index; g.setAttribute('position', geo.attributes.position); g.setAttribute('uv', geo.attributes.uv);
-    const iP = new Float32Array(ids.length * 4), iC = new Float32Array(ids.length * 4);
-    ids.forEach((i, j) => { iP.set(F.slice(i * 8, i * 8 + 4), j * 4); iC.set(F.slice(i * 8 + 4, i * 8 + 8), j * 4); });
-    g.setAttribute('iP', new THREE.InstancedBufferAttribute(iP, 4)); g.setAttribute('iC', new THREE.InstancedBufferAttribute(iC, 4)); g.instanceCount = ids.length;
-    const [tx, tz] = key.split(',').map(Number); g.boundingSphere = new THREE.Sphere(new THREE.Vector3((tx + .5) * TL, 1, (tz + .5) * TL), TL * .75 + 3);
-    const m = new THREE.Mesh(g, mat); m.renderOrder = 1; mesh.add(m); }
-  /* 덤불 속 짙은 덩이: 잎 사이로 바닥이 비치지 않게 속을 채움 (덤불은 속이 꽉 차 있어야 숨을 수 있다는 게 보임) */
-  const dome = new THREE.SphereGeometry(1, 14, 7, 0, Math.PI * 2, 0, Math.PI / 2);
-  { const P = dome.attributes.position; for (let i = 0; i < P.count; i++) { const x = P.getX(i), y = P.getY(i), z = P.getZ(i), n = .85 + .3 * Math.sin(x * 5.1 + z * 3.7) * Math.cos(z * 4.3 - x * 2.1); P.setXYZ(i, x * n, y * n, z * n); } dome.computeVertexNormals(); }
-  const lobes = list.flatMap(b => b.lobes.map(l => [...l, ...ST[b.k].b]));
-  const domeM = new THREE.ShaderMaterial({ uniforms: {},
-    vertexShader: 'attribute vec3 iC; varying vec3 vC, vN; varying float vY; void main(){ vC=iC; vN=normalize(mat3(instanceMatrix)*normal); vY=position.y; gl_Position=projectionMatrix*viewMatrix*instanceMatrix*vec4(position,1.); }',
-    fragmentShader: 'varying vec3 vC, vN; varying float vY; void main(){ float l=.35+.65*max(dot(vN,normalize(vec3(-.4,1.,-.3))),0.); vec3 c=mix(vec3(.01,.014,.012), vC*.22, vY)*l; gl_FragColor=vec4(c,1.); }' });
-  const dm = new THREE.Matrix4(), dt = new Map();
-  lobes.forEach(l => { const key = Math.floor(l[0] / TL) + ',' + Math.floor(l[1] / TL); if (!dt.has(key)) dt.set(key, []); dt.get(key).push(l); });
-  for (const ls of dt.values()) { const g = dome.clone(), iCd = new Float32Array(ls.length * 3), dms = new THREE.InstancedMesh(g, domeM, ls.length);
-    ls.forEach((l, i) => { dm.makeScale(l[2] * .8, Math.min(1.1, l[2] * .3), l[2] * .8); dm.setPosition(l[0], -.1, l[1]); dms.setMatrixAt(i, dm); iCd.set([l[3], l[4], l[5]], i * 3); });
-    g.setAttribute('iC', new THREE.InstancedBufferAttribute(iCd, 3)); dms.computeBoundingSphere(); mesh.add(dms); }
-  let push = 0;
-  return { mesh, list, bushAt, count: cnt,
-    update(t, dt, sx, sz, moving) { const inB = bushAt(sx, sz) > 0; const tg = inB ? 1 : 0; push += (tg - push) * Math.min(1, dt * (tg > push ? 5 : 1.2));   /* 밀 땐 빨리, 일어설 땐 천천히 */
-      mat.uniforms.uT.value = t; mat.uniforms.uShip.value.set(sx, push, sz); mat.uniforms.uIn.value += ((inB ? 1 : 0) - mat.uniforms.uIn.value) * Math.min(1, dt * 3); return inB; } };
+  return { list, bushAt, update: (t, dt, x, z) => bushAt(x, z) > 0 };
 }

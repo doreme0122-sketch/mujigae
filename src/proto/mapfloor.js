@@ -105,13 +105,7 @@ export async function makeMapFloor(renderer, url) {
         /* 바위 능선(벽 자리): 바닥보다 확 밝은 돌 띠 + 짙은 그림자 테두리 + 윗면 빛 → 멀리서도 '못 지나가는 곳'이 보이게 */
         /* 벽 자리 그림은 막힘(1)/지나감(0) 둘뿐 → 보이는 돌 띠 = 실제로 부딪히는 자리. 경계 판정은 게임과 같은 .5 */
         /* 벽 밑 땅은 칠하지 않음: 벽은 바위벽 그 자체로만 보임 (사용자 결정 2026-11-03) */
-        /* 반짝임 물결 (지역마다) */
-        vec2 gq=vW.xz*.5; vec2 gc=floor(gq); float gh=h2(gc);
-        if(gh>1.-.03*Q.x && texture2D(uWf,uv).r<.4 && id!=17){ vec2 gf=fract(gq)-.5, cc=(gc+.5)*2.;
-          float ph = Wv.x<.5 ? dot(cc,Wv.yz) : (Wv.x<1.5 ? length(cc) : atan(cc.y,cc.x)*6.+length(cc)*.25);
-          float wv=max(0.,sin(ph*.09-uT*Wv.w+gh*1.3)); wv=wv*wv; wv=wv*wv; wv=wv*wv; wv=wv*wv;   /* 물결 머리에서만 켜짐 (음수 거듭제곱 없이) */
-          vec3 gcol=Q.z>.5?hue(fract(gh*7.+uT*.05))*.8+.4:uG[id]; float g=exp(-dot(gf,gf)*120.)*wv;
-          c+=gcol*g*2.2; }
+        /* 바닥 반짝임 물결은 없앰 (사용자 2026-11-03: 맵에 번쩍번쩍하는 것 없앰) */
         gl_FragColor=vec4(c,1.); }` });
   const plane = new THREE.Mesh(new THREE.PlaneGeometry(WX + 200, WZ + 200), mat); plane.rotation.x = -Math.PI / 2;
   const fs = new THREE.Scene(); fs.add(plane);
