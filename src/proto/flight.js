@@ -10,8 +10,8 @@
    무게: 기체 한 대 + 불꽃 띠 몇 장 + 꼬리 띠 하나 + 불티 점 묶음 하나 + 그림자 판 하나 */
 import * as THREE from 'three';
 import { buildShip, engineSpots } from '../core/ships/build.js';
-import { flameMesh } from './sortie.js?v=11030837';
-import { MAP } from './mapfloor.js?v=11030837';
+import { flameMesh } from './sortie.js?v=11030914';
+import { MAP } from './mapfloor.js?v=11030914';
 
 export const FLY = { LEN: 2, HOVER: .7, R: .8, SPEEDS: [9, 12, 15, 18], TURN: 7, ACC: .22 };
 const AB = { transparent: true, depthWrite: false, blending: THREE.AdditiveBlending };

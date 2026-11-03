@@ -44,22 +44,35 @@ function bakeNoise(N = 256) {
   return t;
 }
 
+/* 안개 색 지도: 땅마다 안개 색을 칠한 뒤 크게 번지게 함 → 땅 경계에서 안개 색이 칸칸이 끊기지 않고 섞이며 넘어감 (안개는 흘러 퍼지는 것) */
+function fogTex(img) {
+  const c = document.createElement('canvas'), N = img.width; c.width = c.height = N; const g = c.getContext('2d', { willReadFrequently: true }); g.drawImage(img, 0, 0);
+  const d = g.getImageData(0, 0, N, N).data, A = new Float32Array(N * N * 3), B = new Float32Array(N * N * 3);
+  for (let i = 0; i < N * N; i++) { const id = Math.min(17, Math.round(d[i * 4] / 12)), f = ST[id].b; A[i * 3] = f[0]; A[i * 3 + 1] = f[1]; A[i * 3 + 2] = f[2]; }
+  const R = 7, blur = (src, dst, dx, dy) => { for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) { let r = 0, gg = 0, b = 0;
+      for (let k = -R; k <= R; k++) { const x = Math.min(N - 1, Math.max(0, i + k * dx)), y = Math.min(N - 1, Math.max(0, j + k * dy)), o = (y * N + x) * 3; r += src[o]; gg += src[o + 1]; b += src[o + 2]; }
+      const o = (j * N + i) * 3, w = 1 / (2 * R + 1); dst[o] = r * w; dst[o + 1] = gg * w; dst[o + 2] = b * w; } };
+  blur(A, B, 1, 0); blur(B, A, 0, 1); blur(A, B, 1, 0); blur(B, A, 0, 1);              /* 두 번 번지기 = 부드러운 둥근 번짐 */
+  const out = new Uint8Array(N * N * 4); for (let i = 0; i < N * N; i++) { for (let k = 0; k < 3; k++) out[i * 4 + k] = Math.min(255, A[i * 3 + k] * 255 / .6); out[i * 4 + 3] = 255; }
+  const t = new THREE.DataTexture(out, N, N); t.magFilter = t.minFilter = THREE.LinearFilter; t.needsUpdate = true; t.userData.k = .6; return t;
+}
+
 export async function makeMapFloor(renderer, url) {
   const regTex = await new THREE.TextureLoader().loadAsync(url);
   regTex.colorSpace = THREE.NoColorSpace; regTex.magFilter = regTex.minFilter = THREE.NearestFilter; regTex.generateMipmaps = false; regTex.flipY = false;
   const regSoft = regTex.clone(); regSoft.magFilter = regSoft.minFilter = THREE.LinearFilter; regSoft.needsUpdate = true;      /* 경계·길은 부드럽게 */
   const noise = bakeNoise();
   /* 땅 색은 칠하지 않음 (사용자 결정 2026-11-03): 모든 땅이 같은 짙은 우주 바닥 색 · 같은 흰 반짝임.
-     땅마다 다른 건 바닥 결이 흐르는 빠르기·비틀림·반짝임 물결 모양뿐(색 아님). 불씨(붉은 얼룩)·무지개 반짝임도 색이라 뺌 */
+     땅마다 다른 건 바닥 결이 흐르는 빠르기·비틀림·반짝임 물결 모양, 그리고 안개 색. 불씨(붉은 얼룩)·무지개 반짝임도 색이라 뺌 */
   const ONE = { a: [.045, .05, .06], b: [.16, .17, .19], g: [.9, .92, 1] }, V = k => ST.map(s => k === 'q' ? new THREE.Vector3(s.q[0], 0, 0) : new THREE.Vector3(...(ONE[k] || s[k]).slice(0, 3)));
   const WX = MAP.W * MAP.SCALE, WZ = MAP.H * MAP.SCALE;
   const mat = new THREE.ShaderMaterial({ depthWrite: false, depthTest: false,
     uniforms: { uT: { value: 0 }, uFog: { value: 1 }, uN: { value: noise }, uR: { value: regTex }, uRs: { value: regSoft }, uWf: { value: regSoft },
-      uA: { value: V('a') }, uB: { value: V('b') }, uG: { value: V('g') },
+      uA: { value: V('a') }, uB: { value: V('b') }, uFc: { value: fogTex(regTex.image) }, uG: { value: V('g') },
       uP: { value: ST.map(s => new THREE.Vector4(...s.p)) }, uQ: { value: V('q') }, uWv: { value: ST.map(s => new THREE.Vector4(...s.wv)) } },
     vertexShader: 'varying vec3 vW; void main(){ vec4 w=modelMatrix*vec4(position,1.); vW=w.xyz; gl_Position=projectionMatrix*viewMatrix*w; }',
     fragmentShader: `precision highp float; varying vec3 vW; uniform float uT, uFog; uniform sampler2D uN, uR, uRs, uWf;
-      uniform vec3 uA[18], uB[18], uG[18], uQ[18]; uniform vec4 uP[18], uWv[18];
+      uniform vec3 uA[18], uB[18], uG[18], uQ[18]; uniform sampler2D uFc; uniform vec4 uP[18], uWv[18];
       float h2(vec2 p){ p=fract(p*vec2(123.34,456.21)); p+=dot(p,p+45.32); return fract(p.x*p.y); }
       vec3 hue(float h){ return clamp(abs(mod(h*6.+vec3(0.,4.,2.),6.)-3.)-1.,0.,1.); }
       vec2 layer(vec2 xz, float sc, float t, float swirl){ vec2 p=xz*sc*.125;
@@ -76,17 +89,13 @@ export async function makeMapFloor(renderer, url) {
         vec2 L0=layer(vW.xz,sc,t,swirl), L1=layer(vW.xz*1.15+vec2(31.,17.),sc,t*.6,swirl);
         float a0=smoothstep(.35,.85,L0.x)*dens, a1=smoothstep(.38,.85,L1.x)*dens*.6;
         vec3 base = uA[id]*(.55+.35*L1.x);                                                       /* 맨땅: 짙은 색 위에 먼 결 */
-        vec3 c0=mix(uA[id],uB[id],smoothstep(.4,.95,L0.x))*(.8+.4*L0.y);
+        vec3 c0=mix(uA[id],texture2D(uFc,uv).rgb*.6,smoothstep(.4,.95,L0.x))*(.8+.4*L0.y);                      /* 안개는 땅마다 제 색 (바닥은 칠하지 않음): 얼음 성운 푸른 안개, 용암 붉은 안개… */
         vec3 c = mix(base, c0, clamp(a0+a1*.5,0.,1.));
         /* 안개 끔: 흘러가는 구름 결 없이 땅 색 그대로 (서서히 걷힘) */
         vec3 clr = mix(uA[id],uB[id],.3)*(.72+.4*texture2D(uN,vW.xz*.05).r);
         c = mix(clr, c, uFog);
         if(Q.y>.5){ float hot=smoothstep(.55,.8,L1.x); c+=vec3(.5,.1,.02)*hot*(.6+.4*sin(uT*1.2+L0.x*9.))*(1.-L0.x*.6); }
-        /* 큰길: 다져진 밝은 길 + 가운데 희미한 안내 점 */
-        float rd = smoothstep(.6,.9,road), side = smoothstep(.18,.42,road)*(1.-rd);              /* 큰길 · 샛길 */
-        vec3 roadC = mix(uB[id], vec3(.34,.32,.27), .5)*(.7+.3*L0.y);
-        c = mix(c, roadC, rd*.55);
-        c = mix(c, mix(uB[id], vec3(.3,.29,.25), .35)*(.75+.3*L0.y), side*.4);
+        /* 길 그림은 그리지 않음 (사용자 결정 2026-11-03): 길은 벽 사이 열린 땅 그 자체 */
         if (id==17) { float rb=texture2D(uN,vW.xz*.03).r; c = vec3(.035,.035,.04)*(.5+1.2*rb) + vec3(.06,.055,.05)*smoothstep(.55,.75,texture2D(uN,vW.xz*.11).b); }   /* 소행성 잔해: 울퉁불퉁 짙은 돌 */
         /* 지역 경계 = 짙은 바위 능선 (나중에 벽이 섬) */
         /* 바위 능선(벽 자리): 바닥보다 확 밝은 돌 띠 + 짙은 그림자 테두리 + 윗면 빛 → 멀리서도 '못 지나가는 곳'이 보이게 */
