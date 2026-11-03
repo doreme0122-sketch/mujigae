@@ -12,7 +12,7 @@
    무게: 보석 하나 = 뒷면 · 앞면 · 둘레 빛 · 고리 4번 (+ 잔상 보석 2개는 쓸 때만) */
 import * as THREE from 'three';
 import * as A from '../core/audio.js';
-import { pointPool, beamMesh } from './skilldemo.js?v=11031829';
+import { pointPool, beamMesh } from './skilldemo.js?v=11031904';
 
 /* 기본 등급 스킬 (임시 이름 — 실제 스킬은 스킬 설계 때 바뀜). 분류마다 다섯 중 셋이 무작위로 나옴 */
 export const CATS = [
@@ -32,7 +32,7 @@ const sm01 = x => { x = Math.min(1, Math.max(0, x)); return x * x * (3 - 2 * x);
 const ORBIT = 2.7, GEMR = .6, GEMY = 1.6;
 
 /* ── 둥근 브릴리언트: 테이블 8각 · 별 면 8 · 마름모 면 8 · 윗 거들 면 16 · 거들 띠 · 아래 거들 면 16 · 파빌리온 면 8 ── */
-function brilliant() {
+export function brilliant() {
   const P = [], ID = [], CEN = [], RND = [];
   const at = (a, r, y) => [Math.cos(a) * r, y, Math.sin(a) * r], TAU = Math.PI * 2, th = i => i / 8 * TAU;
   const T = i => at(th(i), .54, .36), S = i => at(th(i) + TAU / 16, .76, .27), G = (k, y) => at(k / 16 * TAU, 1, y), L = i => at(th(i) + TAU / 16, .56, -.36), C = [0, -.88, 0];
@@ -66,7 +66,7 @@ const ENV = `vec3 env(vec3 d){
     float s = abs(sin(atan(d.z, d.x) * 3.));
     c += vec3(.9,.95,1.1) * smoothstep(.965, .995, s) * smoothstep(-.15, .35, d.y) * smoothstep(.9, .5, d.y);
     return c; }`;
-function gemMat(back) {
+export function gemMat(back) {
   return new THREE.ShaderMaterial({
     transparent: true, depthWrite: false, side: back ? THREE.BackSide : THREE.FrontSide,
     uniforms: { uCol: { value: new THREE.Vector3(1, 1, 1) }, uA: { value: 1 }, uFlash: { value: 0 }, uGlow: { value: 0 }, uT: { value: 0 }, uSw: { value: new THREE.Vector3(0, 0, 0) }, uDark: { value: 0 } },
