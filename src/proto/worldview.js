@@ -2,12 +2,13 @@
    날아 보기: 1번 기지에서 기체를 조이스틱으로 몰아 맵 크기·길·문을 몸으로 확인(지금 있는 땅 이름 · 출발 뒤 걸린 시간 · 속도 바꾸기)
    보기: 날아 보기·지역 보기는 기체를 따라감, 맵 전체는 가운데 고정(끌어서 이동). 두 손가락(휠)로 확대. 시작 기지 자리는 빛 고리(다음 단계에서 진짜 기지) */
 import * as THREE from 'three';
-import { makeBloom } from '../core/hangar/bloom.js?v=11031113';
-import { makeMapFloor, MAP, toWorld } from './mapfloor.js?v=11031113';
-import { makePerf } from './perf.js?v=11031113';
+import { makeBloom } from '../core/hangar/bloom.js?v=11031125';
+import { makeMapFloor, MAP, toWorld } from './mapfloor.js?v=11031125';
+import { makePerf } from './perf.js?v=11031125';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
-import { makeFlight, loadBlock, FLY } from './flight.js?v=11031113';
-import { makeWalls } from './walls.js?v=11031113';
+import { makeFlight, loadBlock, FLY } from './flight.js?v=11031125';
+import { makeWalls } from './walls.js?v=11031125';
+import { makeMotes } from './motes.js?v=11031125';
 
 const $ = s => document.querySelector(s), clamp = THREE.MathUtils.clamp;
 const VIEWS = [{ name: '날아 보기', h: 42, tilt: .38 }, { name: '지역 보기', h: 160, tilt: .25 }, { name: '맵 전체', h: 520, tilt: .02 }];
@@ -17,9 +18,9 @@ export async function start(canvas, onProgress = () => {}) {
   renderer.toneMapping = THREE.NoToneMapping; renderer.autoClear = false; renderer.setClearColor(0, 1);
   const scene = new THREE.Scene(), camera = new THREE.PerspectiveCamera(40, 1, 1, 3000), bloom = makeBloom(renderer, { samples: 0 });
   onProgress(.2);
-  const floor = await makeMapFloor(renderer, './assets/map/v6.png?v=11031113');
-  const J = await (await fetch('./assets/map/v6.json?v=11031113')).json();
-  const BLK = await loadBlock('./assets/map/v6.png?v=11031113');                  /* 벽 판정 = 바닥에 그린 벽 그림 그대로 */
+  const floor = await makeMapFloor(renderer, './assets/map/v6.png?v=11031125');
+  const J = await (await fetch('./assets/map/v6.json?v=11031125')).json();
+  const BLK = await loadBlock('./assets/map/v6.png?v=11031125');                  /* 벽 판정 = 바닥에 그린 벽 그림 그대로 */
   const UT = { value: 0 }, WALL = makeWalls(BLK, floor, J.ridges, UT); floor.mat.uniforms.uWf.value = WALL.fieldTex;   /* 바닥도 같은 벽 지도로 */
   scene.add(WALL.real); scene.add(WALL.mesh); WALL.mesh.visible = false;   /* 승인된 벽 5종 · 맵 전체 보기에서만 가벼운 한 덩어리 벽(멀리서 보는 지도) */
   { const pm = new THREE.PMREMGenerator(renderer); scene.environment = pm.fromScene(new RoomEnvironment(), .04).texture; scene.environmentIntensity = .6; pm.dispose(); }
@@ -47,6 +48,18 @@ export async function start(canvas, onProgress = () => {}) {
   /* 날아 보기: 1번 기지에서 가운데를 보고 출발 */
   const [sx, sz] = toWorld(...SPAWN[0]);
   const fly = await makeFlight(renderer, BLK, [sx, sz], Math.atan2(sx, sz)); scene.add(fly); const FS = fly.userData.S;
+  const motes = makeMotes(BLK, J.labels.map(o => { const [x, z] = toWorld(o.x, o.y); return [J.names.indexOf(o.n), x, z]; })); scene.add(motes.mesh);   /* 땅마다 떠다니는 알갱이 */
+  /* 땅 이름: 경계를 넘으면 화면 위쪽에 잠깐 떴다 사라짐 (그 땅 안개 색 한 줄과 함께)
+     · 경계에서 왔다 갔다 할 때 깜빡이지 않게: 새 땅에 0.35초 머물러야 띄움 */
+  const SUB = { 0: '시작 기지 앞마당', 16: 'Lv 10+ · 필드 보스' }; J.labels.forEach(o => { const k = J.names.indexOf(o.n); if (!(k in SUB)) SUB[k] = o.l === '보물 땅' ? '보물 땅' : (k >= 6 && k <= 10 ? '중간 보스 · ' : '정글 · ') + o.l; });
+  const ban = document.createElement('div'); ban.style.cssText = 'position:fixed;left:50%;top:calc(env(safe-area-inset-top,0px) + 96px);transform:translateX(-50%);display:flex;flex-direction:column;align-items:center;gap:4px;pointer-events:none;opacity:0;transition:opacity .5s, transform .5s;text-shadow:0 0 14px rgba(0,0,0,.8)';
+  ban.innerHTML = '<div style="display:flex;align-items:center;gap:12px"><i style="display:block;height:1px;width:0;transition:width .7s .1s"></i><b style="font-weight:500;font-size:19px;letter-spacing:.22em;color:#f4f7ee;white-space:nowrap"></b><i style="display:block;height:1px;width:0;transition:width .7s .1s"></i></div><span style="font-size:11px;letter-spacing:.16em;color:rgba(230,240,220,.7)"></span>';
+  document.body.appendChild(ban); const banB = ban.querySelector('b'), banS = ban.querySelector('span'), banL = ban.querySelectorAll('i');
+  let banReg = -1, banCand = -1, banSince = 0, banHide = 0;
+  const showBan = k => { const c = floor.ST[k].b.map(v => Math.min(255, v * 255 * 1.9 | 0)).join(','); banB.textContent = J.names[k]; banS.textContent = SUB[k] || '';
+    banL.forEach(l => { l.style.background = `linear-gradient(90deg, rgba(${c},0), rgba(${c},.9))`; l.style.width = '0'; }); banL[1].style.background = `linear-gradient(90deg, rgba(${c},.9), rgba(${c},0))`;
+    ban.style.transition = 'none'; ban.style.opacity = 0; ban.style.transform = 'translateX(-50%) translateY(6px)'; void ban.offsetWidth; ban.style.transition = 'opacity .5s, transform .5s';
+    ban.style.opacity = 1; ban.style.transform = 'translateX(-50%)'; banL.forEach(l => l.style.width = '46px'); banHide = 2.4; };
   /* 보기 */
   const cam = { x: sx, z: sz, h: 42, H: 42, tilt: .38, T: .38, az: 0 }, tour = $('#tour'); let view = 0;
   $('#head span').textContent = '맵 6안 · 360m · 화면 왼쪽을 누르면 조이스틱 (컴퓨터: WASD·방향키) · 두 손가락으로 확대';
@@ -72,16 +85,19 @@ export async function start(canvas, onProgress = () => {}) {
 
   let Wd = 2, Hd = 2, cw = 1, ch = 1;
   const perf = makePerf(st => { bloom.setSamples(st.aa ? 4 : 0); size(); });
-  function size() { const r = canvas.getBoundingClientRect(); cw = r.width; ch = r.height; [Wd, Hd] = perf.size(r.width, r.height); renderer.setSize(Wd, Hd, false); bloom.size(Wd, Hd); floor.size(Wd, Hd); camera.aspect = Wd / Hd; camera.updateProjectionMatrix(); fly.userData.setPx(Hd); }
+  function size() { const r = canvas.getBoundingClientRect(); cw = r.width; ch = r.height; [Wd, Hd] = perf.size(r.width, r.height); renderer.setSize(Wd, Hd, false); bloom.size(Wd, Hd); floor.size(Wd, Hd); camera.aspect = Wd / Hd; camera.updateProjectionMatrix(); fly.userData.setPx(Hd); motes.setPx(Hd); }
   addEventListener('resize', size); size();
   let last = performance.now(), t = 0; const v = new THREE.Vector3();
   renderer.info.autoReset = false;
   renderer.setAnimationLoop(now => { try { renderer.info.reset();
     const dt = clamp((now - last) / 1000, 0, .05); last = now; t += dt;
     fly.userData.update(t, dt);
+    motes.update(t, dt, FS.x, FS.z);
+    { const k = BLK.region(FS.x, FS.z); if (k !== banCand) { banCand = k; banSince = t; } if (k !== banReg && k !== 17 && t - banSince > .35) { banReg = k; showBan(k); }
+      if (banHide > 0 && (banHide -= dt) <= 0) { ban.style.opacity = 0; banL.forEach(l => l.style.width = '0'); } }
     if (view < 2) { const lx = FS.x + FS.vx * .35, lz = FS.z + FS.vz * .35, k = Math.min(1, dt * 5); cam.x += (lx - cam.x) * k; cam.z += (lz - cam.z) * k; }   /* 기체를 따라감: 가는 쪽을 조금 더 보여줌 */
     { const mv = Math.hypot(FS.vx, FS.vz); if (clock < 0 && mv > .5) clock = t;
-      hud.textContent = `${J.names[BLK.region(FS.x, FS.z)] || ''} · ${clock < 0 ? '출발 전' : '출발 뒤 ' + (t - clock).toFixed(1) + '초'} · ${mv.toFixed(1)}m/초`; }
+      hud.textContent = `${J.names[BLK.region(FS.x, FS.z)] || ''} · ${clock < 0 ? '출발 전' : '출발 뒤 ' + (t - clock).toFixed(1) + '초'} · ${mv.toFixed(1)}m/초${FS.shield > 0 ? ' · 보호막 ' + FS.shield.toFixed(1) : ''}${FS.boost > 0 ? ' · 가속 ' + FS.boost.toFixed(1) : ''}`; }
     cam.h += (cam.H - cam.h) * Math.min(1, dt * 3); cam.tilt += (cam.T - cam.tilt) * Math.min(1, dt * 3);
     camera.position.set(cam.x, cam.h * Math.cos(cam.tilt), cam.z + cam.h * Math.sin(cam.tilt)); camera.lookAt(cam.x, 0, cam.z);
     UT.value = t; WALL.real.userData.update(t, dt); { const u = floor.mat.uniforms.uFog; u.value += ((fogOn ? 1 : 0) - u.value) * Math.min(1, dt * 4); } floor.update(t); ringM.uniforms.uT.value = t;

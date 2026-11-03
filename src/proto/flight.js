@@ -10,10 +10,11 @@
    무게: 기체 한 대 + 불꽃 띠 몇 장 + 꼬리 띠 하나 + 불티 점 묶음 하나 + 그림자 판 하나 */
 import * as THREE from 'three';
 import { buildShip, engineSpots } from '../core/ships/build.js';
-import { flameMesh } from './sortie.js?v=11031113';
-import { MAP } from './mapfloor.js?v=11031113';
+import { flameMesh } from './sortie.js?v=11031125';
+import { MAP } from './mapfloor.js?v=11031125';
 
-export const FLY = { LEN: 2, HOVER: .7, R: .8, SPEEDS: [9, 12, 15, 18], TURN: 7, ACC: .22 };
+export const FLY = { LEN: 2, HOVER: .7, R: .8, SPEEDS: [9, 12, 15, 18], TURN: 7, ACC: .22,
+  BASE: 9, SHIELD: 3, BOOST: 5, BOOSTK: 1.5 };   /* 기지 고리(반지름 9m)를 벗어나는 순간: 보호막 3초 · 가속 5초(1.5배) — 기지 출구 앞 매복에 바로 당하지 않게 */
 const AB = { transparent: true, depthWrite: false, blending: THREE.AdditiveBlending };
 
 /* 설계도 그림 → 막힘 판정
@@ -77,15 +78,23 @@ export async function makeFlight(renderer, B, start, face) {
   const up = e => { if (e.pointerId !== pid) return; pid = null; inp.x = inp.y = 0; pad.style.display = 'none'; }; addEventListener('pointerup', up); addEventListener('pointercancel', up);
   addEventListener('keydown', e => keys.add(e.key.toLowerCase())); addEventListener('keyup', e => keys.delete(e.key.toLowerCase()));
 
-  const S = { x: start[0], z: start[1], vx: 0, vz: 0, head: face, bank: 0, speed: FLY.SPEEDS[1], thr: 0, hit: 0 };
+  const S = { x: start[0], z: start[1], vx: 0, vz: 0, head: face, bank: 0, speed: FLY.SPEEDS[1], thr: 0, hit: 0, armed: true, shield: 0, boost: 0, pop: 0 };
   const fw = new THREE.Vector3(), v = new THREE.Vector3(), c = new THREE.Vector3();
   const free = (x, z) => { if (B.blocked(x, z)) return false; for (let k = 0; k < 8; k++) { const a = k * Math.PI / 4; if (B.blocked(x + Math.cos(a) * FLY.R, z + Math.sin(a) * FLY.R)) return false; } return true; };
   /* 닿은 벽이 보는 쪽: 기체 둘레 16곳 중 막힌 곳들의 반대쪽 평균 */
   const wallN = (x, z) => { let nx = 0, nz = 0, h = 0; const r = FLY.R + .2;
     for (let k = 0; k < 16; k++) { const a = k * Math.PI / 8, c = Math.cos(a), sn = Math.sin(a); if (B.blocked(x + c * r, z + sn * r)) { nx -= c; nz -= sn; h++; } }
     const l = Math.hypot(nx, nz); return h && l > 1e-3 ? [nx / l, nz / l] : null; };
+  const shieldM = new THREE.ShaderMaterial({ ...AB, side: THREE.DoubleSide, uniforms: { uA: { value: 1 }, uT: { value: 0 } },
+    vertexShader: 'varying vec3 vN, vV, vP; void main(){ vec4 w=modelMatrix*vec4(position,1.); vP=position; vN=normalize(mat3(modelMatrix)*normal); vV=normalize(cameraPosition-w.xyz); gl_Position=projectionMatrix*viewMatrix*w; }',
+    fragmentShader: `uniform float uA, uT; varying vec3 vN, vV, vP;
+      void main(){ float f=1.-abs(dot(normalize(vN),vV)); f=f*f*f;
+        float band=.5+.5*sin(vP.y*7.-uT*3.+sin(vP.x*5.+uT)*1.5);                          /* 천천히 흐르는 결 */
+        vec3 c=mix(vec3(.55,1.,.35),vec3(.9,1.,.85),f)*.6;
+        gl_FragColor=vec4(c*(f*1.3+.012+band*.022)*uA,1.); }` });
+  const shieldMesh = new THREE.Mesh(new THREE.SphereGeometry(FLY.LEN * .85, 28, 18), shieldM); shieldMesh.scale.y = .7; shieldMesh.visible = false; shieldMesh.renderOrder = 10; G.add(shieldMesh);
   G.userData.S = S;
-  G.userData.reset = () => { S.x = start[0]; S.z = start[1]; S.vx = S.vz = 0; S.head = face; hist.length = 0; };
+  G.userData.reset = () => { S.x = start[0]; S.z = start[1]; S.vx = S.vz = 0; S.head = face; hist.length = 0; S.armed = true; S.shield = S.boost = S.pop = 0; };
   G.userData.setPx = px => { sparks.material.uniforms.uPx.value = px; };
   G.userData.update = (t, dt) => {
     let ix = inp.x, iy = inp.y;
@@ -96,7 +105,12 @@ export async function makeFlight(renderer, B, start, face) {
     if (m > .08) { const want = Math.atan2(-ix, -iy); let d = want - S.head; d = Math.atan2(Math.sin(d), Math.cos(d)); const st = Math.sign(d) * Math.min(Math.abs(d), FLY.TURN * dt); S.head += st; turn = st / Math.max(dt, 1e-4); }
     S.bank += (THREE.MathUtils.clamp(-turn * .09, -.5, .5) - S.bank) * Math.min(1, dt * 6);
     /* 속도: 바라보는 쪽 x 민 만큼. 바로 붙지 않고 스르륵 (ACC초) */
-    const tx = -Math.sin(S.head) * S.speed * m * (m > .08), tz = -Math.cos(S.head) * S.speed * m * (m > .08), a = Math.min(1, dt / FLY.ACC);
+    /* 기지를 벗어나는 순간 보호막·가속 시작. 가속은 끝나기 0.6초 전부터 스르륵 풀림(갑자기 뚝 느려지지 않게) */
+    if (S.armed && Math.hypot(S.x - start[0], S.z - start[1]) > FLY.BASE) { S.armed = false; S.shield = FLY.SHIELD; S.boost = FLY.BOOST; }
+    if (S.shield > 0 && (S.shield -= dt) <= 0) { S.shield = 0; S.pop = .3; }
+    if (S.boost > 0) S.boost = Math.max(0, S.boost - dt);
+    const bk = Math.min(1, S.boost / .6), spd = S.speed * (1 + (FLY.BOOSTK - 1) * bk * bk * (3 - 2 * bk));
+    const tx = -Math.sin(S.head) * spd * m * (m > .08), tz = -Math.cos(S.head) * spd * m * (m > .08), a = Math.min(1, dt / FLY.ACC);
     S.vx += (tx - S.vx) * a; S.vz += (tz - S.vz) * a; S.thr += (m - S.thr) * Math.min(1, dt * 8);
     /* 벽: 벽을 파고드는 힘만 없애고 벽을 따라가는 힘은 남김 → 비스듬히 닿으면 벽을 타고 미끄러짐, 정면이면 거의 멈춤
        ① 가려던 곳이 막혔으면 닿기 직전까지 감 ② 닿은 벽이 보는 쪽(바깥 방향)을 구함 ③ 그 방향 속도만 빼고 남은 시간만큼 다시 감 (꺾인 벽은 세 번까지)
@@ -118,15 +132,20 @@ export async function makeFlight(renderer, B, start, face) {
     /* 기체 자세 */
     const bob = Math.sin(t * 2.1) * .06 + Math.sin(t * 3.7) * .025;
     ship.position.set(S.x, FLY.HOVER + bob, S.z); ship.rotation.set(0, S.head, 0); ship.rotateZ(S.bank); ship.rotateX(-Math.min(.12, Math.hypot(S.vx, S.vz) / S.speed * .08));
+    /* 보호막: 기체를 감싼 빛 거품. 가장자리가 밝고(빛이 비스듬히 지나는 곳) 결이 천천히 흐름. 끝나기 0.8초 전부터 점점 빨리 깜빡여 곧 꺼진다는 걸 알림 · 꺼질 땐 확 퍼지며 사라짐 */
+    { const on = S.shield > 0, u = shieldM.uniforms; shieldMesh.visible = on || S.pop > 0; shieldMesh.position.set(S.x, FLY.HOVER + bob, S.z);
+      let a = 1; if (on && S.shield < .8) a = .45 + .55 * (Math.sin((.8 - S.shield) * (10 + (.8 - S.shield) * 30)) > 0 ? 1 : 0);
+      if (!on && S.pop > 0) { S.pop -= dt; const k = 1 - S.pop / .3; { const q = 1 + k * .9; shieldMesh.scale.set(q, q * .7, q); } a = (1 - k); } else { const q = 1 + Math.sin(t * 6) * .015; shieldMesh.scale.set(q, q * .7, q); }
+      u.uA.value = a; u.uT.value = t; }
     shadow.position.set(S.x, .05, S.z); shadow.rotation.z = S.head; shM.uniforms.uA.value = .55 - bob;
     ship.updateMatrixWorld(true); fw.set(0, 0, -1).transformDirection(ship.matrixWorld);
     /* 불꽃: 미는 힘만큼 */
-    const I = .35 + S.thr * 1.1, len = (.35 + S.thr * 1.1) * K;
+    const I = (.35 + S.thr * 1.1) * (1 + .5 * bk), len = (.35 + S.thr * 1.1) * K * (1 + .8 * bk);   /* 가속 중엔 불꽃이 길고 밝음 (힘을 더 냄) */
     flames.forEach((f, i) => { v.copy(ENG[i]).applyMatrix4(sm.matrixWorld); const u = f.material.uniforms; u.uA.value.copy(v); u.uB.value.copy(v).addScaledVector(fw, -len * (.9 + .1 * Math.sin(t * 50 + i))); u.uW.value = .1 * K * (1 + S.thr * .4); u.uI.value = I; u.uT.value = t; });
     /* 꼬리 */
     c.set(0, 0, 0); ENG.forEach(p => c.add(v.copy(p).applyMatrix4(sm.matrixWorld))); c.divideScalar(ENG.length);
     hist.unshift({ p: c.clone(), t }); if (hist.length > NT) hist.pop();
-    const life = .12 + .25 * Math.hypot(S.vx, S.vz) / FLY.SPEEDS[3];
+    const life = (.12 + .25 * Math.hypot(S.vx, S.vz) / FLY.SPEEDS[3]) * (1 + .8 * bk);
     for (let i = 0; i < NT; i++) { const h = hist[Math.min(i, hist.length - 1)], al = h ? Math.max(0, 1 - (t - h.t) / life) : 0, p = h ? h.p : c, w = (.1 * (1 - i / NT) + .02) * K * 1.4;
       const sx = Math.cos(S.head) * w, sz2 = -Math.sin(S.head) * w;
       tp[i * 6] = p.x + sx; tp[i * 6 + 1] = p.y; tp[i * 6 + 2] = p.z + sz2; tp[i * 6 + 3] = p.x - sx; tp[i * 6 + 4] = p.y; tp[i * 6 + 5] = p.z - sz2; ta[i * 2] = ta[i * 2 + 1] = al * S.thr; }
