@@ -57,6 +57,38 @@ export function stoneMaterial(uT) {
   m.customProgramCacheKey = () => 'ward-stone';
   return m;
 }
+/* 은빛 금속 + 건담식 판 선 (사용자: 아래 받침은 실버 메탈, 건담 무늬)
+   · 판마다 크기가 다른 네모 판으로 나뉘고, 판 사이는 가늘게 파인 어두운 홈(판 선)
+   · 판 일부엔 안쪽에 한 번 더 네모 선 · 짧은 꺾인 선 · 작은 볼트 점 (기계 장갑판 느낌)
+   · 판마다 은빛이 조금씩 다름(따로 찍어 낸 판), 홈 둘레는 살짝 어두움 */
+export function metalMaterial(uT) {
+  const m = new THREE.MeshPhysicalMaterial({ color: 0xc3c7cf, metalness: .82, roughness: .34, clearcoat: .35, clearcoatRoughness: .25, envMapIntensity: 1.15 });
+  m.onBeforeCompile = sh => { sh.uniforms.uT = uT;
+    sh.vertexShader = 'varying vec3 vMw; varying vec3 vMn;\n' + sh.vertexShader.replace('#include <project_vertex>', '#include <project_vertex>\n vMw = (modelMatrix * vec4(transformed, 1.)).xyz; vMn = normalize(mat3(modelMatrix) * objectNormal);');
+    sh.fragmentShader = `varying vec3 vMw; varying vec3 vMn;
+      float mh(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+      /* 판 나누기: 큰 칸 → 칸마다 가로/세로로 한 번 더 나눔 → 홈까지 거리 · 판 번호 */
+      vec3 panel(vec2 p){ vec2 c = floor(p / vec2(.62, .44)), f = fract(p / vec2(.62, .44)); float h = mh(c), id = h;
+        if (h < .45) { float s = .3 + .4 * mh(c + 3.1); if (f.x < s) { f.x /= s; id += .13; } else { f.x = (f.x - s) / (1. - s); id += .27; } }
+        else if (h < .8) { float s = .35 + .3 * mh(c + 5.7); if (f.y < s) { f.y /= s; id += .41; } else { f.y = (f.y - s) / (1. - s); id += .53; } }
+        vec2 e = min(f, 1. - f) * vec2(.62, .44); float d = min(e.x, e.y); return vec3(d, id, mh(c + id * 7.)); }
+      float lines(vec2 p, out float tone, out float riv){ vec3 P = panel(p); tone = fract(P.y * 3.7);
+        float g = smoothstep(.012, .004, P.x);                                                         /* 판 사이 홈 */
+        vec2 c = floor(p / vec2(.62, .44)), f = fract(p / vec2(.62, .44));
+        float inner = 0.; if (P.z > .55) { vec2 q = abs(f - .5) * vec2(.62, .44); float b = max(q.x - .2, q.y - .12); inner = smoothstep(.006, .002, abs(b)) * .8; }   /* 안쪽 네모 선 */
+        float kink = 0.; if (P.z < .25) { vec2 q = f * vec2(.62, .44); kink = smoothstep(.005, .002, abs(q.y - .1)) * step(.08, q.x) * step(q.x, .3) + smoothstep(.005, .002, abs(q.x - .3)) * step(.1, q.y) * step(q.y, .22); }   /* 짧은 꺾인 선 */
+        vec2 rq = (f - vec2(.06, .08)) * vec2(.62, .44); riv = smoothstep(.016, .01, length(rq)) * step(.4, P.z);                                   /* 볼트 점 */
+        return max(g, max(inner, kink * .8)); }\n` + sh.fragmentShader.replace('#include <color_fragment>', `#include <color_fragment>
+        float mRough = 0.;
+        { vec3 an = abs(vMn); vec2 uv = an.y > .65 ? vMw.xz : (an.x > an.z ? vMw.zy : vMw.xy); uv += vec2(3.7, 1.3);
+          float tone, riv; float L = lines(uv, tone, riv);
+          vec3 base = mix(vec3(.84, .86, .9), vec3(1.02, 1.03, 1.06), tone);                                      /* 판마다 다른 은빛 */
+          float grime = smoothstep(.5, 0., vMw.y) * .18;
+          diffuseColor.rgb *= base * (1. - L * .78) * (1. - grime) * (1. - riv * .35);
+          mRough = L * .35 + riv * .1; }`).replace('#include <roughnessmap_fragment>', '#include <roughnessmap_fragment>\n roughnessFactor = clamp(roughnessFactor + mRough, 0., 1.);'); };
+  m.customProgramCacheKey = () => 'ward-metal-panel';
+  return m;
+}
 /* 빛 (틈·홈·테): 속에서 흐르는 힘. aK = 흐름 위치(아래 0 → 위 1) */
 export function glowMaterial() {
   return new THREE.ShaderMaterial({ transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide,
@@ -154,7 +186,7 @@ export function makeWardBase(uT) {
     const rp = new THREE.Mesh(new THREE.PlaneGeometry(.36, .92), runeMat(tex)); rp.position.set(0, .66, .113); grp.add(rp); rp.renderOrder = 5; G.add(grp); runes.push(rp); }
   /* 둘레에 떨어져 나간 돌 조각 */
   for (let i = 0; i < 7; i++) { const a = R() * TAU, r = 2.15 + R() * .7, s = .12 + R() * .14; const g = block(s * 1.6, s, s * 1.2, .02); g.rotateY(R() * 3); g.rotateZ((R() - .5) * .5); g.translate(Math.cos(a) * r, 0, Math.sin(a) * r); stone.push(g); }
-  const sMat = stoneMaterial(uT), gMat = glowMaterial();
+  const sMat = metalMaterial(uT), gMat = glowMaterial();   /* 받침은 은빛 금속 + 판 선 (사용자) */
   const sm = new THREE.Mesh(mergeGeometries(stone.map(clean)), sMat); G.add(sm);
   const gm = new THREE.Mesh(glowGeo(glow), gMat); gm.renderOrder = 4; G.add(gm);
   G.userData.top = 1.56;                                                    /* 다음 부품(유리 기둥)이 앉을 높이 */
