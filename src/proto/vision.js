@@ -6,7 +6,7 @@
    · 덮개는 화면 위 한 장: 화면 칸마다 '눈높이 1.5m 땅'의 보임 값을 읽어 어둡게 덮음 → 벽·바닥·알갱이 모두 한 번에 가려짐
    · 무게: 빛줄기 320가닥 × 60걸음 (가벼움) · 시야 지도 250×250 한 장 */
 import * as THREE from 'three';
-import { MAP } from './mapfloor.js?v=11032352';
+import { MAP } from './mapfloor.js?v=11040006';
 
 export const SIGHT = 30;
 export function makeVision(B, bushes, floorNoise) {
@@ -41,11 +41,13 @@ export function makeVision(B, bushes, floorNoise) {
         vec2 v=texture2D(uV,uv).rg*.24;
         v+=(texture2D(uV,uv+vec2(px.x,0.)).rg+texture2D(uV,uv-vec2(px.x,0.)).rg+texture2D(uV,uv+vec2(0.,px.y)).rg+texture2D(uV,uv-vec2(0.,px.y)).rg)*.12;
         v+=(texture2D(uV,uv+px*1.4).rg+texture2D(uV,uv-px*1.4).rg+texture2D(uV,uv+vec2(px.x,-px.y)*1.4).rg+texture2D(uV,uv+vec2(-px.x,px.y)*1.4).rg)*.07;
-        float see=smoothstep(.04,.9,v.r), mem=smoothstep(.1,.9,v.g);
-        /* 덮개: 시커먼 구멍이 아니라 짙은 안개 — 처음 보는 곳은 짙게, 본 적 있는 곳은 옅게, 결이 천천히 흐름 (사용자: 벽 뒤 검은 부분) */
-        float a=mix(mix(.8,.55,mem)+(drift-.5)*.1, 0., see);
-        if(uv.x<0.||uv.y<0.||uv.x>1.||uv.y>1.) a=.8;
-        vec3 fog=mix(vec3(.02,.03,.05),vec3(.045,.06,.09),drift)*(.85+.3*fine);
+        float see=smoothstep(.04,.9,v.r);
+        /* 덮개 한 단계 (사용자 2026-11-04: 맵은 판마다 같아 '처음 본 곳·본 곳' 구분이 의미 없음 → 하나로. 안 보이는 곳이 확실해야 플레이어가 대처함)
+           안 보이는 곳 = 깊은 남색 안개로 짙게(지형은 희미하게 비침) · 경계는 부드럽게 번지되, 시야 끝에 옅은 안개 테가 있어 '여기부터 안 보임'이 읽힘 */
+        float rim=exp(-((see-.38)/.2)*((see-.38)/.2))*(1.-see);
+        float a=mix(.95+(drift-.5)*.03, 0., see)-rim*.04;                                                  /* 덮개는 밝기 계산 전 단계에 칠해져 나중에 화면 밝기 보정으로 들려 보임 → .95여야 눈에 약 25%만 비침 */
+        if(uv.x<0.||uv.y<0.||uv.x>1.||uv.y>1.) a=.96;
+        vec3 fog=mix(vec3(.002,.004,.012),vec3(.006,.01,.024),drift)*(.9+.2*fine)+vec3(.02,.03,.05)*rim;
         gl_FragColor=vec4(fog,a*uOn); }` });
   const quad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), mat); quad.frustumCulled = false; quad.renderOrder = 50;
   const scene = new THREE.Scene(); scene.add(quad); const cam0 = new THREE.Camera(), m4 = new THREE.Matrix4();

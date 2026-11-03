@@ -5,11 +5,11 @@
    크기: 지름 약 4.5m, 높이 약 4.7m */
 import * as THREE from 'three';
 import * as A from '../core/audio.js';
-import { makeWardBase } from './wardbase.js?v=11032352';
-import { makeWardCore } from './wardcore.js?v=11032352';
-import { makeWardRing } from './wardring.js?v=11032352';
-import { makeWardSpires } from './wardspire.js?v=11032352';
-import { makeWardEye } from './wardeye.js?v=11032352';
+import { makeWardBase } from './wardbase.js?v=11040006';
+import { makeWardCore } from './wardcore.js?v=11040006';
+import { makeWardRing } from './wardring.js?v=11040006';
+import { makeWardSpires } from './wardspire.js?v=11040006';
+import { makeWardEye } from './wardeye.js?v=11040006';
 
 export const WCOL = { none: new THREE.Vector3(.35, .85, 1.0), mine: new THREE.Vector3(.62, 1.0, .32), foe: new THREE.Vector3(1.0, .36, .24) };
 function bell(f, vol = .1, dec = 1.4, at = 0) { if (!A.live()) return; const c = A.ctx, t0 = c.currentTime + at;
@@ -21,7 +21,7 @@ export function makeWard(uT) {
   const base = makeWardBase(uT), core = makeWardCore(uT, base.userData.top), ring = makeWardRing(uT, base.userData.top + core.userData.height * .5);
   const eye = makeWardEye(uT, base.userData.top + core.userData.height), spires = makeWardSpires(uT, [[-1.56, .96, 0], [1.56, .96, 0]]);
   G.add(base, core, ring, spires, eye);
-  const S = { own: 'none', cap: -1, col: WCOL.none.clone(), power: .35, fill: .12, done: -9, step: 0 };
+  const S = { own: 'none', cap: -1, col: WCOL.none.clone(), power: .35, fill: .12, done: -1e9, step: 0 };   /* done: 차지 완료 시각 — 처음엔 아주 먼 옛날 (−9였을 땐 판 시작 9초 안에 모든 와드가 '완료'로 착각해 맵 곳곳 시야가 열려 버렸음) */
   const glows = [base.userData.glow, core.userData.glow, ring.userData.glow, eye.userData.glow, ...spires.userData.glows].map(m => m.uniforms);
   G.userData.S = S;
   G.userData.top = base.userData.top + core.userData.height + 1.6;
@@ -32,8 +32,8 @@ export function makeWard(uT) {
     const want = capping ? WCOL.none.clone().lerp(WCOL.mine, .3 + .7 * S.cap) : WCOL[S.own]; S.col.lerp(want, Math.min(1, dt * 4));
     S.power += ((S.own === 'none' ? (capping ? .35 + .5 * S.cap : .35) : 1) - S.power) * Math.min(1, dt * 2);
     const run = de >= 0 && de < .3 ? de / .3 : -1, surge = de >= .25 && de < .75 ? (de - .25) / .5 : -1, hit = de >= .75 && de < 2.4;
-    if (de >= 0 && S.step === 0) { S.step = 1; [784, 987.8, 1174.7, 1568].forEach((f, i) => bell(f, .07, 1.2, i * .1)); }
-    if (de >= .75 && S.step === 1) { S.step = 2; eye.userData.snap(t); boom(); bell(2093, .1, 2.4, .02); bell(1318.5, .08, 2.6, .05); G.userData.onHit?.(t); }
+    if (de >= 0 && de < 1 && S.step === 0) { S.step = 1; [784, 987.8, 1174.7, 1568].forEach((f, i) => bell(f, .07, 1.2, i * .1)); }
+    if (de >= .75 && de < 3 && S.step === 1) { S.step = 2; eye.userData.snap(t); boom(); bell(2093, .1, 2.4, .02); bell(1318.5, .08, 2.6, .05); G.userData.onHit?.(t); }
     const boost = hit ? Math.exp(-(de - .75) * 3) : 0, hot = de > .25 && de < 1.2 ? 1.2 : 0;
     base.userData.update(t, S.col, S.power); core.userData.update(t, S.col, S.power + hot, S.fill);
     ring.userData.update(t, dt, S.col, S.power, de > .25 && de < .9 ? 3.2 : capping ? .08 + S.cap * 1 : S.own !== 'none' ? .5 : .06);
