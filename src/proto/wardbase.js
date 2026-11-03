@@ -11,7 +11,7 @@
    단위 m. 받침 높이 약 1.3m, 지름 약 4.4m. 돌은 한 재질, 빛은 한 재질 → 그리는 횟수 적게 */
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { ruinMaterial } from './ruins.js?v=11032323';
+import { ruinMaterial } from './ruins.js?v=11032330';
 
 const rng = seed => { let s = seed * 9301 + 49297; return () => (s = (s * 9301 + 49297) % 233280) / 233280; };
 const clean = g => { for (const k of Object.keys(g.attributes)) if (k !== 'position' && k !== 'normal') g.deleteAttribute(k); return g.index ? g.toNonIndexed() : g; };
@@ -111,7 +111,7 @@ export function glowMaterial() {
         vec3 col = uCol, c;
         if (vA > 0. && uProg >= 0.) {                                                          /* 차지 고리: 차지한 만큼 그 사람 색으로 둘레를 따라 채워짐, 채움 끝이 하얗게 달림 */
           float done = smoothstep(.86, 1., uProg), lit = max(smoothstep(uProg + .03, uProg - .05, vA) * mix(smoothstep(0., .04, vA), 1., done) * smoothstep(0., .04, uProg), done * done); col = mix(uECol, uPCol, lit);   /* 차오르지 않은 쪽은 빈 와드 색 그대로 → 남은 만큼이 끝까지 보임 */
-          float bk = uProg - vA, glowH = bk > 0. ? exp(-bk * 14.) : exp(-bk * bk * 700.);                     /* 채움 끝: 하얀 막대 대신 뒤로 길게 끌리는 부드러운 빛 (날카로운 단면이 안 보이게 · 사용자) */
+          float bk = uProg - vA, glowH = (bk > 0. ? exp(-bk * 14.) : exp(-bk * bk * 700.)) * smoothstep(0., .06, vA);   /* 시작점에서 잘리지 않게 */                     /* 채움 끝: 하얀 막대 대신 뒤로 길게 끌리는 부드러운 빛 (날카로운 단면이 안 보이게 · 사용자) */
           c = (col * col * 1.4 + vec3(.14) * core) * (.25 + core * .9) * mix(.2, 1.05, lit) + uPCol * uPCol * 1.3 * glowH * (.35 + core * .8) * step(.001, uProg) * (1. - done); }   /* 다 차 갈수록 끝 빛·시작점이 녹아 이음매 없이 한 바퀴로 닫힘 (사용자: 100% 즈음 경계선) */
         else c = (col * col * 1.2 + vec3(.12) * core) * (.4 + core * .9) * pulse;   /* 하얀 심을 줄임: 밝아져도 하얗게 날이 서지 않게 */
         if (vA > 0. && uRun >= 0.) { float rd = fract(vA - uRun + .5) - .5; rd *= rd < 0. ? 5. : 16.; c += (uPCol * uPCol * 1.1 + .35) * exp(-rd * rd) * (.4 + core * .8); }   /* 원이 닫히는 순간 한 바퀴 달리는 빛: 칼 같은 하얀 선 대신 뒤로 끌리는 부드러운 빛 */   /* 원이 닫히는 순간: 하얀 빛이 원을 따라 한 바퀴 달림 */
