@@ -8,7 +8,7 @@
    · 규칙(나중에 적·몬스터 붙일 때 그대로 씀): 수풀 안은 바깥에서 안 보임 · 같은 수풀 안이면 서로 보임 · 수풀 안에서 쏘면 2초 드러남
    · 무게: 줄기 전부 한 묶음(그리기 1번). 수풀 자리는 칸 지도로 바로 찾음 */
 import * as THREE from 'three';
-import { MAP, toWorld } from './mapfloor.js?v=11031142';
+import { MAP, toWorld } from './mapfloor.js?v=11031147';
 
 export function makeBushes(B, J, ST) {
   const S = MAP.SCALE, rnd = (() => { let s = 977; return () => (s = (s * 9301 + 49297) % 233280) / 233280; })();
