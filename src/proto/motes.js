@@ -70,7 +70,7 @@ export function makeMotes(B, centers = [], NUM = 360) {   /* centers: [[땅 번�
         if (k.m === 0) { p.vx += Math.sin(t * .3 + p.ph * 9) * .05 * dt; p.vz += Math.cos(t * .27 + p.ph * 7) * .05 * dt; p.vy = Math.sin(t * .5 + p.ph * 6) * .08; }
         else if (k.m === 1) p.vx = k.v * .25 + Math.sin(t * 1.4 + p.ph * 9) * k.v * .2;              /* 내리며 좌우로 흔들림 */
         else if (k.m === 2) { p.vx = Math.sin(t * 2 + p.ph * 9) * .35; p.vz = Math.cos(t * 1.7 + p.ph * 7) * .35; }   /* 솟으며 흔들림 */
-        else if (k.m === 3) { const dx = p.x - p.c[0], dz = p.z - p.c[1], d = Math.hypot(dx, dz) || 1; p.vx = (-dz / d) * k.v - dx / d * k.v * .25; p.vz = (dx / d) * k.v - dz / d * k.v * .25; }   /* 돌며 빨려 듦 */
+        else if (k.m === 3 && p.c) { const dx = p.x - p.c[0], dz = p.z - p.c[1], d = Math.hypot(dx, dz) || 1; p.vx = (-dz / d) * k.v - dx / d * k.v * .25; p.vz = (dx / d) * k.v - dz / d * k.v * .25; }   /* 돌며 빨려 듦 */
         p.x += p.vx * dt; p.y += p.vy * dt; p.z += p.vz * dt;
         const fade = Math.min(1, p.life / .8, (p.max - p.life) / 1.2);                                /* 생겨날 때·사라질 때 서서히 */
         pos[i * 3] = p.x; pos[i * 3 + 1] = p.y; pos[i * 3 + 2] = p.z;

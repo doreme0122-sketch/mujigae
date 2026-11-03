@@ -6,7 +6,7 @@
    투명 재질(뒤를 비추는 계산)은 폰에 무거워서 쓰지 않고, 속은 보는 방향으로 몇 겹 들여다본 잡음으로 흉내 낸다. */
 import * as THREE from 'three';
 import { mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js';
-import { HITS } from './rocks.js?v=11032139';
+import { HITS } from './rocks.js?v=11032148';
 
 function hash(a, b, c) { const s = Math.sin(a * 127.1 + b * 311.7 + c * 74.7) * 43758.5453; return s - Math.floor(s); }
 function vn(x, y, z) { const ix = Math.floor(x), iy = Math.floor(y), iz = Math.floor(z), fx = x - ix, fy = y - iy, fz = z - iz, s = t => t * t * (3 - 2 * t), u = s(fx), v = s(fy), w = s(fz), L = (a, b, t) => a + (b - a) * t;
