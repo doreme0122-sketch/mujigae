@@ -10,8 +10,8 @@
    무게: 기체 한 대 + 불꽃 띠 몇 장 + 꼬리 띠 하나 + 불티 점 묶음 하나 + 그림자 판 하나 */
 import * as THREE from 'three';
 import { buildShip, engineSpots } from '../core/ships/build.js';
-import { flameMesh } from './sortie.js?v=11032018';
-import { MAP } from './mapfloor.js?v=11032018';
+import { flameMesh } from './sortie.js?v=11032049';
+import { MAP } from './mapfloor.js?v=11032049';
 
 export const FLY = { LEN: 2, HOVER: .7, R: .8, SPEEDS: [9, 12, 15, 18], TURN: 7, ACC: .22,
   BASE: 9, SHIELD: 3, BOOST: 5, BOOSTK: 1.5 };   /* 기지 고리(반지름 9m)를 벗어나는 순간: 보호막 3초 · 가속 5초(1.5배) — 기지 출구 앞 매복에 바로 당하지 않게 */
@@ -121,6 +121,7 @@ export async function makeFlight(renderer, B, start, face) {
     /* 벽: 벽을 파고드는 힘만 없애고 벽을 따라가는 힘은 남김 → 비스듬히 닿으면 벽을 타고 미끄러짐, 정면이면 거의 멈춤
        ① 가려던 곳이 막혔으면 닿기 직전까지 감 ② 닿은 벽이 보는 쪽(바깥 방향)을 구함 ③ 그 방향 속도만 빼고 남은 시간만큼 다시 감 (꺾인 벽은 세 번까지)
        들이받은 세기(벽 쪽 속도)만큼 불티 */
+    const ex = S.ex || 0, ez = S.ez || 0; S.vx += ex; S.vz += ez;                                   /* 바깥 힘(블랙홀 소용돌이 흐름)을 실어 같이 움직임 — 벽 미끄러짐도 같이 적용 */
     let hitV = 0, rem = dt;
     for (let it = 0; it < 3 && rem > 1e-5; it++) {
       const tx2 = S.x + S.vx * rem, tz2 = S.z + S.vz * rem;
@@ -132,6 +133,7 @@ export async function makeFlight(renderer, B, start, face) {
       if (vn < 0) { hitV += -vn; S.vx -= vn * n[0]; S.vz -= vn * n[1]; }
       /* 벽에서 아주 조금(3cm) 떼어 놓음: 울퉁불퉁한 벽에 걸려 미끄러지다 멈추지 않게 */
       for (const e of [.03, .08, .15]) if (free(S.x + n[0] * e, S.z + n[1] * e)) { S.x += n[0] * e; S.z += n[1] * e; break; } }
+    S.vx -= ex; S.vz -= ez;                                                                              /* 바깥 힘은 내 속도에 쌓이지 않음 (흐름을 벗어나면 바로 원래 속도) */
     if (hitV > 3 && t - S.hit > .08) { S.hit = t; const n = Math.min(14, 4 + hitV | 0);
       for (let i = 0; i < n; i++) { const s = SP[spI = (spI + 1) % NS]; s.l = .4 + Math.random() * .4; s.p.set(S.x - Math.sin(S.head) * FLY.R, FLY.HOVER * .6, S.z - Math.cos(S.head) * FLY.R);
         s.v.set((Math.random() - .5) * 6, 2 + Math.random() * 3, (Math.random() - .5) * 6).add(v.set(Math.sin(S.head) * hitV * .4, 0, Math.cos(S.head) * hitV * .4)); } }
