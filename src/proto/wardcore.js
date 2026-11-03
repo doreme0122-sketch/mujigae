@@ -1,14 +1,14 @@
 /* 와드 부품 ② 가운데 유리 기둥 — 사용자 참고 그림의 보라 에너지 기둥
-   · 받침 맨 위 빛 테에 꽂힌 투명한 유리 원통. 위아래를 돌 테가 물고, 둘레 돌 버팀대 넷이 세로로 잡아 줌(유리가 홀로 서 있지 않게)
+   · 받침 맨 위 빛 테에 꽂힌 투명한 유리 원통. 위아래를 금속 테가 물고(볼트로 조임), 둘레 금속 버팀대 넷이 세로로 잡아 줌(유리가 홀로 서 있지 않게) — 돌 받침 위에 얹은 금속 장치
    · 안: 보라 에너지가 아래에서 위로 휘감아 오르며 소용돌이 (받침에서 올라온 힘이 여기 모임 — 받침 틈 빛이 위로 흐르던 까닭)
    · 한가운데: 빛 알맹이 + 그 둘레를 서로 다른 기울기로 도는 궤도 셋 (그림의 원자 무늬 — 와드의 심장)
      궤도는 가는 선이 아니라 굵기가 숨 쉬는 빛 띠, 위를 빛 알갱이가 달림
    · 차지할수록 에너지가 아래부터 차오르고(차지 정도가 눈에 보임), 다 차면 알맹이가 확 밝아지며 궤도가 빨라짐
    · 에너지는 늘 보라(와드의 심장 색), 테·버팀대 홈 빛은 주인 색
-   단위 m, 받침 위(y = 받침 top)부터 높이 약 1.35m */
+   단위 m, 받침 위(y = 받침 top)부터 높이 약 1.8m */
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { stoneMaterial, glowMaterial } from './wardbase.js?v=11031908';
+import { glowMaterial } from './wardbase.js?v=11031910';
 
 const clean = g => { for (const k of Object.keys(g.attributes)) if (k !== 'position' && k !== 'normal') g.deleteAttribute(k); return g.index ? g.toNonIndexed() : g; };
 const AB = { transparent: true, depthWrite: false, blending: THREE.AdditiveBlending };
@@ -64,7 +64,7 @@ function ribbonRing(r, w, seg = 96) {          /* 원 둘레 띠 (평면, 폭 w)
 
 export function makeWardCore(uT, y0) {
   const G = new THREE.Group(); G.position.y = y0;
-  const H = 1.32, RG = .44, stone = [], glowQ = [];
+  const H = 1.78, RG = .44, stone = [], glowQ = [];   /* 사용자: 조금 더 길게 (1.32 → 1.78m) */
   const lathe = (pts, seg = 40) => new THREE.LatheGeometry(pts.map(([r, y]) => new THREE.Vector2(r, y)), seg);
   /* 아래 물림 테 · 위 물림 테 (돌) */
   stone.push(lathe([[.44, -.02], [.62, -.02], [.66, .04], [.64, .14], [.56, .2], [.45, .2]]));
@@ -78,7 +78,11 @@ export function makeWardCore(uT, y0) {
     /* 버팀대 바깥 면 세로 홈 빛 */
     const ro = r + .065, ca = Math.cos(a), sa = Math.sin(a), tx = -sa, tz = ca, w = .022, P = (o, y) => [ca * ro + tx * o, y, sa * ro + tz * o];
     for (const [ya, yb] of [[.24, H * .5 - .1], [H * .5 + .1, H - .28]]) glowQ.push([P(-w, ya), P(w, ya), P(w, yb), P(-w, yb)]); }
-  const sMat = stoneMaterial(uT), stoneMesh = new THREE.Mesh(mergeGeometries(stone.map(clean)), sMat); G.add(stoneMesh);
+  /* 물림 테 둘레 볼트 (금속 테를 조인 자리) */
+  for (const [yy, r] of [[.1, .655], [H - .07, .675]]) for (let i = 0; i < 16; i++) { const a = i / 16 * Math.PI * 2, b = new THREE.CylinderGeometry(.028, .028, .03, 8); b.rotateZ(Math.PI / 2); b.rotateY(-a); b.translate(Math.cos(a) * r, yy, Math.sin(a) * r); stone.push(b); }
+  /* 메탈 (사용자: 유리 기둥 틀은 금속): 짙은 건메탈 + 닳은 모서리는 은빛, 위아래 테는 같은 금속 */
+  const sMat = new THREE.MeshPhysicalMaterial({ color: 0x3a3f48, metalness: .92, roughness: .3, clearcoat: .5, clearcoatRoughness: .2, envMapIntensity: 1.15 });
+  const stoneMesh = new THREE.Mesh(mergeGeometries(stone.map(clean)), sMat); G.add(stoneMesh);
   /* 테 빛 (아래·위 물림 테 안쪽) + 버팀대 홈 빛 → 주인 색 */
   { const p = [], uv = [], kk = [];
     const quad = (A, B, C, D, k0, k1) => { p.push(...A, ...B, ...C, ...A, ...C, ...D); uv.push(0, 0, 1, 0, 1, 1, 0, 0, 1, 1, 0, 1); kk.push(k0, k0, k1, k0, k1, k1); };

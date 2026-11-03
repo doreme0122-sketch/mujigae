@@ -4,11 +4,11 @@
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { makeBloom } from '../core/hangar/bloom.js?v=11031908';
-import { chunk, obsidianMaterial } from './rocks.js?v=11031908';
-import { makeWardBase } from './wardbase.js?v=11031908';
-import { makeWardCore } from './wardcore.js?v=11031908';
-import { makePerf } from './perf.js?v=11031908';
+import { makeBloom } from '../core/hangar/bloom.js?v=11031910';
+import { chunk, obsidianMaterial } from './rocks.js?v=11031910';
+import { makeWardBase } from './wardbase.js?v=11031910';
+import { makeWardCore } from './wardcore.js?v=11031910';
+import { makePerf } from './perf.js?v=11031910';
 import * as A from '../core/audio.js';
 
 const $ = s => document.querySelector(s), clamp = THREE.MathUtils.clamp, V = (x = 0, y = 0, z = 0) => new THREE.Vector3(x, y, z);
@@ -104,7 +104,7 @@ export async function start(canvas, onProgress = () => {}) {
     b.onclick = () => { if (k === 'cap') { S.own = 'none'; S.cap = t; stEl.textContent = '② 유리 기둥 · 차지하는 중 — 에너지가 아래부터 차오름'; } else { S.own = k; S.cap = -1; S.fill = k === 'none' ? .12 : 1; stEl.textContent = '② 유리 기둥 · ' + names[k]; } tour.querySelectorAll('button').forEach(x => x.classList.toggle('on', x === b)); };
     if (k === 'none') b.classList.add('on'); tour.appendChild(b); });
   stEl.textContent = '② 유리 기둥 · ' + names.none;
-  const cam = { h: 9, H: 9, tilt: 1.15, T: 1.15, az: .35 };
+  const cam = { h: 10, H: 10, tilt: 1.15, T: 1.15, az: .35 };
   const ptr = new Map(); let pin = 0;
   addEventListener('pointerdown', e => { if (e.target.closest('#tour') || e.target.closest('#perf')) return; ptr.set(e.pointerId, [e.clientX, e.clientY]); if (ptr.size === 2) { const [a, c] = [...ptr.values()]; pin = Math.hypot(a[0] - c[0], a[1] - c[1]); } });
   addEventListener('pointermove', e => { if (!ptr.has(e.pointerId)) return; const o = ptr.get(e.pointerId);
@@ -125,7 +125,7 @@ export async function start(canvas, onProgress = () => {}) {
     base.userData.update(t, S.col, S.power); core.userData.update(t, S.col, S.power, S.fill);
     GU.uT.value = t; GU.uCol.value.copy(S.col); GU.uProg.value = 0; GU.uOwn.value = 0; GU.uPulse.value = 99;
     cam.h += (cam.H - cam.h) * Math.min(1, dt * 3); cam.tilt += (cam.T - cam.tilt) * Math.min(1, dt * 3);
-    camera.position.set(Math.sin(cam.az) * cam.h * Math.sin(cam.tilt), cam.h * Math.cos(cam.tilt) + .6, Math.cos(cam.az) * cam.h * Math.sin(cam.tilt)); camera.lookAt(0, 1.3, 0);
+    camera.position.set(Math.sin(cam.az) * cam.h * Math.sin(cam.tilt), cam.h * Math.cos(cam.tilt) + .6, Math.cos(cam.az) * cam.h * Math.sin(cam.tilt)); camera.lookAt(0, 1.55, 0);
     renderer.setRenderTarget(bloom.scene); renderer.clear(); renderer.render(scene, camera); bloom.render(Wd, Hd, !perf.st.bloom); perf.tick(dt);
   } catch (err) { console.error('[와드 보기]', err); } });
   onProgress(1);
