@@ -10,9 +10,9 @@
    무게: 기체 한 대 + 불꽃 띠 몇 장 + 꼬리 띠 하나 + 불티 점 묶음 하나 + 그림자 판 하나 */
 import * as THREE from 'three';
 import { buildShip, engineSpots } from '../core/ships/build.js';
-import { flameMesh } from './sortie.js?v=11041525';
-import { MAP } from './mapfloor.js?v=11041525';
-import { applyShipHeat, heatVis } from './shipheat.js?v=11041525';
+import { flameMesh } from './sortie.js?v=11041530';
+import { MAP } from './mapfloor.js?v=11041530';
+import { applyShipHeat, heatVis } from './shipheat.js?v=11041530';
 
 export const FLY = { LEN: 2, HOVER: .7, R: .8, SPEEDS: [9, 12, 15, 18], TURN: 7, ACC: .22, TURNMAX: 9,
   BASE: 9, SHIELD: 3, BOOST: 5, BOOSTK: 1.5 };   /* 기지 고리(반지름 9m)를 벗어나는 순간: 보호막 3초 · 가속 5초(1.5배) — 기지 출구 앞 매복에 바로 당하지 않게 */
@@ -169,6 +169,7 @@ export async function makeFlight(renderer, B, start, face) {
     flames.forEach((f, i) => { v.copy(ENG[i]).applyMatrix4(sm.matrixWorld); const u = f.material.uniforms; u.uA.value.copy(v); u.uB.value.copy(v).addScaledVector(fw, -len * (.9 + .1 * Math.sin(t * 50 + i))); u.uW.value = .1 * K * (1 + S.thr * .4); u.uI.value = I; u.uT.value = t; });
     /* 꼬리 */
     c.set(0, 0, 0); ENG.forEach(p => c.add(v.copy(p).applyMatrix4(sm.matrixWorld))); c.divideScalar(ENG.length);
+    if (t < (S.dashUntil || 0) + .35) hist.length = 0;   /* 빛 칼날 도약 동안은 엔진 꼬리를 남기지 않음 (굵은 띠가 남던 것) */
     hist.unshift({ p: c.clone(), t }); if (hist.length > NT) hist.pop();
     const life = (.12 + .25 * Math.hypot(S.vx, S.vz) / FLY.SPEEDS[3]) * (1 + .8 * bk);
     for (let i = 0; i < NT; i++) { const h = hist[Math.min(i, hist.length - 1)], al = h ? Math.max(0, 1 - (t - h.t) / life) : 0, p = h ? h.p : c, w = (.1 * (1 - i / NT) + .02) * K * 1.4;

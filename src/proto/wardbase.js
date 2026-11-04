@@ -11,7 +11,7 @@
    단위 m. 받침 높이 약 1.3m, 지름 약 4.4m. 돌은 한 재질, 빛은 한 재질 → 그리는 횟수 적게 */
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { ruinMaterial } from './ruins.js?v=11041525';
+import { ruinMaterial } from './ruins.js?v=11041530';
 
 const rng = seed => { let s = seed * 9301 + 49297; return () => (s = (s * 9301 + 49297) % 233280) / 233280; };
 const clean = g => { for (const k of Object.keys(g.attributes)) if (k !== 'position' && k !== 'normal') g.deleteAttribute(k); return g.index ? g.toNonIndexed() : g; };

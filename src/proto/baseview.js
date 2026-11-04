@@ -5,17 +5,17 @@
    모든 움직임은 판의 자기장 주기(4.2초)에 맞춘다 — 판에 불이 다 들어오는 순간 기체가 뜬다. */
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
-import { makeBloom } from '../core/hangar/bloom.js?v=11041525';
-import { makePad } from '../core/hangar/pad.js?v=11041525';
-import { makeMag } from '../core/hangar/mag.js?v=11041525';
+import { makeBloom } from '../core/hangar/bloom.js?v=11041530';
+import { makePad } from '../core/hangar/pad.js?v=11041530';
+import { makeMag } from '../core/hangar/mag.js?v=11041530';
 import { buildShip, engineSpots } from '../core/ships/build.js';
 import { makeGlow } from '../preview/glow.js';
 import { filmMaterial, crystalMaterial } from '../preview/fxmat.js';
 import { planetShader } from '../core/planet.js';
 import { planetFor } from '../data/planets.js';
-import { makeRidge, updateRidge } from './rocks.js?v=11041525';
-import { makeFloor, FLOORS } from './floor.js?v=11041525';
-import { makePerf } from './perf.js?v=11041525';
+import { makeRidge, updateRidge } from './rocks.js?v=11041530';
+import { makeFloor, FLOORS } from './floor.js?v=11041530';
+import { makePerf } from './perf.js?v=11041530';
 
 const $ = s => document.querySelector(s), clamp = THREE.MathUtils.clamp, lerp = THREE.MathUtils.lerp, rnd = (a, b) => a + Math.random() * (b - a);
 const ease = t => t < .5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
