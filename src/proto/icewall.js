@@ -11,8 +11,8 @@
    무게: 벽 한 줄 = 얼음 1번 + 눈 1번 그리기 */
 import * as THREE from 'three';
 import { mergeGeometries, mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js';
-import { iceMaterial, block } from './ice.js?v=11050820';
-import { SNOW_GLSL, SNOW_U } from './snowtone.js?v=11050820';
+import { iceMaterial, block } from './ice.js?v=11050837';
+import { SNOW_GLSL, SNOW_U } from './snowtone.js?v=11050837';
 
 const hs = (x, y, z) => { const s = Math.sin(x * 127.1 + y * 311.7 + z * 74.7) * 43758.5453; return s - Math.floor(s); };
 const vn = (x, y, z) => { const ix = Math.floor(x), iy = Math.floor(y), iz = Math.floor(z), fx = x - ix, fy = y - iy, fz = z - iz, u = fx * fx * (3 - 2 * fx), v = fy * fy * (3 - 2 * fy), w = fz * fz * (3 - 2 * fz);
@@ -83,14 +83,17 @@ export function makeIceWall(path, opt = {}) {
   const p = new THREE.Vector3(), tg = new THREE.Vector3(), fr = [];
   for (let i = 0; i <= N; i++) { const d = i / N * len; curve.getPointAt(i / N, p); curve.getTangentAt(i / N, tg); let nx = -tg.z, nz = tg.x; const sg = opt.out ? opt.out(p.x, p.z, nx, nz) : 1; nx *= sg; nz *= sg;
     fr.push({ d, x: p.x, z: p.z, nx, nz, tx: tg.x, tz: tg.z, h: topH(d), sg }); }
+  /* 벽 끝을 둥글게 (사용자 2026-11-05: 칼로 자른 단면 X): 끝 1.8m 안에서 두께가 둥근 활 모양으로 오므라들고 높이도 같이 낮아짐
+     → 녹고 깎여 둥글어진 얼음 코. 끝 단면은 아주 작아져 거의 안 보임 */
+  for (const f of fr) { const e = Math.min(f.d, len - f.d), Lr = 1.8, c = e < Lr ? Math.sqrt(Math.max(0, 1 - Math.pow(1 - e / Lr, 2))) : 1; f.sv = .12 + .88 * c; f.h0 = f.h; f.h *= .42 + .58 * c; f.sc = c; }
   const FL = fr[0].sg < 0;
   /* 단면: 앞면(아래→위) 줄 · 윗단 · 뒷면(위→아래) 줄 — 줄마다 (v, y, 빛) */
   const RF = [0, .06, .13, .21, .3, .4, .5, .6, .7, .79, .87, .94, 1], RB = [0, .2, .45, .7, .9, 1];
   const faceRow = (f, side, yk) => { const y = Math.max(-.3, -.3 + (f.h + .3) * yk), off = shardOff(f.d, yk, side), foot = Math.max(0, .18 - yk) * 2, lean = -.06 * yk;
-    const base = W + foot + (vn(f.d * .35 + side * 9, yk * 2, o) - .5) * .35 + lean; return [side * (base + off), y, (1 - off / PMAX) * (.4 + .6 * (1 - yk))]; };
+    const base = W + foot + (vn(f.d * .35 + side * 9, yk * 2, o) - .5) * .35 + lean; return [side * (base + off) * f.sv, y, (1 - off / PMAX) * (.4 + .6 * (1 - yk))]; };
   const section = f => { const out = [];
     for (const yk of RF) out.push(faceRow(f, -1, yk));
-    out.push([-W + .25 + (vn(f.d * .8, 3, o) - .5) * .2, f.h + .05, .05], [(vn(f.d * .6, 5, o) - .5) * .6, f.h + .12 + vn(f.d * .4, 6, o) * .15, .05], [W - .25, f.h + .03, .05]);
+    out.push([(-W + .25 + (vn(f.d * .8, 3, o) - .5) * .2) * f.sv, f.h + .05 * f.sv, .05], [(vn(f.d * .6, 5, o) - .5) * .6 * f.sv, f.h + (.12 + vn(f.d * .4, 6, o) * .15) * f.sv, .05], [(W - .25) * f.sv, f.h + .03 * f.sv, .05]);
     for (let k = RB.length - 1; k >= 0; k--) out.push(faceRow(f, 1, RB[k]));
     return out; };
   const S = fr.map(section), M = S[0].length, P = [], G = [];
@@ -114,7 +117,8 @@ export function makeIceWall(path, opt = {}) {
   const avgS = (i, k) => { let v = 0, y = 0, n = 0; for (let j = Math.max(0, i - 4); j <= Math.min(N, i + 4); j++) { const w = 5 - Math.abs(j - i); v += S[j][k][0] * w; y += S[j][k][1] * w; n += w; } return [v / n, y / n]; };
   const SM = fr.map((_, i) => { const iT = RF.length - 1; return [0, 1, 2, 3, 4].map(k => avgS(i, iT + k)); });
   { const Q = [], iT = RF.length - 1, top = (i, k, loc) => { const f = fr[i], fe = SM[i][0], be = SM[i][4], t = .32 + vn(f.d * .9, 1, o) * .22, drip = vn(f.d * 1.7, 2, o);
-      const sec = [[fe[0] - .12, fe[1] - .35 - drip * .5], [fe[0] - .2, fe[1] + t * .55], [fe[0] + .3, f.h + t], [SM[i][2][0], SM[i][2][1] + t * 1.05], [be[0] - .35, f.h + t * .9], [be[0] + .12, be[1] + t * .4], [be[0] + .1, be[1] - .3]][k];
+      const v = f.sv, tt = t * (.35 + .65 * v);   /* 둥근 끝에선 눈도 얇아지며 코를 따라 덮음 */
+      const sec = [[fe[0] - .12 * v, fe[1] - (.35 + drip * .5) * v], [fe[0] - .2 * v, fe[1] + tt * .55], [fe[0] + .3 * v, f.h + tt], [SM[i][2][0], SM[i][2][1] + tt * 1.05], [be[0] - .35 * v, f.h + tt * .9], [be[0] + .12 * v, be[1] + tt * .4], [be[0] + .1 * v, be[1] - .3 * v]][k];
       return loc ? sec : [f.x + f.nx * sec[0], sec[1], f.z + f.nz * sec[0]]; };
     for (let i = 0; i < N; i++) for (let k = 0; k < 6; k++) { const a = top(i, k), b = top(i + 1, k), c = top(i, k + 1), d = top(i + 1, k + 1); FL ? Q.push(...a, ...b, ...c, ...b, ...d, ...c) : Q.push(...a, ...c, ...b, ...b, ...c, ...d); }
     snow.push(smoothG(Q)); Q.length = 0;   /* 윗면 눈: 매끈한 면(꼭짓점 노멀을 이웃과 고르게) */
@@ -145,9 +149,9 @@ export function makeIceWall(path, opt = {}) {
     if (gate === 'pillar') {
       /* 결정 문기둥: 벽 끝에 큰 결정 하나가 우뚝, 그 둘레 작은 결정 셋 — 모두 문 바깥쪽(벽 쪽)으로 살짝 벌어져 '열린 문'처럼. 속빛을 세게 → 위에서도 멀리서 문이 보임 */
       const bx = f.x - ax * .7, bz = f.z - az * .7;
-      crystal(bx, bz, f.h - .5, Hm * 1.55, .62, -ax, -az, .1, .8);
+      crystal(bx, bz, -.2, Hm * 1.55 + f.h0 * .55, .62, -ax, -az, .1, .8);   /* 둥근 코 옆 바닥에서 바로 솟음 */
       for (let k = 0; k < 3; k++) { const a2 = (k - 1) * 1.1 + RG() * .4, ox = Math.cos(a2) * f.nx - Math.sin(a2) * ax * 0, oz = Math.cos(a2) * f.nz;
-        crystal(bx - ax * (.4 + RG() * .5) + f.nx * (k - 1) * .75, bz - az * (.4 + RG() * .5) + f.nz * (k - 1) * .75, f.h - .4, Hm * (.75 + RG() * .4), .32 + RG() * .14, -ax + f.nx * (k - 1) * .6, -az + f.nz * (k - 1) * .6, .28 + RG() * .15, .7); }
+        crystal(bx - ax * (.4 + RG() * .5) + f.nx * (k - 1) * .75, bz - az * (.4 + RG() * .5) + f.nz * (k - 1) * .75, -.1, Hm * (.75 + RG() * .4) + f.h0 * .35, .32 + RG() * .14, -ax + f.nx * (k - 1) * .6, -az + f.nz * (k - 1) * .6, .28 + RG() * .15, .7); }
     } else if (gate === 'arch') {
       /* 부서진 아치: 예전엔 문 위를 이었던 얼음 다리가 가운데서 부러짐 — 벽과 같은 결정 조각들이 겹겹이 이어져 솟았다가 문 쪽으로 굽고,
          맨 끝 조각은 부러진 단면이 드러나 속빛이 세게 남 (부러진 지 얼마 안 된 상처) */
@@ -181,7 +185,7 @@ export function makeIceWall(path, opt = {}) {
   for (let d = .5 + R(); d < len - .3; d += .9 + R() * 2.2) { const big = R() < .35; rock(d, -(W + 1.2 + R() * (big ? 1.6 : 2.6)), big ? .9 + R() * .9 : .25 + R() * .4); }
   for (let d = 1 + R() * 2; d < len - .5; d += 2.5 + R() * 4) rock(d, W + 1.1 + R() * 1.2, .3 + R() * .6);
   /* 앞쪽 땅 눈밭 (들쭉날쭉한 가장자리) */
-  { const Q = [], sk = (i, k) => { const f = fr[i], reach = 2.4 + vn(f.d * .3, 4, o) * 3.2, vv = -(W + .2 + [0, .6, reach * .55, reach][k] + (k ? 0 : 0)), y = [.55, .32, .14, -.04][k] + (k < 3 ? (vn(f.d * 1.5, k, o) - .5) * .1 : 0);
+  { const Q = [], sk = (i, k) => { const f = fr[i], reach = 2.4 + vn(f.d * .3, 4, o) * 3.2, vv = -(W * f.sv + .2 + [0, .6, reach * .55, reach][k] * f.sc)   /* 벽 끝으로 갈수록 발치 눈밭도 둥글게 줄어듦 */, y = [.55, .32, .14, -.04][k] + (k < 3 ? (vn(f.d * 1.5, k, o) - .5) * .1 : 0);
       return [f.x + f.nx * vv, y, f.z + f.nz * vv]; };
     for (let i = 0; i < N; i++) for (let k = 0; k < 3; k++) { const a = sk(i, k), b = sk(i + 1, k), c = sk(i, k + 1), d = sk(i + 1, k + 1); (!FL) ? Q.push(...a, ...b, ...c, ...b, ...d, ...c) : Q.push(...a, ...c, ...b, ...b, ...c, ...d); }
     snow.push(smoothG(Q)); }   /* 발치 눈밭도 매끈하게 */
