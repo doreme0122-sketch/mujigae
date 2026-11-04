@@ -1,0 +1,127 @@
+/* 바닥 시험장 — 실제 게임 카메라·조명·기체로 바닥만 바꿔 가며 본다 (사용자 2026-11-04: 작은 바닥 시험장)
+   · 내 기체는 조이스틱(컴퓨터 WASD·방향키)으로 몰고, 상대 기체가 둘레를 돌며 서로 쏜다 → 탄이 바닥 위에서 잘 보이는지
+   · 발밑 표시(정한 C안): 체력 막대 10칸 · 반사 과열 · 왼쪽 네모 레벨 · 금·은 왕관 → 바닥 위에서 읽히는지
+   · 그림자: 기체가 둥실 오르면 작고 옅게, 해 반대쪽으로 살짝 비켜 떨어짐 → 떠 있는 느낌 (보스존 유리 위에도)
+   무게: 바닥 판 하나 + 기체 둘 + 빛 알갱이 한 묶음 + 그림자 판 둘 */
+import * as THREE from 'three';
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+import { makeBloom } from '../core/hangar/bloom.js?v=11042014';
+import { makePerf } from './perf.js?v=11042014';
+import { buildShip, engineSpots } from '../core/ships/build.js';
+import { makeGlow } from '../preview/glow.js';
+import { makeFlight, FLY } from './flight.js?v=11042014';
+import { makeFloorLab, LAB } from './floorlab.js?v=11042014';
+
+const $ = s => document.querySelector(s), clamp = THREE.MathUtils.clamp;
+const VIEWS = [{ id: 'game', name: '게임 시점', h: 42, tilt: .38 }, { id: 'near', name: '가까이', h: 18, tilt: .6 }, { id: 'far', name: '멀리', h: 90, tilt: .3 }];
+const AREA = 70;
+
+export async function start(canvas, onProgress = () => {}) {
+  const renderer = new THREE.WebGLRenderer({ canvas, antialias: false, powerPreference: 'high-performance' });
+  renderer.toneMapping = THREE.NoToneMapping; renderer.autoClear = false; renderer.setClearColor(0, 1);
+  const scene = new THREE.Scene(), camera = new THREE.PerspectiveCamera(40, 1, .5, 900), bloom = makeBloom(renderer, { samples: 0 });
+  { const pm = new THREE.PMREMGenerator(renderer); scene.environment = pm.fromScene(new RoomEnvironment(), .04).texture; scene.environmentIntensity = .6; pm.dispose(); }
+  const sunDir = new THREE.Vector3(-.45, .78, -.42).normalize(), sun = new THREE.DirectionalLight(0xfff0dc, 3); sun.position.copy(sunDir).multiplyScalar(20); scene.add(sun);
+  scene.add(new THREE.HemisphereLight(0x7080a8, 0x2a1810, .5));
+  const lab = makeFloorLab(); scene.add(lab.mesh); let K = 0;
+  const glow = makeGlow(); scene.add(glow.mesh);
+  onProgress(.3);
+  /* 내 기체: 맵과 같은 비행 (둘레 AREA m 밖은 막힘) */
+  const B = { blocked: (x, z) => Math.hypot(x, z) > AREA, region: () => 0 };
+  const fly = await makeFlight(renderer, B, [0, 8], 0); scene.add(fly); const FS = fly.userData.S;
+  fly.traverse(o => { if (o.isMesh && o.renderOrder === 1 && o.geometry.type === 'PlaneGeometry') o.userData.oldShadow = true; });
+  onProgress(.6);
+  /* 상대 기체 */
+  const fb = await buildShip(4, 2, 'neon-black', { renderer, size: FLY.LEN }); const foe = fb.root; scene.add(foe);
+  const fsm = foe.children[0], FENG = engineSpots(fb.ship, fsm, new THREE.Box3().setFromObject(fsm).getSize(new THREE.Vector3()));
+  onProgress(.85);
+  /* 그림자: 해 반대쪽으로 살짝 비켜, 높을수록 넓고 옅게 */
+  const shM = () => new THREE.ShaderMaterial({ transparent: true, depthWrite: false, uniforms: { uA: { value: .5 }, uS: { value: 1 } },
+    vertexShader: 'varying vec2 vP; void main(){ vP=position.xy; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.); }',
+    fragmentShader: 'uniform float uA, uS; varying vec2 vP; void main(){ vec2 q=vP*vec2(1.,1.7)/uS; float r=dot(q,q); float core=exp(-r*4.), soft=exp(-r*1.3); gl_FragColor=vec4(0.,0.,0.,min(1.,(core*.85+soft*.35)*uA)); }' });
+  const mkSh = () => { const m = new THREE.Mesh(new THREE.PlaneGeometry(FLY.LEN * 2.2, FLY.LEN * 2.2), shM()); m.renderOrder = 1; scene.add(m); return m; };
+  const shMe = mkSh(), shFoe = mkSh();
+  const placeShadow = (m, x, z, y, head) => { const hh = y * 2.4, ox = -sunDir.x / sunDir.y * hh * .55, oz = -sunDir.z / sunDir.y * hh * .55;
+    m.position.set(x + ox, .03, z + oz); m.rotation.set(-Math.PI / 2, 0, head);
+    const u = m.material.uniforms; u.uS.value = .55 + y * .35; u.uA.value = clamp(.95 - y * .3, .35, .9); };
+  /* 탄: 빛 알갱이 */
+  const bolts = []; const fire = (x, z, tx, tz, mine) => { const d = Math.hypot(tx - x, tz - z) || 1, sp = mine ? 36 : 26; bolts.push({ x, z, vx: (tx - x) / d * sp, vz: (tz - z) / d * sp, life: 22 / sp, mine }); };
+  const fx = []; const flash = (x, z, c) => fx.push({ x, z, c, t: 0 });
+  /* 발밑 표시 (C안) */
+  const css = document.createElement('style'); css.textContent = `
+    .hud{position:absolute;left:0;top:0;display:flex;align-items:flex-start;gap:2px;pointer-events:none;transform-origin:0 0}
+    .hud .lv{position:relative;width:13px;height:13px;border-radius:2px;background:rgba(8,10,20,.85);border:1px solid var(--c);color:var(--c);font:500 9px/11px 'Audiowide',sans-serif;text-align:center}
+    .hud .lv svg{position:absolute;left:50%;bottom:100%;margin-left:-6px;width:12px;height:9px;filter:drop-shadow(0 0 2px rgba(0,0,0,.8))}
+    .hud .bars{display:flex;flex-direction:column;gap:1.5px;padding:1px;background:rgba(8,10,20,.8);border-radius:1.5px}
+    .hud .hp{position:relative;width:44px;height:6px;background:rgba(255,255,255,.08)}
+    .hud .hp i{position:absolute;left:0;top:0;bottom:0} .hud .hp .lag{background:rgba(255,255,255,.9)} .hud .hp .now{background:var(--c)}
+    .hud .hp .tick{position:absolute;inset:0;background:repeating-linear-gradient(90deg,transparent 0 3.9px,rgba(8,10,20,.75) 3.9px 4.4px)}
+    .hud .ht{position:relative;width:44px;height:3px;background:rgba(255,255,255,.08)} .hud .ht i{position:absolute;left:0;top:0;bottom:0}`;
+  document.head.appendChild(css);
+  const crown = c => `<svg viewBox="0 0 12 9"><path d="M1 8 L1.5 2.5 L4 5 L6 1 L8 5 L10.5 2.5 L11 8 Z" fill="${c}" stroke="rgba(10,8,0,.85)" stroke-width=".8" stroke-linejoin="round"/></svg>`;
+  const mkHud = (col, lv, cr) => { const el = document.createElement('div'); el.className = 'hud'; el.style.setProperty('--c', col);
+    el.innerHTML = `<div class="lv">${lv}${cr ? crown(cr) : ''}</div><div class="bars"><div class="hp"><i class="lag"></i><i class="now"></i><i class="tick"></i></div><div class="ht"><i></i></div></div>`;
+    $('#tags').appendChild(el); return { el, now: el.querySelector('.now'), lag: el.querySelector('.lag'), ht: el.querySelector('.ht i'), hp: 1, lagv: 1, heat: 0 }; };
+  const HM = mkHud('rgb(120,235,150)', 7, '#c9d2dc'), HF = mkHud('rgb(255,95,95)', 12, '#ffcf4a');
+  const drawHud = (h, x, y, z, dt) => { h.lagv += (h.hp - h.lagv) * Math.min(1, dt * (h.lagv > h.hp + .002 ? 2.2 : 50)); h.heat = Math.max(0, h.heat - dt * .18);
+    const v = new THREE.Vector3(x, y, z).project(camera); h.el.style.opacity = v.z < 1 ? 1 : 0;
+    h.el.style.transform = `translate(${(v.x * .5 + .5) * cw - 30}px,${(-v.y * .5 + .5) * ch + 20}px)`;
+    h.now.style.width = (h.hp * 100) + '%'; h.lag.style.width = (h.lagv * 100) + '%'; const k = Math.min(1, h.heat);
+    h.ht.style.width = (k * 100) + '%'; h.ht.style.background = k > .98 ? `rgba(255,60,60,${.6 + .4 * Math.sin(t * 20)})` : `rgb(255,${200 - 150 * k | 0},${80 - 60 * k | 0})`; };
+  /* 버튼 */
+  const cam = { x: 0, z: 8, h: 42, H: 42, tilt: .38, T: .38 };
+  const tip = () => { $('#tip').hidden = false; $('#tip b').textContent = LAB[K].name; $('#tip span').textContent = LAB[K].tip; $('#head b').textContent = '바닥 시험장 · ' + LAB[K].name; };
+  const tour = $('#tour');
+  LAB.forEach((f, i) => { const b = document.createElement('button'); b.type = 'button'; b.textContent = f.name; b.className = 'fl';
+    b.addEventListener('pointerdown', e => { e.stopPropagation(); K = i; lab.set(i); tour.querySelectorAll('.fl').forEach(x => x.classList.toggle('on', x === b)); tip(); }); tour.appendChild(b); });
+  { const sep = document.createElement('i'); sep.style.cssText = 'width:1px;align-self:stretch;background:rgba(185,255,74,.25);margin:0 4px'; tour.appendChild(sep); }
+  VIEWS.forEach(v => { const b = document.createElement('button'); b.type = 'button'; b.textContent = v.name; b.className = 'vw';
+    b.addEventListener('pointerdown', e => { e.stopPropagation(); cam.H = v.h; cam.T = v.tilt; tour.querySelectorAll('.vw').forEach(x => x.classList.toggle('on', x === b)); }); tour.appendChild(b); });
+  tour.querySelector('.fl').classList.add('on'); tour.querySelector('.vw').classList.add('on'); tip();
+  addEventListener('wheel', e => { cam.H = clamp(cam.H * Math.exp(e.deltaY * .0012), 12, 160); }, { passive: true });
+  let Wd = 2, Hd = 2, cw = 1, ch = 1;
+  const perf = makePerf(st => { bloom.setSamples(st.aa ? 4 : 0); size(); });
+  function size() { const r = canvas.getBoundingClientRect(); cw = r.width; ch = r.height; [Wd, Hd] = perf.size(r.width, r.height); renderer.setSize(Wd, Hd, false); bloom.size(Wd, Hd);
+    camera.aspect = Wd / Hd; camera.updateProjectionMatrix(); glow.uRes.value.set(Wd, Hd); fly.userData.setPx?.(Hd / (2 * Math.tan(camera.fov * Math.PI / 360))); }
+  addEventListener('resize', size); size(); bloom.setSamples(perf.st.aa ? 4 : 0);
+  const E = { a: 0, x: 0, z: -12, head: 0, cool: 0, bank: 0 }; let myCool = 0, t = 0, last = performance.now(); const v3 = new THREE.Vector3();
+  renderer.setAnimationLoop(now => { try {
+    const dt = clamp((now - last) / 1000, 0, .05); last = now; t += dt;
+    fly.userData.update(t, dt); fly.traverse(o => { if (o.userData.oldShadow) o.visible = false; });
+    /* 상대: 내 둘레를 크게 돌며 가끔 방향을 바꿈 */
+    { const R = 13 + 4 * Math.sin(t * .23), w = .32 * (Math.sin(t * .11) > -.3 ? 1 : -1); E.a += w * dt;
+      const tx = FS.x + Math.cos(E.a) * R, tz = FS.z + Math.sin(E.a) * R, nx = E.x + (tx - E.x) * Math.min(1, dt * 1.4), nz = E.z + (tz - E.z) * Math.min(1, dt * 1.4);
+      const vx = (nx - E.x) / Math.max(dt, 1e-3), vz = (nz - E.z) / Math.max(dt, 1e-3); E.x = nx; E.z = nz;
+      const want = Math.atan2(-(FS.x - E.x), -(FS.z - E.z)), turn = THREE.MathUtils.euclideanModulo(want - E.head + Math.PI, Math.PI * 2) - Math.PI; E.head += turn * Math.min(1, dt * 4);
+      E.bank += (clamp(-(vx * Math.cos(E.head) - vz * Math.sin(E.head)) * .04, -.5, .5) - E.bank) * Math.min(1, dt * 3);
+      const bob = Math.sin(t * 2.1) * .12; foe.position.set(E.x, FLY.HOVER + .25 + bob, E.z); foe.rotation.set(0, E.head, 0); foe.rotateZ(E.bank); foe.updateMatrixWorld(true);
+      placeShadow(shFoe, E.x, E.z, FLY.HOVER + .25 + bob, E.head);
+      if ((E.cool -= dt) <= 0) { E.cool = .55; fire(E.x - Math.sin(E.head) * 1.2, E.z - Math.cos(E.head) * 1.2, FS.x, FS.z, false); } }
+    { const hy = fly.children[0]?.position.y ?? FLY.HOVER; placeShadow(shMe, FS.x, FS.z, Math.max(.4, hy), FS.head);
+      if ((myCool -= dt) <= 0) { myCool = .22; fire(FS.x - Math.sin(FS.head) * 1.2, FS.z - Math.cos(FS.head) * 1.2, E.x, E.z, true); } }
+    /* 탄 움직임 · 맞음 */
+    for (let i = bolts.length - 1; i >= 0; i--) { const b = bolts[i]; b.x += b.vx * dt; b.z += b.vz * dt; b.life -= dt;
+      const [hx, hz] = b.mine ? [E.x, E.z] : [FS.x, FS.z];
+      if (Math.hypot(b.x - hx, b.z - hz) < 1.1) { flash(b.x, b.z, b.mine ? [.6, 1.3, .7] : [1.4, .5, .5]); if (b.mine) { HF.hp = Math.max(.05, HF.hp - .018); HF.heat += .07; } else HM.hp = Math.max(.05, HM.hp - .03); bolts.splice(i, 1); continue; }
+      if (b.life <= 0) bolts.splice(i, 1); }
+    HM.hp = Math.min(1, HM.hp + dt * .03); HF.hp = Math.min(1, HF.hp + dt * .05);
+    lab.ships[0].set(FS.x, 0, FS.z, 1); lab.ships[1].set(E.x, 0, E.z, 2); lab.update(t);
+    glow.begin();
+    for (const b of bolts) glow.add(b.x, FLY.HOVER + .3, b.z, -b.vx * .05, 0, -b.vz * .05, .2, 0, b.mine ? [.45, 1.25, .6] : [1.35, .35, .45], 1, b.x);
+    for (let i = fx.length - 1; i >= 0; i--) { const f = fx[i]; f.t += dt; if (f.t > .25) { fx.splice(i, 1); continue; } const k = 1 - f.t / .25; glow.add(f.x, FLY.HOVER + .3, f.z, 0, 0, 0, .5 + f.t * 3, 3, f.c, k); }
+    { const hx = -Math.sin(E.head), hz = -Math.cos(E.head); for (const p of FENG) { v3.copy(p).applyMatrix4(fsm.matrixWorld); glow.add(v3.x, v3.y, v3.z, -hx * .9, 0, -hz * .9, .15, 3, [1.3, .35, .5], .9); } }
+    glow.end(); glow.uT.value = t;
+    /* 카메라: 내 기체를 따라감 */
+    { const lx = FS.x + FS.vx * .35, lz = FS.z + FS.vz * .35, k = Math.min(1, dt * 5); cam.x += (lx - cam.x) * k; cam.z += (lz - cam.z) * k; }
+    cam.h += (cam.H - cam.h) * Math.min(1, dt * 3); cam.tilt += (cam.T - cam.tilt) * Math.min(1, dt * 3);
+    camera.position.set(cam.x, cam.h * Math.cos(cam.tilt), cam.z + cam.h * Math.sin(cam.tilt)); camera.lookAt(cam.x, 0, cam.z); camera.updateMatrixWorld();
+    lab.mesh.position.set(Math.round(cam.x / 4) * 4, 0, Math.round(cam.z / 4) * 4);
+    drawHud(HM, FS.x, FLY.HOVER, FS.z, dt); drawHud(HF, E.x, FLY.HOVER, E.z, dt);
+    renderer.setRenderTarget(bloom.scene); renderer.clear(); renderer.render(scene, camera);
+    bloom.render(Wd, Hd, !perf.st.bloom); perf.tick(dt);
+  } catch (e) { console.error('[바닥 시험장]', e); } });
+  { const v = (import.meta.url.match(/v=(\d+)/) || [])[1] || '개발'; const el = document.createElement('div'); el.textContent = '판 번호 ' + v;
+    el.style.cssText = 'position:fixed;left:max(18px,env(safe-area-inset-left,0px));bottom:calc(env(safe-area-inset-bottom,0px) + 14px);font-size:11px;color:rgba(185,255,74,.7);pointer-events:none'; document.body.appendChild(el); }
+  onProgress(1);
+  window.__fl = { cam, set: i => tour.querySelectorAll('.fl')[i].dispatchEvent(new PointerEvent('pointerdown')), FS, E };
+}
