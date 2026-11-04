@@ -74,7 +74,7 @@ window.__ver = fetch('ver.json?t=' + Date.now(), { cache: 'no-store' }).then(r =
 <div id="load"><p>와드를 세우는 중</p><div class="b"><i></i></div></div>
 <div id="rot">기기를 가로로 돌려 주세요</div>
 <script type="module">
-import { start } from './src/proto/wardview.js?v=11042204';
+import { start } from './src/proto/wardview.js?v=11042210';
 await window.__ver;
 const bar = document.querySelector('#load i');
 start(document.querySelector('#cv'), p => { bar.style.transform = `scaleX(${p})`; })

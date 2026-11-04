@@ -134,16 +134,19 @@ export function makeIceWall(path, opt = {}) {
   const uT = opt.uT || { value: 0 }, mat = opt.mat || iceWallMaterial(uT), smat = opt.smat || snowMaterial(), doors = opt.doors || [true, true];
   const seed = opt.seed || 3, R = (() => { let s = seed * 7919; return () => (s = (s * 9301 + 49297) % 233280) / 233280; })(), o = seed * 1.3;
   const curve = new THREE.CatmullRomCurve3(path.map(p => new THREE.Vector3(p[0], 0, p[1])), false, 'centripetal'), len = curve.getLength();
-  const Hm = opt.H || 6.2, W = 3.9, STEP = .35, DS = .32, N = Math.max(4, Math.round(len / DS));
+  const Hm = opt.H || 5.6, W = 2.1, STEP = .35, DS = .32, N = Math.max(4, Math.round(len / DS));
   /* 윗단: 구간(2.5~5m)마다 높이 한 단씩 */
   const seg = []; for (let d = 0; d < len;) { const L2 = 2.5 + R() * 2.5; seg.push([d, d + L2, (R() - .5) * 2.4]); d += L2; }
-  /* 산맥: 봉우리 여러 개(높이 제각각) 사이로 안장처럼 낮은 등이 이어짐 */
-  const pk = []; for (let d = R() * 4; d < len + 4; d += 5 + R() * 6) pk.push([d, .55 + R() * .9, 2.2 + R() * 2.2]);
-  const topH = d => { let h = Hm * .55 * (1 + .12 * Math.sin(d * .23 + o));
-    for (const [d0, k, w] of pk) { const x = (d - d0) / w; h = Math.max(h, Hm * (.55 + k * .6) * Math.max(0, 1 - Math.abs(x)) ** .85); }
-    const ds = doors[0] ? d : 1e9, de = doors[1] ? len - d : 1e9, dd = Math.min(ds, de); h = Math.max(h, Hm * 1.15 * Math.exp(-dd * dd / 9));   /* 문 양옆 우뚝 */
+  /* 산맥 윤곽 — 규칙적이지 않게: 크고 작은 물결을 겹친 기복(능선 잡음) + 띄엄띄엄(가끔 몰려서) 솟는 비대칭 봉우리 + 가끔 깊게 팬 골 + 잔 톱니 */
+  const fb = d => { let a = 0, w = .5, f = .045; for (let k = 0; k < 4; k++) { a += w * (1 - Math.abs(vn(d * f + k * 13 + o, 0, 0) * 2 - 1)); w *= .5; f *= 2.3; } return a / .94; };
+  const pk = []; for (let d = R() * 6; d < len + 6;) { const k = .35 + R() * R() * 1.3, wl = 1.2 + R() * 3.4, wr = 1.2 + R() * 3.4; pk.push([d, k, wl, wr]); d += R() < .3 ? 1.5 + R() * 2.5 : 6 + R() * 11; }
+  const notch = []; for (let d = 3 + R() * 8; d < len; d += 9 + R() * 14) notch.push([d, 1 + R() * 1.6, .35 + R() * .3]);
+  const topH = d => { let h = Hm * (.38 + .5 * fb(d));
+    for (const [d0, k, wl, wr] of pk) { const x = d < d0 ? (d0 - d) / wl : (d - d0) / wr; if (x < 1) h = Math.max(h, h + Hm * k * Math.pow(1 - x, 1.4 + k * .4)); }
+    for (const [d0, w, dep] of notch) { const x = Math.abs(d - d0) / w; if (x < 1) h *= 1 - dep * (1 - x * x); }
+    const ds = doors[0] ? d : 1e9, de = doors[1] ? len - d : 1e9, dd = Math.min(ds, de); h = Math.max(h, Hm * 1.15 * Math.exp(-dd * dd / 8));   /* 문 양옆 우뚝 */
     if (!doors[0] && d < 3) h *= .35 + .65 * d / 3; if (!doors[1] && len - d < 3) h *= .35 + .65 * (len - d) / 3;
-    return h + (vn(d * 1.7, 1, o) - .5) * .5; };
+    return Math.max(1.4, h + (vn(d * 2.3, 1, o) - .5) * .35 + (vn(d * 6.1, 2, o) - .5) * .18); };
   const flute = (d, side) => { const a = vn(d * .9 + side * 17 + o, 0, 0), b = vn(d * 2.6 + side * 31, 3, 0); return (a - .5) * .9 + (b - .5) * .35 + Math.abs(Math.sin(d * 3.1 + side * 2 + o * 3)) * .18; };   /* 세로 결 깊이 */
   const p = new THREE.Vector3(), tg = new THREE.Vector3(), frames = [];
   for (let i = 0; i <= N; i++) { const d = i / N * len; curve.getPointAt(i / N, p); curve.getTangentAt(i / N, tg); let nx = -tg.z, nz = tg.x; const sg = opt.out ? opt.out(p.x, p.z, nx, nz) : 1; nx *= sg; nz *= sg;
