@@ -4,7 +4,7 @@
    · 멀어질수록 깊은 색으로 가라앉힘 (가까운 싸움터가 또렷하게)
    0 금속 판 · 1 이끼 낀 암반 · 2 결정 섞인 모래 · 3 은은한 평지 · 4 보스존 별빛 우주(보이지 않는 유리 바닥 + 아래로 깊은 별 세 겹) */
 import * as THREE from 'three';
-import { SNOW_GLSL, SNOW_U } from './snowtone.js?v=11042345';
+import { SNOW_GLSL, SNOW_U } from './snowtone.js?v=11042352';
 
 function bakeNoise(N = 256) {
   const hash = (x, y, p) => { x = ((x % p) + p) % p; y = ((y % p) + p) % p; const s = Math.sin(x * 127.1 + y * 311.7) * 43758.5453; return s - Math.floor(s); };
@@ -71,23 +71,10 @@ export function makeFloorLab() {
         md=8.; for(int j=-1;j<=1;j++) for(int i=-1;i<=1;i++){ vec2 g=mg+vec2(float(i),float(j)); vec2 o=vec2(h2(n+g),h2(n+g+17.3))*.85+.075; vec2 r=g+o-f;
           vec2 dd=r-mr; if(dot(dd,dd)>1e-5) md=min(md,dot(.5*(mr+r),normalize(dd))); }
         return vec3(md,h2(n+mg+3.1),h2(n+mg+9.7)); }
-      /* 얼음 땅 (벽과 같은 세상): 눈 많이(uIV 0) / 얼음 많이 + 눈 조금(uIV 1)
-         · 색은 벽에서 가져옴: 눈 = 새하양 + 푸른 그늘, 얼음 = 밝은 하늘색 + 하얀 금 + 금 속 푸른 빛
-         · 모양도 벽처럼 각지게: 얼음은 깨진 판(각진 조각)들, 눈 가장자리도 판 금을 따라 꺾임
-         · 두께: 눈은 바람에 쌓인 언덕 — 해 쪽은 볼록하게 밝고, 반대쪽 얼음 위로 그림자가 짐
-         · edge = 벽 가까이일수록 눈이 두꺼움(벽 발치 눈밭과 이어짐) */
-      float snowF(vec2 p, float cell){ vec2 wd=vec2(.82,.57); return N4(p*.02).r*.72+N4(p*.07).g*.18+sin(dot(p,wd)*1.6+N4(p*.05).b*7.)*.03+(cell-.5)*.22; }
+      /* 얼음 땅 (벽과 같은 세상) — 바닥 눈은 없앰(사용자 2026-11-04): 바닥은 얼음판만, 눈은 벽 위·바위·벽 발치 눈밭에만
+         · 색은 벽에서 가져옴: 밝은 하늘색 + 하얀 금 + 금 속 푸른 빛 · 모양도 벽처럼 각진 깨진 판 */
       vec3 iceGround(vec2 p, vec3 rd, float edge){
-        vec2 wq=(N4(p*.04).rg-.5)*1.1+(N4(p*.16).ba-.5)*.25; vec3 v=vor(p*.3+wq), v2=vor(p*1.1+7.+wq*2.);   /* 판 모양이 고르지 않게 살짝 비틂 */                                   /* 큰 판 3m 남짓 · 그 안의 잔 판 */
-        float th=mix(.34,.62,uIV)-edge*.45;
-        float S=snowF(p,v.y); float snow=smoothstep(th-.012,th+.012,S);
-        float dep=clamp((S-th)/.1,0.,1.);                                    /* 가장자리에서 얼마나 안쪽인지 = 눈 두께 */
-        /* 눈: 언덕 기울기(가장자리일수록 가파름) */
-        float e=.25; vec2 gS=vec2(snowF(p+vec2(e,0.),v.y)-S, snowF(p+vec2(0.,e),v.y)-S)/e;
-        vec3 nS=normalize(vec3(-gS.x*(1.-dep)*26., 1., -gS.y*(1.-dep)*26.));   /* 눈 언덕 기울기만 · 결(물결·알갱이)은 snowTone 안에서 벽과 같이 */
-        float dS=dot(nS,uSun);
-        vec3 snowLit=SNOW_LIT, snowSh=SNOW_SH;
-        vec3 cs=snowTone(nS,-rd,vec3(p.x,0.,p.y),uSun,uT);                       /* 벽 눈과 같은 계산 */
+        vec2 wq=(N4(p*.04).rg-.5)*1.1+(N4(p*.16).ba-.5)*.25; vec3 v=vor(p*.3+wq), v2=vor(p*1.1+7.+wq*2.);   /* 큰 판 3m 남짓 · 그 안의 잔 판 · 모양이 고르지 않게 살짝 비틂 */
         /* 얼음 판 */
         float tilt=v.z; vec3 nI=normalize(vec3((v.y-.5)*.14,1.,(v.z-.5)*.14));
         vec3 ib=mix(vec3(.24,.54,.76),vec3(.45,.74,.9),v.y)*(.92+.12*N4(p*.08).r);
@@ -98,14 +85,7 @@ export function makeFloorLab() {
         float hair=smoothstep(.006,.0,abs(N4(p*.11+v.y).g-.5))*.35;
         vec3 ci=ib+vec3(.1,.35,.6)*glow*.18+vec3(.9,.96,1.)*(crack*.55+crack2*.4+hair)*(1.-crack*.2)+vec3(1.)*spec;
         float bub=step(.982,h2(floor(p*6.)))*smoothstep(.3,.6,v.x); ci+=vec3(.6,.8,.9)*bub*.25;
-        /* 눈 그림자: 해 반대쪽 얼음 위 · 눈가루: 경계 앞에 흩날림 */
-        vec2 so=-uSun.xz/max(uSun.y,.2)*.8; float sh=smoothstep(th-.01,th+.02,snowF(p-so,v.y))*(1.-snow);
-        ci*=1.-sh*.45; ci=mix(ci,ci*vec3(.75,.88,1.05),sh*.5);
-        float dust=smoothstep(th-.07,th-.005,S)*(1.-snow)*smoothstep(.45,.75,N4(p*.45).g);
-        ci=mix(ci,mix(snowSh,snowLit,.6),dust*.45);
-        vec3 c=mix(ci,cs,snow);
-        float rim=snow*(1.-smoothstep(.0,.25,dep))*smoothstep(.3,.9,dS); c+=vec3(.05)*rim;   /* 해 받는 눈 언덕 턱 */
-        gSnow=snow; return c; }
+        gSnow=0.; return ci; }
       void main(){
         vec3 ro=cameraPosition, rd=normalize(vW-ro); vec2 p=vW.xz; float dist=length(p-ro.xz); vec3 c;
         if(uK<.5){ /* 금속 판: 4m 판 · 이음매 · 모서리로 갈수록 살짝 둥글게 깎임(빛 받는 턱) · 볼트 · 긁힘 · 얼룩 */
