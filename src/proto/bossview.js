@@ -4,11 +4,11 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
-import { makeBloom } from '../core/hangar/bloom.js?v=11050837';
-import { makePerf } from './perf.js?v=11050837';
-import { enhanceChron } from './bosses/chronfx.js?v=11050837';
-import { makeChronarch } from './bosses/chronarch.js?v=11050837';
-import { makeHive } from './bosses/hive.js?v=11050837';
+import { makeBloom } from '../core/hangar/bloom.js?v=11050843';
+import { makePerf } from './perf.js?v=11050843';
+import { enhanceChron } from './bosses/chronfx.js?v=11050843';
+import { makeChronarch } from './bosses/chronarch.js?v=11050843';
+import { makeHive } from './bosses/hive.js?v=11050843';
 
 const $ = s => document.querySelector(s), clamp = THREE.MathUtils.clamp;
 export async function start(canvas, onProgress = () => {}) {
