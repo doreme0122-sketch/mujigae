@@ -11,12 +11,12 @@
    무게: 꼬리 한 장 · 머리 한 장 · 부스러기 한 장 · 조준 빛 한 장 = 그리기 4번 */
 import * as THREE from 'three';
 import * as A from '../core/audio.js';
-import { FLY } from './flight.js?v=11040943';
-import { BH } from './blackhole.js?v=11040943';
-import { hitWall } from './rocks.js?v=11040943';
+import { FLY } from './flight.js?v=11040953';
+import { BH } from './blackhole.js?v=11040953';
+import { hitWall } from './rocks.js?v=11040953';
 
 export const SHOT = {
-  basic: { name: '기본탄', rate: 7, speed: 44, life: 1.1, heat: .0286, cool: .35, coolWait: .3, lock: .3,   /* 쉬지 않고 쏘면 약 5초에 과열 · 과열되면 약 2.5초 식어야 다시 (사용자 2026-11-04) */ tail: 3.4, W: .27, col: [.62, 1, .32], spread: .012, bounces: 3 }
+  basic: { name: '기본탄', rate: 7, speed: 44, life: 1.1, heat: .0476, cool: .44, coolWait: .3, lock: .3,   /* 쉬지 않고 쏘면 약 3초에 과열 · 과열되면 약 2초 식어야 다시 (사용자 2026-11-04: 5초는 너무 김) */ tail: 3.4, W: .27, col: [.62, 1, .32], spread: .012, bounces: 3 }
 };
 const MAXB = 60, NT = 12, NP = 320;
 const AB = { transparent: true, depthWrite: false, blending: THREE.AdditiveBlending };
@@ -157,7 +157,6 @@ export function makeShots({ B, crystals, bh, FS, say, mobs, onKill }) {
     aim.visible = false;                                                                                     /* 땅 부채꼴 빛은 뺌 (사용자: 기체 앞 안개 같은 초록 → 빨강이 이상함) */
     /* 과열은 기체 금속이 달아오르는 것으로 (시안 B · shipheat.js) — 기체에는 50%부터 보임 */
     { FS.heatV = S.heat; FS.heatFlash = Math.max(0, (FS.heatFlash || 0) - dt * 2.2);
-      if (!shooting && S.heat > .5 && t > (S.tickAt || 0)) { tickS(); S.tickAt = t + .18 + Math.random() * .5 * (1.2 - S.heat); }   /* 식는 금속이 틱 틱 */
       muz.material.uniforms.uA.value = 0;
       /* 자동 조준 표시: 노리는 적 둘레에 작게 도는 조준 고리 */
       const L = S.lock; lkA += ((L && want ? 1 : 0) - lkA) * Math.min(1, dt * 12); if (L) { lkP[0] = L.x; lkP[1] = L.y; lkP[2] = L.z; lk.material.uniforms.uS.value = L.s; }

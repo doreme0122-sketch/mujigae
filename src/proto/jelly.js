@@ -116,7 +116,8 @@ function tentMat(uT) {
         return p; }
       void main(){ vS = aS; vB = iB; vC = iC; float s = aS.x;
         vec3 p0 = P(s), p1 = P(min(1., s + .04)) - P(max(0., s - .04));
-        vec3 w = iA.xyz + p0, V = normalize(cameraPosition - w), side = normalize(cross(p1 + vec3(1e-4), V));
+        vec3 w = iA.xyz + p0, V = normalize(cameraPosition - w), cr = cross(p1, V); float cl = length(cr);
+        vec3 side = cl > 1e-6 ? cr / cl : normalize(cross(vec3(1., 0., 0.), V));   /* 촉수가 카메라 쪽을 똑바로 향할 때 옆 방향이 0이 되어 '숫자 아님'이 생겼음 → 컴퓨터에서 검은 네모 (사용자 화면) */
         float wd = aR.w * iA.w * (aS.z < .5 ? pow(1. - s, .6) * (.7 + .3 * sin(s * 30. + iB.w)) : (.35 + .65 * sin(min(s, 1.) * 3.1416)) * (1. + .4 * sin(s * 18. - uT * 2.5 + aR.x * 4.)));   /* 촉수: 끝으로 가늘게 · 입 팔: 주름져 넓어졌다 좁아짐 */
         w += side * wd * aS.y;
         gl_Position = projectionMatrix * viewMatrix * vec4(w, 1.); }`,

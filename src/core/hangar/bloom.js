@@ -14,7 +14,7 @@ export function makeBloom(renderer, bo = {}){
     vertexShader:'in vec3 position;in vec2 uv;out vec2 vU;void main(){vU=uv;gl_Position=vec4(position.xy,0.,1.);}',
     fragmentShader:`precision highp float;in vec2 vU;out vec4 o;uniform sampler2D t;uniform float th;
       void main(){ vec3 c=texture(t,vU).rgb; float l=max(c.r,max(c.g,c.b));
-        if(!(l<1e4)){ c=vec3(0.); l=0.; }                                          /* 계산이 깨진 점은 뺌 */
+        if(any(isnan(c))||any(isinf(c))||!(l<1e4)){ c=vec3(0.); l=0.; }                                          /* 계산이 깨진 점은 뺌 */
         else if(l>2.){ float L=2.+(l-2.)/(1.+(l-2.)*.5); c*=L/l; l=L; }           /* 아주 밝은 점(매끈한 흑요석·결정의 바늘 끝 반사)은 번짐에 넣을 때 세기를 부드럽게 눌러 최대 4 — 점 하나가 화면 넓게 번지지 않게 (사용자 2026-11-03: 와드·흑요석 벽 하얀 얼룩) */
         o=vec4(c*smoothstep(th,th+.5,l),1.); }`});
   const blur=new THREE.RawShaderMaterial({glslVersion:THREE.GLSL3,uniforms:{t:{value:null},dir:{value:new THREE.Vector2()}},
