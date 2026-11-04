@@ -59,7 +59,7 @@ button{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:poin
 /* 고정 주소(번호 없이)로 열어도 늘 최신: 최신 판 번호(ver.json, 기억하지 않고 매번 새로 받음)와 다르면 최신 번호 주소로 바로 넘어감 */
 window.__ver = fetch('ver.json?t=' + Date.now(), { cache: 'no-store' }).then(r => r.json()).then(j => {
   const f = location.pathname.split('/').pop() || 'index.html', want = j[f], have = new URLSearchParams(location.search).get('v');
-  if (want && want !== have) { location.replace(f + '?v=' + want + location.hash); return new Promise(() => {}); } }).catch(() => {});
+  if (want && (!have || +want > +have)) { location.replace(f + '?v=' + want + location.hash); return new Promise(() => {}); } }).catch(() => {});
 </script>
 <script type="importmap">{"imports":{"three":"./vendor/three.module.js","three/addons/":"./vendor/addons/"}}</script>
 </head><body>
@@ -74,7 +74,7 @@ window.__ver = fetch('ver.json?t=' + Date.now(), { cache: 'no-store' }).then(r =
 <div id="load"><p>와드를 세우는 중</p><div class="b"><i></i></div></div>
 <div id="rot">기기를 가로로 돌려 주세요</div>
 <script type="module">
-import { start } from './src/proto/wardview.js?v=11042316';
+import { start } from './src/proto/wardview.js?v=11042317';
 await window.__ver;
 const bar = document.querySelector('#load i');
 start(document.querySelector('#cv'), p => { bar.style.transform = `scaleX(${p})`; })
