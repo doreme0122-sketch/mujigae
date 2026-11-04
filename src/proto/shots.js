@@ -11,9 +11,9 @@
    무게: 꼬리 한 장 · 머리 한 장 · 부스러기 한 장 · 바닥 흔적 한 장 · 모으는 빛 한 장 · 조준 고리 한 장 = 그리기 6번 (탄 종류가 늘어도 같음) */
 import * as THREE from 'three';
 import * as A from '../core/audio.js';
-import { FLY } from './flight.js?v=11041136';
-import { BH } from './blackhole.js?v=11041136';
-import { hitWall } from './rocks.js?v=11041136';
+import { FLY } from './flight.js?v=11041138';
+import { BH } from './blackhole.js?v=11041138';
+import { hitWall } from './rocks.js?v=11041138';
 
 /* 비교표 그대로. heatT: 쉬지 않고 쏘면 과열까지(초) · coolT: 과열 뒤 다시 쏠 때까지(초) · cryB/wallB: 수정·벽에서 튕기는 횟수
    kind: 그림 결 (0 기본 · 1 서리 · 2 따뜻한 빛 · 3 빛 창 · 4 쇳물 · 5 불티 · 6 바늘 · 7 활) */
@@ -69,9 +69,9 @@ export function makeShots({ B, crystals, bh, FS, say, mobs, onKill, onDamage, on
   const tg = new THREE.BufferGeometry(); tg.setAttribute('position', new THREE.BufferAttribute(tp, 3)); tg.setAttribute('aU', new THREE.BufferAttribute(tu, 3)); tg.setAttribute('aC', new THREE.BufferAttribute(tc, 4)); tg.setIndex(ti);
   const tailM = new THREE.ShaderMaterial({ ...AB, side: THREE.DoubleSide, uniforms: { uT: { value: 0 } },
     vertexShader: 'attribute vec3 aU; attribute vec4 aC; varying vec3 vU; varying vec4 vC; void main(){ vU = aU; vC = aC; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.); }',
-    fragmentShader: `uniform float uT; varying vec3 vU; varying vec4 vC;   /* vU: x 꼬리 위치(0 머리 → 1 끝) · y 띠 가로(-1~1) · z 밝기×100 + 튕김 · vC: 탄 색 + 결 */
+    fragmentShader: `uniform float uT; varying vec3 vU; varying vec4 vC;   /* vU: x 꼬리 위치(0 머리 → 1 끝) · y 띠 가로(-1~1) · z 밝기 · vC: 탄 색 + 결(+16 = 튕김) */
       vec3 spec(float x){ return clamp(abs(fract(x + vec3(0., .33, .67)) * 6. - 3.) - 1., 0., 1.); }
-      void main(){ if (vU.x < 0.) discard; float u = clamp(vU.x, 0., 1.), s = vU.y, k = fract(vU.z), al = floor(vU.z) / 100., kd = vC.w; vec3 C = vC.rgb;
+      void main(){ if (vU.x < 0.) discard; float u = clamp(vU.x, 0., 1.), s = vU.y, k = step(15.5, vC.w), al = clamp(vU.z, 0., 1.), kd = vC.w - 16. * k;   /* 튕김은 결 칸에 16을 더해 담음 (소수 자리에 담으면 그래픽 카드에 따라 반올림이 틀어져 안 튕긴 탄도 무지개가 됨) */ vec3 C = vC.rgb;
         float core = exp(-s * s * 7.), body = exp(-s * s * 1.8) * .45, fade = (1. - u) * (1. - u);
         vec3 hot = mix(vec3(1.15, 1.2, 1.1), C * C * 1.4, smoothstep(.0, .55, u));                              /* 머리 가까이는 하얗게 뜨겁고 뒤로 갈수록 탄 색 */
         if (kd > .5 && kd < 1.5) { body *= .55 + .45 * pow(max(abs(sin(u * 31. - uT * 18. + s * 2.)), 0.), 6.); hot = mix(vec3(1.1, 1.18, 1.25), C * 1.1, smoothstep(0., .35, u)); }   /* 서리: 얼어붙은 마디마디가 반짝임 */
@@ -322,9 +322,9 @@ export function makeShots({ B, crystals, bh, FS, say, mobs, onKill, onDamage, on
         let dx = prevx - tmp[0], dz = prevz - tmp[1], dl = Math.hypot(dx, dz); if (dl < 1e-5) { dx = b.vx; dz = b.vz; dl = Math.hypot(dx, dz) || 1; }
         const px_ = -dz / dl * w, pz_ = dx / dl * w, y = FLY.HOVER;
         tp[j * 3] = tmp[0] + px_; tp[j * 3 + 1] = y; tp[j * 3 + 2] = tmp[1] + pz_; tp[(j + 1) * 3] = tmp[0] - px_; tp[(j + 1) * 3 + 1] = y; tp[(j + 1) * 3 + 2] = tmp[1] - pz_;
-        const z = Math.floor(lifeK * 100) + (b.bo ? .999 : 0);
+        const z = lifeK, kw = bc.kind + (b.bo ? 16 : 0);
         tu[j * 3] = u; tu[j * 3 + 1] = 1; tu[j * 3 + 2] = z; tu[(j + 1) * 3] = u; tu[(j + 1) * 3 + 1] = -1; tu[(j + 1) * 3 + 2] = z;
-        tc.set([C[0], C[1], C[2], bc.kind], j * 4); tc.set([C[0], C[1], C[2], bc.kind], (j + 1) * 4); }
+        tc.set([C[0], C[1], C[2], kw], j * 4); tc.set([C[0], C[1], C[2], kw], (j + 1) * 4); }
       hp[bi * 3] = b.x; hp[bi * 3 + 1] = FLY.HOVER; hp[bi * 3 + 2] = b.z; ha.set([b.dead >= 0 ? 0 : lifeK, b.bo ? 1 : 0, b.head, bc.kind], bi * 4); hc.set(C, bi * 3); }
     tg.attributes.position.needsUpdate = tg.attributes.aU.needsUpdate = tg.attributes.aC.needsUpdate = true; hg.attributes.position.needsUpdate = hg.attributes.aH.needsUpdate = hg.attributes.aC.needsUpdate = true;
     /* 부스러기 */
