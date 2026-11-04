@@ -9,7 +9,7 @@
 import * as THREE from 'three';
 import * as A from '../core/audio.js';
 import { buildShip } from '../core/ships/build.js';
-import { FLY } from './flight.js?v=11041339';
+import { FLY } from './flight.js?v=11041341';
 
 export const DUEL = { WIN: .25, CRIT: .1, CD: .55, ARC: 60 * Math.PI / 180, REACH: 1.6, NORMAL: 1.3, CRITK: 2.5, DMGK: 1.5, MAXR: 3, SPEED: 20, DMG: 8, ORBIT: 14 };
 const NB = 40, NT = 12, NP = 260;
@@ -131,9 +131,10 @@ export async function makeDuel({ renderer, scene, B, fly, FS, cam, say, ui, avoi
   /* ── 시합 자리: 둘레 20m가 막힘 없이 트인 곳 ── */
   let spot = null;
   const findSpot = () => { let best = null, bs = -1;
-    for (let x = -170; x <= 170; x += 8) for (let z = -170; z <= 170; z += 8) { if (B.blocked(x, z) || Math.hypot(x, z) < 75 || (avoid && avoid(x, z))) continue;   /* 보스 구역(블랙홀)·몹 떼 근처는 뺌 */ let ok = 0, n = 0;
-      for (let r = 4; r <= 22; r += 3) for (let k = 0; k < 16; k++) { n++; const a = k / 16 * 6.283; if (!B.blocked(x + Math.cos(a) * r, z + Math.sin(a) * r)) ok++; }
-      const sc = ok / n - (B.region(x, z) === 1 ? .2 : 0); if (sc > bs) { bs = sc; best = [x, z]; } }
+    for (let x = -172; x <= 172; x += 4) for (let z = -172; z <= 172; z += 4) { if (B.blocked(x, z) || B.region(x, z) === 17 || Math.hypot(x, z) < 75 || (avoid && avoid(x, z))) continue;   /* 보스 구역(블랙홀)·몹 떼 근처는 뺌 */
+      let ok = 0, n = 0, rFree = 0;
+      for (let r = 3; r <= 24; r += 3) { let ringOk = true; for (let k = 0; k < 24; k++) { n++; const a = k / 24 * 6.283; if (!B.blocked(x + Math.cos(a) * r, z + Math.sin(a) * r)) ok++; else ringOk = false; } if (ringOk && rFree === r - 3) rFree = r; }
+      const sc = rFree * 10 + ok / n; if (sc > bs) { bs = sc; best = [x, z]; } }   /* 막힘 없이 트인 반지름이 가장 큰 곳 */
     return best; };
   /* ── 탄 쏘기 ── */
   let bI = 0, maxRally = 0, cnt = { c: 0, n: 0, m: 0 };
@@ -157,8 +158,9 @@ export async function makeDuel({ renderer, scene, B, fly, FS, cam, say, ui, avoi
     if (E.mode === 'flank' && E.modeT > 3.2) { E.mode = 'orbit'; E.modeT = 0; E.oa = Math.atan2(E.x - FS.x, E.z - FS.z); }
     let gx, gz; if (E.mode === 'orbit') { E.oa += dt * .32; gx = FS.x + Math.sin(E.oa) * DUEL.ORBIT; gz = FS.z + Math.cos(E.oa) * DUEL.ORBIT; }
     else { gx = FS.x + Math.sin(FS.head) * 11; gz = FS.z + Math.cos(FS.head) * 11; }   /* 내 등 뒤 11m */
+    for (let q = 0; q < 6 && B.blocked(gx, gz); q++) { gx = FS.x + (gx - FS.x) * .8; gz = FS.z + (gz - FS.z) * .8; }   /* 가려는 자리가 벽이면 나에게 조금씩 당겨 옴 */
     { const dx = gx - E.x, dz = gz - E.z, d = Math.hypot(dx, dz), sp = Math.min(E.mode === 'flank' ? 16 : 9, d * 2.5); E.vx += ((dx / (d || 1)) * sp - E.vx) * Math.min(1, dt * 3); E.vz += ((dz / (d || 1)) * sp - E.vz) * Math.min(1, dt * 3);
-      const nx = E.x + E.vx * dt, nz = E.z + E.vz * dt; if (!B.blocked(nx, nz)) { E.x = nx; E.z = nz; } else { E.vx *= -.3; E.vz *= -.3; } }
+      const nx = E.x + E.vx * dt, nz = E.z + E.vz * dt; if (!B.blocked(nx, nz)) { E.x = nx; E.z = nz; } else if (!B.blocked(nx, E.z)) { E.x = nx; E.vz *= .3; } else if (!B.blocked(E.x, nz)) { E.z = nz; E.vx *= .3; } else { E.vx *= -.3; E.vz *= -.3; } }   /* 벽을 따라 미끄러짐 */
     const fh = Math.atan2(-(FS.x - E.x), -(FS.z - E.z)); let dh = Math.atan2(Math.sin(fh - E.head), Math.cos(fh - E.head)); E.head += dh * Math.min(1, dt * 8); E.bank += (THREE.MathUtils.clamp(-dh * 1.5, -.4, .4) - E.bank) * Math.min(1, dt * 6);
     const bob = Math.sin(t * 2.1) * .08, alive = E.dead < 0;
     foe.visible = alive || Math.floor(t * 12) % 2 === 0 && t - E.dead < .6; foe.position.set(E.x, FLY.HOVER + bob, E.z); foe.rotation.set(0, E.head, 0); foe.rotateZ(E.bank);
