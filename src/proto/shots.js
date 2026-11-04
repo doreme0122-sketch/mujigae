@@ -11,9 +11,9 @@
    무게: 꼬리 한 장 · 머리 한 장 · 부스러기 한 장 · 바닥 흔적 한 장 · 모으는 빛 한 장 · 조준 고리 한 장 = 그리기 6번 (탄 종류가 늘어도 같음) */
 import * as THREE from 'three';
 import * as A from '../core/audio.js';
-import { FLY } from './flight.js?v=11041516';
-import { BH } from './blackhole.js?v=11041516';
-import { hitWall } from './rocks.js?v=11041516';
+import { FLY } from './flight.js?v=11041519';
+import { BH } from './blackhole.js?v=11041519';
+import { hitWall } from './rocks.js?v=11041519';
 
 /* 비교표 그대로. heatT: 쉬지 않고 쏘면 과열까지(초) · coolT: 과열 뒤 다시 쏠 때까지(초) · cryB/wallB: 수정·벽에서 튕기는 횟수
    kind: 그림 결 (0 기본 · 1 서리 · 2 따뜻한 빛 · 3 빛 창 · 4 쇳물 · 5 불티 · 6 바늘 · 7 활) */
@@ -507,7 +507,7 @@ export function makeShots({ B, crystals, bh, FS, say, mobs, onKill, onDamage, on
     emit(x, FLY.HOVER, z, Math.cos(a) * sp, 1.5 + Math.random() * 3, Math.sin(a) * sp, r * 1.2, g * 1.2, b * 1.2, .09 + Math.random() * .06, .25 + Math.random() * .3); }
     emit(x, FLY.HOVER, z, 0, 0, 0, 1.2, 1.15, 1, .8, .09, 4, 0); };                                       /* 닿은 순간 번쩍 */
   /* 한 번 쏘기: k = 모은 정도(모아 쏘기만) */
-  const fire = (t, k = 1, lv = 3) => { const c = cfg; if (c.blade) { slash(t); return; } const n = c.n || 1, base = S.aimA, sp = (c.ang || 0) * Math.PI / 180, tg = S.lock;
+  const fire = (t, k = 1, lv = 3) => { const c = cfg; S.nFired = (S.nFired || 0) + (c.blade ? 1 : c.n || 1); if (c.blade) { slash(t); return; } const n = c.n || 1, base = S.aimA, sp = (c.ang || 0) * Math.PI / 180, tg = S.lock;
     for (let i = 0; i < n; i++) { const b = BU[bI = (bI + 1) % MAXB];
       let a = base + (Math.random() - .5) * (c.jit || 0) * Math.PI / 180 * 2;
       if (c.pat === 'v') a += (i ? 1 : -1) * sp / 2; else if (c.pat === 'fan') a += (i / (n - 1) - .5) * sp + (Math.random() - .5) * sp / n * .5;

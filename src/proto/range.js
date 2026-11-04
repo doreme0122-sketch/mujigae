@@ -4,8 +4,8 @@
    · 맞은 해파리 위에 피해 숫자가 떠오름 (튕겨서 맞으면 ×1.5 표시 · 쓰러뜨린 한 방은 크게)
    · 아래: 사냥터 / 수정 기둥 / 숨을 곳으로 바로 옮기기 · 해파리 다시 채우기 */
 import * as THREE from 'three';
-import { SHOT, SHOT_IDS } from './shots.js?v=11041516';
-import { makeDuel } from './duel.js?v=11041516';
+import { SHOT, SHOT_IDS } from './shots.js?v=11041519';
+import { makeDuel } from './duel.js?v=11041519';
 
 const css = `
 #rgSel{position:fixed;top:calc(env(safe-area-inset-top,0px) + 10px);left:50%;transform:translateX(-50%);display:flex;flex-direction:column;align-items:flex-start;gap:4px;z-index:7;touch-action:none}
@@ -33,7 +33,7 @@ const css = `
 #rgNums b.kill{color:#fff}
 #rgNums b sup{font-family:var(--kr);font-size:.6em;margin-left:2px;color:#e8d6ff}`;
 
-export function makeRange({ shots, fly, FS, cam, hunt, jel, crystals, bushes, say, renderer, scene, B }) {
+export function makeRange({ shots, fly, FS, cam, hunt, jel, crystals, bushes, say, renderer, scene, B, rooms }) {
   const st = document.createElement('style'); st.textContent = css; document.head.appendChild(st);
   const rgb = c => c.map(v => Math.min(255, Math.round(Math.sqrt(v) * 255))).join(',');
   /* ── 탄 고르기 ── */
@@ -87,6 +87,26 @@ export function makeRange({ shots, fly, FS, cam, hunt, jel, crystals, bushes, sa
     ['숨을 곳', () => { const b = bushes.list.reduce((m, o) => !m || Math.hypot(o.x - FS.x, o.z - FS.z) < Math.hypot(m.x - FS.x, m.z - FS.z) ? o : m, null); if (b) go(b.x + 8, b.z, -Math.PI / 2, '숨을 곳 — 비추는 탄으로 밝혀 보세요'); }],
     ['해파리 다시', () => { hunt.refill(); say?.('쓰러진 떼를 다시 채웠어요'); }],
   ];
+  /* 손풀기 (사용자 2026-11-04): 체력이 끝없는 허수아비로 탄·스킬을 차분히 시험
+     정면 가까이 서 있음(8m) · 정면 멀리 서 있음(20m) · 서서 쏨(오른쪽 앞 14m) · 좌우로 움직임(왼쪽 앞 12m) · 붙어 선 무리 다섯(왼쪽 앞 10m)
+     밀려나면 잠깐 굳었다 제자리로 돌아옴 · 옆에 벽이 있는 트인 자리 (튕김 시험) */
+  let dummies = [], trainOn = false; const tags = [];
+  const tagBox = document.createElement('div'); tagBox.style.cssText = 'position:fixed;inset:0;pointer-events:none;z-index:4'; document.body.appendChild(tagBox);
+  const findTrain = () => { let best = null, bs = -1;
+    for (let x = -170; x <= 170; x += 4) for (let z = -170; z <= 170; z += 4) { if (B.blocked(x, z) || B.region(x, z) === 17 || Math.hypot(x, z) < 75 || (rooms || []).some(([rx, rz]) => Math.hypot(rx - x, rz - z) < 34)) continue;   /* 태어나는 방 근처는 뺌 */ if (jel.userData.list.some(j => j.on && !j.dummy && Math.hypot(j.x - x, j.z - z) < 32)) continue;
+      let free = 0; for (let rr = 3; rr <= 21; rr += 3) { let ok = true; for (let k = 0; k < 24; k++) { const a = k / 24 * 6.283; if (B.blocked(x + Math.cos(a) * rr, z + Math.sin(a) * rr)) { ok = false; break; } } if (!ok) break; free = rr; }
+      let wall = 0; for (let k = 0; k < 24; k++) { const a = k / 24 * 6.283; for (let rr = free + 1; rr <= free + 8; rr += 1) if (B.blocked(x + Math.cos(a) * rr, z + Math.sin(a) * rr)) { wall++; break; } }   /* 바로 바깥에 벽이 있으면 좋음 */
+      const sc = Math.min(free, 21) + Math.min(wall, 8) * .3; if (sc > bs) { bs = sc; best = [x, z]; } }
+    return best; };
+  const startTrain = () => { const sp = findTrain(); if (!sp) { say?.('트인 자리를 못 찾았어요'); return; } const [cx, cz] = sp, x = cx - 10, z = cz; fly.userData.moveTo(x, z, -Math.PI / 2); cam.x = x; cam.z = z;   /* 나는 왼쪽에서 오른쪽(+x)을 봄 — 화면 가로가 길어서 멀리 선 것까지 보임 */
+    const P = [[8, 0, '서 있음 · 8m'], [20, 0, '서 있음 · 20m'], [14, -7, '서서 쏨', 'shooter'], [12, 8, '좌우로 움직임', 'mover']];
+    dummies = []; for (const [ox, oz, name, kind] of P) { const j = jel.userData.add(x + ox, z + oz, { group: 9000 + dummies.length, strong: kind === 'shooter' }); Object.assign(j, { dummy: true, shooter: kind === 'shooter', mover: kind === 'mover', base: [x + ox, z + oz], mAng: 0, name }); j.home = [x + ox, z + oz]; dummies.push(j); }
+    for (let i = 0; i < 5; i++) { const a = i / 5 * 6.283, ox = 6 + Math.cos(a) * 1.6, oz = -6 + Math.sin(a) * 1.6; const j = jel.userData.add(x + ox, z + oz, { group: 9100 }); Object.assign(j, { dummy: true, base: [x + ox, z + oz], name: i ? '' : '무리 다섯' }); j.home = [x + ox, z + oz]; dummies.push(j); }
+    for (const t of tags) t.remove(); tags.length = 0; for (const j of dummies) { const el = document.createElement('div'); el.style.cssText = 'position:absolute;left:0;top:0;font-size:10.5px;letter-spacing:.05em;color:rgba(255,220,200,.85);white-space:nowrap;text-shadow:0 1px 3px #000;transition:opacity .2s'; el.textContent = j.name || ''; tagBox.appendChild(el); tags.push(el); }
+    trainOn = true; shots.userData.S.nFired = 0; M.t0 = -1; M.sum = M.hits = M.kills = 0; say?.('손풀기 — 체력이 끝없는 허수아비로 시험해 보세요'); };
+  const stopTrain = () => { for (const j of dummies) j.on = false; const L = jel.userData.list; for (let i = L.length - 1; i >= 0; i--) if (L[i].dummy) L.splice(i, 1); dummies = []; for (const t of tags) t.remove(); tags.length = 0; trainOn = false; };
+  spots.push(['손풀기', b => { if (trainOn) { stopTrain(); b.textContent = '손풀기'; b.classList.remove('on'); } else { startTrain(); if (trainOn) { b.textContent = '손풀기 끝'; b.classList.add('on'); } } }]);
+  spots.push(['숫자 다시', () => { M.t0 = -1; M.sum = M.hits = M.kills = 0; shots.userData.S.nFired = 0; liveB.textContent = '0'; liveS.textContent = '쏘기 시작하면 잽니다'; }]);
   /* 반사 시험: 상대 기체가 쏘는 탄을 반사로 돌려보내 봄 (누르면 켜고 · 다시 누르면 끔) */
   let duel = null, duelBusy = false;
   spots.push(['반사 시험', async b => { if (duelBusy) return; if (!duel) { duelBusy = true; b.textContent = '준비 중…'; duel = await makeDuel({ renderer, scene, B, fly, FS, cam, say, ui: document.querySelector('#ui'), avoid: (x, z) => jel.userData.list.some(j => j.on && Math.hypot(j.x - x, j.z - z) < 34) }); duelBusy = false; }
@@ -101,6 +121,8 @@ export function makeRange({ shots, fly, FS, cam, hunt, jel, crystals, bushes, sa
       n.el.style.opacity = (k < .65 ? 1 : 1 - (k - .65) / .35).toFixed(2); n.el.style.transform = `translate(${x}px,${y}px) translate(-50%,-50%) scale(${pop.toFixed(2)})`; }
     const S = shots.userData.S; heatI.style.width = (S.heat * 100).toFixed(0) + '%';
     if (M.t0 >= 0) { const span = Math.max(.5, (t - M.last > 1.5 ? M.last : t) - M.t0 + .15), dps = M.sum / span;
-      liveB.textContent = dps.toFixed(1); liveS.textContent = `${span.toFixed(1)}초 · ${M.hits}번 맞힘 · 합 ${Math.round(M.sum)}${M.kills ? ` · ${M.kills}마리 쓰러뜨림` : ''}${t - M.last > 1.5 ? ' · 멈춤' : ''}`; } };
+      const nf = shots.userData.S.nFired || 0, cfgNow = SHOT[shots.userData.type], ratio = nf && !cfgNow.beam ? ` · 맞힌 비율 ${Math.min(100, Math.round(M.hits / nf * 100))}%` : '';
+      liveB.textContent = dps.toFixed(1); liveS.textContent = `${span.toFixed(1)}초 · ${M.hits}번 맞힘 · 합 ${Math.round(M.sum)}${ratio}${M.kills ? ` · ${M.kills}마리 쓰러뜨림` : ''}${t - M.last > 1.5 ? ' · 멈춤' : ''}`; }
+    if (trainOn) dummies.forEach((j, i) => { const el = tags[i]; if (!el) return; v.set(j.x, (j.y || 2) + 1.3 * j.s, j.z).project(camera); el.style.transform = `translate(${(v.x * .5 + .5) * cw}px,${(-v.y * .5 + .5) * ch}px) translate(-50%,-50%)`; }); };
   return { dmg, kill, update, get duel() { return duel; } };
 }
