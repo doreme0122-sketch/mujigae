@@ -11,23 +11,21 @@
    무게: 꼬리 한 장 · 머리 한 장 · 부스러기 한 장 · 바닥 흔적 한 장 · 모으는 빛 한 장 · 조준 고리 한 장 = 그리기 6번 (탄 종류가 늘어도 같음) */
 import * as THREE from 'three';
 import * as A from '../core/audio.js';
-import { FLY } from './flight.js?v=11041226';
-import { BH } from './blackhole.js?v=11041226';
-import { hitWall } from './rocks.js?v=11041226';
+import { FLY } from './flight.js?v=11041240';
+import { BH } from './blackhole.js?v=11041240';
+import { hitWall } from './rocks.js?v=11041240';
 
 /* 비교표 그대로. heatT: 쉬지 않고 쏘면 과열까지(초) · coolT: 과열 뒤 다시 쏠 때까지(초) · cryB/wallB: 수정·벽에서 튕기는 횟수
    kind: 그림 결 (0 기본 · 1 서리 · 2 따뜻한 빛 · 3 빛 창 · 4 쇳물 · 5 불티 · 6 바늘 · 7 활) */
 export const SHOT = {
-  rapid:   { name: '연발탄', role: '기본형', rate: 7, dmg: 4, speed: 44, range: 40, R: .20, heatT: 3, coolT: 2, n: 1, jit: 1, cryB: 3, wallB: 0, aimR: 30, fireSlow: .5, recoil: 1, col: [.62, 1, .32], tail: 3.4, W: .27, head: 1, kind: 0, snd: 'pew', look: '연두 빛 덩어리 + 가는 꼬리' },
-  heavy:   { name: '무거운 탄', role: '기본형', rate: 2.5, dmg: 11, speed: 26, range: 34, R: .45, heatT: 4, coolT: 2.5, n: 1, jit: 0, cryB: 1, wallB: 0, knock: 2.5, aimR: 32, fireSlow: .6, recoil: 2, shake: .22, col: [1, .55, .2], tail: 4.4, W: .62, head: 2, kind: 4, snd: 'boom', look: '주황 쇳물 덩어리 + 굵은 꼬리' },
-  charge:  { name: '모아 쏘기', role: '기본형', rate: 1.1, dmg: [6, 22], speed: 50, range: 46, R: [.25, .5], chargeT: .8, heatT: 0, heatFull: 1 / 3, coolT: 2, n: 1, jit: 0, cryB: 2, wallB: 0, pierceFull: 1, knockFull: 1, aimR: 34, fireSlow: .4, chargeSlow: .65, recoil: [.6, 2], col: [.92, .96, 1], tail: [3, 7], W: [.26, .62], head: [1, 2.3], kind: 3, snd: 'charge', look: '하얀 빛 창 (모일수록 커짐)' },
-  twin:    { name: '쌍갈래 탄', role: '거리형', rate: 5, dmg: 2.8, speed: 40, range: 28, R: .18, heatT: 3, coolT: 2, n: 2, pat: 'v', ang: 8, jit: .4, cryB: 2, wallB: 0, aimR: 24, fireSlow: .5, recoil: 0.8, col: [.32, .62, 1], tail: 3, W: .22, head: .85, kind: 0, snd: 'twin', look: '파랑 두 줄기' },
-  scatter: { name: '흩뿌림', role: '거리형', rate: 1.6, dmg: 3.5, speed: 34, range: 16, R: .14, heatT: 3.5, coolT: 2.5, n: 5, pat: 'fan', ang: 26, jit: 2, spd: .12, cryB: 0, wallB: 0, knock: .12, aimR: 16, fireSlow: .45, recoil: 1.6, col: [1, .86, .62], tail: 1.5, W: .16, head: .6, kind: 5, snd: 'scatter', look: '하얀 불티 알갱이' },
-  needle:  { name: '꿰뚫는 바늘', role: '거리형', rate: 9, dmg: 2.8, speed: 70, range: 48, R: .10, heatT: 3, coolT: 2, n: 1, jit: .5, pierce: 1, pierceK: .7, cryB: 2, wallB: 0, aimR: 34, fireSlow: .5, recoil: 0.4, col: [.8, .88, 1], tail: 7, W: .12, head: .55, kind: 6, snd: 'needle', look: '은빛 가는 바늘 + 긴 꼬리' },
-  bounce:  { name: '튕김탄', role: '머리 쓰는 형', rate: 6, dmg: 3.5, speed: 38, range: 50, R: .20, heatT: 3, coolT: 2, n: 1, jit: 1, cryB: 3, wallB: 2, aimR: 28, fireSlow: .5, recoil: 0.8, col: [.78, 1, .96], tail: 3.4, W: .24, head: .95, kind: 0, snd: 'ting', look: '맑은 빛 (튕기면 무지개 꼬리)' },
-  curve:   { name: '휘는 탄', role: '머리 쓰는 형', rate: 4, dmg: 6.5, speed: 30, range: 36, R: .25, heatT: 3, coolT: 2, n: 1, jit: 0, cryB: 2, wallB: 0, knock: .5, curve: .5, aimR: 28, fireSlow: .5, recoil: 1, col: [.72, .42, 1], tail: 4.6, W: .3, head: 1.1, kind: 7, snd: 'whee', look: '보랏빛 활처럼 휘는 꼬리' },
-  frost:   { name: '서리탄', role: '도움형', rate: 6, dmg: 3, speed: 40, range: 36, R: .20, heatT: 3.5, coolT: 2, n: 1, jit: 1, cryB: 2, wallB: 0, slow: .1, slowMax: .3, slowT: 2, aimR: 30, fireSlow: .5, recoil: 0.8, col: [.55, .88, 1], tail: 3, W: .24, head: 1.1, kind: 1, snd: 'ice', look: '하늘색 얼음 결정 + 서리 부스러기' },
-  light:   { name: '비추는 탄', role: '도움형', rate: 6, dmg: 2.5, speed: 46, range: 44, R: .20, heatT: 4, coolT: 2, n: 1, jit: 1, cryB: 3, wallB: 0, reveal: 4, revealT: 2, aimR: 34, fireSlow: .4, recoil: 0.8, col: [1, .86, .62], tail: 3.2, W: .26, head: 1.1, kind: 2, snd: 'ding', look: '따뜻한 흰 빛 · 맞은 자리에 빛 꽃' },
+  rapid:   { name: '연발탄', role: '기본형', rate: 7, dmg: 4, speed: 26, range: 11, R: .20, heatT: 3, coolT: 2, n: 1, jit: 1, cryB: 3, wallB: 0, aimR: 11, fireSlow: .5, recoil: 1, col: [.62, 1, .32], tail: 3.0, W: .27, head: 1, kind: 0, snd: 'pew', look: '연두 빛 덩어리 + 가는 꼬리' },
+  heavy:   { name: '무거운 탄', role: '기본형', rate: 2.5, dmg: 11, speed: 16, range: 9, R: .45, heatT: 4, coolT: 2.5, n: 1, jit: 0, cryB: 1, wallB: 0, knock: 2.5, aimR: 9, fireSlow: .6, recoil: 2, shake: .22, col: [1, .55, .2], tail: 3.4, W: .62, head: 2, kind: 4, snd: 'boom', look: '주황 쇳물 덩어리 + 굵은 꼬리' },
+  charge:  { name: '모아 쏘기', role: '기본형', rate: 1.1, dmg: [6, 13, 22], speed: 30, range: 13, R: [.25, .5], chargeT: .8, heatT: 0, heatFull: 1 / 3, coolT: 2, n: 1, jit: 0, cryB: 2, wallB: 0, pierceFull: 1, knockFull: 1, aimR: 13, fireSlow: .4, chargeSlow: .65, recoil: [.6, 2], col: [.92, .96, 1], tail: [2.4, 5], W: [.26, .62], head: [1, 2.3], kind: 3, snd: 'charge', look: '하얀 빛 창 (모일수록 커짐)' },
+  twin:    { name: '쌍갈래 탄', role: '거리형', rate: 5, dmg: 2.8, speed: 22, range: 8, R: .18, heatT: 3, coolT: 2, n: 2, pat: 'v', ang: 8, jit: .4, cryB: 2, wallB: 0, aimR: 8, fireSlow: .5, recoil: 0.8, col: [.32, .62, 1], tail: 2.4, W: .22, head: .85, kind: 0, snd: 'twin', look: '파랑 두 줄기' },
+  scatter: { name: '흩뿌림', role: '거리형', rate: 1.6, dmg: 3.5, speed: 18, range: 5.5, R: .14, heatT: 3.5, coolT: 2.5, n: 5, pat: 'fan', ang: 26, jit: 2, spd: .12, cryB: 0, wallB: 0, knock: .12, aimR: 5.5, fireSlow: .45, recoil: 1.6, col: [1, .86, .62], tail: 1.2, W: .16, head: .6, kind: 5, snd: 'scatter', look: '하얀 불티 알갱이' },
+  needle:  { name: '꿰뚫는 바늘', role: '거리형', rate: 9, dmg: 2.8, speed: 40, range: 13, R: .10, heatT: 3, coolT: 2, n: 1, jit: .5, pierce: 1, pierceK: .7, cryB: 2, wallB: 0, aimR: 13, fireSlow: .5, recoil: 0.4, col: [.8, .88, 1], tail: 4.6, W: .12, head: .55, kind: 6, snd: 'needle', look: '은빛 가는 바늘 + 긴 꼬리' },
+  bounce:  { name: '튕김탄', role: '머리 쓰는 형', rate: 6, dmg: 3.5, speed: 24, range: 12, R: .20, heatT: 3, coolT: 2, n: 1, jit: 1, cryB: 3, wallB: 2, aimR: 12, fireSlow: .5, recoil: 0.8, col: [.78, 1, .96], tail: 2.8, W: .24, head: .95, kind: 0, snd: 'ting', look: '맑은 빛 (튕기면 무지개 꼬리)' },
+  curve:   { name: '휘는 탄', role: '머리 쓰는 형', rate: 4, dmg: 6.5, speed: 18, range: 10, R: .25, heatT: 3, coolT: 2, n: 1, jit: 0, cryB: 2, wallB: 0, knock: .5, curve: .5, aimR: 10, fireSlow: .5, recoil: 1, col: [.72, .42, 1], tail: 3.4, W: .3, head: 1.1, kind: 7, snd: 'whee', look: '보랏빛 활처럼 휘는 꼬리' },
 };
 export const SHOT_IDS = Object.keys(SHOT);
 const pick = (v, k) => Array.isArray(v) ? v[0] + (v[1] - v[0]) * k : v;
@@ -61,7 +59,7 @@ function makeWhine() { let o = null, o2 = null, g = null;
       const t0 = c.currentTime; o.frequency.setTargetAtTime(180 + 620 * k * k, t0, .03); o2.frequency.setTargetAtTime(360 + 1240 * k * k + (k >= 1 ? 30 * Math.sin(t0 * 40) : 0), t0, .03); g.gain.setTargetAtTime(.012 + .03 * k, t0, .04); },
     stop() { if (!o) return; const t0 = A.ctx.currentTime; g.gain.setTargetAtTime(0, t0, .02); const a = o, b = o2; setTimeout(() => { try { a.stop(); b.stop(); } catch (_) {} }, 200); o = o2 = g = null; } }; }
 
-export function makeShots({ B, crystals, bh, FS, say, mobs, onKill, onDamage, onReveal }) {
+export function makeShots({ B, crystals, bh, FS, say, mobs, onKill, onDamage, onReveal, canSee }) {
   const G = new THREE.Group(); let cfg = SHOT.rapid, cid = 'rapid';
   /* ── 꼬리: 탄마다 NT점 띠 (색·결은 탄마다 → 탄을 바꿔도 날아가던 탄은 제 모습 그대로) ── */
   const tp = new Float32Array(MAXB * NT * 2 * 3), tu = new Float32Array(MAXB * NT * 2 * 3), tc = new Float32Array(MAXB * NT * 2 * 4), ti = [];
@@ -129,14 +127,35 @@ export function makeShots({ B, crystals, bh, FS, say, mobs, onKill, onDamage, on
         gl_FragColor = vec4(c, 1.); }` });
   const decal = new THREE.Mesh(dG, decM); decal.frustumCulled = false; decal.renderOrder = 6; G.add(decal); let dI = 0;
   const stamp = (x, z, r, kind, life) => { const i = dI = (dI + 1) % ND; dP.set([x, .09 + i * .001, z], i * 3); dF.set([decM.uniforms.uT.value, r, kind, life], i * 4); dG.attributes.aP.needsUpdate = dG.attributes.aF.needsUpdate = true; };
-  /* ── 모으는 빛: 기체 앞에 빛이 모여 커짐 (모아 쏘기) ── */
+  /* ── 모으는 빛 3단계 (사용자 2026-11-04: 모으는 단계를 셋으로 나눠 보여 줄 것 · 단순하지 않게)
+     1단계 '씨앗': 둘레 빛 알갱이가 소용돌이치며 빨려 들어 작은 빛 구슬이 맺힘
+     2단계 '고리': 구슬 둘레에 기울어진 빛 고리 둘이 엇갈려 돎 (힘이 갇혀 맴도는 느낌)
+     3단계 '창': 두 고리가 쏘는 쪽으로 접혀 들어가며 구슬이 앞뒤로 길어져 빛 창이 되고, 넘치는 힘에 파르르 떪
+     uSt: 0~3 (단계가 오를 때마다 0.12초에 걸쳐 넘어감) · uDir: 화면에서 쏘는 쪽 */
   const mzP = new Float32Array(3), mzG = new THREE.BufferGeometry(); mzG.setAttribute('position', new THREE.BufferAttribute(mzP, 3));
-  const muzM = new THREE.ShaderMaterial({ ...AB, uniforms: { uA: { value: 0 }, uPx: { value: 600 }, uT: { value: 0 }, uFull: { value: 0 } },
-    vertexShader: 'uniform float uPx, uA; void main(){ vec4 mv = modelViewMatrix * vec4(position, 1.); gl_Position = projectionMatrix * mv; gl_PointSize = uA > .01 ? uPx * (.5 + 1.9 * uA) / max(.1, -mv.z) : 0.; }',
-    fragmentShader: `uniform float uA, uT, uFull; void main(){ vec2 q = gl_PointCoord - .5; float r2 = dot(q, q) * 4., a = atan(q.y, q.x + 1e-5);
-      float sw = pow(max(.5 + .5 * sin(a * 4. - uT * 9. + sqrt(r2) * 14.), 0.), 3.) * exp(-r2 * 3.) * .45;                           /* 빨려 드는 소용돌이 결 */
-      float pul = 1. + uFull * .35 * sin(uT * 30.), core = exp(-r2 * 22. / (.4 + uA)) * 1.5 * pul, ring = uFull * exp(-(sqrt(r2) - .7) * (sqrt(r2) - .7) * 90.) * .6;   /* 꽉 차면 떨리며 둘레 고리 */
-      gl_FragColor = vec4((vec3(1.2, 1.25, 1.35) * core + vec3(.7, .85, 1.2) * (sw + exp(-r2 * 4.) * .35 + ring)) * uA, 1.); }` });
+  const muzM = new THREE.ShaderMaterial({ ...AB, uniforms: { uA: { value: 0 }, uPx: { value: 600 }, uT: { value: 0 }, uSt: { value: 0 }, uDir: { value: new THREE.Vector2(0, 1) }, uPop: { value: 0 } },
+    vertexShader: 'uniform float uPx, uA, uSt; void main(){ vec4 mv = modelViewMatrix * vec4(position, 1.); gl_Position = projectionMatrix * mv; gl_PointSize = uA > .01 ? uPx * (1.1 + .55 * uSt) / max(.1, -mv.z) : 0.; }',
+    fragmentShader: `uniform float uA, uT, uSt, uPop; uniform vec2 uDir;
+      void main(){ vec2 q = (gl_PointCoord - .5) * 2.; q.y = -q.y; float r = length(q), a = atan(q.y, q.x + 1e-5);
+        float s1 = clamp(uSt, 0., 1.), s2 = clamp(uSt - 1., 0., 1.), s3 = clamp(uSt - 2., 0., 1.);
+        vec2 d = normalize(uDir + vec2(1e-5, 0.)); float al = dot(q, d), sd = dot(q, vec2(-d.y, d.x));
+        /* 1단계: 소용돌이 결 + 맺히는 구슬 */
+        float sw = pow(max(.5 + .5 * sin(a * 3. - uT * 7. + r * 16.), 0.), 4.) * smoothstep(1., .25, r) * smoothstep(.05, .3, r) * (.25 + .35 * s1) * (1. - .7 * s3);
+        float orb = exp(-r * r * mix(90., 26., s1) * (1. + 2. * s3)) * (.6 + 1.1 * s1);
+        /* 2단계: 기울어진 빛 고리 둘 (앞쪽 반은 밝고 뒤쪽 반은 옅게 → 도는 입체감) */
+        float rings = 0.;
+        for (int i = 0; i < 2; i++) { float th = uT * (i == 0 ? 2.6 : -3.1) + float(i) * 1.7, c = cos(th), sn = sin(th);
+          vec2 v = vec2(c * q.x - sn * q.y, sn * q.x + c * q.y); float sq = mix(.32, .08, s3), rr = mix(.5, .26, s3);
+          float e = length(vec2(v.x, v.y / sq)), band = exp(-(e - rr) * (e - rr) * 260.), front = .45 + .55 * step(0., v.y);
+          rings += band * front; }
+        rings *= s2 * (1. - .8 * s3) * .9;
+        /* 3단계: 쏘는 쪽으로 길어진 빛 창 + 떨림 + 끝이 뾰족 */
+        float jt = sin(uT * 61.) * .02 * s3, L = mix(.2, .85, s3), al2 = al - jt;
+        float spear = exp(-sd * sd * mix(200., 70., s3)) * smoothstep(L, L * .2, abs(al2 - .12 * s3)) * s3 * 1.3;
+        float tip = exp(-((al2 - L * .9) * (al2 - L * .9) * 300. + sd * sd * 400.)) * s3 * .8;
+        float glow = exp(-r * r * 3.) * (.12 + .15 * uSt / 3.), pop = uPop * exp(-(r - .7 * (1. - uPop)) * (r - .7 * (1. - uPop)) * 60.) * .9;   /* 단계가 오르는 순간 퍼지는 빛 고리 */
+        vec3 c = vec3(1.25, 1.28, 1.35) * (orb + spear + tip) + vec3(.65, .82, 1.25) * (sw + rings + glow) + vec3(.9, .95, 1.3) * pop;
+        gl_FragColor = vec4(c * uA, 1.); }` });
   const muz = new THREE.Points(mzG, muzM); muz.frustumCulled = false; muz.renderOrder = 12; G.add(muz);
   /* 자동 조준 표시: 몬스터 발밑 바닥에 얇은 빛 고리 (사용자 2026-11-04) — 네 곳 눈금이 천천히 돎 · 표적이 바뀌면 스르르 · 쓰러지면 오므라듦 */
   const lkM = new THREE.ShaderMaterial({ ...AB, side: THREE.DoubleSide, uniforms: { uA: { value: 0 }, uT: { value: 0 } },
@@ -146,6 +165,51 @@ export function makeShots({ B, crystals, bh, FS, say, mobs, onKill, onDamage, on
       gl_FragColor = vec4(vec3(1., .95, .8) * (ring * .5 + ticks * .8 + soft) * uA, 1.); }` });
   const lk = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), lkM); lk.rotation.x = -Math.PI / 2; lk.position.y = .07; lk.renderOrder = 5; lk.frustumCulled = false; lk.visible = false; G.add(lk);
   const LK = { x: 0, z: 0, sc: 0, a: 0, done: -9, dx: 0, dz: 0 };
+  /* ── 사거리 원 (사용자 2026-11-04): 쏘기 버튼을 누르는 동안 기체 둘레 땅에 얇은 빛 원 = 이 탄이 닿는 끝
+     탄 색 빛이 원을 따라 천천히 흐름 · 과열이 오르면 원도 주황으로 달아오름 · 원 안에 보이는 적이 있는 쪽은 원이 살짝 밝아짐
+     눈금 24개는 아주 옅게 (거리를 가늠하는 자 느낌) · 누르면 0.15초에 걸쳐 바깥에서 제자리로 오므라들며 나타남 */
+  const rgM = new THREE.ShaderMaterial({ ...AB, side: THREE.DoubleSide, uniforms: { uA: { value: 0 }, uT: { value: 0 }, uR: { value: 10 }, uC: { value: new THREE.Vector3(1, 1, 1) }, uHeat: { value: 0 }, uE: { value: Array.from({ length: 6 }, () => new THREE.Vector4()) } },
+    vertexShader: 'uniform float uR; varying vec2 vP; void main(){ vP = position.xy * (uR + 1.2); gl_Position = projectionMatrix * modelViewMatrix * vec4(position.xy * (uR + 1.2), 0., 1.); }',
+    fragmentShader: `uniform float uA, uT, uR, uHeat; uniform vec3 uC; uniform vec4 uE[6]; varying vec2 vP;
+      void main(){ float r = length(vP), a = atan(vP.y, vP.x + 1e-5), e = r - uR; vec2 dv = vP / max(r, 1e-3);
+        float line = exp(-e * e * 420.), halo = exp(-e * e * 9.) * .1, inner = smoothstep(-2.2, 0., e) * step(e, 0.) * .035;
+        float flow = .55 + .45 * pow(max(.5 + .5 * sin(a * 3. - uT * 1.4), 0.), 3.);                 /* 원을 따라 흐르는 빛 */
+        float tick = pow(max(abs(cos(a * 12.)), 0.), 160.) * exp(-(e + .25) * (e + .25) * 90.) * .5;
+        float en = 0.; for (int i = 0; i < 6; i++) { float k = max(dot(dv, uE[i].xy), 0.); en += pow(k, 60.) * uE[i].z; }   /* 적이 있는 쪽 */
+        vec3 col = mix(uC * uC * 1.2 + .15, vec3(1.2, .5, .15), smoothstep(.5, 1., uHeat));
+        float k = line * (.35 + .4 * flow + 1.1 * min(en, 1.)) + halo * (.6 + en) + inner + tick;
+        gl_FragColor = vec4(col * k * uA, 1.); }` });
+  const rg = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), rgM); rg.rotation.x = -Math.PI / 2; rg.position.y = .06; rg.renderOrder = 4; rg.frustumCulled = false; rg.visible = false; G.add(rg);
+  let rgA = 0, rgR = 10;
+  /* ── 예상 경로 (모아 쏘기): 모으는 동안 나갈 길을 바닥 위에 빛 점선으로 · 수정에 튕기면 꺾여서 · 벽에서 멈춤
+     점선은 쏘는 쪽으로 흘러가고, 모은 단계만큼 밝고 촘촘해짐 · 끝에 작은 표적 점 · 꺾이는 곳마다 작은 빛 */
+  const NPP = 64, ppP = new Float32Array(NPP * 2 * 3), ppU = new Float32Array(NPP * 2 * 2), ppI = [];
+  for (let i = 0; i < NPP - 1; i++) { const p = i * 2; ppI.push(p, p + 1, p + 2, p + 1, p + 3, p + 2); }
+  const ppG = new THREE.BufferGeometry(); ppG.setAttribute('position', new THREE.BufferAttribute(ppP, 3)); ppG.setAttribute('aU', new THREE.BufferAttribute(ppU, 2)); ppG.setIndex(ppI);
+  const ppM = new THREE.ShaderMaterial({ ...AB, side: THREE.DoubleSide, uniforms: { uA: { value: 0 }, uT: { value: 0 }, uL: { value: 1 }, uSt: { value: 0 }, uBk: { value: new THREE.Vector4(-9, -9, -9, -9) } },
+    vertexShader: 'attribute vec2 aU; varying vec2 vU; void main(){ vU = aU; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.); }',
+    fragmentShader: `uniform float uA, uT, uL, uSt; uniform vec4 uBk; varying vec2 vU;
+      void main(){ float s = vU.x, w = vU.y, end = uL - s;
+        float dash = smoothstep(.15, .5, fract(s * (1.1 + .35 * uSt) - uT * 2.6)) * smoothstep(.95, .6, fract(s * (1.1 + .35 * uSt) - uT * 2.6));
+        float core = exp(-w * w * 9.), fade = smoothstep(0., 1.2, s) * smoothstep(-.2, .8, end);
+        float tipm = exp(-end * end * 6.) * 1.4, bk = 0.; for (int i = 0; i < 4; i++) bk += exp(-(s - uBk[i]) * (s - uBk[i]) * 30.);   /* 끝 점 · 꺾이는 곳 */
+        float k = core * (dash * (.35 + .25 * uSt) * fade + tipm + bk * .9);
+        gl_FragColor = vec4(vec3(.8, .9, 1.25) * k * uA, 1.); }` });
+  const pth = new THREE.Mesh(ppG, ppM); pth.frustumCulled = false; pth.renderOrder = 8; pth.visible = false; G.add(pth);
+  /* 길 그리기: 지금 자리에서 쏘는 쪽으로 사거리만큼 걸어 보며 수정 튕김·벽을 그대로 따짐 */
+  const drawPath = (x0, z0, ang, len, cry, sta) => { let x = x0, z = z0, vx = -Math.sin(ang), vz = -Math.cos(ang), s = 0, n = 0, bk = [-9, -9, -9, -9], nb = 0; const step = len / (NPP - 1), pts = [];
+    pts.push([x, z, s]);
+    while (pts.length < NPP && s < len) { let nx = x + vx * step, nz = z + vz * step;
+      const h = cry > 0 && crystals ? crystals.userData.cross(x, z, nx, nz, .12) : null;
+      if (h) { const vn = vx * h.nx + vz * h.nz; if (vn < 0) { vx -= 2 * vn * h.nx; vz -= 2 * vn * h.nz; } s += Math.hypot(h.x - x, h.z - z); x = h.x + h.nx * .05; z = h.z + h.nz * .05; cry--; if (nb < 4) bk[nb++] = s; pts.push([x, z, s]); continue; }
+      if (B.blocked(nx, nz)) { let lo = 0, hi = 1; for (let k = 0; k < 6; k++) { const m = (lo + hi) / 2; if (B.blocked(x + (nx - x) * m, z + (nz - z) * m)) hi = m; else lo = m; } s += step * lo; x += (nx - x) * lo; z += (nz - z) * lo; pts.push([x, z, s]); break; }
+      x = nx; z = nz; s += step; pts.push([x, z, s]); }
+    while (pts.length < NPP) pts.push(pts[pts.length - 1]);
+    const W = .1 + .05 * sta;
+    for (let i = 0; i < NPP; i++) { const [px_, pz_, ps] = pts[i], [qx, qz] = pts[Math.min(NPP - 1, i + 1)], [ox, oz] = pts[Math.max(0, i - 1)]; let dx = qx - ox, dz = qz - oz, l = Math.hypot(dx, dz); if (l < 1e-5) { dx = vx; dz = vz; l = 1; }
+      const sx = -dz / l * W, sz = dx / l * W, y = FLY.HOVER - .25;
+      ppP.set([px_ + sx, y, pz_ + sz, px_ - sx, y, pz_ - sz], i * 6); ppU.set([ps, 1, ps, -1], i * 4); }
+    ppG.attributes.position.needsUpdate = ppG.attributes.aU.needsUpdate = true; ppM.uniforms.uL.value = s; ppM.uniforms.uBk.value.set(...bk); };
 
   /* ── 버튼 ── */
   const st = document.createElement('style'); st.textContent = `
@@ -156,6 +220,11 @@ export function makeShots({ B, crystals, bh, FS, say, mobs, onKill, onDamage, on
     #fireB .chg{position:absolute;inset:6px;border-radius:50%;background:conic-gradient(from 0deg,rgba(235,245,255,.85) var(--c,0deg),transparent 0);opacity:0;transition:opacity .15s;
       -webkit-mask:radial-gradient(circle,transparent 39px,#000 40px,#000 42px,transparent 43px);mask:radial-gradient(circle,transparent 39px,#000 40px,#000 42px,transparent 43px)}
     #fireB.chging .chg{opacity:1}
+    #fireB .seg{position:absolute;inset:6px;border-radius:50%;opacity:0;transition:opacity .15s;background:conic-gradient(from -2deg,#05070c 0 4deg,transparent 4deg 120deg,#05070c 120deg 124deg,transparent 124deg 240deg,#05070c 240deg 244deg,transparent 244deg);   /* 세 칸으로 나눈 틈 */
+      -webkit-mask:radial-gradient(circle,transparent 38px,#000 39px,#000 43px,transparent 44px);mask:radial-gradient(circle,transparent 38px,#000 39px,#000 43px,transparent 44px)}
+    #fireB.chging .seg{opacity:1}
+    #fireB.st1 .chg{filter:drop-shadow(0 0 3px rgba(200,225,255,.6))}#fireB.st2 .chg{filter:drop-shadow(0 0 5px rgba(200,225,255,.85))}#fireB.st3 .chg{filter:drop-shadow(0 0 8px #fff);animation:stF .09s infinite alternate}
+    @keyframes stF{from{transform:translate(-.6px,0)}to{transform:translate(.6px,.4px)}}
     #fireB .knob{position:absolute;left:50%;top:50%;width:40px;height:40px;margin:-20px 0 0 -20px;border-radius:50%;transition:opacity .2s;
       background:radial-gradient(circle at 50% 42%,#fff 0 3px,rgba(var(--sc,185,255,74),.95) 4px,rgba(var(--sc,185,255,74),.45) 9px,rgba(var(--sc,185,255,74),0) 20px)}
     #fireB .knob::after{content:'';position:absolute;left:50%;top:-2px;width:4px;height:16px;margin-left:-2px;border-radius:2px;background:linear-gradient(rgba(255,255,255,0),rgba(255,255,255,.8));opacity:var(--ka,.0)}
@@ -164,7 +233,7 @@ export function makeShots({ B, crystals, bh, FS, say, mobs, onKill, onDamage, on
     #fireB.hot{animation:fbHot .5s infinite alternate}#fireB.hot .knob{opacity:.35}#fireB.hot .lab{color:#ff9a5a}
     @keyframes fbHot{from{box-shadow:0 0 0 1.5px rgba(255,110,50,.55) inset,0 0 10px rgba(255,90,30,.2)}to{box-shadow:0 0 0 1.5px rgba(255,140,60,.9) inset,0 0 26px rgba(255,90,30,.45)}}`;
   document.head.appendChild(st);
-  const btn = document.createElement('div'); btn.id = 'fireB'; btn.innerHTML = '<div class="ring"></div><div class="chg"></div><div class="knob"></div><div class="lab"></div>'; document.body.appendChild(btn);
+  const btn = document.createElement('div'); btn.id = 'fireB'; btn.innerHTML = '<div class="ring"></div><div class="chg"></div><div class="seg"></div><div class="knob"></div><div class="lab"></div>'; document.body.appendChild(btn);
   const knob = btn.querySelector('.knob'), lab = btn.querySelector('.lab');
   const I = { held: false, pid: null, drag: false, ang: 0, key: false };
   btn.addEventListener('pointerdown', e => { e.stopPropagation(); e.preventDefault(); if (I.pid !== null) return; I.pid = e.pointerId; I.held = true; I.drag = false; I.ang = FS.head; try { btn.setPointerCapture(e.pointerId); } catch (_) {} });
@@ -180,7 +249,7 @@ export function makeShots({ B, crystals, bh, FS, say, mobs, onKill, onDamage, on
   const whine = makeWhine();
   G.userData.S = S;
   let scRGB = '185,255,74';
-  const setType = id => { if (!SHOT[id]) return; cid = id; cfg = SHOT[id]; S.heat = 0; S.over = false; S.ch = 0; S.acc = .999; whine.stop();
+  const setType = id => { if (!SHOT[id]) return; cid = id; cfg = SHOT[id]; S.ch = 0; S.stage = 0; S.acc = .999; whine.stop();   /* 열은 그대로 이어짐 (바꿔서 식히는 꼼수 막음) */
     scRGB = cfg.col.map(v => Math.min(255, Math.round(Math.sqrt(v) * 255))).join(','); btn.style.setProperty('--sc', scRGB); lab.textContent = cfg.name; };
   setType('rapid');
   G.userData.setType = setType; Object.defineProperty(G.userData, 'type', { get: () => cid });
@@ -190,14 +259,14 @@ export function makeShots({ B, crystals, bh, FS, say, mobs, onKill, onDamage, on
     emit(x, FLY.HOVER, z, Math.cos(a) * sp, 1.5 + Math.random() * 3, Math.sin(a) * sp, r * 1.2, g * 1.2, b * 1.2, .09 + Math.random() * .06, .25 + Math.random() * .3); }
     emit(x, FLY.HOVER, z, 0, 0, 0, 1.2, 1.15, 1, .8, .09, 4, 0); };                                       /* 닿은 순간 번쩍 */
   /* 한 번 쏘기: k = 모은 정도(모아 쏘기만) */
-  const fire = (t, k = 1) => { const c = cfg, n = c.n || 1, base = S.aimA, sp = (c.ang || 0) * Math.PI / 180, tg = S.lock;
+  const fire = (t, k = 1, lv = 3) => { const c = cfg, n = c.n || 1, base = S.aimA, sp = (c.ang || 0) * Math.PI / 180, tg = S.lock;
     for (let i = 0; i < n; i++) { const b = BU[bI = (bI + 1) % MAXB];
       let a = base + (Math.random() - .5) * (c.jit || 0) * Math.PI / 180 * 2;
       if (c.pat === 'v') a += (i ? 1 : -1) * sp / 2; else if (c.pat === 'fan') a += (i / (n - 1) - .5) * sp + (Math.random() - .5) * sp / n * .5;
       let side = 0; if (c.curve) { side = S.side; S.side = -S.side; a += side * c.curve; }                  /* 휘는 탄: 한 발씩 번갈아 왼쪽·오른쪽으로 나가서 활처럼 휘어 들어감 */
-      const v = c.speed * (1 + (Math.random() - .5) * 2 * (c.spd || 0)), dx = -Math.sin(a), dz = -Math.cos(a), full = k >= .98;
+      const v = c.speed * (1 + (Math.random() - .5) * 2 * (c.spd || 0)), dx = -Math.sin(a), dz = -Math.cos(a), full = c.chargeT ? lv >= 3 : k >= .98;
       Object.assign(b, { on: true, c, x: FS.x + dx * 1.15, z: FS.z + dz * 1.15, vx: dx * v, vz: dz * v, age: 0, life: c.range / c.speed, bo: 0, cbo: 0, cry: c.cryB, wall: c.wallB, dead: -1,
-        dmg: pick(c.dmg, k), R: pick(c.R, k), W: pick(c.W, k), tail: pick(c.tail, k), head: pick(c.head, k), hits: 1 + (c.pierce || (full ? c.pierceFull || 0 : 0)), knock: c.knock || (full ? c.knockFull || 0 : 0),
+        dmg: Array.isArray(c.dmg) && c.dmg.length === 3 ? c.dmg[lv - 1] : pick(c.dmg, k), R: pick(c.R, k), W: pick(c.W, k), tail: pick(c.tail, k), head: pick(c.head, k), hits: 1 + (c.pierce || (full ? c.pierceFull || 0 : 0)), knock: c.knock || (full ? c.knockFull || 0 : 0),
         tg: c.curve ? tg : null, tx: FS.x - Math.sin(base) * c.range * .55, tz: FS.z - Math.cos(base) * c.range * .55, side });
       b.hist.length = 0; b.hitL.length = 0; b.hist.push([FS.x + dx * .6, FS.z + dz * .6]); }
     const dx = -Math.sin(base), dz = -Math.cos(base), big = c.kind === 4 || c.kind === 3;
@@ -205,7 +274,7 @@ export function makeShots({ B, crystals, bh, FS, say, mobs, onKill, onDamage, on
     if (c.kind === 5) for (let i = 0; i < 10; i++) { const a = base + (Math.random() - .5) * sp * 1.2, s = 6 + Math.random() * 8; emit(FS.x + dx * 1.2, FLY.HOVER, FS.z + dz * 1.2, -Math.sin(a) * s, .5 + Math.random(), -Math.cos(a) * s, 1.3, 1, .6, .05 + Math.random() * .04, .12 + Math.random() * .12); }   /* 흩뿌림: 총구에서 불티가 확 퍼짐 */
     if (c.kind === 4) for (let i = 0; i < 8; i++) { const a = base + Math.PI + (Math.random() - .5) * 1.6, s = 2 + Math.random() * 3; emit(FS.x + dx * .8, FLY.HOVER, FS.z + dz * .8, -Math.sin(a) * s, 1 + Math.random(), -Math.cos(a) * s, 1.2, .5, .15, .07, .3 + Math.random() * .3); }   /* 무거운 탄: 뒤로 튀는 쇳물 방울 */
     FS.rc = Math.min(2, pick(c.recoil, k)); if (c.shake) FS.shake = Math.max(FS.shake || 0, c.shake);
-    if (c.kind === 3 && k > .9) FS.shake = Math.max(FS.shake || 0, .3);
+    if (c.kind === 3 && lv >= 3) FS.shake = Math.max(FS.shake || 0, .3);
     play(c.snd, k); };
   const dmgHit = (b, j, t) => { const c = b.c, first = !b.hitL.length, d = b.dmg * (b.bo > 0 ? 1.5 : 1) * (first ? 1 : c.pierceK || .7);
     const l = Math.hypot(b.vx, b.vz) || 1, killed = mobs.userData.hit(j, t, b.vx / l, b.vz / l, d, { knock: b.knock, slow: c.slow, slowMax: c.slowMax, slowT: c.slowT });
@@ -218,25 +287,35 @@ export function makeShots({ B, crystals, bh, FS, say, mobs, onKill, onDamage, on
     const c = cfg, want = I.held || I.key, shooting = want && !S.over;
     /* 자동 조준 (사용자 2026-11-04): 한 번 잡은 적은 쓰러지거나 멀어질 때까지 계속 노림 → 쓰러지면 0.15초 뒤 그 바로 옆 적으로 넘어감 · 조준 거리는 탄마다 */
     { const R2 = c.aimR * c.aimR, alive = j => j && j.on && j.dieT < 0, d2 = (j, x, z) => (j.x - x) * (j.x - x) + (j.z - z) * (j.z - z);
-      const near = (x, z) => { let b = null, bd = 1e18; if (mobs) for (const j of mobs.userData.list) { if (!alive(j) || d2(j, FS.x, FS.z) > R2) continue; const d = d2(j, x, z); if (d < bd) { bd = d; b = j; } } return b; };
+      const vis = j => !canSee || canSee(j.x, j.z);   /* 안 보이는 곳(안개·벽 뒤)의 적은 자동 조준 안 함 (사용자 2026-11-04) */
+      const near = (x, z) => { let b = null, bd = 1e18; if (mobs) for (const j of mobs.userData.list) { if (!alive(j) || d2(j, FS.x, FS.z) > R2 || !vis(j)) continue; const d = d2(j, x, z); if (d < bd) { bd = d; b = j; } } return b; };
       if (S.lock && !alive(S.lock)) { if (S.lock.dieT > 0) { LK.done = t; LK.dx = S.lock.x; LK.dz = S.lock.z; S.next = t + .15; } S.lockLost = S.lock; S.lock = null; }
-      if (S.lock && d2(S.lock, FS.x, FS.z) > R2) S.lock = null;
+      if (S.lock && (d2(S.lock, FS.x, FS.z) > R2 || !vis(S.lock))) S.lock = null;
       if (!(I.held && I.drag) && want && !S.lock && t >= (S.next || 0)) S.lock = S.lockLost && S.lockLost.dieT > 0 ? near(S.lockLost.x, S.lockLost.z) : near(FS.x, FS.z);   /* 쓰러진 적 바로 옆부터 */
       if (!want && !(S.ch > 0)) { S.lock = null; S.lockLost = null; } }
     if (want) S.aimA = I.held && I.drag ? I.ang : S.lock ? Math.atan2(-(S.lock.x - FS.x), -(S.lock.z - FS.z)) : t < (S.next || 0) ? S.aimA : (I.key ? FS.mh ?? FS.head : S.aimA0 ?? FS.head);
     if (!want) S.aimA0 = FS.head;
     FS.aim = want ? S.aimA : null; FS.fireSlow = c.fireSlow;
     const heatPer = c.heatT ? 1 / (c.heatT * c.rate) : 0, cool = .7 / (c.coolT * .8);
-    if (c.chargeT) {   /* 모아 쏘기: 누르는 동안 모음(65% 느려짐) → 떼면 나감. 빨라도 1초에 1.1발 */
-      if (shooting && t >= S.chOk) { const k0 = S.ch; S.ch = Math.min(1, S.ch + dt / c.chargeT); FS.fireSlow = c.chargeSlow; whine.set(S.ch);
-        if (k0 < 1 && S.ch >= 1) { emit(FS.x, FLY.HOVER, FS.z, 0, 0, 0, 1, 1.1, 1.3, 1.6, .12, 6, 0); bounceTing(2900); }   /* 꽉 참: 번쩍 + 맑은 울림 */
+    if (c.chargeT) {   /* 모아 쏘기: 누르는 동안 모음(65% 느려짐) → 떼면 나감. 세 단계 (0.25초 · 0.55초 · 0.8초) — 피해 6 → 13 → 22 */
+      const TH = [.3, .68, 1];
+      if (shooting && t >= S.chOk) { S.ch = Math.min(1, S.ch + dt / c.chargeT); FS.fireSlow = c.chargeSlow; whine.set(S.ch);
+        const st = S.ch >= TH[2] ? 3 : S.ch >= TH[1] ? 2 : S.ch >= TH[0] ? 1 : 0;
+        if (st > (S.stage || 0)) { S.stage = st; S.stT = t; const nx = FS.x - Math.sin(S.aimA) * 1.3, nz = FS.z - Math.cos(S.aimA) * 1.3;   /* 단계가 오름: 빛 고리가 퍼지고 · 알갱이가 튐 · 한 단계 높은 맑은 울림 */
+          for (let i = 0; i < 8 + st * 6; i++) { const a = Math.random() * 6.283, v = 2 + st * 1.5 + Math.random() * 2; emit(nx, FLY.HOVER, nz, Math.cos(a) * v, Math.random() * 1.5, Math.sin(a) * v, .8, .9, 1.3, .05 + .02 * st, .25 + Math.random() * .2, 0, 2); }
+          bounceTing([0, 1900, 2500, 3200][st]); if (st === 3) { emit(nx, FLY.HOVER, nz, 0, 0, 0, 1, 1.1, 1.3, 1.6, .12, 6, 0); FS.shake = Math.max(FS.shake || 0, .15); } }
         const nx = FS.x - Math.sin(S.aimA) * 1.3, nz = FS.z - Math.cos(S.aimA) * 1.3;
-        if (Math.random() < dt * (20 + 50 * S.ch)) { const a = Math.random() * 6.283, r = 1.6 + Math.random() * 1.6; emit(nx + Math.cos(a) * r, FLY.HOVER + (Math.random() - .5), nz + Math.sin(a) * r, -Math.cos(a) * r * 4, 0, -Math.sin(a) * r * 4, .8, .9, 1.3, .06, .22, 0, 0, 0); }   /* 둘레 빛이 빨려 듦 */
-        mzP[0] = nx; mzP[1] = FLY.HOVER; mzP[2] = nz; mzG.attributes.position.needsUpdate = true; }
-      else if (!want && S.ch > 0) { if (!S.over) { fire(t, S.ch); S.lastShot = t; S.heat += c.heatFull * Math.max(.3, S.ch); if (S.heat >= 1) { S.heat = 1; S.over = true; FS.heatFlash = 1; FS.shake = 1; flare(); crack(); } }
-        S.chOk = t + Math.max(.05, 1 / c.rate - c.chargeT); S.ch = 0; whine.stop(); }
-      muzM.uniforms.uA.value += ((S.ch > 0 ? .25 + .75 * S.ch : 0) - muzM.uniforms.uA.value) * Math.min(1, dt * 20); muzM.uniforms.uFull.value = S.ch >= 1 ? 1 : 0; }
-    else { muzM.uniforms.uA.value = 0;
+        if (Math.random() < dt * (24 + 40 * S.ch) * (S.stage >= 3 ? .4 : 1)) { const a = Math.random() * 6.283, r = 1.4 + Math.random() * 1.8; emit(nx + Math.cos(a) * r, FLY.HOVER + (Math.random() - .5), nz + Math.sin(a) * r, -Math.cos(a) * r * 4 - Math.sin(a) * 2, 0, -Math.sin(a) * r * 4 + Math.cos(a) * 2, .8, .9, 1.3, .06, .22, 0, 0, 0); }   /* 둘레 빛이 소용돌이치며 빨려 듦 */
+        if (S.stage >= 3 && Math.random() < dt * 30) { const a = S.aimA + Math.PI + (Math.random() - .5) * .8, v = 3 + Math.random() * 3; emit(nx, FLY.HOVER, nz, -Math.sin(a) * v, Math.random(), -Math.cos(a) * v, .9, 1, 1.3, .04, .18, 0, 1); }   /* 넘치는 힘: 뒤로 새는 불티 */
+        mzP[0] = nx; mzP[1] = FLY.HOVER; mzP[2] = nz; mzG.attributes.position.needsUpdate = true;
+        drawPath(nx, nz, S.aimA, c.range, c.cryB, S.stage); }
+      else if (!want && S.ch > 0) { const lv = Math.max(1, S.stage || 0); if (!S.over) { fire(t, lv / 3, lv); S.lastShot = t; S.heat += c.heatFull * lv / 3; if (S.heat >= 1) { S.heat = 1; S.over = true; FS.heatFlash = 1; FS.shake = 1; flare(); crack(); } }
+        S.chOk = t + Math.max(.05, 1 / c.rate - c.chargeT); S.ch = 0; S.stage = 0; whine.stop(); muzM.uniforms.uPop.value = 0; }
+      const on = S.ch > 0, stv = (S.stage || 0) - Math.max(0, 1 - (t - (S.stT || 0)) / .12) * (S.stage ? 1 : 0);   /* 단계 사이를 0.12초에 걸쳐 넘어감 */
+      muzM.uniforms.uA.value += ((on ? .55 + .45 * S.ch : 0) - muzM.uniforms.uA.value) * Math.min(1, dt * 20); muzM.uniforms.uSt.value = on ? Math.max(S.ch / TH[0] * .6, stv) : 0;
+      muzM.uniforms.uPop.value = on ? Math.max(0, 1 - (t - (S.stT || -9)) / .3) : 0; muzM.uniforms.uDir.value.set(-Math.sin(S.aimA), Math.cos(S.aimA));
+      ppM.uniforms.uA.value += ((on ? 1 : 0) - ppM.uniforms.uA.value) * Math.min(1, dt * 14); ppM.uniforms.uSt.value = S.stage || 0; ppM.uniforms.uT.value = t; pth.visible = ppM.uniforms.uA.value > .01; }
+    else { muzM.uniforms.uA.value = 0; pth.visible = false;
       if (shooting) { S.acc += dt * c.rate; if (S.acc > 1.5) S.acc = 1.5; while (S.acc >= 1) { S.acc -= 1; fire(t); S.lastShot = t; S.heat += heatPer; if (S.heat >= 1) { S.heat = 1; S.over = true; S.acc = 0; FS.heatFlash = 1; FS.shake = 1; flare(); crack(); break; } } }
       else S.acc = Math.min(.999, S.acc + dt * c.rate); }                                                     /* 쉬는 동안 다음 발이 준비됨 → 누르는 순간 바로 첫 발 */
     if ((t - S.lastShot > .3 && !(S.ch > 0)) || S.over) S.heat = Math.max(0, S.heat - dt * cool * (S.over ? .8 : 1));
@@ -244,7 +323,13 @@ export function makeShots({ B, crystals, bh, FS, say, mobs, onKill, onDamage, on
     /* 버튼: 열 고리 · 모으는 고리 */
     { const h = S.heat, hc = S.over ? '#ff6a2a' : h > .7 ? '#ffb347' : h > .4 ? '#e8ff8a' : `rgb(${scRGB})`;
       btn.style.setProperty('--h', (h * 360).toFixed(1) + 'deg'); btn.style.setProperty('--hc', hc); btn.style.setProperty('--c', (S.ch * 360).toFixed(1) + 'deg');
-      btn.classList.toggle('hot', S.over); btn.classList.toggle('on', want && !S.over); btn.classList.toggle('chging', S.ch > 0); lab.textContent = S.over ? '과열' : S.ch >= 1 ? c.name + ' · 꽉' : c.name; }
+      btn.classList.toggle('hot', S.over); btn.classList.toggle('on', want && !S.over); btn.classList.toggle('chging', S.ch > 0); for (let k = 1; k <= 3; k++) btn.classList.toggle('st' + k, S.ch > 0 && (S.stage || 0) === k); lab.textContent = S.over ? '과열' : S.ch > 0 && S.stage ? c.name + ' · ' + S.stage + '단계' : c.name; }
+    /* 사거리 원: 누르는 동안 (모아 쏘기는 모으는 동안) */
+    { const on = want || S.ch > 0; rgA += ((on ? 1 : 0) - rgA) * Math.min(1, dt * (on ? 12 : 6)); rg.visible = rgA > .01;
+      if (rg.visible) { const goal = c.range, k0 = on && rgA < .5 ? 1.25 : 1; rgR += (goal * k0 - rgR) * Math.min(1, dt * 14); rg.position.set(FS.x, .06, FS.z);
+        rgM.uniforms.uR.value = rgR; rgM.uniforms.uA.value = rgA; rgM.uniforms.uT.value = t; rgM.uniforms.uHeat.value = S.heat; rgM.uniforms.uC.value.set(...c.col);
+        const E = rgM.uniforms.uE.value, cand = []; if (mobs) for (const j of mobs.userData.list) { if (!j.on || j.dieT > 0) continue; const dx = j.x - FS.x, dz = j.z - FS.z, d = Math.hypot(dx, dz); if (d > c.range || d < .5 || (canSee && !canSee(j.x, j.z))) continue; cand.push([d, dx / d, -dz / d, j === S.lock]); }
+        cand.sort((a, b) => a[0] - b[0]); for (let i = 0; i < 6; i++) { const q = cand[i]; if (q) E[i].set(q[1], q[2], q[3] ? 1 : .5, 0); else E[i].set(0, 0, 0, 0); } } }
     /* 과열은 기체 금속이 달아오르는 것으로 (시안 B · shipheat.js) — 기체에는 50%부터 보임 */
     { FS.heatV = S.heat; FS.heatFlash = Math.max(0, (FS.heatFlash || 0) - dt * 2.2);
       const L = S.lock, de = t - LK.done;
@@ -283,7 +368,7 @@ export function makeShots({ B, crystals, bh, FS, say, mobs, onKill, onDamage, on
       /* 수정 기둥: 튕김 */
       const hit = b.cry > 0 && crystals ? crystals.userData.cross(b.x, b.z, nx, nz, .12) : null;
       if (hit) { const vn = b.vx * hit.nx + b.vz * hit.nz; if (vn < 0) { b.vx -= 2 * vn * hit.nx; b.vz -= 2 * vn * hit.nz; }
-        b.x = hit.x + hit.nx * .05; b.z = hit.z + hit.nz * .05; b.bo++; b.cbo++; b.cry--; b.life = Math.max(b.life, b.age + .5); b.hist.push([b.x, b.z]); b.tg = null;
+        b.x = hit.x + hit.nx * .05; b.z = hit.z + hit.nz * .05; b.bo++; b.cbo++; b.cry--; b.hist.push([b.x, b.z]); b.tg = null;
         crystals.userData.flash(t, hit.x - hit.nx * .1, FLY.HOVER, hit.z - hit.nz * .1); hitSparks(b.x, b.z, hit.nx, hit.nz, 10, true); continue; }
       /* 벽·와드: 그 벽 무늬가 빛남 · 튕김탄은 벽에서도 튕김(두 번) */
       if (B.blocked(nx, nz)) { let lo = 0, hi = 1; for (let k = 0; k < 6; k++) { const m = (lo + hi) / 2; if (B.blocked(b.x + (nx - b.x) * m, b.z + (nz - b.z) * m)) hi = m; else lo = m; }
@@ -291,7 +376,7 @@ export function makeShots({ B, crystals, bh, FS, say, mobs, onKill, onDamage, on
         if (b.wall > 0) { const e = .6, gx = B.field(b.x + e, b.z) - B.field(b.x - e, b.z), gz = B.field(b.x, b.z + e) - B.field(b.x, b.z - e), gl = Math.hypot(gx, gz);   /* 벽이 보는 쪽 = 벽 지도가 옅어지는 쪽 */
           let wx = -b.vx / l, wz = -b.vz / l; if (gl > 1e-4) { wx = -gx / gl; wz = -gz / gl; }
           const vn = b.vx * wx + b.vz * wz; if (vn < 0) { b.vx -= 2 * vn * wx; b.vz -= 2 * vn * wz; } else { b.vx = -b.vx; b.vz = -b.vz; }
-          b.wall--; b.bo++; b.life = Math.max(b.life, b.age + .5); b.hist.push([b.x, b.z]); b.tg = null; hitSparks(b.x, b.z, wx, wz, 9, true); bounceTing(2200 + b.bo * 300); continue; }
+          b.wall--; b.bo++; b.hist.push([b.x, b.z]); b.tg = null; hitSparks(b.x, b.z, wx, wz, 9, true); bounceTing(2200 + b.bo * 300); continue; }
         hitSparks(b.x, b.z, -b.vx / l, -b.vz / l, 8, b.bo > 0, bc.kind === 1 ? [.6, .9, 1.2] : null); thud(.03);
         if (bc.kind === 1) stamp(b.x, b.z, 1.2, 1, .9); else if (bc.kind === 4) stamp(b.x, b.z, 2.2, 2, .45);
         reveal(b.x, b.z, bc); b.dead = 0; continue; }
