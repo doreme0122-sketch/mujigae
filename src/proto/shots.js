@@ -11,9 +11,9 @@
    무게: 꼬리 한 장 · 머리 한 장 · 부스러기 한 장 · 조준 빛 한 장 = 그리기 4번 */
 import * as THREE from 'three';
 import * as A from '../core/audio.js';
-import { FLY } from './flight.js?v=11040953';
-import { BH } from './blackhole.js?v=11040953';
-import { hitWall } from './rocks.js?v=11040953';
+import { FLY } from './flight.js?v=11041006';
+import { BH } from './blackhole.js?v=11041006';
+import { hitWall } from './rocks.js?v=11041006';
 
 export const SHOT = {
   basic: { name: '기본탄', rate: 7, speed: 44, life: 1.1, heat: .0476, cool: .44, coolWait: .3, lock: .3,   /* 쉬지 않고 쏘면 약 3초에 과열 · 과열되면 약 2초 식어야 다시 (사용자 2026-11-04: 5초는 너무 김) */ tail: 3.4, W: .27, col: [.62, 1, .32], spread: .012, bounces: 3 }
@@ -88,13 +88,15 @@ export function makeShots({ B, crystals, bh, FS, say, mobs, onKill }) {
     fragmentShader: 'uniform vec3 uC; uniform float uA; void main(){ vec2 q = gl_PointCoord - .5; float r2 = dot(q, q) * 4.; gl_FragColor = vec4(uC * (exp(-r2 * 16.) * 1.2 + exp(-r2 * 4.) * .35) * uA, 1.); }' }));
   muz.frustumCulled = false; muz.renderOrder = 12; G.add(muz);
   /* 자동 조준 고리 */
-  const lkP = new Float32Array(3), lkG = new THREE.BufferGeometry(); lkG.setAttribute('position', new THREE.BufferAttribute(lkP, 3)); let lkA = 0;
-  const lk = new THREE.Points(lkG, new THREE.ShaderMaterial({ ...AB, uniforms: { uA: { value: 0 }, uT: { value: 0 }, uS: { value: 1 }, uPx: { value: 600 } },
-    vertexShader: 'uniform float uPx, uA, uS; void main(){ vec4 mv = modelViewMatrix * vec4(position, 1.); gl_Position = projectionMatrix * mv; gl_PointSize = uA > .01 ? uPx * 1.55 * sqrt(uS) * (1.25 - .25 * uA) / max(.1, -mv.z) : 0.; }',
-    fragmentShader: `uniform float uA, uT; void main(){ vec2 q = gl_PointCoord - .5; float r = length(q) * 2., a = atan(q.y, q.x + 1e-5) + uT * 1.2;
-      float ring = exp(-(r - .8) * (r - .8) * 300.), ticks = smoothstep(.7, .95, abs(cos(a * 2.))) * exp(-(r - .88) * (r - .88) * 120.);   /* 가는 고리 + 네 곳 눈금이 천천히 돎 */
-      gl_FragColor = vec4(vec3(1., .95, .8) * (ring * .35 + ticks * .7) * uA, 1.); }` }));
-  lk.frustumCulled = false; lk.renderOrder = 12; G.add(lk);
+  /* 자동 조준 표시: 몬스터 발밑 바닥에 얇은 빛 고리 (사용자 2026-11-04: 몸 높이에 띄우면 둥실거림·비스듬한 카메라 때문에 가운데에서 벗어나 보임)
+     네 곳 눈금이 천천히 돎 · 표적이 바뀌면 새 표적 발밑으로 스르르 미끄러져 감 · 표적이 쓰러지면 그 자리에서 작게 오므라들며 '처리'를 보여 줌 */
+  const lkM = new THREE.ShaderMaterial({ ...AB, side: THREE.DoubleSide, uniforms: { uA: { value: 0 }, uT: { value: 0 } },
+    vertexShader: 'varying vec2 vU; void main(){ vU = uv * 2. - 1.; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.); }',
+    fragmentShader: `uniform float uA, uT; varying vec2 vU; void main(){ float r = length(vU), a = atan(vU.y, vU.x + 1e-5) + uT * 1.2;
+      float ring = exp(-(r - .82) * (r - .82) * 700.), ticks = smoothstep(.75, .97, abs(cos(a * 2.))) * exp(-(r - .9) * (r - .9) * 350.), soft = exp(-(r - .8) * (r - .8) * 40.) * .12;
+      gl_FragColor = vec4(vec3(1., .95, .8) * (ring * .5 + ticks * .8 + soft) * uA, 1.); }` });
+  const lk = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), lkM); lk.rotation.x = -Math.PI / 2; lk.position.y = .07; lk.renderOrder = 5; lk.frustumCulled = false; lk.visible = false; G.add(lk);
+  const LK = { x: 0, z: 0, sc: 0, a: 0, done: -9, dx: 0, dz: 0 };
 
   /* ── 버튼 ── */
   const st = document.createElement('style'); st.textContent = `
@@ -135,13 +137,18 @@ export function makeShots({ B, crystals, bh, FS, say, mobs, onKill }) {
 
   const tmp = [0, 0];
   G.userData.update = (t, dt, px) => {
-    headM.uniforms.uPx.value = px * .75; partM.uniforms.uPx.value = px; headM.uniforms.uT.value = t; tailM.uniforms.uT.value = t; aimM.uniforms.uT.value = t; muz.material.uniforms.uPx.value = px; lk.material.uniforms.uPx.value = px;
+    headM.uniforms.uPx.value = px * .75; partM.uniforms.uPx.value = px; headM.uniforms.uT.value = t; tailM.uniforms.uT.value = t; aimM.uniforms.uT.value = t; muz.material.uniforms.uPx.value = px;
     /* 조준·쏘기 */
     const want = I.held || I.key, shooting = want && !S.over;
     /* 조준 (사용자 2026-11-04): 누르고만 있으면 가장 가까운 적을 자동 조준 · 끌면 끈 방향 그대로 */
-    S.lock = null;
-    if (want && !(I.held && I.drag)) { let bd = 24 * 24; if (mobs) for (const j of mobs.userData.list) { if (!j.on || j.dieT > 0) continue; const dx = j.x - FS.x, dz = j.z - FS.z, d = dx * dx + dz * dz; if (d < bd) { bd = d; S.lock = j; } } }
-    if (want) S.aimA = I.held && I.drag ? I.ang : S.lock ? Math.atan2(-(S.lock.x - FS.x), -(S.lock.z - FS.z)) : (I.key ? FS.mh ?? FS.head : S.aimA0 ?? FS.head);
+    /* 자동 조준 (사용자 2026-11-04): 한 번 잡은 적은 쓰러지거나 멀어질 때까지 계속 노림 → 쓰러지면 0.15초 뒤 그 바로 옆 적으로 넘어감 · 조준 거리 30m */
+    { const R2 = 30 * 30, alive = j => j && j.on && j.dieT < 0, d2 = (j, x, z) => (j.x - x) * (j.x - x) + (j.z - z) * (j.z - z);
+      const near = (x, z) => { let b = null, bd = 1e18; if (mobs) for (const j of mobs.userData.list) { if (!alive(j) || d2(j, FS.x, FS.z) > R2) continue; const d = d2(j, x, z); if (d < bd) { bd = d; b = j; } } return b; };
+      if (S.lock && !alive(S.lock)) { if (S.lock.dieT > 0) { LK.done = t; LK.dx = S.lock.x; LK.dz = S.lock.z; S.next = t + .15; } S.lockLost = S.lock; S.lock = null; }
+      if (S.lock && d2(S.lock, FS.x, FS.z) > R2) S.lock = null;
+      if (!(I.held && I.drag) && want && !S.lock && t >= (S.next || 0)) S.lock = S.lockLost && S.lockLost.dieT > 0 ? near(S.lockLost.x, S.lockLost.z) : near(FS.x, FS.z);   /* 쓰러진 적 바로 옆부터 */
+      if (!want) { S.lock = null; S.lockLost = null; } }
+    if (want) S.aimA = I.held && I.drag ? I.ang : S.lock ? Math.atan2(-(S.lock.x - FS.x), -(S.lock.z - FS.z)) : t < (S.next || 0) ? S.aimA : (I.key ? FS.mh ?? FS.head : S.aimA0 ?? FS.head);
     if (!want) S.aimA0 = FS.head;
     FS.aim = want ? S.aimA : null;
     if (shooting) { S.acc += dt * cfg.rate; if (S.acc > 1.5) S.acc = 1.5; while (S.acc >= 1) { S.acc -= 1; fire(t); S.lastShot = t; S.heat += cfg.heat; if (S.heat >= 1) { S.heat = 1; S.over = true; S.acc = 0; FS.heatFlash = 1; FS.shake = 1; flare(); crack(); break; } } }
@@ -159,8 +166,12 @@ export function makeShots({ B, crystals, bh, FS, say, mobs, onKill }) {
     { FS.heatV = S.heat; FS.heatFlash = Math.max(0, (FS.heatFlash || 0) - dt * 2.2);
       muz.material.uniforms.uA.value = 0;
       /* 자동 조준 표시: 노리는 적 둘레에 작게 도는 조준 고리 */
-      const L = S.lock; lkA += ((L && want ? 1 : 0) - lkA) * Math.min(1, dt * 12); if (L) { lkP[0] = L.x; lkP[1] = L.y; lkP[2] = L.z; lk.material.uniforms.uS.value = L.s; }
-      lk.material.uniforms.uA.value = lkA; lk.material.uniforms.uT.value = t; lk.geometry.attributes.position.needsUpdate = true; }
+      const L = S.lock, de = t - LK.done;
+      if (de < .15) { LK.x = LK.dx; LK.z = LK.dz; LK.sc *= Math.exp(-dt * 18); LK.a = 1 - de / .15; }                                     /* 쓰러진 자리에서 작게 오므라듦 */
+      else if (L && want) { const fresh = LK.a < .05; if (fresh) { LK.x = L.x; LK.z = L.z; LK.sc = L.s * .3; }
+        const k = Math.min(1, dt * 14); LK.x += (L.x - LK.x) * k; LK.z += (L.z - LK.z) * k; LK.sc += (L.s * .95 - LK.sc) * Math.min(1, dt * 10); LK.a += (1 - LK.a) * Math.min(1, dt * 10); }   /* 새 표적 발밑으로 스르르 */
+      else { LK.a += (0 - LK.a) * Math.min(1, dt * 10); }
+      lk.visible = LK.a > .01; lk.position.set(LK.x, .07, LK.z); lk.scale.setScalar(Math.max(.01, LK.sc)); lkM.uniforms.uA.value = LK.a; lkM.uniforms.uT.value = t; }
     /* 탄 움직임 */
     const P = bh?.userData.P;
     for (const b of BU) { if (!b.on) continue;

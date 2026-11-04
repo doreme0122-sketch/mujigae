@@ -52,7 +52,7 @@ function bellMat(uT) {
         float sq = clamp(c + hitK * .8, -.6, 1.2);                                                       /* 음수 = 쏘기 전 신호로 부풂 */
         float rs = 1. - .2 * sq * v * v - .05 * sq + .025 * sin(a * 8. + uT * 2.3 + iB.w * 9.) * v;        /* 오므리면 가장자리가 안쪽으로 · 늘 살짝 일렁임 */
         p.xz *= rs; p.y *= 1. + .16 * sq;
-        float die = max(iC.z, 0.); if (iC.z >= 0.) { p.xz *= 1. + die * (.9 + .6 * jh(floor(a * 3.) + iB.w)); p.y -= die * die * .6; }   /* 쓰러짐: 꽃잎처럼 벌어지며 가라앉음 */
+        float die = max(iC.z, 0.); if (iC.z >= 0.) { float tm = die * 1.3; p *= 1. + .3 * smoothstep(0., .1, tm) * (1. - smoothstep(.1, .35, tm)); p.xz *= 1. + die * (.9 + .6 * jh(floor(a * 3.) + iB.w)); p.y -= die * die * .6; }   /* 쓰러짐: 꽃잎처럼 벌어지며 가라앉음 */
         vL = p; mat3 M = tiltM(iB.xy); vec3 w = iA.xyz + M * (p * iA.w);
         vN = normalize(M * (normal * vec3(1. / rs, 1., 1. / rs))); vW = w;
         gl_Position = projectionMatrix * viewMatrix * vec4(w, 1.); }`,
@@ -78,7 +78,10 @@ function bellMat(uT) {
         if (vSig >= 0. && vSig < 1.2) { float sw = (r - vSig * 2.4) / .22, ring = exp(-sw * sw) * (1. - vSig / 1.2);   /* 떼 경보: 신호를 받는 순간 붉은 빛 고리가 몸 가운데서 가장자리로 번짐 */
           col += (uR * uR * 1.6 + .1) * ring * (.6 + rim); }
         col *= smoothstep(1.12, .95, vU.y);
-        float die = vC.z; if (die >= 0.) { float nd = n(vL.xz * 14. + seed * 5.); float edge = smoothstep(die * 1.2 - .15, die * 1.2, nd); col = col * edge + bc * 1.4 * (edge - smoothstep(die * 1.2, die * 1.2 + .1, nd)) * 2. ; col *= 1. - smoothstep(.75, 1., die); }   /* 쓰러짐: 가장자리가 빛나며 녹아 사라짐 */
+        float die = vC.z; if (die >= 0.) { float tm = die * 1.3, nd = n(vL.xz * 14. + seed * 5.);
+          /* 쓰러짐 (사용자 2026-11-04: 천천히 사라지면 죽었는지 헷갈림) → 맞는 순간 0.2초 안에 하얗게 번쩍 터지고 몸빛이 꺼짐 · 남은 꽃잎 조각은 빛 없이 어둡게 흩어지며 가라앉음 */
+          float pop = exp(-tm * 16.), lit = 1. - smoothstep(.06, .2, tm), edge = smoothstep(die * 1.2 - .15, die * 1.2, nd);
+          col = col * lit + vec3(1.2, 1.15, 1.1) * pop * (.6 + rim) + bc * .07 * edge * (1. - lit) * (1. - smoothstep(.6, 1., die));   /* 꺼진 뒤엔 어두운 막 조각만 */ }
         gl_FragColor = vec4(col, 1.); }` });
 }
 
@@ -128,7 +131,7 @@ function tentMat(uT) {
         vec3 body = mix(uC, uR, alert), col = mix(body * body, uW * uW, vS.z * .45);
         vec3 c = col * core * (.16 + bead * .55) * pow(1. - s, 1.1) * (vS.z > .5 ? 1.3 : 1.);
         c += vec3(1.) * exp(-max(vC.y, 0.) * 12.) * step(0., vC.y) * core * .3 * (1. - s);
-        if (die >= 0.) c *= 1. - smoothstep(.5, 1., die);
+        if (die >= 0.) c *= 1. - smoothstep(.04, .16, die);                                                      /* 쓰러지면 촉수 빛도 바로 꺼짐 */
         gl_FragColor = vec4(c, 1.); }` });
 }
 
@@ -194,7 +197,7 @@ export function makeJellies(uT) {
       const at = d => { const tt = t - d; for (let i = H.length - 3; i >= 0; i -= 3) if (H[i] <= tt) { const i2 = Math.min(H.length - 3, i + 3), k = H[i2] > H[i] ? (tt - H[i]) / (H[i2] - H[i]) : 0; return [H[i + 1] + (H[i2 + 1] - H[i + 1]) * k - j.x, H[i + 2] + (H[i2 + 2] - H[i + 2]) * k - j.z]; } return [H[1] - j.x, H[2] - j.z]; };
       const d1 = at(.35), d2 = at(.8), lim = 1.6 * j.s; const cl = v => { const l = Math.hypot(v[0], v[1]); return l > lim ? [v[0] / l * lim, v[1] / l * lim] : v; };
       const [a1, b1] = cl(d1), [a2, b2] = cl(d2); iD.set([a1, b1, a2, b2], n * 4); iE.set([j.ph, j.tell > 0 ? 1 : 0, j.sigT > 0 && t - j.sigT < 1.2 ? t - j.sigT : -1, 0], n * 4);
-      bP.set([j.x, yb, j.z], n * 3); bA[n * 2] = j.dieT > 0 ? Math.max(0, 1 - dieA) * j.s : j.s * (.85 + .3 * Math.max(0, c)); bA[n * 2 + 1] = j.alert;
+      bP.set([j.x, yb, j.z], n * 3); bA[n * 2] = j.dieT > 0 ? Math.max(0, 1 - dieA * 6) * j.s : j.s * (.85 + .3 * Math.max(0, c)); bA[n * 2 + 1] = j.alert;
       put(iA, iB, iC, n++); if (j.strong) put(sA, sB, sC, m++); }
     for (const g of [bg, tg]) { g.instanceCount = n; for (const k of ['iA', 'iB', 'iC']) g.attributes[k].needsUpdate = true; } tg.attributes.iD.needsUpdate = tg.attributes.iE.needsUpdate = true; for (let k = n; k < MAX; k++) bA[k * 2] = 0; bGeo.attributes.position.needsUpdate = bGeo.attributes.aA.needsUpdate = true;
     sg.instanceCount = m; for (const k of ['iA', 'iB', 'iC']) sg.attributes[k].needsUpdate = true; };

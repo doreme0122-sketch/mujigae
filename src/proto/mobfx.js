@@ -4,7 +4,8 @@
    · 떼 경보 신호: 맞은 해파리에서 떼 동무에게 빛 알갱이가 둥글게 날아가 닿음 (신호가 어디서 어디로 퍼지는지 보임)
    무게: 빛 방울 한 장 · 알갱이(경험치+신호) 한 장 */
 import * as THREE from 'three';
-import { JCOL } from './jelly.js?v=11040953';
+import { JCOL } from './jelly.js?v=11041006';
+import * as A from '../core/audio.js';
 
 const AB = { transparent: true, depthWrite: false, blending: THREE.AdditiveBlending };
 export function makeMobFx() {
@@ -61,6 +62,11 @@ export function makeMobFx() {
     fragmentShader: 'uniform vec3 uC; varying vec2 vU; void main(){ float x = vU.y, a = exp(-x * x * 3.) * vU.x; gl_FragColor = vec4(uC * uC * .5 + .25, a * .55); }' });
   const strands = new THREE.Mesh(sGeo, sMat); strands.frustumCulled = false; strands.renderOrder = 4; G.add(strands);
   const ST = Array.from({ length: NS }, (_, k) => ({ ax: 0, az: 0, on: false, k }));
+  /* 쓰러지는 소리: 맞는 소리와 확실히 다르게 — 톡 터지는 소리 + 짧은 맑은 울림 */
+  G.userData.pop = (big = false) => { if (!A.live()) return; const c = A.ctx, t0 = c.currentTime, f = big ? 520 : 820;
+    const o = c.createOscillator(), g = c.createGain(); o.type = 'sine'; o.frequency.setValueAtTime(f * 2.2, t0); o.frequency.exponentialRampToValueAtTime(f * .5, t0 + .06); o.connect(g); A.env(g, t0, .001, .12, .09); A.out(g, .2); o.start(t0); o.stop(t0 + .12);
+    const n = A.noise(.05), hp = c.createBiquadFilter(), g2 = c.createGain(); hp.type = 'highpass'; hp.frequency.value = 2500; n.connect(hp); hp.connect(g2); A.env(g2, t0, .001, .08, .04); A.out(g2, .1); n.start(t0);
+    [1568, 2093].forEach((ff, i) => { const o2 = c.createOscillator(), g3 = c.createGain(); o2.type = 'sine'; o2.frequency.value = ff * (big ? .75 : 1); o2.connect(g3); A.env(g3, t0 + .03 + i * .05, .003, .035, .5); A.out(g3, .5); o2.start(t0 + .03 + i * .05); o2.stop(t0 + .7); }); };
   G.userData.spit = (x, y, z, dx, dz, sp = 6.5) => { const q = BL.find(b => !b.on); if (!q) return; Object.assign(q, { on: true, x, y, z, vx: dx * sp, vz: dz * sp, life: 0, seed: Math.random() }); };
   /* 쓰러진 자리에서 경험치 알갱이 n개 */
   G.userData.burst = (x, y, z, n) => { for (let c = 0; c < n; c++) { const o = free(); if (!o) break; const a = Math.random() * 6.283, sp = 2 + Math.random() * 3; Object.assign(o, { on: true, kind: 0, x, y, z, vx: Math.cos(a) * sp, vy: 1.5 + Math.random() * 2, vz: Math.sin(a) * sp, age: -c * .04, sig: null }); } };

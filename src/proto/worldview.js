@@ -2,23 +2,23 @@
    날아 보기: 1번 기지에서 기체를 조이스틱으로 몰아 맵 크기·길·문을 몸으로 확인(지금 있는 땅 이름 · 출발 뒤 걸린 시간 · 속도 바꾸기)
    보기: 날아 보기·지역 보기는 기체를 따라감, 맵 전체는 가운데 고정(끌어서 이동). 두 손가락(휠)로 확대. 시작 기지 자리는 빛 고리(다음 단계에서 진짜 기지) */
 import * as THREE from 'three';
-import { makeBloom } from '../core/hangar/bloom.js?v=11040953';
-import { makeMapFloor, MAP, toWorld } from './mapfloor.js?v=11040953';
-import { makePerf } from './perf.js?v=11040953';
+import { makeBloom } from '../core/hangar/bloom.js?v=11041006';
+import { makeMapFloor, MAP, toWorld } from './mapfloor.js?v=11041006';
+import { makePerf } from './perf.js?v=11041006';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
-import { makeFlight, loadBlock, FLY } from './flight.js?v=11040953';
-import { makeWalls } from './walls.js?v=11040953';
-import { makeMotes } from './motes.js?v=11040953';
-import { makeBushes } from './bushes.js?v=11040953';
-import { makeVision } from './vision.js?v=11040953';
-import { makeHide } from './hideviz.js?v=11040953';
-import { makeWardsOnMap, WARDS } from './wardsight.js?v=11040953';
-import { makeBlackHole } from './blackhole.js?v=11040953';
-import { makeBossCrystals } from './bosscrystals.js?v=11040953';
-import { makeShots } from './shots.js?v=11040953';
-import { makeJellies } from './jelly.js?v=11040953';
-import { makeMobFx } from './mobfx.js?v=11040953';
-import { makeHunt } from './hunt.js?v=11040953';
+import { makeFlight, loadBlock, FLY } from './flight.js?v=11041006';
+import { makeWalls } from './walls.js?v=11041006';
+import { makeMotes } from './motes.js?v=11041006';
+import { makeBushes } from './bushes.js?v=11041006';
+import { makeVision } from './vision.js?v=11041006';
+import { makeHide } from './hideviz.js?v=11041006';
+import { makeWardsOnMap, WARDS } from './wardsight.js?v=11041006';
+import { makeBlackHole } from './blackhole.js?v=11041006';
+import { makeBossCrystals } from './bosscrystals.js?v=11041006';
+import { makeShots } from './shots.js?v=11041006';
+import { makeJellies } from './jelly.js?v=11041006';
+import { makeMobFx } from './mobfx.js?v=11041006';
+import { makeHunt } from './hunt.js?v=11041006';
 
 const $ = s => document.querySelector(s), clamp = THREE.MathUtils.clamp;
 const VIEWS = [{ name: '날아 보기', h: 42, tilt: .38 }, { name: '지역 보기', h: 160, tilt: .25 }, { name: '맵 전체', h: 520, tilt: .02 }];
@@ -28,9 +28,9 @@ export async function start(canvas, onProgress = () => {}) {
   renderer.toneMapping = THREE.NoToneMapping; renderer.autoClear = false; renderer.setClearColor(0, 1);
   const scene = new THREE.Scene(), camera = new THREE.PerspectiveCamera(40, 1, 1, 3000), bloom = makeBloom(renderer, { samples: 0 });
   onProgress(.2);
-  const floor = await makeMapFloor(renderer, './assets/map/v7.png?v=11040953');
-  const J = await (await fetch('./assets/map/v7.json?v=11040953')).json();
-  const BLK = await loadBlock('./assets/map/v7.png?v=11040953');                  /* 벽 판정 = 바닥에 그린 벽 그림 그대로 */
+  const floor = await makeMapFloor(renderer, './assets/map/v7.png?v=11041006');
+  const J = await (await fetch('./assets/map/v7.json?v=11041006')).json();
+  const BLK = await loadBlock('./assets/map/v7.png?v=11041006');                  /* 벽 판정 = 바닥에 그린 벽 그림 그대로 */
   const UT = { value: 0 }, WALL = makeWalls(BLK, floor, J.ridges, UT); floor.mat.uniforms.uWf.value = WALL.fieldTex;   /* 바닥도 같은 벽 지도로 */
   scene.add(WALL.real); scene.add(WALL.mesh); WALL.mesh.visible = false;   /* 승인된 벽 5종 · 맵 전체 보기에서만 가벼운 한 덩어리 벽(멀리서 보는 지도) */
   { const pm = new THREE.PMREMGenerator(renderer); scene.environment = pm.fromScene(new RoomEnvironment(), .04).texture; scene.environmentIntensity = .6; pm.dispose(); }
@@ -72,7 +72,7 @@ export async function start(canvas, onProgress = () => {}) {
   const beaconScene = new THREE.Scene(); beaconScene.add(jel.userData.beacon);                       /* 안개 속 등불: 시야 덮개 뒤에 그림 */
   const hunt = makeHunt(BLK, jel, SPAWN.map(p => toWorld(...p)));
   let expN = 0;
-  const shots = makeShots({ B: BLK, crystals, bh, FS, say, mobs: jel, onKill: (j, killed) => { if (killed) mfx.userData.burst(j.x, j.y, j.z, j.strong ? 14 : 5); } }); scene.add(shots);                          /* 기본탄: 오른쪽 아래 버튼에서 끌어 조준 · 누르는 동안 쏨 · 과열 */
+  const shots = makeShots({ B: BLK, crystals, bh, FS, say, mobs: jel, onKill: (j, killed) => { if (killed) { mfx.userData.burst(j.x, j.y, j.z, j.strong ? 14 : 5); mfx.userData.pop(j.strong); } } }); scene.add(shots);                          /* 기본탄: 오른쪽 아래 버튼에서 끌어 조준 · 누르는 동안 쏨 · 과열 */
   const hideEl = document.createElement('div'); hideEl.id = 'hide'; hideEl.innerHTML = '<i></i><b>숨음</b>'; document.body.appendChild(hideEl);
   const motes = makeMotes(BLK, J.labels.map(o => { const [x, z] = toWorld(o.x, o.y); return [J.names.indexOf(o.n), x, z]; })); scene.add(motes.mesh);   /* 땅마다 떠다니는 알갱이 */
   /* 땅 이름: 경계를 넘으면 화면 위쪽에 잠깐 떴다 사라짐 (그 땅 안개 색 한 줄과 함께)
