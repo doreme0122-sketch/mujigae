@@ -12,15 +12,15 @@ export function makeBloom(renderer, bo = {}){
   const V='varying vec2 vU;void main(){vU=uv;gl_Position=vec4(position.xy,0.,1.);}';
   const cut=new THREE.RawShaderMaterial({glslVersion:THREE.GLSL3,uniforms:{t:{value:null},th:{value:.95}},
     vertexShader:'in vec3 position;in vec2 uv;out vec2 vU;void main(){vU=uv;gl_Position=vec4(position.xy,0.,1.);}',
-    fragmentShader:`precision highp float;in vec2 vU;out vec4 o;uniform sampler2D t;uniform float th;
-      bool bad(vec3 c){ uvec3 b=floatBitsToUint(c)&0x7f800000u; return any(equal(b,uvec3(0x7f800000u))); }   /* 숫자 아님·끝없음: 비트로 확인(그래픽 카드가 지워 버리지 못하게) */
+    fragmentShader:`precision highp float;precision highp int;precision highp sampler2D;in vec2 vU;out vec4 o;uniform sampler2D t;uniform float th;
+      bool bad(highp vec3 c){ highp uvec3 b=floatBitsToUint(c)&uvec3(0x7f800000u); return any(equal(b,uvec3(0x7f800000u))); }   /* 숫자 아님·끝없음: 비트로 확인(그래픽 카드가 지워 버리지 못하게) · 정수도 꼭 highp — 폰(Adreno)은 정수가 기본 16비트라 0x7f800000이 0으로 잘려 모든 점을 '깨짐'으로 보고 화면이 통째로 까매졌음 */
       void main(){ vec3 c=texture(t,vU).rgb; float l=max(c.r,max(c.g,c.b));
         if(bad(c)||!(l<1e4)){ c=vec3(0.); l=0.; }                                          /* 계산이 깨진 점은 뺌 */
         else if(l>2.){ float L=2.+(l-2.)/(1.+(l-2.)*.5); c*=L/l; l=L; }           /* 아주 밝은 점(매끈한 흑요석·결정의 바늘 끝 반사)은 번짐에 넣을 때 세기를 부드럽게 눌러 최대 4 — 점 하나가 화면 넓게 번지지 않게 (사용자 2026-11-03: 와드·흑요석 벽 하얀 얼룩) */
         o=vec4(c*smoothstep(th,th+.5,l),1.); }`});
   const blur=new THREE.RawShaderMaterial({glslVersion:THREE.GLSL3,uniforms:{t:{value:null},dir:{value:new THREE.Vector2()}},
     vertexShader:'in vec3 position;in vec2 uv;out vec2 vU;void main(){vU=uv;gl_Position=vec4(position.xy,0.,1.);}',
-    fragmentShader:`precision highp float;in vec2 vU;out vec4 o;uniform sampler2D t;uniform vec2 dir;
+    fragmentShader:`precision highp float;precision highp int;precision highp sampler2D;in vec2 vU;out vec4 o;uniform sampler2D t;uniform vec2 dir;
       void main(){ vec3 s=texture(t,vU).rgb*.2270;
         s+=(texture(t,vU+dir*1.3846).rgb+texture(t,vU-dir*1.3846).rgb)*.3162;
         s+=(texture(t,vU+dir*3.2308).rgb+texture(t,vU-dir*3.2308).rgb)*.0702;
@@ -28,13 +28,13 @@ export function makeBloom(renderer, bo = {}){
   /* 절반으로 줄이기: 네 점을 고르게 섞어 줄임 (한 번에 크게 줄이면 띄엄띄엄 집혀 네모가 드러남) */
   const down=new THREE.RawShaderMaterial({glslVersion:THREE.GLSL3,uniforms:{t:{value:null},px:{value:new THREE.Vector2()}},
     vertexShader:'in vec3 position;in vec2 uv;out vec2 vU;void main(){vU=uv;gl_Position=vec4(position.xy,0.,1.);}',
-    fragmentShader:`precision highp float;in vec2 vU;out vec4 o;uniform sampler2D t;uniform vec2 px;
+    fragmentShader:`precision highp float;precision highp int;precision highp sampler2D;in vec2 vU;out vec4 o;uniform sampler2D t;uniform vec2 px;
       void main(){ vec3 s=texture(t,vU+px*vec2(-1.,-1.)).rgb+texture(t,vU+px*vec2(1.,-1.)).rgb+texture(t,vU+px*vec2(-1.,1.)).rgb+texture(t,vU+px*vec2(1.,1.)).rgb; o=vec4(s*.25,1.); }`});
   const comp=new THREE.RawShaderMaterial({glslVersion:THREE.GLSL3,
     uniforms:{t:{value:null},b1:{value:null},b2:{value:null},b3:{value:null},k:{value:.28},warp:{value:new THREE.Vector4(.5,.5,0,0)},lens:{value:new THREE.Vector4(.5,.5,0,0)},haze:{value:new THREE.Vector4(.5,.5,0,0)},hT:{value:0},asp:{value:1}},
     vertexShader:'in vec3 position;in vec2 uv;out vec2 vU;void main(){vU=uv;gl_Position=vec4(position.xy,0.,1.);}',
-    fragmentShader:`precision highp float;in vec2 vU;out vec4 o;uniform sampler2D t,b1,b2,b3;uniform float k,asp,hT;uniform vec4 warp,lens,haze;
-      bool bad(vec3 c){ uvec3 b=floatBitsToUint(c)&0x7f800000u; return any(equal(b,uvec3(0x7f800000u))); }
+    fragmentShader:`precision highp float;precision highp int;precision highp sampler2D;in vec2 vU;out vec4 o;uniform sampler2D t,b1,b2,b3;uniform float k,asp,hT;uniform vec4 warp,lens,haze;
+      bool bad(highp vec3 c){ highp uvec3 b=floatBitsToUint(c)&uvec3(0x7f800000u); return any(equal(b,uvec3(0x7f800000u))); }
       void main(){ vec2 uv=vU;
         if(lens.w>0.){ vec2 d=(uv-lens.xy)*vec2(asp,1.); float r=length(d)+1e-5, R=max(lens.z,1e-3);   /* 블랙홀: 둘레 공간이 휘감기며(소용돌이) 가운데로 끌려 보임 */
           float sw=lens.w*2.4*exp(-r/(R*1.3)), cs=cos(sw), sn=sin(sw); d=mat2(cs,-sn,sn,cs)*d;
