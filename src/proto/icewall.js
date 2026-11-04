@@ -64,7 +64,7 @@ export function makeIceWall(path, opt = {}) {
   const uT = opt.uT || { value: 0 }, mat = opt.mat || iceWallMaterial(uT), smat = opt.smat || snowMaterial(), doors = opt.doors || [true, true];
   const seed = opt.seed || 3, R = (() => { let s = seed * 7919 + 7; return () => (s = (s * 9301 + 49297) % 233280) / 233280; })(), o = seed * 1.3;
   const curve = new THREE.CatmullRomCurve3(path.map(p => new THREE.Vector3(p[0], 0, p[1])), false, 'centripetal'), len = curve.getLength();
-  const Hm = opt.H || 4.4, W = 1.5, DS = .2, N = Math.max(4, Math.round(len / DS));
+  const Hm = opt.H || 4.4, W = 1., DS = .2, N = Math.max(4, Math.round(len / DS));
   /* ③ 윗단: 2~5m 판마다 높이 한 단씩 (거의 평평, 완만히 오르내림) · 문 쪽 끝은 높게 */
   const slab = []; for (let d = 0; d < len;) { const l = 2 + R() * 3; slab.push([d, d + l, (R() - .5) * 1.3]); d += l; }
   const topH = d => { const sb = slab.find(q => d >= q[0] && d < q[1]) || slab[slab.length - 1]; let h = Hm + sb[2] * .55 + .25 * Math.sin(d * .07 + o);
@@ -72,8 +72,8 @@ export function makeIceWall(path, opt = {}) {
     if (!doors[0] && d < 1.5) h *= .55 + .45 * d / 1.5; if (!doors[1] && len - d < 1.5) h *= .55 + .45 * (len - d) / 1.5; return h; };
   /* ① 결정 조각 (앞면 · 뒷면 따로) */
   const shards = side => { const L = []; for (let d = -.5; d < len + .5; d += .35 + R() * .7) { const big = R() < .18;
-      L.push({ d, w: (big ? .9 : .45) + R() * (big ? .9 : .6), p: (big ? .75 : .35) + R() * (big ? .6 : .45), y0: -.3 + R() * (big ? .2 : 1.4), y1: .55 + R() * .5, lean: (R() - .5) * .25 }); } return L; };
-  const SH = { '-1': shards(-1), '1': shards(1) }, PMAX = 1.35;
+      L.push({ d, w: (big ? .9 : .45) + R() * (big ? .9 : .6), p: ((big ? .75 : .35) + R() * (big ? .6 : .45)) * .67, y0: -.3 + R() * (big ? .2 : 1.4), y1: .55 + R() * .5, lean: (R() - .5) * .25 }); } return L; };
+  const SH = { '-1': shards(-1), '1': shards(1) }, PMAX = .9;
   const shardOff = (d, yk, side) => { let m = 0, best = 0; const L = SH[side];
     for (const s of L) { const dd = d - s.d - s.lean * yk * 2; if (Math.abs(dd) > s.w) continue; const t0 = (yk - s.y0) / Math.max(.05, s.y1 - s.y0); if (t0 < 0 || t0 > 1.05) continue;
       const env = Math.min(1, t0 / .25, (1.05 - t0) / .3); if (env <= 0) continue; const v = s.p * (1 - Math.abs(dd) / s.w) * env; if (v > m) { m = v; } }
@@ -84,7 +84,7 @@ export function makeIceWall(path, opt = {}) {
   const FL = fr[0].sg < 0;
   /* 단면: 앞면(아래→위) 줄 · 윗단 · 뒷면(위→아래) 줄 — 줄마다 (v, y, 빛) */
   const RF = [0, .06, .13, .21, .3, .4, .5, .6, .7, .79, .87, .94, 1], RB = [0, .2, .45, .7, .9, 1];
-  const faceRow = (f, side, yk) => { const y = Math.max(-.3, -.3 + (f.h + .3) * yk), off = shardOff(f.d, yk, side), foot = Math.max(0, .18 - yk) * 3.2, lean = -.06 * yk;
+  const faceRow = (f, side, yk) => { const y = Math.max(-.3, -.3 + (f.h + .3) * yk), off = shardOff(f.d, yk, side), foot = Math.max(0, .18 - yk) * 2, lean = -.06 * yk;
     const base = W + foot + (vn(f.d * .35 + side * 9, yk * 2, o) - .5) * .35 + lean; return [side * (base + off), y, (1 - off / PMAX) * (.4 + .6 * (1 - yk))]; };
   const section = f => { const out = [];
     for (const yk of RF) out.push(faceRow(f, -1, yk));
@@ -119,8 +119,13 @@ export function makeIceWall(path, opt = {}) {
   /* ⑦ 발치: 눈 덮인 큰 얼음 바위 + 작은 조각 (앞쪽 많이, 뒤쪽 조금) */
   const rock = (d, v, s) => { const i = Math.round(d / len * N), f = fr[Math.min(N, Math.max(0, i))], g = prep(block(seed * 31 + Math.floor(d * 7)).clone(), .2), sy = s * (.75 + R() * .45);
     g.scale(s * (.9 + R() * .4), sy, s * (.8 + R() * .3)); g.rotateY(R() * 6); const x = f.x + f.nx * v, z = f.z + f.nz * v; g.translate(x, sy * .25, z); ice.push(g);
-    if (s > .55) { const c = new THREE.IcosahedronGeometry(1, 1); const P2 = c.attributes.position; for (let j = 0; j < P2.count; j++) if (P2.getY(j) < 0) P2.setY(j, P2.getY(j) * .15);
-      c.scale(s * .85, s * .28, s * .75); c.translate(x, sy * .25 + sy * .62, z); snow.push(prepS(c)); } };
+    /* 바위 위 눈: 바위 윗면 모양 그대로 따라 쌓임 (각진 면엔 각지게) · 바람 쪽으로 쏠림 · 바위마다 양이 다름(안 덮인 것도) */
+    const amt = R(); if (amt > .2) { const th = (amt > .75 ? .2 : amt > .45 ? .11 : .05) * Math.min(1.4, s + .3), wind = new THREE.Vector3(R() - .5, 0, R() - .5).normalize(), lim = .42 - amt * .15;
+      g.computeVertexNormals(); const A = g.attributes.position, Nn = g.attributes.normal, Q = [], a = new THREE.Vector3(), nn = new THREE.Vector3();
+      for (let t = 0; t < A.count; t += 3) { nn.fromBufferAttribute(Nn, t); if (nn.y + nn.dot(wind) * .35 < lim) continue;
+        for (let k = 0; k < 3; k++) { a.fromBufferAttribute(A, t + k); const w = th * (.6 + .8 * vn(a.x * 3, a.y * 3, a.z * 3)) * Math.min(1, (nn.y - lim + .15) * 2);
+          Q.push(a.x + nn.x * w * .15, a.y + w, a.z + nn.z * w * .15); } }
+      if (Q.length) { const c = new THREE.BufferGeometry(); c.setAttribute('position', new THREE.Float32BufferAttribute(Q, 3)); c.computeVertexNormals(); snow.push(c); } } };
   for (let d = .5 + R(); d < len - .3; d += .9 + R() * 2.2) { const big = R() < .35; rock(d, -(W + 1.2 + R() * (big ? 1.6 : 2.6)), big ? .9 + R() * .9 : .25 + R() * .4); }
   for (let d = 1 + R() * 2; d < len - .5; d += 2.5 + R() * 4) rock(d, W + 1.1 + R() * 1.2, .3 + R() * .6);
   /* 앞쪽 땅 눈밭 (들쭉날쭉한 가장자리) */
