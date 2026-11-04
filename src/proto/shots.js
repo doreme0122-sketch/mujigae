@@ -11,9 +11,9 @@
    무게: 꼬리 한 장 · 머리 한 장 · 부스러기 한 장 · 조준 빛 한 장 = 그리기 4번 */
 import * as THREE from 'three';
 import * as A from '../core/audio.js';
-import { FLY } from './flight.js?v=11041006';
-import { BH } from './blackhole.js?v=11041006';
-import { hitWall } from './rocks.js?v=11041006';
+import { FLY } from './flight.js?v=11041026';
+import { BH } from './blackhole.js?v=11041026';
+import { hitWall } from './rocks.js?v=11041026';
 
 export const SHOT = {
   basic: { name: '기본탄', rate: 7, speed: 44, life: 1.1, heat: .0476, cool: .44, coolWait: .3, lock: .3,   /* 쉬지 않고 쏘면 약 3초에 과열 · 과열되면 약 2초 식어야 다시 (사용자 2026-11-04: 5초는 너무 김) */ tail: 3.4, W: .27, col: [.62, 1, .32], spread: .012, bounces: 3 }

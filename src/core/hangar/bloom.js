@@ -13,8 +13,9 @@ export function makeBloom(renderer, bo = {}){
   const cut=new THREE.RawShaderMaterial({glslVersion:THREE.GLSL3,uniforms:{t:{value:null},th:{value:.95}},
     vertexShader:'in vec3 position;in vec2 uv;out vec2 vU;void main(){vU=uv;gl_Position=vec4(position.xy,0.,1.);}',
     fragmentShader:`precision highp float;in vec2 vU;out vec4 o;uniform sampler2D t;uniform float th;
+      bool bad(vec3 c){ uvec3 b=floatBitsToUint(c)&0x7f800000u; return any(equal(b,uvec3(0x7f800000u))); }   /* 숫자 아님·끝없음: 비트로 확인(그래픽 카드가 지워 버리지 못하게) */
       void main(){ vec3 c=texture(t,vU).rgb; float l=max(c.r,max(c.g,c.b));
-        if(any(isnan(c))||any(isinf(c))||!(l<1e4)){ c=vec3(0.); l=0.; }                                          /* 계산이 깨진 점은 뺌 */
+        if(bad(c)||!(l<1e4)){ c=vec3(0.); l=0.; }                                          /* 계산이 깨진 점은 뺌 */
         else if(l>2.){ float L=2.+(l-2.)/(1.+(l-2.)*.5); c*=L/l; l=L; }           /* 아주 밝은 점(매끈한 흑요석·결정의 바늘 끝 반사)은 번짐에 넣을 때 세기를 부드럽게 눌러 최대 4 — 점 하나가 화면 넓게 번지지 않게 (사용자 2026-11-03: 와드·흑요석 벽 하얀 얼룩) */
         o=vec4(c*smoothstep(th,th+.5,l),1.); }`});
   const blur=new THREE.RawShaderMaterial({glslVersion:THREE.GLSL3,uniforms:{t:{value:null},dir:{value:new THREE.Vector2()}},
@@ -33,6 +34,7 @@ export function makeBloom(renderer, bo = {}){
     uniforms:{t:{value:null},b1:{value:null},b2:{value:null},b3:{value:null},k:{value:.28},warp:{value:new THREE.Vector4(.5,.5,0,0)},lens:{value:new THREE.Vector4(.5,.5,0,0)},haze:{value:new THREE.Vector4(.5,.5,0,0)},hT:{value:0},asp:{value:1}},
     vertexShader:'in vec3 position;in vec2 uv;out vec2 vU;void main(){vU=uv;gl_Position=vec4(position.xy,0.,1.);}',
     fragmentShader:`precision highp float;in vec2 vU;out vec4 o;uniform sampler2D t,b1,b2,b3;uniform float k,asp,hT;uniform vec4 warp,lens,haze;
+      bool bad(vec3 c){ uvec3 b=floatBitsToUint(c)&0x7f800000u; return any(equal(b,uvec3(0x7f800000u))); }
       void main(){ vec2 uv=vU;
         if(lens.w>0.){ vec2 d=(uv-lens.xy)*vec2(asp,1.); float r=length(d)+1e-5, R=max(lens.z,1e-3);   /* 블랙홀: 둘레 공간이 휘감기며(소용돌이) 가운데로 끌려 보임 */
           float sw=lens.w*2.4*exp(-r/(R*1.3)), cs=cos(sw), sn=sin(sw); d=mat2(cs,-sn,sn,cs)*d;
@@ -42,7 +44,8 @@ export function makeBloom(renderer, bo = {}){
           uv-=d/r/vec2(asp,1.)*w*warp.w; }
         if(haze.w>0.){ vec2 d=(uv-haze.xy)*vec2(asp,1.); float f=exp(-dot(d,d)/max(haze.z*haze.z,1e-6));   /* 열 아지랑이: 달아오른 총구 앞 공기만 투명하게 일렁임 */
           uv+=vec2(sin(uv.y*260.+hT*11.+sin(uv.x*120.+hT*3.)*2.),cos(uv.x*240.-hT*9.+sin(uv.y*90.)*2.))*haze.w*f*.0022; }
-        vec3 c=texture(t,uv).rgb + (texture(b1,uv).rgb*.45+texture(b3,uv).rgb*.45+texture(b2,uv).rgb*.6)*k;
+        vec3 m0=texture(t,uv).rgb; if(bad(m0)) m0=vec3(0.);
+        vec3 c=m0 + (texture(b1,uv).rgb*.45+texture(b3,uv).rgb*.45+texture(b2,uv).rgb*.6)*k;
         c=c/(1.+c*.52);
         o=vec4(pow(max(c,0.),vec3(1./2.2)),1.); }`});
   const mesh=new THREE.Mesh(geo,cut); sc.add(mesh);

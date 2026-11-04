@@ -109,7 +109,7 @@ function tentMat(uT) {
         vec3 root = vec3(cos(ang) * rad, -.05 * iA.w, sin(ang) * rad), out_ = vec3(cos(ang), 0., sin(ang)), tang = vec3(-sin(ang), 0., cos(ang));
         float die = max(iC.z, 0.);
         vec2 lag = (2. * s * (1. - s) * iD.xy + s * s * iD.zw) * (aS.z < .5 ? 1. : .55);                     /* 끝일수록 더 오래전 자리 (입 팔은 짧고 굵어 덜 끌림) */
-        float s16 = pow(s, 1.6);
+        float s16 = pow(max(s, 0.), 1.6);
         vec3 h = vec3(lag.x, 0., lag.y);
         h += out_ * len * s * (.05 + .17 * cS + .5 * die);                                                        /* 오므림 물결이 지나가는 마디에서 살짝 퍼짐 */
         h += tang * (sin(s * 3.2 - uT * 1.35 + seed * 6. + ang * 3.) * .2 + sin(s * 6.5 - uT * 2.3 + ang * 5.) * .06) * s16 * len;   /* 끝일수록 크고 느린 너울 */
@@ -121,7 +121,7 @@ function tentMat(uT) {
         vec3 p0 = P(s), p1 = P(min(1., s + .04)) - P(max(0., s - .04));
         vec3 w = iA.xyz + p0, V = normalize(cameraPosition - w), cr = cross(p1, V); float cl = length(cr);
         vec3 side = cl > 1e-6 ? cr / cl : normalize(cross(vec3(1., 0., 0.), V));   /* 촉수가 카메라 쪽을 똑바로 향할 때 옆 방향이 0이 되어 '숫자 아님'이 생겼음 → 컴퓨터에서 검은 네모 (사용자 화면) */
-        float wd = aR.w * iA.w * (aS.z < .5 ? pow(1. - s, .6) * (.7 + .3 * sin(s * 30. + iB.w)) : (.35 + .65 * sin(min(s, 1.) * 3.1416)) * (1. + .4 * sin(s * 18. - uT * 2.5 + aR.x * 4.)));   /* 촉수: 끝으로 가늘게 · 입 팔: 주름져 넓어졌다 좁아짐 */
+        float wd = aR.w * iA.w * (aS.z < .5 ? pow(max(1. - s, 0.), .6) * (.7 + .3 * sin(s * 30. + iB.w)) : (.35 + .65 * sin(min(s, 1.) * 3.1416)) * (1. + .4 * sin(s * 18. - uT * 2.5 + aR.x * 4.)));   /* 촉수: 끝으로 가늘게 · 입 팔: 주름져 넓어졌다 좁아짐 */
         w += side * wd * aS.y;
         gl_Position = projectionMatrix * viewMatrix * vec4(w, 1.); }`,
     fragmentShader: `uniform float uT; uniform vec3 uC, uW, uR; varying vec3 vS; varying vec4 vB, vC;
@@ -129,8 +129,8 @@ function tentMat(uT) {
         float core = exp(-x * x * 3.5);
         float bq = fract(s * 2.2 - uT * .55 - vB.w * 3.) - .5, bead = exp(-bq * bq * 70.) * (.4 + .6 * vB.z);          /* 빛 구슬이 촉수를 타고 내려감 */
         vec3 body = mix(uC, uR, alert), col = mix(body * body, uW * uW, vS.z * .45);
-        vec3 c = col * core * (.16 + bead * .55) * pow(1. - s, 1.1) * (vS.z > .5 ? 1.3 : 1.);
-        c += vec3(1.) * exp(-max(vC.y, 0.) * 12.) * step(0., vC.y) * core * .3 * (1. - s);
+        vec3 c = col * core * (.16 + bead * .55) * pow(max(1. - s, 0.), 1.1) * (vS.z > .5 ? 1.3 : 1.);
+        c += vec3(1.) * exp(-max(vC.y, 0.) * 12.) * step(0., vC.y) * core * .3 * max(1. - s, 0.);   /* 그래픽 카드는 띠 끝에서 s가 1을 살짝 넘게 보간함 → 음수 거듭제곱이 '숫자 아님'이 되어 검은 네모 (사용자 컴퓨터) */
         if (die >= 0.) c *= 1. - smoothstep(.04, .16, die);                                                      /* 쓰러지면 촉수 빛도 바로 꺼짐 */
         gl_FragColor = vec4(c, 1.); }` });
 }
