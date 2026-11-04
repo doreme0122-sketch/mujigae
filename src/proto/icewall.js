@@ -11,8 +11,8 @@
    무게: 벽 한 줄 = 얼음 1번 + 눈 1번 그리기 */
 import * as THREE from 'three';
 import { mergeGeometries, mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js';
-import { iceMaterial, block } from './ice.js?v=11050009';
-import { SNOW_GLSL, SNOW_U } from './snowtone.js?v=11050009';
+import { iceMaterial, block } from './ice.js?v=11050013';
+import { SNOW_GLSL, SNOW_U } from './snowtone.js?v=11050013';
 
 const hs = (x, y, z) => { const s = Math.sin(x * 127.1 + y * 311.7 + z * 74.7) * 43758.5453; return s - Math.floor(s); };
 const vn = (x, y, z) => { const ix = Math.floor(x), iy = Math.floor(y), iz = Math.floor(z), fx = x - ix, fy = y - iy, fz = z - iz, u = fx * fx * (3 - 2 * fx), v = fy * fy * (3 - 2 * fy), w = fz * fz * (3 - 2 * fz);
@@ -59,11 +59,12 @@ export function makeIceWall(path, opt = {}) {
   const uT = opt.uT || { value: 0 }, mat = opt.mat || iceWallMaterial(uT), smat = opt.smat || snowMaterial(uT), doors = opt.doors || [true, true];
   const seed = opt.seed || 3, R = (() => { let s = seed * 7919 + 7; return () => (s = (s * 9301 + 49297) % 233280) / 233280; })(), o = seed * 1.3;
   const curve = new THREE.CatmullRomCurve3(path.map(p => new THREE.Vector3(p[0], 0, p[1])), false, 'centripetal'), len = curve.getLength();
-  const Hm = opt.H || 3.7, W = 1., DS = .2, N = Math.max(4, Math.round(len / DS));
+  const Hm = opt.H || 1.85, HK = Hm / 3.7,   /* 벽 높이 절반 (사용자 2026-11-05: 3.7m → 1.85m) · 문 솟음·결정 기둥도 같은 비율 */
+    W = 1., DS = .2, N = Math.max(4, Math.round(len / DS));
   /* ③ 윗단: 2~5m 판마다 높이 한 단씩 (거의 평평, 완만히 오르내림) · 문 쪽 끝은 높게 */
   const slab = []; for (let d = 0; d < len;) { const l = 2 + R() * 3; slab.push([d, d + l, (R() - .5) * 1.3]); d += l; }
-  const topH = d => { const sb = slab.find(q => d >= q[0] && d < q[1]) || slab[slab.length - 1]; let h = Hm + sb[2] * .55 + .25 * Math.sin(d * .07 + o);
-    const ds = doors[0] ? d : 1e9, de = doors[1] ? len - d : 1e9, dd = Math.min(ds, de); h += Math.exp(-dd * dd / 12) * 1.3;
+  const topH = d => { const sb = slab.find(q => d >= q[0] && d < q[1]) || slab[slab.length - 1]; let h = Hm + (sb[2] * .55 + .25 * Math.sin(d * .07 + o)) * HK;
+    const ds = doors[0] ? d : 1e9, de = doors[1] ? len - d : 1e9, dd = Math.min(ds, de); h += Math.exp(-dd * dd / 12) * 1.3 * HK;
     if (!doors[0] && d < 1.5) h *= .55 + .45 * d / 1.5; if (!doors[1] && len - d < 1.5) h *= .55 + .45 * (len - d) / 1.5; return h; };
   /* ① 결정 조각 (앞면 · 뒷면 따로) */
   const shards = side => { const L = []; for (let d = -.5; d < len + .5; d += .35 + R() * .7) { const big = R() < .18;
@@ -120,8 +121,8 @@ export function makeIceWall(path, opt = {}) {
   const spire = (d, v, hh, r, tilt) => { const i = Math.round(d / len * N), f = fr[Math.min(N, Math.max(0, i))]; const g = new THREE.CylinderGeometry(0, r, hh, 5 + Math.floor(R() * 2), 3);
     const P2 = g.attributes.position; for (let j = 0; j < P2.count; j++) { P2.setX(j, P2.getX(j) * (1 + (R() - .5) * .25)); P2.setZ(j, P2.getZ(j) * (.75 + R() * .3)); }
     g.rotateY(R() * 6); g.rotateZ(tilt * (R() < .5 ? -1 : 1)); g.rotateX((R() - .5) * tilt); g.translate(f.x + f.nx * v, f.h + hh / 2 - .3, f.z + f.nz * v); ice.push(prep(g, .55)); };
-  for (const end of [0, 1]) if (doors[end]) { const d0 = end ? len - .8 : .8; spire(d0, -.2, 3.2 + R() * 1.4, .7, .12); spire(d0 + (end ? -1.3 : 1.3), .4, 2.2 + R() * 1.2, .5, .25); }
-  for (let d = 5 + R() * 5; d < len - 3; d += 7 + R() * 9) spire(d, (R() - .5) * 1.4, 1.1 + R() * 1.6, .35 + R() * .25, .2);
+  for (const end of [0, 1]) if (doors[end]) { const d0 = end ? len - .8 : .8; spire(d0, -.2, (3.2 + R() * 1.4) * HK, .7, .12); spire(d0 + (end ? -1.3 : 1.3), .4, (2.2 + R() * 1.2) * HK, .5, .25); }
+  for (let d = 5 + R() * 5; d < len - 3; d += 7 + R() * 9) spire(d, (R() - .5) * 1.4, (1.1 + R() * 1.6) * HK, .35 + R() * .25, .2);
   /* ⑦ 발치: 눈 덮인 큰 얼음 바위 + 작은 조각 (앞쪽 많이, 뒤쪽 조금) */
   const rock = (d, v, s) => { const i = Math.round(d / len * N), f = fr[Math.min(N, Math.max(0, i))], g = prep(block(seed * 31 + Math.floor(d * 7)).clone(), .2), sy = s * (.75 + R() * .45);
     g.scale(s * (.9 + R() * .4), sy, s * (.8 + R() * .3)); g.rotateY(R() * 6); const x = f.x + f.nx * v, z = f.z + f.nz * v; g.translate(x, sy * .25, z); ice.push(g);
