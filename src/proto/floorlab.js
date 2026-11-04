@@ -62,29 +62,49 @@ export function makeFloorLab() {
          · 눈: 하얗고 푸른 눈 · 바람에 쓸린 잔물결 · 반짝임 · 그늘은 푸름
          · 드러난 얼음: 맑은 청록 · 속 푸른 금빛(벽과 같은 빛) · 하늘을 비추는 매끈한 면
          · 눈과 얼음 경계: 얇은 서리 테 · 작은 얼음 부스러기 · edge = 벽 가까이일수록 눈이 두꺼움(발치 눈밭과 이어짐) */
+      /* 얼음 판 나눔: 가장 가까운 판까지 거리(금까지 거리) + 판 번호 */
+      vec3 vor(vec2 x){ vec2 n=floor(x), f=fract(x), mg=vec2(0.), mr=vec2(0.); float md=8.;
+        for(int j=-1;j<=1;j++) for(int i=-1;i<=1;i++){ vec2 g=vec2(float(i),float(j)); vec2 o=vec2(h2(n+g),h2(n+g+17.3))*.85+.075; vec2 r=g+o-f; float d=dot(r,r); if(d<md){ md=d; mr=r; mg=g; } }
+        md=8.; for(int j=-1;j<=1;j++) for(int i=-1;i<=1;i++){ vec2 g=mg+vec2(float(i),float(j)); vec2 o=vec2(h2(n+g),h2(n+g+17.3))*.85+.075; vec2 r=g+o-f;
+          vec2 dd=r-mr; if(dot(dd,dd)>1e-5) md=min(md,dot(.5*(mr+r),normalize(dd))); }
+        return vec3(md,h2(n+mg+3.1),h2(n+mg+9.7)); }
+      /* 얼음 땅 (벽과 같은 세상): 눈 많이(uIV 0) / 얼음 많이 + 눈 조금(uIV 1)
+         · 색은 벽에서 가져옴: 눈 = 새하양 + 푸른 그늘, 얼음 = 밝은 하늘색 + 하얀 금 + 금 속 푸른 빛
+         · 모양도 벽처럼 각지게: 얼음은 깨진 판(각진 조각)들, 눈 가장자리도 판 금을 따라 꺾임
+         · 두께: 눈은 바람에 쌓인 언덕 — 해 쪽은 볼록하게 밝고, 반대쪽 얼음 위로 그림자가 짐
+         · edge = 벽 가까이일수록 눈이 두꺼움(벽 발치 눈밭과 이어짐) */
+      float snowF(vec2 p, float cell){ vec2 wd=vec2(.82,.57); return N4(p*.02).r*.72+N4(p*.07).g*.18+sin(dot(p,wd)*1.6+N4(p*.05).b*7.)*.03+(cell-.5)*.22; }
       vec3 iceGround(vec2 p, vec3 rd, float edge){
-        vec2 wd=normalize(vec2(.8,.55)); float rip=sin(dot(p,wd)*2.4+N4(p*.05).g*9.)*.5+.5;
-        float cov=N4(p*.022).r*.65+N4(p*.075).g*.35+rip*.06;
-        float th=mix(.36,.66,uIV)-edge*.45;                                       /* 이 값보다 높으면 눈 */
-        float snow=smoothstep(th-.03,th+.04,cov); float dust=smoothstep(th-.08,th-.01,cov)*(1.-snow)*smoothstep(.45,.7,N4(p*.4).g+rip*.25);  /* 경계 앞 얼음 위에 흩날려 앉은 얇은 눈가루 */
-        float rim=exp(-pow((cov-th)/.018,2.))*(1.-snow*.4);                         /* 경계 서리 테 */
-        /* 눈 */
-        vec3 nS=normalize(vec3(-wd.x*cos(dot(p,wd)*2.4)*.06+(N4(p*.6).b-.5)*.08,1.,-wd.y*cos(dot(p,wd)*2.4)*.06+(N4(p*.6+.3).b-.5)*.08));
-        vec3 sb=vec3(.86,.91,.97)*(.9+.14*N4(p*.3).a);
-        vec3 cs=lit(sb,nS,rd,.06,10.)*.62; cs=mix(cs*vec3(.8,.9,1.12),cs,smoothstep(.0,1.,nS.y*2.-1.));
-        vec2 gq=p*3.6; float gh=h2(floor(gq)); if(gh>.975){ vec2 gf=fract(gq)-.5; cs+=vec3(.9,.95,1.)*exp(-dot(gf,gf)*60.)*.9; }
-        /* 드러난 얼음 */
-        vec3 nI=normalize(vec3((N4(p*.12).b-.5)*.12,1.,(N4(p*.12+.5).b-.5)*.12));
-        float cr1=abs(N4(p*.035+.6).g-.5), cr2=abs(N4(p*.09+.2).r-.5);
-        float crack=smoothstep(.007,.0,cr1)*smoothstep(.35,.6,N4(p*.05+.3).b)+smoothstep(.005,.0,cr2)*.45, halo=smoothstep(.05,.0,cr1)*.25;  /* 금은 군데군데만 · 가늘게 */
-        float deep=N4(p*.018+.9).r;
-        vec3 ib=mix(vec3(.04,.26,.4),vec3(.14,.52,.66),deep); float bub=step(.985,h2(floor(p*5.)))*smoothstep(.4,.8,deep);  /* 갇힌 공기방울 */
-        vec3 ci=lit(ib,nI,rd,1.2,90.)*.3+vec3(.55,.8,.95)*crack*.32+vec3(.1,.45,.7)*halo*.22+vec3(.03,.14,.22)*deep*.3+vec3(.4,.6,.7)*bub*.25;
-        float fr=pow(1.-max(-rd.y,0.),3.); ci+=vec3(.15,.25,.38)*fr*.25;            /* 매끈한 얼음이 하늘을 비춤 */
-        /* 작은 부스러기 */
-        vec2 cq=p*1.7; vec2 cc=floor(cq); float ch=h2(cc+7.); vec3 c=mix(ci,cs,snow);
-        if(ch>.93){ vec2 cf=fract(cq)-.5-vec2(h2(cc)-.5,h2(cc+3.)-.5)*.5; float r=length(cf); c=mix(c,mix(vec3(.12,.3,.42),vec3(.5,.58,.68),snow)*.45,smoothstep(.12,.06,r)); c*=1.-smoothstep(.16,.1,length(cf+vec2(.06,.05)))*.25; }
-        c=mix(c,cs*.85,dust*.4); c+=vec3(.6,.7,.82)*rim*.35;
+        vec2 wq=(N4(p*.04).rg-.5)*1.1+(N4(p*.16).ba-.5)*.25; vec3 v=vor(p*.3+wq), v2=vor(p*1.1+7.+wq*2.);   /* 판 모양이 고르지 않게 살짝 비틂 */                                   /* 큰 판 3m 남짓 · 그 안의 잔 판 */
+        float th=mix(.34,.62,uIV)-edge*.45;
+        float S=snowF(p,v.y); float snow=smoothstep(th-.012,th+.012,S);
+        float dep=clamp((S-th)/.1,0.,1.);                                    /* 가장자리에서 얼마나 안쪽인지 = 눈 두께 */
+        /* 눈: 언덕 기울기(가장자리일수록 가파름) */
+        float e=.25; vec2 gS=vec2(snowF(p+vec2(e,0.),v.y)-S, snowF(p+vec2(0.,e),v.y)-S)/e;
+        vec2 wd=vec2(.82,.57); float rp=cos(dot(p,wd)*1.9+N4(p*.05).g*8.)*.07;   /* 바람 물결 */
+        vec3 nS=normalize(vec3(-gS.x*(1.-dep)*26.-wd.x*rp+(N4(p*.7).b-.5)*.05, 1., -gS.y*(1.-dep)*26.-wd.y*rp+(N4(p*.7+.3).b-.5)*.05));
+        float dS=dot(nS,uSun);
+        vec3 snowLit=vec3(.86,.9,.95), snowSh=vec3(.5,.62,.8);
+        vec3 cs=mix(snowSh,snowLit,smoothstep(.35,.92,dS))*(.95+.06*N4(p*.25).a);
+        cs+=vec3(.06)*pow(max(dot(nS,normalize(uSun-rd)),0.),24.);
+        vec2 gq=p*4.; float gh=h2(floor(gq)); if(gh>.97){ vec2 gf=fract(gq)-.5; cs+=vec3(.5,.6,.7)*exp(-dot(gf,gf)*70.)*fract(gh*41.+uT*.3); }   /* 반짝임 */
+        /* 얼음 판 */
+        float tilt=v.z; vec3 nI=normalize(vec3((v.y-.5)*.14,1.,(v.z-.5)*.14));
+        vec3 ib=mix(vec3(.24,.54,.76),vec3(.45,.74,.9),v.y)*(.92+.12*N4(p*.08).r);
+        ib=mix(ib,ib*vec3(.78,.9,1.),smoothstep(.0,.5,v.x));                 /* 판 가운데는 깊어 보여 조금 짙음 · 금 가까이 밝음 */
+        float spec=pow(max(dot(nI,normalize(uSun-rd)),0.),60.)*.35;
+        float cw=.012+.04*smoothstep(.3,.8,N4(p*.06+.2).g); float crack=smoothstep(cw,.0,v.x)*(.35+.65*smoothstep(.25,.6,N4(p*.09).r)),   /* 금 굵기·세기가 곳마다 다름 */ crack2=smoothstep(.025,.0,v2.x)*.45*step(.45,v2.y);
+        float glow=smoothstep(.22,.0,v.x);
+        float hair=smoothstep(.006,.0,abs(N4(p*.11+v.y).g-.5))*.35;
+        vec3 ci=ib+vec3(.1,.35,.6)*glow*.18+vec3(.9,.96,1.)*(crack*.55+crack2*.4+hair)*(1.-crack*.2)+vec3(1.)*spec;
+        float bub=step(.982,h2(floor(p*6.)))*smoothstep(.3,.6,v.x); ci+=vec3(.6,.8,.9)*bub*.25;
+        /* 눈 그림자: 해 반대쪽 얼음 위 · 눈가루: 경계 앞에 흩날림 */
+        vec2 so=-uSun.xz/max(uSun.y,.2)*.8; float sh=smoothstep(th-.01,th+.02,snowF(p-so,v.y))*(1.-snow);
+        ci*=1.-sh*.45; ci=mix(ci,ci*vec3(.75,.88,1.05),sh*.5);
+        float dust=smoothstep(th-.07,th-.005,S)*(1.-snow)*smoothstep(.45,.75,N4(p*.45).g);
+        ci=mix(ci,mix(snowSh,snowLit,.6),dust*.45);
+        vec3 c=mix(ci,cs,snow);
+        float rim=snow*(1.-smoothstep(.0,.25,dep))*smoothstep(.3,.9,dS); c+=vec3(.05)*rim;   /* 해 받는 눈 언덕 턱 */
         return c; }
       void main(){
         vec3 ro=cameraPosition, rd=normalize(vW-ro); vec2 p=vW.xz; float dist=length(p-ro.xz); vec3 c;
