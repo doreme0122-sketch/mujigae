@@ -11,9 +11,9 @@
    무게: 꼬리 한 장 · 머리 한 장 · 부스러기 한 장 · 바닥 흔적 한 장 · 모으는 빛 한 장 · 조준 고리 한 장 = 그리기 6번 (탄 종류가 늘어도 같음) */
 import * as THREE from 'three';
 import * as A from '../core/audio.js';
-import { FLY } from './flight.js?v=11041624';
-import { BH } from './blackhole.js?v=11041624';
-import { hitWall } from './rocks.js?v=11041624';
+import { FLY } from './flight.js?v=11041627';
+import { BH } from './blackhole.js?v=11041627';
+import { hitWall } from './rocks.js?v=11041627';
 
 /* 비교표 그대로. heatT: 쉬지 않고 쏘면 과열까지(초) · coolT: 과열 뒤 다시 쏠 때까지(초) · cryB/wallB: 수정·벽에서 튕기는 횟수
    kind: 그림 결 (0 기본 · 1 서리 · 2 따뜻한 빛 · 3 빛 창 · 4 쇳물 · 5 불티 · 6 바늘 · 7 활) */
@@ -396,16 +396,18 @@ export function makeShots({ B, crystals, bh, FS, say, mobs, onKill, onDamage, on
   const pvM = new THREE.ShaderMaterial({ ...AB, side: THREE.DoubleSide, uniforms: { uA: { value: 0 }, uS: { value: new THREE.Vector2() }, uE: { value: new THREE.Vector2(0, -1) }, uL: { value: 3 }, uR: { value: 3 }, uCot: { value: .18 }, uT: { value: 0 }, uRdy: { value: 0 } },
     vertexShader: 'varying vec2 vW; void main(){ vec4 w = modelMatrix * vec4(position, 1.); vW = w.xz; gl_Position = projectionMatrix * viewMatrix * w; }',
     fragmentShader: `uniform float uA, uL, uR, uCot, uT, uRdy; uniform vec2 uS, uE; varying vec2 vW;
-      void main(){ vec2 q = vW - uS, pe = vec2(-uE.y, uE.x); float x = dot(q, uE), y = dot(q, pe), m = abs(y) * uCot, s = min(uL, x - m);
-        float dArc = uR - length(vec2(x - s, y)), dBack = (x - m) * .985;   /* 둘레(반달·옆) 까지 · 뒤쪽 비스듬한 변까지 */
-        float inside = step(0., s) * step(0., dArc); float dEdge = min(abs(dArc), s >= 0. ? 1e3 : abs(dBack)); dEdge = min(dEdge, abs(dBack) + step(0., -s) * 1e3);
-        float e1 = exp(-dArc * dArc * 90.) * step(0., s), e2 = exp(-dBack * dBack * 90.) * step(abs(y) * 0., 1.) * step(length(vec2(x, y)), uR + .05) * step(-.05, dArc + .2);
-        if (inside < .5 && e1 < .02 && e2 < .02) discard;
-        float dash = .6 + .4 * step(.5, fract((x + abs(y)) * 1.1 - uT * 1.6)), fill = inside * .05 * (.8 + .2 * sin(x * 6. - uT * 8.));
-        vec3 c = mix(vec3(.35, .9, 1.2), vec3(.5, 1.2, .75), uRdy) * (max(e1, e2) * dash * (.5 + .5 * uRdy) + fill);
+      void main(){ vec2 q = vW - uS, pe = vec2(-uE.y, uE.x); float x = dot(q, uE), y = dot(q, pe), ay = abs(y);
+        /* 기체 끝(0,0)에서 출발해 튀어 나가는 길(0~L)을 덮으며 벌어지다가 끝(L)에서 반지름 R 반달로 닫히는 물방울 · sd = 안쪽으로 잰 둘레까지 거리 */
+        float sd = x >= uL ? uR - length(vec2(x - uL, y)) : x >= 0. ? (uR * x - uL * ay) / length(vec2(uR, uL)) : -length(q);
+        float inside = step(0., sd), e = exp(-sd * sd * 70.);
+        float spine = exp(-y * y * 140.) * step(0., x) * step(x, uL) * step(.45, fract(x * 2.2 - uT * 3.));   /* 가운데 점선 = 기체가 튀어 나갈 길 */
+        if (inside < .5 && e < .02) discard;
+        float flow = .75 + .25 * sin(x * 5. - uT * 9.), fill = inside * (.06 + .05 * smoothstep(0., uL + uR, x)) * flow;   /* 끝으로 갈수록 살짝 진해짐 = 칼날이 닿는 쪽 */
+        float dash = .65 + .35 * step(.5, fract((x + ay) * 1.1 - uT * 1.6));
+        vec3 c = mix(vec3(.35, .9, 1.2), vec3(.5, 1.2, .75), uRdy) * (e * dash * (.55 + .45 * uRdy) + fill + spine * inside * .35);
         gl_FragColor = vec4(c * uA, 1.); }` });
   const pv = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), pvM); pv.rotation.x = -Math.PI / 2; pv.scale.setScalar(9); pv.renderOrder = 5; pv.frustumCulled = false; pv.visible = false; G.add(pv);
-  const bladeIn = (qx, qz, sx, sz, dir, L, R, cot, pad) => { const ex = -Math.sin(dir), ez = -Math.cos(dir), x = (qx - sx) * ex + (qz - sz) * ez, y = (qx - sx) * -ez + (qz - sz) * ex, ay = Math.max(0, Math.abs(y) - pad), s = Math.min(L, x + pad - ay * cot);
+  const bladeIn = (qx, qz, sx, sz, dir, L, R, cot, pad) => { const ex = -Math.sin(dir), ez = -Math.cos(dir), x = (qx - sx) * ex + (qz - sz) * ez, y = Math.abs((qx - sx) * -ez + (qz - sz) * ex); return x >= L ? Math.hypot(x - L, y) <= R + pad : x >= -pad && (R * x - L * y) / Math.hypot(R, L) >= -pad; };   /* 미리 보기 물방울과 같은 식 (pad = 적 몸 반지름) */
     return s >= 0 && Math.hypot(Math.max(0, x - s), ay) <= R + pad; };   /* 그 자리가 베일 범위(물방울) 안인지 — 미리 보기와 같은 식 */
   /* 시안별 휘두름: [시작 각, 끝 각, 시작 시점, 끝 시점, 반경 더하기] (각은 기체 앞 기준 · 왼쪽 +) */
   const D2R = Math.PI / 180, STY = {
