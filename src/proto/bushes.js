@@ -8,7 +8,7 @@
    · 모양·크기는 제각각: 작음(한 대가 겨우) · 중간 · 큼(여럿) × 둥긂 · 길쭉함(벽 따라) · 굽음
    · 규칙: 숨으면 바깥에서 안 보이고, 숨은 기체가 밀어내는 가스·돌 움직임도 바깥에선 안 보임(내 화면에서만).
            숨은 내 기체는 내 화면에서 반투명. 같은 숨을 곳 안이면 서로 반투명하게 보임. 안에서 쏘면 2초 드러남(적 붙일 때) */
-import { MAP, toWorld } from './mapfloor.js?v=11041558';
+import { MAP, toWorld } from './mapfloor.js?v=11041600';
 
 function fromMap(arr) {
   const S = MAP.SCALE, N = 500, grid = new Uint8Array(N * N);

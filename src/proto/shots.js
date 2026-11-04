@@ -11,9 +11,9 @@
    무게: 꼬리 한 장 · 머리 한 장 · 부스러기 한 장 · 바닥 흔적 한 장 · 모으는 빛 한 장 · 조준 고리 한 장 = 그리기 6번 (탄 종류가 늘어도 같음) */
 import * as THREE from 'three';
 import * as A from '../core/audio.js';
-import { FLY } from './flight.js?v=11041558';
-import { BH } from './blackhole.js?v=11041558';
-import { hitWall } from './rocks.js?v=11041558';
+import { FLY } from './flight.js?v=11041600';
+import { BH } from './blackhole.js?v=11041600';
+import { hitWall } from './rocks.js?v=11041600';
 
 /* 비교표 그대로. heatT: 쉬지 않고 쏘면 과열까지(초) · coolT: 과열 뒤 다시 쏠 때까지(초) · cryB/wallB: 수정·벽에서 튕기는 횟수
    kind: 그림 결 (0 기본 · 1 서리 · 2 따뜻한 빛 · 3 빛 창 · 4 쇳물 · 5 불티 · 6 바늘 · 7 활) */
@@ -30,7 +30,7 @@ export const SHOT = {
   /* 단거리 (6~12m): 파고들어 끝냄 · 약 32 */
   scatter: { name: '흩뿌림', role: '단거리', rate: 1.6, dmg: 4, speed: 22, range: 10, R: .14, heatT: 3.5, coolT: 2.5, n: 5, pat: 'fan', ang: 26, jit: 2, spd: .12, cryB: 0, wallB: 0, knock: .06, stun: .2, selfPush: .6, aimR: 10, fireSlow: .45, recoil: 1.6, col: [1, .86, .62], tail: 1.6, W: .16, head: .6, kind: 5, snd: 'scatter', look: '하얀 불티 알갱이' },
   heavy:   { name: '무거운 탄', role: '단거리', rate: 2.5, dmg: 13, speed: 22, range: 12, R: .45, heatT: 4, coolT: 2.5, n: 1, jit: 0, cryB: 1, wallB: 0, knock: 4, stun: .5, selfPush: 1, aimR: 12, fireSlow: .6, recoil: 2, shake: .22, col: [1, .55, .2], tail: 3.6, W: .62, head: 2, kind: 4, snd: 'boom', look: '주황 쇳물 덩어리 + 굵은 꼬리' },
-  blade:   { name: '빛 칼날', role: '단거리', blade: 1, rate: 1.6, dmg: 20, range: 5.6, reach: 2.6, heatShots: 3, width: 1.5, swing: .12, windup: .18, cutDelay: .1, style: 'A', heatT: 3, coolT: 2, aimR: 0, fireSlow: .3, recoil: .6, noReflect: 1, lunge: 3, col: [.85, 1, 1.1], kind: 0, snd: 'swish', look: '발도: 멈췄다 번개처럼 앞으로 베며 나감 · 반사 안 됨' },
+  blade:   { name: '빛 칼날', role: '단거리', blade: 1, rate: 1.6, dmg: 20, range: 5.6, reach: 2.6, heatShots: 3, width: 1.5, swing: .12, windup: .18, cutDelay: .1, style: 'A', heatT: 3, coolT: 2, aimR: 0, fireSlow: .3, recoil: .6, noReflect: 1, lunge: 3, coolWait: 1.2, col: [.85, 1, 1.1], kind: 0, snd: 'swish', look: '발도: 멈췄다 번개처럼 앞으로 베며 나감 · 반사 안 됨' },
 };
 export const SHOT_IDS = Object.keys(SHOT);
 const rngOf = (c, lv = 3) => Array.isArray(c.range) ? c.range[Math.max(0, Math.min(c.range.length, lv) - 1)] : c.range;   /* 모아 쏘기는 단계마다 사거리가 늘어남 */
@@ -569,6 +569,7 @@ export function makeShots({ B, crystals, bh, FS, say, mobs, onKill, onDamage, on
     FS.aim = want && !c.blade ? S.aimA : null; FS.fireSlow = c.fireSlow;
     const heatPer = c.heatShots ? 1 / c.heatShots : c.heatT ? 1 / (c.heatT * c.rate) : 0,   /* 빛 칼날: 세 번 베면 과열 */ cool = .7 / (c.coolT * .8);
     FS.turnCap = (c.chargeT && S.ch > 0) || (c.beam && shooting) ? 1.22 : null;   /* 빛 칼날은 slashStep에서 다시 정함 */   /* 모으는 동안·비추는 동안 조준이 아주 느리게 돎 (1초에 70°) */
+    if (!c.blade) pv.visible = false;
     beamStep(t, dt, !!(c.beam && shooting), c); slashStep(t, dt);
     if (c.beam) { muzM.uniforms.uA.value = 0; pth.visible = false; if (shooting) { S.lastShot = t; S.heat += dt / c.heatT; if (S.heat >= 1) { S.heat = 1; S.over = true; FS.heatFlash = 1; FS.shake = 1; flare(); crack(); } } }   /* 빛줄기: 비추는 동안 열이 차오름 */
     else if (c.chargeT) {   /* 모아 쏘기: 누르는 동안 모음(65% 느려짐) → 떼면 나감. 세 단계 (0.25초 · 0.55초 · 0.8초) — 피해 6 → 13 → 22 */
@@ -591,7 +592,6 @@ export function makeShots({ B, crystals, bh, FS, say, mobs, onKill, onDamage, on
       muzM.uniforms.uA.value += ((on ? .55 + .45 * S.ch : 0) - muzM.uniforms.uA.value) * Math.min(1, dt * 20); muzM.uniforms.uSt.value = on ? Math.max(S.ch / TH[0] * .6, stv) : 0;
       muzM.uniforms.uPop.value = on ? Math.max(0, 1 - (t - (S.stT || -9)) / .3) : 0; muzM.uniforms.uDir.value.set(-Math.sin(FS.head), Math.cos(FS.head));
       ppM.uniforms.uA.value += ((on ? 1 : 0) - ppM.uniforms.uA.value) * Math.min(1, dt * 14); ppM.uniforms.uSt.value = S.stage || 0; ppM.uniforms.uT.value = t; pth.visible = ppM.uniforms.uA.value > .01; }
-    if (!c.blade) pv.visible = false;
     else if (c.blade) { muzM.uniforms.uA.value = 0; pth.visible = false;   /* 빛 칼날: 누르고 있는 동안 자세 잡기 → 떼면 바라보는 쪽으로 베며 나감 */
       const W = c.windup || .18, sty = STY[c.style] || STY.A, R0 = c.reach + .6;
       if (want && !S.over && !SL.st && !SL.aim && t >= (S.bladeOk || 0)) { SL.aim = 1; SL.h0 = t; SL.sg = -SL.sg; }
@@ -607,7 +607,7 @@ export function makeShots({ B, crystals, bh, FS, say, mobs, onKill, onDamage, on
     else { muzM.uniforms.uA.value = 0; pth.visible = false;
       if (shooting) { S.acc += dt * c.rate; if (S.acc > 1.5) S.acc = 1.5; while (S.acc >= 1) { S.acc -= 1; fire(t); S.lastShot = t; S.heat += heatPer; if (S.heat >= 1) { S.heat = 1; S.over = true; S.acc = 0; FS.heatFlash = 1; FS.shake = 1; flare(); crack(); break; } } }
       else S.acc = Math.min(.999, S.acc + dt * c.rate); }                                                     /* 쉬는 동안 다음 발이 준비됨 → 누르는 순간 바로 첫 발 */
-    if ((t - S.lastShot > .3 && !(S.ch > 0)) || S.over) S.heat = Math.max(0, S.heat - dt * cool * (S.over ? .8 : 1));
+    if ((t - S.lastShot > (c.coolWait ?? .3) && !(S.ch > 0) && !SL.aim) || S.over) S.heat = Math.max(0, S.heat - dt * cool * (S.over ? .8 : 1));
     if (S.over && S.heat <= .3) S.over = false;
     /* 버튼: 열 고리 · 모으는 고리 */
     { const h = S.heat, hc = S.over ? '#ff6a2a' : h > .7 ? '#ffb347' : h > .4 ? '#e8ff8a' : `rgb(${scRGB})`;
