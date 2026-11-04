@@ -11,9 +11,9 @@
    무게: 꼬리 한 장 · 머리 한 장 · 부스러기 한 장 · 조준 빛 한 장 = 그리기 4번 */
 import * as THREE from 'three';
 import * as A from '../core/audio.js';
-import { FLY } from './flight.js?v=11040846';
-import { BH } from './blackhole.js?v=11040846';
-import { hitWall } from './rocks.js?v=11040846';
+import { FLY } from './flight.js?v=11040908';
+import { BH } from './blackhole.js?v=11040908';
+import { hitWall } from './rocks.js?v=11040908';
 
 export const SHOT = {
   basic: { name: '기본탄', rate: 7, speed: 44, life: 1.1, heat: .07, cool: .42, coolWait: .3, lock: .3, tail: 3.4, W: .27, col: [.62, 1, .32], spread: .012, bounces: 3 }
@@ -26,6 +26,8 @@ function pew() { if (!A.live()) return; const c = A.ctx, t0 = c.currentTime, o =
   o.type = 'triangle'; o.frequency.setValueAtTime(f, t0); o.frequency.exponentialRampToValueAtTime(f * .42, t0 + .07); o.connect(g); A.env(g, t0, .002, .035, .08); A.out(g, .1); o.start(t0); o.stop(t0 + .12); }
 function thud(vol = .05) { if (!A.live()) return; const c = A.ctx, t0 = c.currentTime, n = A.noise(.12), f = c.createBiquadFilter(), g = c.createGain(); f.type = 'lowpass'; f.frequency.value = 1400; n.connect(f); f.connect(g); A.env(g, t0, .002, vol, .1); A.out(g, .15); n.start(t0); }
 function hiss() { if (!A.live()) return; const c = A.ctx, t0 = c.currentTime, n = A.noise(1.1), f = c.createBiquadFilter(), g = c.createGain(); f.type = 'bandpass'; f.frequency.setValueAtTime(5200, t0); f.frequency.exponentialRampToValueAtTime(1600, t0 + 1); f.Q.value = .7; n.connect(f); f.connect(g); A.env(g, t0, .03, .07, 1); A.out(g, .2); n.start(t0); }
+function crack() { if (!A.live()) return; const c = A.ctx, t0 = c.currentTime, n = A.noise(.08), hp = c.createBiquadFilter(), g = c.createGain(); hp.type = 'highpass'; hp.frequency.value = 3000; n.connect(hp); hp.connect(g); A.env(g, t0, .001, .09, .07); A.out(g, .2); n.start(t0);   /* 과열: 달아오른 금속이 쩍 */
+  const o = c.createOscillator(), g2 = c.createGain(); o.type = 'square'; o.frequency.setValueAtTime(1900, t0); o.frequency.exponentialRampToValueAtTime(700, t0 + .05); o.connect(g2); A.env(g2, t0, .001, .02, .06); A.out(g2, .1); o.start(t0); o.stop(t0 + .08); }
 function clunk() { if (!A.live()) return; const c = A.ctx, t0 = c.currentTime, o = c.createOscillator(), g = c.createGain(); o.type = 'sine'; o.frequency.setValueAtTime(300, t0); o.frequency.exponentialRampToValueAtTime(120, t0 + .12); o.connect(g); A.env(g, t0, .003, .06, .14); A.out(g, .1); o.start(t0); o.stop(t0 + .2); }
 
 export function makeShots({ B, crystals, bh, FS, say, mobs, onKill }) {
@@ -77,6 +79,20 @@ export function makeShots({ B, crystals, bh, FS, say, mobs, onKill }) {
         vec3 col = mix(uC * uC, vec3(1., .35, .12), uHot);
         gl_FragColor = vec4(col * fan * (.16 + .14 * flow) * uA, 1.); }` });
   const aim = new THREE.Mesh(new THREE.PlaneGeometry(8, 11).translate(0, 5.5, 0), aimM); aim.rotation.x = -Math.PI / 2; aim.position.y = .08; aim.renderOrder = 4; aim.frustumCulled = false; G.add(aim);
+  /* 총구 열 빛 */
+  const mzP = new Float32Array(3), mzG = new THREE.BufferGeometry(); mzG.setAttribute('position', new THREE.BufferAttribute(mzP, 3));
+  const muz = new THREE.Points(mzG, new THREE.ShaderMaterial({ ...AB, uniforms: { uC: { value: new THREE.Vector3() }, uA: { value: 0 }, uPx: { value: 600 } },
+    vertexShader: 'uniform float uPx, uA; void main(){ vec4 mv = modelViewMatrix * vec4(position, 1.); gl_Position = projectionMatrix * mv; gl_PointSize = uA > .01 ? uPx * (.55 + .35 * uA) / max(.1, -mv.z) : 0.; }',
+    fragmentShader: 'uniform vec3 uC; uniform float uA; void main(){ vec2 q = gl_PointCoord - .5; float r2 = dot(q, q) * 4.; gl_FragColor = vec4(uC * (exp(-r2 * 16.) * 1.2 + exp(-r2 * 4.) * .35) * uA, 1.); }' }));
+  muz.frustumCulled = false; muz.renderOrder = 12; G.add(muz);
+  /* 자동 조준 고리 */
+  const lkP = new Float32Array(3), lkG = new THREE.BufferGeometry(); lkG.setAttribute('position', new THREE.BufferAttribute(lkP, 3)); let lkA = 0;
+  const lk = new THREE.Points(lkG, new THREE.ShaderMaterial({ ...AB, uniforms: { uA: { value: 0 }, uT: { value: 0 }, uS: { value: 1 }, uPx: { value: 600 } },
+    vertexShader: 'uniform float uPx, uA, uS; void main(){ vec4 mv = modelViewMatrix * vec4(position, 1.); gl_Position = projectionMatrix * mv; gl_PointSize = uA > .01 ? uPx * 1.55 * sqrt(uS) * (1.25 - .25 * uA) / max(.1, -mv.z) : 0.; }',
+    fragmentShader: `uniform float uA, uT; void main(){ vec2 q = gl_PointCoord - .5; float r = length(q) * 2., a = atan(q.y, q.x + 1e-5) + uT * 1.2;
+      float ring = exp(-(r - .8) * (r - .8) * 300.), ticks = smoothstep(.7, .95, abs(cos(a * 2.))) * exp(-(r - .88) * (r - .88) * 120.);   /* 가는 고리 + 네 곳 눈금이 천천히 돎 */
+      gl_FragColor = vec4(vec3(1., .95, .8) * (ring * .35 + ticks * .7) * uA, 1.); }` }));
+  lk.frustumCulled = false; lk.renderOrder = 12; G.add(lk);
 
   /* ── 버튼 ── */
   const st = document.createElement('style'); st.textContent = `
@@ -113,16 +129,20 @@ export function makeShots({ B, crystals, bh, FS, say, mobs, onKill }) {
   const fire = t => { const b = BU[bI = (bI + 1) % MAXB], a = S.aimA + (Math.random() - .5) * cfg.spread * 2, dx = -Math.sin(a), dz = -Math.cos(a);
     Object.assign(b, { on: true, x: FS.x + dx * 1.15, z: FS.z + dz * 1.15, vx: dx * cfg.speed, vz: dz * cfg.speed, age: 0, life: cfg.life, bo: 0, dead: -1 }); b.hist.length = 0; b.hist.push([FS.x + dx * .6, FS.z + dz * .6]);
     emit(FS.x + dx * 1.1, FLY.HOVER, FS.z + dz * 1.1, FS.vx, 0, FS.vz, 1.1, 1.2, .9, .55, .06, 3, 0);            /* 쏘는 불빛 */
-    pew(); };
+    FS.rc = 1; pew(); };                                                                                   /* 쏠 때마다 기체가 반동으로 살짝 밀림 */
 
   const tmp = [0, 0];
   G.userData.update = (t, dt, px) => {
-    headM.uniforms.uPx.value = px * .75; partM.uniforms.uPx.value = px; headM.uniforms.uT.value = t; tailM.uniforms.uT.value = t; aimM.uniforms.uT.value = t;
+    headM.uniforms.uPx.value = px * .75; partM.uniforms.uPx.value = px; headM.uniforms.uT.value = t; tailM.uniforms.uT.value = t; aimM.uniforms.uT.value = t; muz.material.uniforms.uPx.value = px; lk.material.uniforms.uPx.value = px;
     /* 조준·쏘기 */
     const want = I.held || I.key, shooting = want && !S.over;
-    if (want) S.aimA = I.held && I.drag ? I.ang : (I.key ? FS.mh ?? FS.head : I.ang);
+    /* 조준 (사용자 2026-11-04): 누르고만 있으면 가장 가까운 적을 자동 조준 · 끌면 끈 방향 그대로 */
+    S.lock = null;
+    if (want && !(I.held && I.drag)) { let bd = 24 * 24; if (mobs) for (const j of mobs.userData.list) { if (!j.on || j.dieT > 0) continue; const dx = j.x - FS.x, dz = j.z - FS.z, d = dx * dx + dz * dz; if (d < bd) { bd = d; S.lock = j; } } }
+    if (want) S.aimA = I.held && I.drag ? I.ang : S.lock ? Math.atan2(-(S.lock.x - FS.x), -(S.lock.z - FS.z)) : (I.key ? FS.mh ?? FS.head : S.aimA0 ?? FS.head);
+    if (!want) S.aimA0 = FS.head;
     FS.aim = want ? S.aimA : null;
-    if (shooting) { S.acc += dt * cfg.rate; if (S.acc > 1.5) S.acc = 1.5; while (S.acc >= 1) { S.acc -= 1; fire(t); S.lastShot = t; S.heat += cfg.heat; if (S.heat >= 1) { S.heat = 1; S.over = true; S.acc = 0; hiss(); clunk(); break; } } }
+    if (shooting) { S.acc += dt * cfg.rate; if (S.acc > 1.5) S.acc = 1.5; while (S.acc >= 1) { S.acc -= 1; fire(t); S.lastShot = t; S.heat += cfg.heat; if (S.heat >= 1) { S.heat = 1; S.over = true; S.acc = 0; hiss(); clunk(); crack(); break; } } }
     else S.acc = Math.min(.999, S.acc + dt * cfg.rate);                                                        /* 쉬는 동안 다음 발이 준비됨 → 누르는 순간 바로 첫 발 */
     if (t - S.lastShot > cfg.coolWait || S.over) S.heat = Math.max(0, S.heat - dt * cfg.cool * (S.over ? .8 : 1));
     if (S.over && S.heat <= cfg.lock) S.over = false;
@@ -133,8 +153,18 @@ export function makeShots({ B, crystals, bh, FS, say, mobs, onKill }) {
     { const h = S.heat, hc = S.over ? '#ff6a2a' : h > .7 ? '#ffb347' : h > .4 ? '#e8ff8a' : '#b9ff4a';
       btn.style.setProperty('--h', (h * 360).toFixed(1) + 'deg'); btn.style.setProperty('--hc', hc); btn.classList.toggle('hot', S.over); btn.classList.toggle('on', want && !S.over); lab.textContent = S.over ? '과열' : cfg.name; }
     /* 조준 빛 */
-    { const u = aimM.uniforms; u.uA.value += ((want ? 1 : 0) - u.uA.value) * Math.min(1, dt * 10); u.uHot.value += ((S.over ? 1 : 0) - u.uHot.value) * Math.min(1, dt * 6);
-      aim.visible = u.uA.value > .01; aim.position.x = FS.x; aim.position.z = FS.z; aim.rotation.z = S.aimA; }
+    aim.visible = false;                                                                                     /* 땅 부채꼴 빛은 뺌 (사용자: 기체 앞 안개 같은 초록 → 빨강이 이상함) */
+    /* 과열은 기체에서 (사용자 2026-11-04): 총구가 어두운 빨강 → 주황 → 하얗게 달아오름 · 둘레 공기가 아른거림 · 탄 색도 따뜻해짐 · 과열이면 붉게 맥박 */
+    { const h = S.heat, fx = -Math.sin(FS.head), fz = -Math.cos(FS.head), mx = FS.x + fx * 1.05, mz = FS.z + fz * 1.05;
+      const pulse = S.over ? .6 + .4 * Math.sin(t * 14) : 1, k = h * h;
+      const r = .25 + 1.15 * Math.min(1, h * 1.6), g = .05 + .9 * Math.max(0, h - .35) * 1.5, bb = .02 + .9 * Math.max(0, h - .7) * 3.3;
+      muz.material.uniforms.uC.value.set(r, Math.min(1.1, g), Math.min(1, bb)).multiplyScalar(pulse * (S.over ? 1.3 : 1)); muz.material.uniforms.uA.value = Math.min(1, h * 1.8) * (S.over ? 1 : .85);
+      mzP[0] = mx; mzP[1] = FLY.HOVER + .05; mzP[2] = mz; muz.geometry.attributes.position.needsUpdate = true;
+      if (h > .45 && Math.random() < dt * 26 * h) emit(mx + (Math.random() - .5) * .3, FLY.HOVER + .1, mz + (Math.random() - .5) * .3, FS.vx * .6 + (Math.random() - .5) * .4, .8 + Math.random() * .8, FS.vz * .6 + (Math.random() - .5) * .4, .5 * k, .22 * k, .08 * k, .22 + Math.random() * .1, .45, .5, -1.5);   /* 달아오른 총구 위로 아른거리는 열기 */
+      C.set(cfg.col[0], cfg.col[1], cfg.col[2]).lerp(new THREE.Vector3(1.15, .62, .25), Math.min(1, k * 1.1));                /* 뜨거울수록 탄이 따뜻한 색 */
+      /* 자동 조준 표시: 노리는 적 둘레에 작게 도는 조준 고리 */
+      const L = S.lock; lkA += ((L && want ? 1 : 0) - lkA) * Math.min(1, dt * 12); if (L) { lkP[0] = L.x; lkP[1] = L.y; lkP[2] = L.z; lk.material.uniforms.uS.value = L.s; }
+      lk.material.uniforms.uA.value = lkA; lk.material.uniforms.uT.value = t; lk.geometry.attributes.position.needsUpdate = true; }
     /* 탄 움직임 */
     const P = bh?.userData.P;
     for (const b of BU) { if (!b.on) continue;

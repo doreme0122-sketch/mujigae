@@ -10,8 +10,8 @@
    무게: 기체 한 대 + 불꽃 띠 몇 장 + 꼬리 띠 하나 + 불티 점 묶음 하나 + 그림자 판 하나 */
 import * as THREE from 'three';
 import { buildShip, engineSpots } from '../core/ships/build.js';
-import { flameMesh } from './sortie.js?v=11040846';
-import { MAP } from './mapfloor.js?v=11040846';
+import { flameMesh } from './sortie.js?v=11040908';
+import { MAP } from './mapfloor.js?v=11040908';
 
 export const FLY = { LEN: 2, HOVER: .7, R: .8, SPEEDS: [9, 12, 15, 18], TURN: 7, ACC: .22,
   BASE: 9, SHIELD: 3, BOOST: 5, BOOSTK: 1.5 };   /* 기지 고리(반지름 9m)를 벗어나는 순간: 보호막 3초 · 가속 5초(1.5배) — 기지 출구 앞 매복에 바로 당하지 않게 */
@@ -119,9 +119,11 @@ export async function makeFlight(renderer, B, start, face) {
     if (S.armed && Math.hypot(S.x - start[0], S.z - start[1]) > FLY.BASE) { S.armed = false; S.shield = FLY.SHIELD; S.boost = FLY.BOOST; }
     if (S.shield > 0 && (S.shield -= dt) <= 0) { S.shield = 0; S.pop = .3; }
     if (S.boost > 0) S.boost = Math.max(0, S.boost - dt);
-    const bk = Math.min(1, S.boost / .6), spd = S.speed * (1 + (FLY.BOOSTK - 1) * bk * bk * (3 - 2 * bk)) * (1 - .3 * (S.goo || 0));   /* 해파리 점액 위: 30% 느려짐 */
-    const sl = 1 - .45 * S.aimK, tx = -Math.sin(S.mh) * spd * sl * m * (m > .08), tz = -Math.cos(S.mh) * spd * sl * m * (m > .08)   /* 쏘는 동안 느려짐 */, a = Math.min(1, dt / FLY.ACC);
-    S.vx += (tx - S.vx) * a; S.vz += (tz - S.vz) * a; S.thr += (m - S.thr) * Math.min(1, dt * 8);
+    const bk = Math.min(1, S.boost / .6) * (1 - S.aimK), spd = S.speed * (1 + (FLY.BOOSTK - 1) * bk * bk * (3 - 2 * bk)) * (1 - .5 * (S.goo || 0));   /* 해파리 점액 위: 50% 느려짐 (30%는 거의 안 느껴졌음 · 사용자) */
+    const sl = 1 - .5 * S.aimK, tx = -Math.sin(S.mh) * spd * sl * m * (m > .08), tz = -Math.cos(S.mh) * spd * sl * m * (m > .08)   /* 쏘는 동안 느려짐 */, a = Math.min(1, dt / FLY.ACC);
+    S.vx += (tx - S.vx) * a; S.vz += (tz - S.vz) * a;
+    { const cap = S.speed * 1.9 * sl * (1 - .5 * (S.goo || 0)) + 1e-3, v = Math.hypot(S.vx, S.vz); if (v > cap && (S.aimK > .5 || (S.goo || 0) > .5)) { const k = Math.max(cap / v, 1 - dt * 6); S.vx *= k; S.vz *= k; } }   /* 쏘는 중·점액 위에선 가속 중이어도 확실히 느려짐 */
+    S.rc = Math.max(0, (S.rc || 0) - dt * 9); S.thr += (m - S.thr) * Math.min(1, dt * 8);
     /* 벽: 벽을 파고드는 힘만 없애고 벽을 따라가는 힘은 남김 → 비스듬히 닿으면 벽을 타고 미끄러짐, 정면이면 거의 멈춤
        ① 가려던 곳이 막혔으면 닿기 직전까지 감 ② 닿은 벽이 보는 쪽(바깥 방향)을 구함 ③ 그 방향 속도만 빼고 남은 시간만큼 다시 감 (꺾인 벽은 세 번까지)
        들이받은 세기(벽 쪽 속도)만큼 불티 */
@@ -144,7 +146,7 @@ export async function makeFlight(renderer, B, start, face) {
     applyGhost(dt);
     /* 기체 자세 */
     const bob = Math.sin(t * 2.1) * .06 + Math.sin(t * 3.7) * .025;
-    ship.position.set(S.x, FLY.HOVER + bob, S.z); ship.rotation.set(0, S.head, 0); ship.rotateZ(S.bank); ship.rotateX(-Math.min(.12, Math.hypot(S.vx, S.vz) / S.speed * .08));
+    ship.position.set(S.x + Math.sin(S.head) * S.rc * .14, FLY.HOVER + bob, S.z + Math.cos(S.head) * S.rc * .14);   /* 반동: 쏠 때마다 뒤로 살짝 밀렸다 돌아옴 */ ship.rotation.set(0, S.head, 0); ship.rotateZ(S.bank); ship.rotateX(-Math.min(.12, Math.hypot(S.vx, S.vz) / S.speed * .08));
     /* 보호막: 기체를 감싼 빛 거품. 가장자리가 밝고(빛이 비스듬히 지나는 곳) 결이 천천히 흐름. 끝나기 0.8초 전부터 점점 빨리 깜빡여 곧 꺼진다는 걸 알림 · 꺼질 땐 확 퍼지며 사라짐 */
     { const on = S.shield > 0, u = shieldM.uniforms; shieldMesh.visible = on || S.pop > 0; shieldMesh.position.set(S.x, FLY.HOVER + bob, S.z);
       let a = 1; if (on && S.shield < .8) a = .45 + .55 * (Math.sin((.8 - S.shield) * (10 + (.8 - S.shield) * 30)) > 0 ? 1 : 0);

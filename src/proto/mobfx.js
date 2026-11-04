@@ -4,7 +4,7 @@
    · 떼 경보 신호: 맞은 해파리에서 떼 동무에게 빛 알갱이가 둥글게 날아가 닿음 (신호가 어디서 어디로 퍼지는지 보임)
    무게: 빛 방울 한 장 · 알갱이(경험치+신호) 한 장 */
 import * as THREE from 'three';
-import { JCOL } from './jelly.js?v=11040846';
+import { JCOL } from './jelly.js?v=11040908';
 
 const AB = { transparent: true, depthWrite: false, blending: THREE.AdditiveBlending };
 export function makeMobFx() {
@@ -86,7 +86,7 @@ export function makeMobFx() {
     gm.uniforms.uT.value = t;
     /* 기체가 점액 위에 있나 */
     let on = false; if (ship) { const R2 = (GOO.R + .35) * (GOO.R + .35); for (let i = 0; i < NG && !on; i++) { const age = t - gI[i * 4 + 3]; if (age < 0 || age > GOO.LIFE * .92) continue; const dx = ship.x - gI[i * 4], dz = ship.z - gI[i * 4 + 1]; if (dx * dx + dz * dz < R2) on = true; }
-      const want = on || t < (ship.gooUntil || 0) ? 1 : 0; ship.goo = (ship.goo || 0) + (want - (ship.goo || 0)) * Math.min(1, dt * (want ? 8 : 3));
+      const want = on || t < (ship.gooUntil || 0) ? 1 : 0; ship.goo = (ship.goo || 0) + (want - (ship.goo || 0)) * Math.min(1, dt * (want ? 30 : 2));   /* 밟는 순간 바로 붙잡히고 빠져나오면 0.5초에 걸쳐 풀림 */
       /* 끈적한 실 */
       const hy = .55, sx = ship.x, sz = ship.z;
       ST.forEach((st, k) => { const ox = Math.cos(k * 2.1 + .5) * .35, oz = Math.sin(k * 2.1 + .5) * .35;

@@ -203,7 +203,7 @@ export function makeJellies(uT) {
     for (const j of list) { if (!j.on) continue;
       if (j.dieT > 0) { const e = t - j.dieT; j.vx *= Math.exp(-dt * 3); j.vz *= Math.exp(-dt * 3); j.x += j.vx * dt; j.z += j.vz * dt; j.y -= dt * .2; j.ph += dt * j.rate * .5; if (e > 1.3) { j.on = false; ctx.died?.(j); } continue; }
       if (j.alarmAt && t >= j.alarmAt) { j.alarmAt = 0; j.alarmUntil = t + 8; j.sigT = t; j.alert = Math.max(j.alert, .7); ctx.alarmed?.(j); }   /* 떼 경보가 닿음 */
-      const dsx = ctx.sx - j.x, dsz = ctx.sz - j.z, ds = Math.hypot(dsx, dsz), sees = ds < (j.strong ? 14 : 11) || t < (j.alarmUntil || 0);
+      const dsx = ctx.sx - j.x, dsz = ctx.sz - j.z, ds = Math.hypot(dsx, dsz), sees = (ds < (j.strong ? 14 : 11) || t < (j.alarmUntil || 0)) && (!ctx.canChase || ctx.canChase(j));   /* 제 사냥터 밖까지는 쫓지 않음 (사용자: 태어나는 방까지 올라오면 안 됨) */
       j.alert += ((sees ? 1 : 0) - j.alert) * Math.min(1, dt * (sees ? 2.2 : .6));                          /* 다가오면 서서히 붉게 물듦, 멀어지면 천천히 가라앉음 */
       /* 가고 싶은 쪽 */
       let ax = 0, az = 0;

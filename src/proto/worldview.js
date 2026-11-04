@@ -2,23 +2,23 @@
    날아 보기: 1번 기지에서 기체를 조이스틱으로 몰아 맵 크기·길·문을 몸으로 확인(지금 있는 땅 이름 · 출발 뒤 걸린 시간 · 속도 바꾸기)
    보기: 날아 보기·지역 보기는 기체를 따라감, 맵 전체는 가운데 고정(끌어서 이동). 두 손가락(휠)로 확대. 시작 기지 자리는 빛 고리(다음 단계에서 진짜 기지) */
 import * as THREE from 'three';
-import { makeBloom } from '../core/hangar/bloom.js?v=11040846';
-import { makeMapFloor, MAP, toWorld } from './mapfloor.js?v=11040846';
-import { makePerf } from './perf.js?v=11040846';
+import { makeBloom } from '../core/hangar/bloom.js?v=11040908';
+import { makeMapFloor, MAP, toWorld } from './mapfloor.js?v=11040908';
+import { makePerf } from './perf.js?v=11040908';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
-import { makeFlight, loadBlock, FLY } from './flight.js?v=11040846';
-import { makeWalls } from './walls.js?v=11040846';
-import { makeMotes } from './motes.js?v=11040846';
-import { makeBushes } from './bushes.js?v=11040846';
-import { makeVision } from './vision.js?v=11040846';
-import { makeHide } from './hideviz.js?v=11040846';
-import { makeWardsOnMap, WARDS } from './wardsight.js?v=11040846';
-import { makeBlackHole } from './blackhole.js?v=11040846';
-import { makeBossCrystals } from './bosscrystals.js?v=11040846';
-import { makeShots } from './shots.js?v=11040846';
-import { makeJellies } from './jelly.js?v=11040846';
-import { makeMobFx } from './mobfx.js?v=11040846';
-import { makeHunt } from './hunt.js?v=11040846';
+import { makeFlight, loadBlock, FLY } from './flight.js?v=11040908';
+import { makeWalls } from './walls.js?v=11040908';
+import { makeMotes } from './motes.js?v=11040908';
+import { makeBushes } from './bushes.js?v=11040908';
+import { makeVision } from './vision.js?v=11040908';
+import { makeHide } from './hideviz.js?v=11040908';
+import { makeWardsOnMap, WARDS } from './wardsight.js?v=11040908';
+import { makeBlackHole } from './blackhole.js?v=11040908';
+import { makeBossCrystals } from './bosscrystals.js?v=11040908';
+import { makeShots } from './shots.js?v=11040908';
+import { makeJellies } from './jelly.js?v=11040908';
+import { makeMobFx } from './mobfx.js?v=11040908';
+import { makeHunt } from './hunt.js?v=11040908';
 
 const $ = s => document.querySelector(s), clamp = THREE.MathUtils.clamp;
 const VIEWS = [{ name: '날아 보기', h: 42, tilt: .38 }, { name: '지역 보기', h: 160, tilt: .25 }, { name: '맵 전체', h: 520, tilt: .02 }];
@@ -28,9 +28,9 @@ export async function start(canvas, onProgress = () => {}) {
   renderer.toneMapping = THREE.NoToneMapping; renderer.autoClear = false; renderer.setClearColor(0, 1);
   const scene = new THREE.Scene(), camera = new THREE.PerspectiveCamera(40, 1, 1, 3000), bloom = makeBloom(renderer, { samples: 0 });
   onProgress(.2);
-  const floor = await makeMapFloor(renderer, './assets/map/v7.png?v=11040846');
-  const J = await (await fetch('./assets/map/v7.json?v=11040846')).json();
-  const BLK = await loadBlock('./assets/map/v7.png?v=11040846');                  /* 벽 판정 = 바닥에 그린 벽 그림 그대로 */
+  const floor = await makeMapFloor(renderer, './assets/map/v7.png?v=11040908');
+  const J = await (await fetch('./assets/map/v7.json?v=11040908')).json();
+  const BLK = await loadBlock('./assets/map/v7.png?v=11040908');                  /* 벽 판정 = 바닥에 그린 벽 그림 그대로 */
   const UT = { value: 0 }, WALL = makeWalls(BLK, floor, J.ridges, UT); floor.mat.uniforms.uWf.value = WALL.fieldTex;   /* 바닥도 같은 벽 지도로 */
   scene.add(WALL.real); scene.add(WALL.mesh); WALL.mesh.visible = false;   /* 승인된 벽 5종 · 맵 전체 보기에서만 가벼운 한 덩어리 벽(멀리서 보는 지도) */
   { const pm = new THREE.PMREMGenerator(renderer); scene.environment = pm.fromScene(new RoomEnvironment(), .04).texture; scene.environmentIntensity = .6; pm.dispose(); }
@@ -122,7 +122,7 @@ export async function start(canvas, onProgress = () => {}) {
     fly.userData.update(t, dt);
     shots.userData.update(t, dt, Hd / (2 * Math.tan(camera.fov * Math.PI / 360)));
     { const px = Hd / (2 * Math.tan(camera.fov * Math.PI / 360));
-      jel.userData.step(t, dt, { sx: FS.x, sz: FS.z, blocked: BLK.blocked, spit: (j, dx, dz) => mfx.userData.spit(j.x + dx * j.s * .7, j.y - .2, j.z + dz * j.s * .7, dx, dz) });
+      jel.userData.step(t, dt, { sx: FS.x, sz: FS.z, blocked: (x, z) => BLK.blocked(x, z) || BLK.region(x, z) !== 1, canChase: j => BLK.region(FS.x, FS.z) === 1 && Math.hypot(FS.x - j.home[0], FS.z - j.home[1]) < 22, spit: (j, dx, dz) => mfx.userData.spit(j.x + dx * j.s * .7, j.y - .2, j.z + dz * j.s * .7, dx, dz) });
       for (const sg of jel.userData.signals.splice(0)) mfx.userData.signal(sg);
       hunt.update(t); jel.userData.draw(t, cam.x, cam.z, 80); jel.userData.setPx(px);
       mfx.userData.update(t, dt, px, FS, q => { FS.hurt = t; FS.gooUntil = t + 2; shots.userData.sparks(q.x, q.z, 1.2, .45, .3, 12); }, () => { expN++; }); }
