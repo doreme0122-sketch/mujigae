@@ -4,7 +4,7 @@
    · 멀어질수록 깊은 색으로 가라앉힘 (가까운 싸움터가 또렷하게)
    0 금속 판 · 1 이끼 낀 암반 · 2 결정 섞인 모래 · 3 은은한 평지 · 4 보스존 별빛 우주(보이지 않는 유리 바닥 + 아래로 깊은 별 세 겹) */
 import * as THREE from 'three';
-import { SNOW_GLSL, SNOW_U } from './snowtone.js?v=11042352';
+import { SNOW_GLSL, SNOW_U } from './snowtone.js?v=11050004';
 
 function bakeNoise(N = 256) {
   const hash = (x, y, p) => { x = ((x % p) + p) % p; y = ((y % p) + p) % p; const s = Math.sin(x * 127.1 + y * 311.7) * 43758.5453; return s - Math.floor(s); };
@@ -149,7 +149,6 @@ export function makeFloorLab() {
             if(ice){ /* 얼음 땅: 벽에 맞춘 눈·얼음 땅 · 벽 가까이일수록 눈 두껍게 · 문턱 얇은 곳은 아래 유리·별이 비침 */
               float thin=doorZ*smoothstep(-3.,0.,sd);
               land=iceGround(p,rd,smoothstep(-7.,-1.5,sI));
-              land=mix(land,sky*1.3+vec3(.004,.012,.02),thin*.35*(1.-gSnow));                    /* 유리가 비치는 건 얼음 부분만 · 눈은 그대로 하얗게 */
               land=mix(land,mix(vec3(.05,.08,.11),SNOW_SH*.85,gSnow),lip*.8);            /* 부서진 옆면: 얼음은 짙게, 눈은 눈 그늘색 */
             } else { /* 용암: 검은 현무암 껍질 · 숨 쉬듯 빛나는 붉은 결 · 부서진 옆면은 속이 붉게 */
               float e=.35; float h=N4(p*.035+.4).r*.6+N4(p*.14).b*.4, hx=N4((p+vec2(e,0.))*.035+.4).r*.6+N4((p+vec2(e,0.))*.14).b*.4, hz=N4((p+vec2(0.,e))*.035+.4).r*.6+N4((p+vec2(0.,e))*.14).b*.4;
