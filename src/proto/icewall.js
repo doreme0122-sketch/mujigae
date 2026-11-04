@@ -28,22 +28,18 @@ export function iceWallMaterial(uT) {
   m.onBeforeCompile = sh => { prev(sh);
     sh.vertexShader = 'attribute float aG; varying float vG;\n' + sh.vertexShader.replace('#include <project_vertex>', '#include <project_vertex>\n vG=aG;');
     sh.fragmentShader = 'varying float vG;\n' + sh.fragmentShader
-      .replace('#include <roughnessmap_fragment>', `#include <roughnessmap_fragment>
-      float snw=smoothstep(.5,.82,vNw.y+(inz(vIw*1.7)-.5)*.35+(inz(vIw*5.)-.5)*.12)*smoothstep(1.,1.7,vIw.y);   /* 위를 향한 깎인 면에 눈 (점마다 부드러운 경계) */
-      roughnessFactor=mix(roughnessFactor,.92,snw);`)
       .replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>
       { float fh=ih(floor(vNw*6.)+floor(vIw*.7)); diffuseColor.rgb=mix(diffuseColor.rgb*.7,diffuseColor.rgb*vec3(.9,1.25,1.4)+vec3(.04,.09,.12),fh);   /* 면마다 맑기가 다름 */
         vec3 q=vIw*vec3(1.6,.7,1.6); float l1=abs(inz(q)-.5), l2=abs(inz(q*2.7+3.)-.5);
         float hair=smoothstep(.018,.0,l1)*.6+smoothstep(.012,.0,l2)*.4; diffuseColor.rgb=mix(diffuseColor.rgb,vec3(.55,.75,.85),hair*.5);   /* 겉의 하얀 잔금 */
-        diffuseColor.rgb=mix(diffuseColor.rgb,diffuseColor.rgb*vec3(.6,.85,1.15),smoothstep(3.,.2,vIw.y)*.5);
-        diffuseColor.rgb=mix(diffuseColor.rgb,vec3(.6,.68,.78)*(.9+.2*inz(vIw*3.)),snw); }`)
+        diffuseColor.rgb=mix(diffuseColor.rgb,diffuseColor.rgb*vec3(.6,.85,1.15),smoothstep(3.,.2,vIw.y)*.5); }`)
       .replace('#include <aomap_fragment>', `#include <aomap_fragment>
       { vec3 q=vIw*vec3(.5,.22,.5); float c1=abs(inz(q)-.5), c2=abs(inz(q*2.3+7.)-.5);
         float crack=smoothstep(.026,.0,c1)+smoothstep(.02,.0,c2)*.6, halo=smoothstep(.15,.0,c1)*.3;
         float seam=pow(clamp(vG,0.,1.),1.6);                                                        /* 조각 사이 틈 */
         float deep=smoothstep(4.5,.3,vIw.y);
         float ndv=abs(dot(normal,normalize(vViewPosition)));
-        totalEmissiveRadiance+=vec3(.08,.55,1.)*(crack*.4+halo*.6+seam*1.7*(.5+.5*deep))*(.55+.45*ndv)*(1.-snw*.9)+vec3(.1,.45,.9)*pow(1.-ndv,2.)*.25+vec3(.03,.18,.35)*deep*.5;
+        totalEmissiveRadiance+=vec3(.08,.55,1.)*(crack*.4+halo*.6+seam*1.7*(.5+.5*deep))*(.55+.45*ndv)+vec3(.1,.45,.9)*pow(1.-ndv,2.)*.25+vec3(.03,.18,.35)*deep*.5;
         float lip=smoothstep(.5,.95,dot(vNw,normalize(vec3(-.45,.78,-.42))))*(1.-smoothstep(.6,.95,vNw.y));
         totalEmissiveRadiance+=vec3(.7,.85,1.)*lip*.3;
         float sp=step(.993,ih(floor(vIw*16.)))*smoothstep(.3,.9,vNw.y+.4); totalEmissiveRadiance+=vec3(.8,.9,1.)*sp; }`); };
@@ -92,8 +88,7 @@ export function makeIceWall(path, opt = {}) {
     const base = W + foot + (vn(f.d * .35 + side * 9, yk * 2, o) - .5) * .35 + lean; return [side * (base + off), y, (1 - off / PMAX) * (.4 + .6 * (1 - yk))]; };
   const section = f => { const out = [];
     for (const yk of RF) out.push(faceRow(f, -1, yk));
-    /* 윗면: 일단 매끈하게 7점으로 깔고, 나중에 큰 평평한 칼로 쳐 내서 각진 판을 만듦 (아래 ⓒ) */
-    for (let k = 0; k < 7; k++) { const v = -W + .1 + k / 6 * (2 * W - .2); out.push([v, f.h + .12 * (1 - (v / W) ** 2) + (vn(f.d * .5, k, o) - .5) * .08, .05]); }
+    out.push([-W + .25 + (vn(f.d * .8, 3, o) - .5) * .2, f.h + .05, .05], [(vn(f.d * .6, 5, o) - .5) * .6, f.h + .12 + vn(f.d * .4, 6, o) * .15, .05], [W - .25, f.h + .03, .05]);
     for (let k = RB.length - 1; k >= 0; k--) out.push(faceRow(f, 1, RB[k]));
     return out; };
   const S = fr.map(section), M = S[0].length, P = [], G = [];
@@ -102,30 +97,17 @@ export function makeIceWall(path, opt = {}) {
   for (let i = 0; i < N; i++) for (let k = 0; k < M - 1; k++) { const a = pt(i, k), b = pt(i + 1, k), c = pt(i, k + 1), d = pt(i + 1, k + 1), g = (ii, kk) => S[ii][kk][2];
     tri(a, c, b, g(i, k), g(i, k + 1), g(i + 1, k)); tri(b, c, d, g(i + 1, k), g(i, k + 1), g(i + 1, k + 1)); }
   for (const i of [0, N]) { const c = [fr[i].x, fr[i].h * .5, fr[i].z]; for (let k = 0; k < M - 1; k++) { const a = pt(i, k), b = pt(i, k + 1); i === 0 ? tri(a, c, b, .3, .3, .3) : tri(a, b, c, .3, .3, .3); } }
-  /* ⓒ 윗면 깎기: 바위를 깎은 것과 같은 방식 — 크고 평평한 칼(넓이 2~4m)을 비스듬히 여러 번 대서 그 위를 쳐 냄 → 큼직하게 각진 판
-     점마다 위치만 보고 똑같이 깎으므로 맞닿은 면끼리 어긋나지 않음 */
-  { const cuts = [], grid = new Map(), C = 4;
-    for (let d = R() * 1.5; d < len; d += 1.1 + R() * 1.5) { const i = Math.min(N, Math.round(d / len * N)), f = fr[i], v0 = (R() - .5) * 2 * W * .9, a = R() * 6.283, tilt = .18 + R() * .45;
-      const nrm = new THREE.Vector3(Math.cos(a) * Math.sin(tilt), Math.cos(tilt), Math.sin(a) * Math.sin(tilt)), c = new THREE.Vector3(f.x + f.nx * v0, f.h - .08 - R() * .55, f.z + f.nz * v0);
-      const cut = { c, n: nrm, r: 1.6 + R() * 2.2, hMin: f.h * .72 }; cuts.push(cut);
-      for (let gx = Math.floor((c.x - cut.r) / C); gx <= Math.floor((c.x + cut.r) / C); gx++) for (let gz = Math.floor((c.z - cut.r) / C); gz <= Math.floor((c.z + cut.r) / C); gz++) { const k = gx + ',' + gz; if (!grid.has(k)) grid.set(k, []); grid.get(k).push(cut); } }
-    const v = new THREE.Vector3();
-    for (let i = 0; i < P.length; i += 3) { v.set(P[i], P[i + 1], P[i + 2]); const L = grid.get(Math.floor(v.x / C) + ',' + Math.floor(v.z / C)); if (!L) continue;
-      for (const cu of L) { if (v.y < cu.hMin) continue; const dx = v.x - cu.c.x, dz = v.z - cu.c.z; if (dx * dx + dz * dz > cu.r * cu.r) continue;
-        const h = (v.x - cu.c.x) * cu.n.x + (v.y - cu.c.y) * cu.n.y + (v.z - cu.c.z) * cu.n.z; if (h > 0) v.addScaledVector(cu.n, -h); }
-      P[i] = v.x; P[i + 1] = v.y; P[i + 2] = v.z; } }
   const ice = []; { const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(P, 3)); g.setAttribute('aG', new THREE.Float32BufferAttribute(G, 1)); g.computeVertexNormals(); ice.push(g); }
   const snow = [];
-  /* ④ 눈: 윗면의 각진 판 모양 그대로 따라 쌓임 (바위 위 눈과 같은 방식) · 바람 쪽으로 쏠림 · 곳마다 두께가 다름 · 앞 모서리는 살짝 넘쳐 흘러내림 */
-  { const A = ice[0].attributes.position, Nn = ice[0].attributes.normal, Q = [], a = new THREE.Vector3(), nn = new THREE.Vector3(), wind = new THREE.Vector3(R() - .5, 0, R() - .5).normalize();
-    for (let t = 0; t < A.count; t += 3) { nn.fromBufferAttribute(Nn, t); a.fromBufferAttribute(A, t); if (a.y < 1.2) continue;
-      const up = nn.y + nn.dot(wind) * .15; if (up < .86) continue;
-      for (let k = 0; k < 3; k++) { a.fromBufferAttribute(A, t + k); const th = (.06 + .2 * vn(a.x * .7, 3, a.z * .7) + .05 * vn(a.x * 3, a.y * 3, a.z * 3)) * Math.min(1, (up - .86) * 8);
-        Q.push(a.x + nn.x * th * .2, a.y + th, a.z + nn.z * th * .2); } }
+  /* ④ 눈: 윗단 전체 + 앞 모서리로 둥글게 넘쳐 흘러내림 */
+  { const Q = [], iT = RF.length - 1, top = (i, k) => { const f = fr[i], s = S[i], fe = s[iT], be = s[iT + 4], t = .32 + vn(f.d * .9, 1, o) * .22, drip = vn(f.d * 1.7, 2, o);
+      const sec = [[fe[0] - .12, fe[1] - .35 - drip * .5], [fe[0] - .2, fe[1] + t * .55], [fe[0] + .3, f.h + t], [s[iT + 2][0], s[iT + 2][1] + t * 1.05], [be[0] - .35, f.h + t * .9], [be[0] + .12, be[1] + t * .4], [be[0] + .1, be[1] - .3]][k];
+      return [f.x + f.nx * sec[0], sec[1], f.z + f.nz * sec[0]]; };
+    for (let i = 0; i < N; i++) for (let k = 0; k < 6; k++) { const a = top(i, k), b = top(i + 1, k), c = top(i, k + 1), d = top(i + 1, k + 1); FL ? Q.push(...a, ...b, ...c, ...b, ...d, ...c) : Q.push(...a, ...c, ...b, ...b, ...c, ...d); }
     const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(Q, 3)); g.computeVertexNormals(); snow.push(g); }
   /* ⑤ 고드름: 앞 모서리에서 아주 촘촘히 (긴 것 사이사이 짧은 것) · 뒤 모서리도 드문드문 */
   const icicle = (x, y, z, l, r) => { const g = new THREE.ConeGeometry(r, l, 5, 2); const P2 = g.attributes.position; for (let j = 0; j < P2.count; j++) { const yy = P2.getY(j); P2.setX(j, P2.getX(j) * (1 + (yy / l) * .3)); } g.rotateX(Math.PI); g.rotateY(R() * 6); g.translate(x, y - l / 2, z); return prep(g, .45); };
-  for (let i = 0; i <= N; i++) for (const side of [-1, 1]) { const f = fr[i], s = S[i][side < 0 ? RF.length - 1 : RF.length + 7]; if (side > 0 && R() < .6) continue;
+  for (let i = 0; i <= N; i++) for (const side of [-1, 1]) { const f = fr[i], s = S[i][side < 0 ? RF.length - 1 : RF.length + 3]; if (side > 0 && R() < .6) continue;
     const longOne = R() < .35, l = longOne ? 1.1 + R() * 1.6 : .35 + R() * .7, v = s[0] + side * .06, y = f.h - .1;
     if (R() < .82) ice.push(icicle(f.x + f.nx * v + f.tx * (R() - .5) * .15, y, f.z + f.nz * v + f.tz * (R() - .5) * .15, l, (longOne ? .13 : .08) + R() * .06)); }
   /* ⑥ 뾰족한 결정 기둥 */
