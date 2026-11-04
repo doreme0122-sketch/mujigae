@@ -5,16 +5,16 @@
    무게: 바닥 판 하나 + 기체 둘 + 빛 알갱이 한 묶음 + 그림자 판 둘 */
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
-import { makeBloom } from '../core/hangar/bloom.js?v=11050758';
-import { makePerf } from './perf.js?v=11050758';
+import { makeBloom } from '../core/hangar/bloom.js?v=11050820';
+import { makePerf } from './perf.js?v=11050820';
 import { buildShip, engineSpots } from '../core/ships/build.js';
 import { makeGlow } from '../preview/glow.js';
-import { makeFlight, FLY } from './flight.js?v=11050758';
-import { makeFloorLab, LAB, JOIN, sdBlob, sdRoad, blobR } from './floorlab.js?v=11050758';
-import { makeMassWall, STYLES } from './wallmass.js?v=11050758';
-import { makeIceWall } from './icewall.js?v=11050758';
-import { SNOW_U } from './snowtone.js?v=11050758';
-import { iceWallMaterial, snowMaterial } from './icewall.js?v=11050758';
+import { makeFlight, FLY } from './flight.js?v=11050820';
+import { makeFloorLab, LAB, JOIN, sdBlob, sdRoad, blobR } from './floorlab.js?v=11050820';
+import { makeMassWall, STYLES } from './wallmass.js?v=11050820';
+import { makeIceWall } from './icewall.js?v=11050820';
+import { SNOW_U } from './snowtone.js?v=11050820';
+import { iceWallMaterial, snowMaterial } from './icewall.js?v=11050820';
 
 const $ = s => document.querySelector(s), clamp = THREE.MathUtils.clamp;
 const VIEWS = [{ id: 'game', name: '게임 시점', h: 42, tilt: .38 }, { id: 'near', name: '가까이', h: 18, tilt: .6 }, { id: 'far', name: '멀리', h: 90, tilt: .3 }];
@@ -47,14 +47,22 @@ export async function start(canvas, onProgress = () => {}) {
   const UT = { value: 0 }, walls = new THREE.Group(); scene.add(walls); walls.visible = false;
   const ring = (c, ph, gapAt) => { const pts = [], ag = .27; for (let a = gapAt + ag; a <= gapAt + Math.PI * 2 - ag + 1e-6; a += .045) { const r = blobR(Math.cos(a), Math.sin(a), JOIN.R, ph); pts.push([c[0] + Math.cos(a) * r, c[1] + Math.sin(a) * r]); } return pts; };
   const outOf = c => (x, z, nx, nz) => ((x - c[0]) * nx + (z - c[1]) * nz) > 0 ? 1 : -1;
-  walls.add(makeIceWall(ring(JOIN.ice, 0, 0), { uT: UT, seed: 4, out: outOf(JOIN.ice) }));
+  const iceRing = ring(JOIN.ice, 0, 0); let joinIce = null;
   walls.add(makeMassWall('obsidian', ring(JOIN.lava, 2.1, Math.PI), { uT: UT, seed: 3, out: outOf(JOIN.lava) }));
   /* 빙하 얼음 벽 보기: 가운데 문이 있는 벽 한 줄 + 오른쪽에 토막 셋을 따로 (낮은 · 높은 · 문 옆) */
   const GAL = { z: -12, xs: [-12, 12], kinds: [] }, gal = new THREE.Group(); scene.add(gal); gal.visible = false;
   const north = (x, z, nx, nz) => nz < 0 ? 1 : -1, galTags = [], iceM = iceWallMaterial(UT), snowM = snowMaterial(UT);
   const line = (a, b, ph) => { const pts = []; for (let x = a; x <= b + 1e-6; x += 1) pts.push([x, GAL.z + Math.sin(x * .12 + ph) * 1.2]); return pts; };
-  const wl = makeIceWall(line(-34, -4, 0), { uT: UT, mat: iceM, smat: snowM, seed: 11, out: north, doors: [false, true] }); gal.add(wl);
-  gal.add(makeIceWall(line(4, 34, 1), { uT: UT, mat: iceM, smat: snowM, seed: 12, out: north, doors: [true, false] }));
+  /* 입구 시안: 고를 때마다 얼음 벽(이음 장면 + 벽 칸)을 새 입구로 다시 지음 · 바닥 문턱 자리도 알려 줌 */
+  const L1 = line(-34, -4, 0), L2 = line(4, 34, 1); let galW = [];
+  const GATES = [['입구 · 결정 문기둥', 'pillar'], ['입구 · 부서진 아치', 'arch'], ['입구 · 깨져 벌어진 틈', 'breach'], ['입구 · 빛나는 문턱', 'sill']];
+  const drop = o => { o.parent && o.parent.remove(o); o.traverse(m => m.isMesh && m.geometry.dispose()); };
+  const buildGate = gi => { const gate = GATES[gi][1];
+    if (joinIce) drop(joinIce); joinIce = makeIceWall(iceRing, { uT: UT, mat: iceM, smat: snowM, seed: 4, out: outOf(JOIN.ice), gate }); walls.add(joinIce);
+    galW.forEach(drop); galW = [makeIceWall(L1, { uT: UT, mat: iceM, smat: snowM, seed: 11, out: north, doors: [false, true], gate }), makeIceWall(L2, { uT: UT, mat: iceM, smat: snowM, seed: 12, out: north, doors: [true, false], gate })]; galW.forEach(w => gal.add(w));
+    lab.mat.uniforms.uGate.value = gi; const D = lab.mat.uniforms.uDoor.value, e = iceRing[iceRing.length - 1], s0 = iceRing[0];
+    D[0].set(e[0], e[1], s0[0], s0[1]); D[1].set(L1[L1.length - 1][0], L1[L1.length - 1][1], L2[0][0], L2[0][1]); };
+  buildGate(0);
   const tagAt = (txt, x, y, z) => { const el = document.createElement('div'); el.className = 'tag'; el.innerHTML = `<b>${txt}</b>`; el.style.opacity = 0; $('#tags').appendChild(el); galTags.push({ el, p: new THREE.Vector3(x, y, z) }); };
   tagAt('빙하 얼음 벽 · 한 덩어리 절벽', -19, 10, GAL.z); tagAt('문', 0, 4, GAL.z);
 
@@ -104,6 +112,8 @@ export async function start(canvas, onProgress = () => {}) {
   { const sep2 = document.createElement('i'); sep2.style.cssText = 'width:1px;align-self:stretch;background:rgba(185,255,74,.25);margin:0 4px'; tour.appendChild(sep2);
     /* 바닥 눈 없앰 → '눈 많이 / 얼음 많이' 버튼도 없앰 */
     /* 눈 결 비교: 벽 눈과 바닥 눈이 같은 결을 씀 — 매끈 / 물결 */
+    GATES.forEach(([nm], j) => { const b = document.createElement('button'); b.type = 'button'; b.textContent = nm; b.className = 'gt' + (j ? '' : ' on');
+      b.addEventListener('pointerdown', e => { e.stopPropagation(); buildGate(j); tour.querySelectorAll('.gt').forEach(x => x.classList.toggle('on', x === b)); }); tour.appendChild(b); });
     [['눈 결 · 벽 눈처럼 매끈', 0], ['눈 결 · 바닥 눈처럼 물결', 1]].forEach(([nm, k], j) => { const b = document.createElement('button'); b.type = 'button'; b.textContent = nm; b.className = 'sg' + (j ? ' on' : '');
       b.addEventListener('pointerdown', e => { e.stopPropagation(); SNOW_U.uSG.value = k; tour.querySelectorAll('.sg').forEach(x => x.classList.toggle('on', x === b)); }); tour.appendChild(b); }); }
   VIEWS.forEach(v => { const b = document.createElement('button'); b.type = 'button'; b.textContent = v.name; b.className = 'vw';

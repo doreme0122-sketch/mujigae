@@ -11,8 +11,8 @@
    무게: 벽 한 줄 = 얼음 1번 + 눈 1번 그리기 */
 import * as THREE from 'three';
 import { mergeGeometries, mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js';
-import { iceMaterial, block } from './ice.js?v=11050758';
-import { SNOW_GLSL, SNOW_U } from './snowtone.js?v=11050758';
+import { iceMaterial, block } from './ice.js?v=11050820';
+import { SNOW_GLSL, SNOW_U } from './snowtone.js?v=11050820';
 
 const hs = (x, y, z) => { const s = Math.sin(x * 127.1 + y * 311.7 + z * 74.7) * 43758.5453; return s - Math.floor(s); };
 const vn = (x, y, z) => { const ix = Math.floor(x), iy = Math.floor(y), iz = Math.floor(z), fx = x - ix, fy = y - iy, fz = z - iz, u = fx * fx * (3 - 2 * fx), v = fy * fy * (3 - 2 * fy), w = fz * fz * (3 - 2 * fz);
@@ -58,13 +58,19 @@ export function snowMaterial(uT) {
 export function makeIceWall(path, opt = {}) {
   const uT = opt.uT || { value: 0 }, mat = opt.mat || iceWallMaterial(uT), smat = opt.smat || snowMaterial(uT), doors = opt.doors || [true, true];
   const seed = opt.seed || 3, R = (() => { let s = seed * 7919 + 7; return () => (s = (s * 9301 + 49297) % 233280) / 233280; })(), o = seed * 1.3;
+  /* 입구 모양 (시안 비교, 사용자 2026-11-05): pillar 결정 문기둥 · arch 부서진 아치 · breach 깨져 벌어진 틈 · sill 빛나는 문턱
+     입구 것은 따로 뽑는 수(RG)로 → 입구만 바뀌고 나머지 벽은 시안마다 똑같음 */
+  const gate = opt.gate || 'pillar', RG = (() => { let s = seed * 104729 + 13; return () => (s = (s * 9301 + 49297) % 233280) / 233280; })();
   const curve = new THREE.CatmullRomCurve3(path.map(p => new THREE.Vector3(p[0], 0, p[1])), false, 'centripetal'), len = curve.getLength();
   const Hm = opt.H || 2.4, HK = Hm / 3.7,   /* 벽 높이 (사용자 2026-11-05: 3.7m → 절반 1.85m → 조금 더 높여 2.4m) · 문 솟음·결정 기둥도 같은 비율 */
     W = 1., DS = .2, N = Math.max(4, Math.round(len / DS));
   /* ③ 윗단: 2~5m 판마다 높이 한 단씩 (거의 평평, 완만히 오르내림) · 문 쪽 끝은 높게 */
   const slab = []; for (let d = 0; d < len;) { const l = 2 + R() * 3; slab.push([d, d + l, (R() - .5) * 1.3]); d += l; }
   const topH = d => { const sb = slab.find(q => d >= q[0] && d < q[1]) || slab[slab.length - 1]; let h = Hm + (sb[2] * .55 + .25 * Math.sin(d * .07 + o)) * HK;
-    const ds = doors[0] ? d : 1e9, de = doors[1] ? len - d : 1e9, dd = Math.min(ds, de); h += Math.exp(-dd * dd / 12) * 1.3 * HK;
+    const ds = doors[0] ? d : 1e9, de = doors[1] ? len - d : 1e9, dd = Math.min(ds, de); const near = Math.exp(-dd * dd / 12);
+    if (gate === 'breach') h *= 1 - .55 * Math.exp(-dd * dd / 5) + (vn(d * 2.3, 7, o) - .5) * .5 * Math.exp(-dd * dd / 8);   /* 틈: 문 쪽으로 갈수록 무너져 낮아지고 들쭉날쭉 */
+    else if (gate === 'sill') h += near * .45 * HK;                                                                    /* 문턱: 끝은 살짝만 솟음 (빛이 주인공) */
+    else h += near * 1.3 * HK;
     if (!doors[0] && d < 1.5) h *= .55 + .45 * d / 1.5; if (!doors[1] && len - d < 1.5) h *= .55 + .45 * (len - d) / 1.5; return h; };
   /* ① 결정 조각 (앞면 · 뒷면 따로) */
   const shards = side => { const L = []; for (let d = -.5; d < len + .5; d += .35 + R() * .7) { const big = R() < .18;
@@ -121,11 +127,50 @@ export function makeIceWall(path, opt = {}) {
   const spire = (d, v, hh, r, tilt) => { const i = Math.round(d / len * N), f = fr[Math.min(N, Math.max(0, i))]; const g = new THREE.CylinderGeometry(0, r, hh, 5 + Math.floor(R() * 2), 3);
     const P2 = g.attributes.position; for (let j = 0; j < P2.count; j++) { P2.setX(j, P2.getX(j) * (1 + (R() - .5) * .25)); P2.setZ(j, P2.getZ(j) * (.75 + R() * .3)); }
     g.rotateY(R() * 6); g.rotateZ(tilt * (R() < .5 ? -1 : 1)); g.rotateX((R() - .5) * tilt); g.translate(f.x + f.nx * v, f.h + hh / 2 - .3, f.z + f.nz * v); ice.push(prep(g, .55)); };
-  for (const end of [0, 1]) if (doors[end]) { const d0 = end ? len - .8 : .8; spire(d0, -.2, (3.2 + R() * 1.4) * HK, .7, .12); spire(d0 + (end ? -1.3 : 1.3), .4, (2.2 + R() * 1.2) * HK, .5, .25); }
+  /* 결정 하나: 육각 기둥 + 뾰족한 끝, 기울기(lx,lz 쪽으로 lean) — 문기둥용 */
+  const crystal = (x, z, y0, hh, r, lx, lz, lean, glow) => { const body = new THREE.CylinderGeometry(r * .92, r, hh * .76, 6, 2), tip = new THREE.ConeGeometry(r * .92, hh * .24, 6, 1);
+    body.translate(0, hh * .38, 0); tip.translate(0, hh * .76 + hh * .12, 0); const g = mergeGeometries([body.toNonIndexed(), tip.toNonIndexed()]);
+    const P2 = g.attributes.position; for (let j = 0; j < P2.count; j++) { const yy = P2.getY(j); P2.setX(j, P2.getX(j) * (1 + (hs(j % 7, seed, 1) - .5) * .15)); P2.setZ(j, P2.getZ(j) * (.8 + hs(j % 5, seed, 2) * .25)); }
+    g.rotateY(RG() * 6); const q = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), new THREE.Vector3(lx * lean, 1, lz * lean).normalize()); g.applyQuaternion(q);
+    g.translate(x, y0, z); ice.push(prep(g, glow)); };
+  /* 결정 하나를 아무 방향(dv)으로 · cut = 끝을 비스듬히 부러뜨린 단면(뾰족한 끝 대신, 단면 속빛 세게) */
+  const crystalDir = (x, y, z, dv, hh, r, glow, cut) => { const body = new THREE.CylinderGeometry(r * .9, r, hh * (cut ? 1 : .76), 6, 2); body.translate(0, hh * (cut ? .5 : .38), 0);
+    let g; if (cut) { g = body.toNonIndexed(); const P2 = g.attributes.position, tilt = new THREE.Vector3(RG() - .5, 1.4, RG() - .5).normalize();
+        for (let j = 0; j < P2.count; j++) if (P2.getY(j) > hh * .9) { const px = P2.getX(j), pz = P2.getZ(j); P2.setY(j, hh - (px * tilt.x + pz * tilt.z) / tilt.y * .9 + (hs(j, 3, seed) - .5) * .25 * r); } }
+    else { const tip = new THREE.ConeGeometry(r * .9, hh * .24, 6, 1); tip.translate(0, hh * .88, 0); g = mergeGeometries([body.toNonIndexed(), tip.toNonIndexed()]); }
+    const P2 = g.attributes.position; for (let j = 0; j < P2.count; j++) { P2.setX(j, P2.getX(j) * (1 + (hs(j % 7, seed, 1) - .5) * .15)); P2.setZ(j, P2.getZ(j) * (.8 + hs(j % 5, seed, 2) * .25)); }
+    g.rotateY(RG() * 6); g.applyQuaternion(new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), dv)); g.translate(x, y, z); g.computeVertexNormals(); ice.push(prep(g, glow)); };
+  for (const end of [0, 1]) if (doors[end]) {
+    const f = fr[end ? N : 0], dir = end ? 1 : -1, ax = f.tx * dir, az = f.tz * dir;   /* ax,az = 벽 끝에서 문(틈) 쪽 방향 */
+    if (gate === 'pillar') {
+      /* 결정 문기둥: 벽 끝에 큰 결정 하나가 우뚝, 그 둘레 작은 결정 셋 — 모두 문 바깥쪽(벽 쪽)으로 살짝 벌어져 '열린 문'처럼. 속빛을 세게 → 위에서도 멀리서 문이 보임 */
+      const bx = f.x - ax * .7, bz = f.z - az * .7;
+      crystal(bx, bz, f.h - .5, Hm * 1.55, .62, -ax, -az, .1, .8);
+      for (let k = 0; k < 3; k++) { const a2 = (k - 1) * 1.1 + RG() * .4, ox = Math.cos(a2) * f.nx - Math.sin(a2) * ax * 0, oz = Math.cos(a2) * f.nz;
+        crystal(bx - ax * (.4 + RG() * .5) + f.nx * (k - 1) * .75, bz - az * (.4 + RG() * .5) + f.nz * (k - 1) * .75, f.h - .4, Hm * (.75 + RG() * .4), .32 + RG() * .14, -ax + f.nx * (k - 1) * .6, -az + f.nz * (k - 1) * .6, .28 + RG() * .15, .7); }
+    } else if (gate === 'arch') {
+      /* 부서진 아치: 예전엔 문 위를 이었던 얼음 다리가 가운데서 부러짐 — 벽과 같은 결정 조각들이 겹겹이 이어져 솟았다가 문 쪽으로 굽고,
+         맨 끝 조각은 부러진 단면이 드러나 속빛이 세게 남 (부러진 지 얼마 안 된 상처) */
+      const NS = 6, reach = 2.5, rise = 1.6 * (Hm / 2.4);
+      const at = t => { const along = -.8 + (reach + .8) * Math.pow(t, 1.2), up = rise * Math.sin(t * 2.0); return [f.x + ax * along, f.h - .3 + up, f.z + az * along]; };
+      for (let k = 0; k < NS; k++) { const t = k / (NS - 1), P0 = at(t), Pa = at(Math.max(0, t - .06)), Pb = at(Math.min(1, t + .06)), d = new THREE.Vector3(Pb[0] - Pa[0], Pb[1] - Pa[1], Pb[2] - Pa[2]).normalize();   /* 굽은 길의 방향 (양옆 점으로 → 끝에서도 방향이 있음) */
+        const r = .82 * (1 - t * .5), hh = (1.6 - t * .5) * (Hm / 2.4), last = k === NS - 1;
+        /* 조각 몸통은 굽은 길을 따라 눕고, 둘레로 작은 조각이 하나씩 붙어 덩어리감 */
+        crystalDir(P0[0] - d.x * hh * .35, P0[1] - d.y * hh * .35, P0[2] - d.z * hh * .35, d, hh, r, last ? 1. : .6 + t * .3, last);
+        if (!last) { const side = (k % 2 ? 1 : -1) * .35; crystalDir(P0[0] + f.nx * side * r * 2, P0[1] - .15, P0[2] + f.nz * side * r * 2, new THREE.Vector3(d.x + f.nx * side, d.y + .4, d.z + f.nz * side).normalize(), hh * .55, r * .5, .65, false); } }
+    } else if (gate === 'breach') {
+      /* 깨져 벌어진 틈: 무언가 벽을 뚫고 지나감 — 끝은 무너져 낮고 들쭉날쭉(topH), 깨진 덩어리는 길 양옆(벽 앞뒤)으로 밀려나 흩어짐(길 한가운데는 비움) */
+      for (let k = 0; k < 9; k++) { const side = k % 2 ? 1 : -1, back = RG() * 1.6 - .4, off = side * (W + .6 + RG() * 2.8), sz = .22 + RG() * .55;
+        rockAt(f.x + ax * back + f.nx * off, f.z + az * back + f.nz * off, sz); }
+    } else if (gate === 'sill') {
+      /* 빛나는 문턱: 벽 끝은 얌전히 · 빛은 바닥(floorlab 문턱 줄)이 맡음. 벽 끝 단면 아래쪽에만 작은 결정 하나 → 빛 줄의 시작점 */
+      crystal(f.x - ax * .35, f.z - az * .35, 0, Hm * .45, .26, ax, az, .25, .9);
+    } }
   for (let d = 5 + R() * 5; d < len - 3; d += 7 + R() * 9) spire(d, (R() - .5) * 1.4, (1.1 + R() * 1.6) * HK, .35 + R() * .25, .2);
   /* ⑦ 발치: 눈 덮인 큰 얼음 바위 + 작은 조각 (앞쪽 많이, 뒤쪽 조금) */
-  const rock = (d, v, s) => { const i = Math.round(d / len * N), f = fr[Math.min(N, Math.max(0, i))], g = prep(block(seed * 31 + Math.floor(d * 7)).clone(), .2), sy = s * (.75 + R() * .45);
-    g.scale(s * (.9 + R() * .4), sy, s * (.8 + R() * .3)); g.rotateY(R() * 6); const x = f.x + f.nx * v, z = f.z + f.nz * v; g.translate(x, sy * .25, z); ice.push(g);
+  const rock = (d, v, s) => { const i = Math.round(d / len * N), f = fr[Math.min(N, Math.max(0, i))]; rockAt(f.x + f.nx * v, f.z + f.nz * v, s, Math.floor(d * 7), R); };
+  function rockAt(x, z, s, bk = Math.floor(RG() * 999), Rr = RG) { const g = prep(block(seed * 31 + bk).clone(), .2), sy = s * (.75 + Rr() * .45); const R = Rr;
+    g.scale(s * (.9 + R() * .4), sy, s * (.8 + R() * .3)); g.rotateY(R() * 6); g.translate(x, sy * .25, z); ice.push(g);
     /* 바위 위 눈: 바위 윗면 모양 그대로 따라 쌓임 (각진 면엔 각지게) · 바람 쪽으로 쏠림 · 바위마다 양이 다름(안 덮인 것도) */
     const amt = R(); if (amt > .2) { const th = (amt > .75 ? .2 : amt > .45 ? .11 : .05) * Math.min(1.4, s + .3), wind = new THREE.Vector3(R() - .5, 0, R() - .5).normalize(), lim = .42 - amt * .15;
       g.computeVertexNormals(); const A = g.attributes.position, Nn = g.attributes.normal, Q = [], a = new THREE.Vector3(), nn = new THREE.Vector3();

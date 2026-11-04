@@ -4,7 +4,7 @@
    · 멀어질수록 깊은 색으로 가라앉힘 (가까운 싸움터가 또렷하게)
    0 금속 판 · 1 이끼 낀 암반 · 2 결정 섞인 모래 · 3 은은한 평지 · 4 보스존 별빛 우주(보이지 않는 유리 바닥 + 아래로 깊은 별 세 겹) */
 import * as THREE from 'three';
-import { SNOW_GLSL, SNOW_U } from './snowtone.js?v=11050758';
+import { SNOW_GLSL, SNOW_U } from './snowtone.js?v=11050820';
 
 function bakeNoise(N = 256) {
   const hash = (x, y, p) => { x = ((x % p) + p) % p; y = ((y % p) + p) % p; const s = Math.sin(x * 127.1 + y * 311.7) * 43758.5453; return s - Math.floor(s); };
@@ -37,9 +37,9 @@ export function makeFloorLab() {
   const noise = bakeNoise();
   const ships = Array.from({ length: 2 }, () => new THREE.Vector4(0, 0, 0, 0));
   const mat = new THREE.ShaderMaterial({ depthWrite: true,
-    uniforms: { uN: { value: noise }, uK: { value: 0 }, uT: { value: 0 }, uSun: { value: new THREE.Vector3(-.45, .78, -.42).normalize() }, uShips: { value: ships }, uIV: { value: 0 }, uSG: SNOW_U.uSG },
+    uniforms: { uN: { value: noise }, uK: { value: 0 }, uT: { value: 0 }, uSun: { value: new THREE.Vector3(-.45, .78, -.42).normalize() }, uShips: { value: ships }, uIV: { value: 0 }, uSG: SNOW_U.uSG, uGate: { value: 0 }, uDoor: { value: [new THREE.Vector4(), new THREE.Vector4()] } },
     vertexShader: 'varying vec3 vW; void main(){ vec4 w=modelMatrix*vec4(position,1.); vW=w.xyz; gl_Position=projectionMatrix*viewMatrix*w; }',
-    fragmentShader: `precision highp float; varying vec3 vW; uniform sampler2D uN; uniform float uK, uT; uniform vec3 uSun; uniform vec4 uShips[2]; uniform float uIV;
+    fragmentShader: `precision highp float; varying vec3 vW; uniform sampler2D uN; uniform float uK, uT; uniform vec3 uSun; uniform vec4 uShips[2]; uniform float uIV; uniform float uGate; uniform vec4 uDoor[2];
       float h2(vec2 p){ p=fract(p*vec2(123.34,456.21)); p+=dot(p,p+45.32); return fract(p.x*p.y); }
       vec4 N4(vec2 p){ return texture2D(uN,p); }
       const vec3 SUN=vec3(1.,.94,.86), SKY=vec3(.42,.48,.62), GND=vec3(.16,.12,.1);
@@ -86,6 +86,30 @@ export function makeFloorLab() {
         vec3 ci=ib+vec3(.1,.35,.6)*glow*.18+vec3(.9,.96,1.)*(crack*.55+crack2*.4+hair)*(1.-crack*.2)+vec3(1.)*spec;
         float bub=step(.982,h2(floor(p*6.)))*smoothstep(.3,.6,v.x); ci+=vec3(.6,.8,.9)*bub*.25;
         gSnow=0.; return ci; }
+      /* 입구 바닥 (시안): 2 = 깨져 벌어진 틈 → 문 둘레 바닥에 부딪힌 자리처럼 방사형 금 · 3 = 빛나는 문턱 → 두 벽 끝을 잇는 빛 줄(숨 쉬듯 밝아졌다 어두워짐 = 지나갈 수 있는 살아 있는 문) */
+      vec3 doorFx(vec2 p, vec3 c){
+        for(int i=0;i<2;i++){ if((uK>5.5)!=(i==1)) continue;                 /* 이음 장면은 그 문만, 벽 칸은 그 문만 */
+          vec4 D=uDoor[i]; vec2 a=D.xy, b=D.zw, ab=b-a; if(dot(ab,ab)<.01) continue;
+          if(uGate>1.5&&uGate<2.5){ /* 깨져 벌어진 틈: 무언가 부딪혀 뚫고 간 자리 — 가운데는 하얗게 으스러진 가루, 둘레로 금이 제멋대로 뻗어 나감(길이·굵기 제각각), 부서진 둥근 금은 조각조각 끊김 */
+            vec2 m=(a+b)*.5, q=p-m; float r=length(q); if(r>8.) continue; float an=atan(q.y,q.x)/6.2832;
+            float w=N4(p*.09+float(i)).r*.5;
+            float sec=floor(an*11.+w), reachR=2.5+5.*h2(vec2(sec,3.1));         /* 금마다 뻗은 길이가 다름 */
+            float ln=abs(fract(an*11.+w+N4(p*.25).g*.12)-.5)*r;                 /* 금 폭은 m 단위로 일정 → 멀어도 굵어지지 않음 */
+            float cr=smoothstep(.06,.0,ln)*smoothstep(reachR,reachR*.4,r)*smoothstep(.6,1.6,r);
+            float br=smoothstep(.03,.0,abs(fract(an*23.+w*2.-r*.11)-.5)*r)*smoothstep(3.5,1.2,r)*step(.45,h2(vec2(floor(an*23.+w*2.),7.)));   /* 잔가지 금 */
+            float rr=r-1.5-(N4(p*.18).b-.5)*1.1; float arc=exp(-rr*rr/.02)*step(.4,N4(p*.22+.5).r);        /* 둥근 금: 군데군데 끊김 */
+            float dust=smoothstep(1.7,.3,r+(N4(p*1.3).g-.5)*.8);                   /* 으스러진 가운데 */
+            c=mix(c,vec3(.88,.93,.98)*(.9+.1*N4(p*2.).a),dust*.85);
+            float L=min(1.,cr+br*.7+arc*.8); c=mix(c,vec3(.94,.98,1.),L*.8); c+=vec3(.08,.35,.7)*L*.15; }
+          if(uGate>2.5){ /* 빛나는 문턱: 두 벽 끝 사이 얼음 아래에서 빛이 올라옴 — 얼음 잔금을 따라 새어 나오고(빛은 금 모양), 숨 쉬듯 밝아졌다 어두워짐(지나갈 수 있는 살아 있는 문) */
+            float t=clamp(dot(p-a,ab)/dot(ab,ab),0.,1.); float d=length(p-a-ab*t); if(d>2.5) continue;
+            float band=exp(-d*d/(.55+.35*N4(p*.2).r)), br=.7+.3*sin(uT*1.25);
+            vec3 v=vor(p*1.25+vec2(float(i)*3.)); float crk=smoothstep(.06,.0,v.x)*(.5+.5*v.y);
+            float under=(N4(p*.35+uT*.02).g*.6+.4);                               /* 얼음 속 빛이 고르지 않게 일렁임 */
+            float endk=smoothstep(0.,.08,t)*smoothstep(1.,.92,t)*.6+.4;
+            vec3 gl=vec3(.12,.55,1.)*band*under*.9*br*endk;                              /* 밝은 얼음 위에서도 보이게: 색을 섞어 바꾸고(더하기만 하면 묻힘) 금은 빛 번짐이 날 만큼 밝게 */
+            c=mix(c,c*vec3(.55,.8,1.1)+gl,min(1.,band*.75)); c+=vec3(.6,.9,1.3)*crk*band*1.6*br*endk; } }
+        return c; }
       void main(){
         vec3 ro=cameraPosition, rd=normalize(vW-ro); vec2 p=vW.xz; float dist=length(p-ro.xz); vec3 c;
         if(uK<.5){ /* 금속 판: 4m 판 · 이음매 · 모서리로 갈수록 살짝 둥글게 깎임(빛 받는 턱) · 볼트 · 긁힘 · 얼룩 */
@@ -124,7 +148,7 @@ export function makeFloorLab() {
           vec3 base=vec3(.17,.19,.22)*(.88+.22*a)+vec3(.012)*(g2-.5);
           c=lit(base,n,rd,.06,20.);
         } else if(uK>5.5){ /* 얼음 벽 칸: 얼음 땅 (벽 줄 z=-12 가까이 눈 두껍게) */
-          c=iceGround(p,rd,smoothstep(9.,2.,abs(p.y+12.)));
+          c=doorFx(p,iceGround(p,rd,smoothstep(9.,2.,abs(p.y+12.))));
         } else if(uK<4.5){ /* 보스존: 바닥도 그림자도 없는 우주 */
           c=deep(ro,rd);
         } else { /* 이음 시험: 얼음 땅 · 용암 땅 · 둘을 잇는 별빛 유리 큰길 */
@@ -148,7 +172,7 @@ export function makeFloorLab() {
           if(landM>.01){
             if(ice){ /* 얼음 땅: 벽에 맞춘 눈·얼음 땅 · 벽 가까이일수록 눈 두껍게 · 문턱 얇은 곳은 아래 유리·별이 비침 */
               float thin=doorZ*smoothstep(-3.,0.,sd);
-              land=iceGround(p,rd,smoothstep(-7.,-1.5,sI));
+              land=doorFx(p,iceGround(p,rd,smoothstep(-7.,-1.5,sI)));
               land=mix(land,mix(vec3(.05,.08,.11),SNOW_SH*.85,gSnow),lip*.8);            /* 부서진 옆면: 얼음은 짙게, 눈은 눈 그늘색 */
             } else { /* 용암: 검은 현무암 껍질 · 숨 쉬듯 빛나는 붉은 결 · 부서진 옆면은 속이 붉게 */
               float e=.35; float h=N4(p*.035+.4).r*.6+N4(p*.14).b*.4, hx=N4((p+vec2(e,0.))*.035+.4).r*.6+N4((p+vec2(e,0.))*.14).b*.4, hz=N4((p+vec2(0.,e))*.035+.4).r*.6+N4((p+vec2(0.,e))*.14).b*.4;
