@@ -11,9 +11,9 @@
    무게: 꼬리 한 장 · 머리 한 장 · 부스러기 한 장 · 바닥 흔적 한 장 · 모으는 빛 한 장 · 조준 고리 한 장 = 그리기 6번 (탄 종류가 늘어도 같음) */
 import * as THREE from 'three';
 import * as A from '../core/audio.js';
-import { FLY } from './flight.js?v=11041627';
-import { BH } from './blackhole.js?v=11041627';
-import { hitWall } from './rocks.js?v=11041627';
+import { FLY } from './flight.js?v=11041632';
+import { BH } from './blackhole.js?v=11041632';
+import { hitWall } from './rocks.js?v=11041632';
 
 /* 비교표 그대로. heatT: 쉬지 않고 쏘면 과열까지(초) · coolT: 과열 뒤 다시 쏠 때까지(초) · cryB/wallB: 수정·벽에서 튕기는 횟수
    kind: 그림 결 (0 기본 · 1 서리 · 2 따뜻한 빛 · 3 빛 창 · 4 쇳물 · 5 불티 · 6 바늘 · 7 활) */
@@ -408,7 +408,6 @@ export function makeShots({ B, crystals, bh, FS, say, mobs, onKill, onDamage, on
         gl_FragColor = vec4(c * uA, 1.); }` });
   const pv = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), pvM); pv.rotation.x = -Math.PI / 2; pv.scale.setScalar(9); pv.renderOrder = 5; pv.frustumCulled = false; pv.visible = false; G.add(pv);
   const bladeIn = (qx, qz, sx, sz, dir, L, R, cot, pad) => { const ex = -Math.sin(dir), ez = -Math.cos(dir), x = (qx - sx) * ex + (qz - sz) * ez, y = Math.abs((qx - sx) * -ez + (qz - sz) * ex); return x >= L ? Math.hypot(x - L, y) <= R + pad : x >= -pad && (R * x - L * y) / Math.hypot(R, L) >= -pad; };   /* 미리 보기 물방울과 같은 식 (pad = 적 몸 반지름) */
-    return s >= 0 && Math.hypot(Math.max(0, x - s), ay) <= R + pad; };   /* 그 자리가 베일 범위(물방울) 안인지 — 미리 보기와 같은 식 */
   /* 시안별 휘두름: [시작 각, 끝 각, 시작 시점, 끝 시점, 반경 더하기] (각은 기체 앞 기준 · 왼쪽 +) */
   const D2R = Math.PI / 180, STY = {
     A: { name: '반달 휘두르기', sw: .14, lunge: 3, sweeps: sg => [[sg * 80, -sg * 80, 0, 1, 0]] },                                          /* 한 번 크게 휘둘러 반달 */
