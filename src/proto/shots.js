@@ -11,12 +11,12 @@
    무게: 꼬리 한 장 · 머리 한 장 · 부스러기 한 장 · 조준 빛 한 장 = 그리기 4번 */
 import * as THREE from 'three';
 import * as A from '../core/audio.js';
-import { FLY } from './flight.js?v=11040931';
-import { BH } from './blackhole.js?v=11040931';
-import { hitWall } from './rocks.js?v=11040931';
+import { FLY } from './flight.js?v=11040943';
+import { BH } from './blackhole.js?v=11040943';
+import { hitWall } from './rocks.js?v=11040943';
 
 export const SHOT = {
-  basic: { name: '기본탄', rate: 7, speed: 44, life: 1.1, heat: .07, cool: .42, coolWait: .3, lock: .3, tail: 3.4, W: .27, col: [.62, 1, .32], spread: .012, bounces: 3 }
+  basic: { name: '기본탄', rate: 7, speed: 44, life: 1.1, heat: .0286, cool: .35, coolWait: .3, lock: .3,   /* 쉬지 않고 쏘면 약 5초에 과열 · 과열되면 약 2.5초 식어야 다시 (사용자 2026-11-04) */ tail: 3.4, W: .27, col: [.62, 1, .32], spread: .012, bounces: 3 }
 };
 const MAXB = 60, NT = 12, NP = 320;
 const AB = { transparent: true, depthWrite: false, blending: THREE.AdditiveBlending };
@@ -28,6 +28,8 @@ function thud(vol = .05) { if (!A.live()) return; const c = A.ctx, t0 = c.curren
 function hiss() { if (!A.live()) return; const c = A.ctx, t0 = c.currentTime, n = A.noise(1.1), f = c.createBiquadFilter(), g = c.createGain(); f.type = 'bandpass'; f.frequency.setValueAtTime(5200, t0); f.frequency.exponentialRampToValueAtTime(1600, t0 + 1); f.Q.value = .7; n.connect(f); f.connect(g); A.env(g, t0, .03, .07, 1); A.out(g, .2); n.start(t0); }
 function crack() { if (!A.live()) return; const c = A.ctx, t0 = c.currentTime, n = A.noise(.08), hp = c.createBiquadFilter(), g = c.createGain(); hp.type = 'highpass'; hp.frequency.value = 3000; n.connect(hp); hp.connect(g); A.env(g, t0, .001, .09, .07); A.out(g, .2); n.start(t0);   /* 과열: 달아오른 금속이 쩍 */
   const o = c.createOscillator(), g2 = c.createGain(); o.type = 'square'; o.frequency.setValueAtTime(1900, t0); o.frequency.exponentialRampToValueAtTime(700, t0 + .05); o.connect(g2); A.env(g2, t0, .001, .02, .06); A.out(g2, .1); o.start(t0); o.stop(t0 + .08); }
+function flare() { if (!A.live()) return; const c = A.ctx, t0 = c.currentTime, o = c.createOscillator(), g = c.createGain(); o.type = 'sine'; o.frequency.setValueAtTime(220, t0); o.frequency.exponentialRampToValueAtTime(140, t0 + .6); o.connect(g); A.env(g, t0, .005, .08, .7); A.out(g, .4); o.start(t0); o.stop(t0 + .8); }   /* 과열: 낮게 울리는 금속 */
+function tickS() { if (!A.live()) return; const c = A.ctx, t0 = c.currentTime, o = c.createOscillator(), g = c.createGain(), f = 2600 + Math.random() * 1400; o.type = 'sine'; o.frequency.value = f; o.connect(g); A.env(g, t0, .001, .018, .05); A.out(g, .5); o.start(t0); o.stop(t0 + .07); }   /* 식는 금속이 틱 */
 function clunk() { if (!A.live()) return; const c = A.ctx, t0 = c.currentTime, o = c.createOscillator(), g = c.createGain(); o.type = 'sine'; o.frequency.setValueAtTime(300, t0); o.frequency.exponentialRampToValueAtTime(120, t0 + .12); o.connect(g); A.env(g, t0, .003, .06, .14); A.out(g, .1); o.start(t0); o.stop(t0 + .2); }
 
 export function makeShots({ B, crystals, bh, FS, say, mobs, onKill }) {
@@ -142,26 +144,21 @@ export function makeShots({ B, crystals, bh, FS, say, mobs, onKill }) {
     if (want) S.aimA = I.held && I.drag ? I.ang : S.lock ? Math.atan2(-(S.lock.x - FS.x), -(S.lock.z - FS.z)) : (I.key ? FS.mh ?? FS.head : S.aimA0 ?? FS.head);
     if (!want) S.aimA0 = FS.head;
     FS.aim = want ? S.aimA : null;
-    if (shooting) { S.acc += dt * cfg.rate; if (S.acc > 1.5) S.acc = 1.5; while (S.acc >= 1) { S.acc -= 1; fire(t); S.lastShot = t; S.heat += cfg.heat; if (S.heat >= 1) { S.heat = 1; S.over = true; S.acc = 0; hiss(); clunk(); crack(); break; } } }
+    if (shooting) { S.acc += dt * cfg.rate; if (S.acc > 1.5) S.acc = 1.5; while (S.acc >= 1) { S.acc -= 1; fire(t); S.lastShot = t; S.heat += cfg.heat; if (S.heat >= 1) { S.heat = 1; S.over = true; S.acc = 0; FS.heatFlash = 1; FS.shake = 1; flare(); crack(); break; } } }
     else S.acc = Math.min(.999, S.acc + dt * cfg.rate);                                                        /* 쉬는 동안 다음 발이 준비됨 → 누르는 순간 바로 첫 발 */
     if (t - S.lastShot > cfg.coolWait || S.over) S.heat = Math.max(0, S.heat - dt * cfg.cool * (S.over ? .8 : 1));
     if (S.over && S.heat <= cfg.lock) S.over = false;
     /* 과열 김: 기체 양옆에서 뿜어져 오름 */
-    if (S.over && Math.random() < dt * 30) { const s = Math.random() < .5 ? 1 : -1, hx = Math.cos(FS.head) * .55 * s, hz = -Math.sin(FS.head) * .55 * s;
-      emit(FS.x + hx, FLY.HOVER + .1, FS.z + hz, hx * 2 + FS.vx * .5, 1.4 + Math.random(), hz * 2 + FS.vz * .5, .32, .3, .3, .35, .8 + Math.random() * .4, .9, -1.2); }
+    /* 과열 김은 뺌 (사용자: 연기 빼자) */
     /* 버튼: 열 고리 */
     { const h = S.heat, hc = S.over ? '#ff6a2a' : h > .7 ? '#ffb347' : h > .4 ? '#e8ff8a' : '#b9ff4a';
       btn.style.setProperty('--h', (h * 360).toFixed(1) + 'deg'); btn.style.setProperty('--hc', hc); btn.classList.toggle('hot', S.over); btn.classList.toggle('on', want && !S.over); lab.textContent = S.over ? '과열' : cfg.name; }
     /* 조준 빛 */
     aim.visible = false;                                                                                     /* 땅 부채꼴 빛은 뺌 (사용자: 기체 앞 안개 같은 초록 → 빨강이 이상함) */
-    /* 과열은 기체에서 (사용자 2026-11-04): 총구가 어두운 빨강 → 주황 → 하얗게 달아오름 · 둘레 공기가 아른거림 · 탄 색도 따뜻해짐 · 과열이면 붉게 맥박 */
-    { const h = S.heat, fx = -Math.sin(FS.head), fz = -Math.cos(FS.head), mx = FS.x + fx * 1.05, mz = FS.z + fz * 1.05;
-      const pulse = S.over ? .6 + .4 * Math.sin(t * 14) : 1, k = h * h;
-      const r = .25 + 1.15 * Math.min(1, h * 1.6), g = .05 + .9 * Math.max(0, h - .35) * 1.5, bb = .02 + .9 * Math.max(0, h - .7) * 3.3;
-      muz.material.uniforms.uC.value.set(r, Math.min(1.1, g), Math.min(1, bb)).multiplyScalar(pulse * (S.over ? 1.3 : 1)); muz.material.uniforms.uA.value = Math.min(1, h * 1.8) * (S.over ? 1 : .85);
-      mzP[0] = mx; mzP[1] = FLY.HOVER + .05; mzP[2] = mz; muz.geometry.attributes.position.needsUpdate = true;
-      if (h > .45 && Math.random() < dt * 26 * h) emit(mx + (Math.random() - .5) * .3, FLY.HOVER + .1, mz + (Math.random() - .5) * .3, FS.vx * .6 + (Math.random() - .5) * .4, .8 + Math.random() * .8, FS.vz * .6 + (Math.random() - .5) * .4, .5 * k, .22 * k, .08 * k, .22 + Math.random() * .1, .45, .5, -1.5);   /* 달아오른 총구 위로 아른거리는 열기 */
-      C.set(cfg.col[0], cfg.col[1], cfg.col[2]).lerp(new THREE.Vector3(1.15, .62, .25), Math.min(1, k * 1.1));                /* 뜨거울수록 탄이 따뜻한 색 */
+    /* 과열은 기체 금속이 달아오르는 것으로 (시안 B · shipheat.js) — 기체에는 50%부터 보임 */
+    { FS.heatV = S.heat; FS.heatFlash = Math.max(0, (FS.heatFlash || 0) - dt * 2.2);
+      if (!shooting && S.heat > .5 && t > (S.tickAt || 0)) { tickS(); S.tickAt = t + .18 + Math.random() * .5 * (1.2 - S.heat); }   /* 식는 금속이 틱 틱 */
+      muz.material.uniforms.uA.value = 0;
       /* 자동 조준 표시: 노리는 적 둘레에 작게 도는 조준 고리 */
       const L = S.lock; lkA += ((L && want ? 1 : 0) - lkA) * Math.min(1, dt * 12); if (L) { lkP[0] = L.x; lkP[1] = L.y; lkP[2] = L.z; lk.material.uniforms.uS.value = L.s; }
       lk.material.uniforms.uA.value = lkA; lk.material.uniforms.uT.value = t; lk.geometry.attributes.position.needsUpdate = true; }

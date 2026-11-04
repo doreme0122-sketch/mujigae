@@ -6,14 +6,14 @@
    무게: 기체 재질에 몇 줄 더함 + 화면 마무리 단계에서 한 번 일렁임 (그리기 횟수 늘지 않음) */
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
-import { makeBloom } from '../core/hangar/bloom.js?v=11040931';
+import { makeBloom } from '../core/hangar/bloom.js?v=11040943';
 import { buildShip } from '../core/ships/build.js';
-import { pointPool } from './skilldemo.js?v=11040931';
-import { makePerf } from './perf.js?v=11040931';
+import { pointPool } from './skilldemo.js?v=11040943';
+import { makePerf } from './perf.js?v=11040943';
 import * as A from '../core/audio.js';
 
 const $ = s => document.querySelector(s), clamp = THREE.MathUtils.clamp;
-const SHOT = { rate: 7, heat: .07, cool: .42, wait: .3, lock: .3 };
+const SHOT = { rate: 7, heat: .0286, cool: .35, wait: .3, lock: .3 };   /* 쉬지 않고 쏘면 약 5초에 과열 */
 /* 달군 쇠 색 */
 export function blackbody(h, out = new THREE.Vector3()) { const k = clamp(h, 0, 1);
   const st = [[0, .25, .015, 0], [.3, .8, .07, .01], [.6, 1.25, .38, .04], [.85, 1.45, .9, .35], [1, 1.6, 1.35, 1.]];
@@ -81,9 +81,9 @@ export async function start(canvas, onProgress = () => {}) {
   /* 쏘기 · 시연 */
   const S = { heat: 0, over: false, acc: 0, last: -9, flash: 0, auto: true, hold: false, tickAt: 0, shake: 0 };
   const BL = [];
-  const names = { 0: '시안 A — 이음매가 달아오름', 1: '시안 B — 열이 번져 감', 2: '시안 C — 절제' };
+  const names = { 0: '시안 A — 이음매가 달아오름', 1: '시안 B (확정) — 열이 번져 감', 2: '시안 C — 절제' };
   const tips = { 0: '총구 쪽 금속의 모서리·이음매를 따라 가는 선이 열만큼 어두운 빨강 → 주황 → 하얗게 달아오름. 총구 앞 공기가 투명하게 일렁임. 과열 순간 선이 하얗게 확 타오르고 양옆 통풍구에서 가는 김이 짧게 새어 나옴. 식는 동안 틱 틱 수축 소리.',
-    1: '열이 총구에서 시작해 쏠수록 몸통 쪽으로 번져 감 — 얼마나 뒤까지 달아올랐나가 곧 열 정도. 앞쪽이 가장 뜨겁고 뒤로 갈수록 식은 색. 과열이면 몸 끝까지 닿고 기체가 파르르 떨림.',
+    1: '열 50%부터 총구 끝에서 피어나 쏠수록 몸통 쪽으로 번져 감 — 얼마나 뒤까지 달아올랐나가 곧 열 정도. 앞쪽이 가장 뜨겁고 뒤로 갈수록 식은 색. 과열이면 몸 끝까지 닿고 한 번 하얗게 타오르며 파르르 떨림. 연기 없음. 쉬지 않고 쏘면 약 5초에 과열.',
     2: '기체는 그대로 두고, 총구 끝 아주 작은 점의 색만 달군 쇠 색으로 바뀜 + 총구 앞 아지랑이. 버튼 고리가 주된 표시.' };
   const tour = $('#tour'), bts = {};
   const pick = k => { H.mode.value = k; $('#tip b').textContent = names[k]; $('#tip span').textContent = tips[k]; $('#tip').hidden = false; for (const x in bts) bts[x].classList.toggle('on', x == k || (x === 'auto' && S.auto)); };
@@ -92,7 +92,7 @@ export async function start(canvas, onProgress = () => {}) {
   const hb = document.createElement('button'); hb.type = 'button'; hb.textContent = '누르는 동안 쏘기'; hb.style.cssText = 'border-color:#ffb36a!important;color:#ffd2a6!important'; tour.appendChild(hb);
   const hd = e => { e.preventDefault(); S.hold = true; S.auto = false; pick(H.mode.value); }, hu = () => { S.hold = false; };
   hb.addEventListener('pointerdown', hd); addEventListener('pointerup', hu); addEventListener('pointercancel', hu);
-  pick(0);
+  pick(1);
   const ring = $('#heat i');
   const cam = { h: 5.2, H: 5.2, tilt: .62, T: .62, az: .25 };
   const ptr = new Map(); let pin = 0;
@@ -113,14 +113,14 @@ export async function start(canvas, onProgress = () => {}) {
     let want = S.hold; if (S.auto) { cyc += dt; want = !S.over && cyc > 1.2; if (S.over) cyc = 0; }
     if (want && !S.over) { S.acc += dt * SHOT.rate; while (S.acc >= 1) { S.acc -= 1; S.last = t; S.heat += SHOT.heat; pew();
         BL.push({ z: bx.min.z * 2 * .5, life: .6 }); if (S.heat >= 1) { S.heat = 1; S.over = true; S.flash = 1; S.shake = 1; flare();
-          for (let i = 0; i < 2; i++) { const sd = i ? 1 : -1; steam.emit(q => { q.p.set(sd * .55, .78, .1); q.v.set(sd * (2.5 + Math.random()), .6 + Math.random() * .6, (Math.random() - .5) * .8); q.max = q.life = .5 + Math.random() * .4; q.c.set(.85, .87, .9); q.s = .45; q.grow = 1.6; q.drag = 3.5; }, 14); }   /* 양옆 통풍구에서 가는 김 */
+          if (H.mode.value < .5) for (let i = 0; i < 2; i++) { const sd = i ? 1 : -1; steam.emit(q => { q.p.set(sd * .55, .78, .1); q.v.set(sd * (2.5 + Math.random()), .6 + Math.random() * .6, (Math.random() - .5) * .8); q.max = q.life = .5 + Math.random() * .4; q.c.set(.85, .87, .9); q.s = .45; q.grow = 1.6; q.drag = 3.5; }, 14); }   /* 양옆 통풍구에서 가는 김 */
           break; } } }
     else S.acc = Math.min(.999, S.acc + dt * SHOT.rate);
     if (t - S.last > SHOT.wait || S.over) { const h0 = S.heat; S.heat = Math.max(0, S.heat - dt * SHOT.cool * (S.over ? .8 : 1));
       if (H.mode.value < 1.5 && h0 > .25 && t > S.tickAt) { tickS(); S.tickAt = t + .18 + Math.random() * .5 * (1.2 - h0); } }   /* 식으며 틱 틱 */
     if (S.over && S.heat <= SHOT.lock) S.over = false;
     S.flash = Math.max(0, S.flash - dt * 2.2); S.shake = Math.max(0, S.shake - dt * 2);
-    H.heat.value += (S.heat - H.heat.value) * Math.min(1, dt * 12); H.flash.value = H.mode.value < 1.5 ? S.flash * S.flash : 0;
+    { const tv = H.mode.value > .5 && H.mode.value < 1.5 ? Math.max(0, (S.heat - .5) / .5) : S.heat; H.heat.value += (tv - H.heat.value) * Math.min(1, dt * 12); }   /* B(확정): 기체에는 50%부터 */ H.flash.value = H.mode.value < 1.5 ? S.flash * S.flash : 0;
     ship.position.x = H.mode.value > .5 && H.mode.value < 1.5 ? Math.sin(t * 70) * .025 * S.shake : 0;   /* B: 과열이면 파르르 */
     ship.position.y = .7 + Math.sin(t * 2.1) * .04; ship.updateMatrixWorld(true); H.inv.value.copy(ship.matrixWorld).invert();
     /* 탄 */

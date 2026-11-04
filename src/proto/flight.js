@@ -10,8 +10,9 @@
    무게: 기체 한 대 + 불꽃 띠 몇 장 + 꼬리 띠 하나 + 불티 점 묶음 하나 + 그림자 판 하나 */
 import * as THREE from 'three';
 import { buildShip, engineSpots } from '../core/ships/build.js';
-import { flameMesh } from './sortie.js?v=11040931';
-import { MAP } from './mapfloor.js?v=11040931';
+import { flameMesh } from './sortie.js?v=11040943';
+import { MAP } from './mapfloor.js?v=11040943';
+import { applyShipHeat, heatVis } from './shipheat.js?v=11040943';
 
 export const FLY = { LEN: 2, HOVER: .7, R: .8, SPEEDS: [9, 12, 15, 18], TURN: 7, ACC: .22,
   BASE: 9, SHIELD: 3, BOOST: 5, BOOSTK: 1.5 };   /* 기지 고리(반지름 9m)를 벗어나는 순간: 보호막 3초 · 가속 5초(1.5배) — 기지 출구 앞 매복에 바로 당하지 않게 */
@@ -94,6 +95,7 @@ export async function makeFlight(renderer, B, start, face) {
         gl_FragColor=vec4(c*(f*1.3+.012+band*.022)*uA,1.); }` });
   const shieldMesh = new THREE.Mesh(new THREE.SphereGeometry(FLY.LEN * .85, 28, 18), shieldM); shieldMesh.scale.y = .7; shieldMesh.visible = false; shieldMesh.renderOrder = 10; G.add(shieldMesh);
   /* 숨었을 때 반투명: 기체 재질을 비치게 (내 화면에서만) */
+  const heatFx = applyShipHeat(ship, { value: 0 });                                                   /* 과열: 기체 금속이 총구부터 달아오름 (시안 B) */
   const mats = []; ship.traverse(o => { if (o.isMesh) (Array.isArray(o.material) ? o.material : [o.material]).forEach(m => { if (!mats.includes(m)) mats.push(m); }); });
   let ghost = 0, ghostT = 0;
   G.userData.setGhost = on => { ghostT = on ? 1 : 0; };
@@ -153,7 +155,9 @@ export async function makeFlight(renderer, B, start, face) {
       if (!on && S.pop > 0) { S.pop -= dt; const k = 1 - S.pop / .3; { const q = 1 + k * .9; shieldMesh.scale.set(q, q * .7, q); } a = (1 - k); } else { const q = 1 + Math.sin(t * 6) * .015; shieldMesh.scale.set(q, q * .7, q); }
       u.uA.value = a; u.uT.value = t; }
     shadow.position.set(S.x, .05, S.z); shadow.rotation.z = S.head; shM.uniforms.uA.value = .55 - bob;
+    if (S.shake > 0) { S.shake = Math.max(0, S.shake - dt * 2); ship.position.x += Math.sin(t * 70) * .03 * S.shake; ship.position.z += Math.cos(t * 63) * .02 * S.shake; }   /* 과열 순간 파르르 */
     ship.updateMatrixWorld(true); fw.set(0, 0, -1).transformDirection(ship.matrixWorld);
+    heatFx.update(S.heatV || 0, S.heatFlash || 0); S.nose = heatFx.nose.clone().applyMatrix4(ship.matrixWorld); S.heatVis = heatVis(S.heatV || 0);
     /* 불꽃: 미는 힘만큼 */
     const gf = (S.goo || 0) * (.5 + .5 * Math.sin(t * 23) * Math.sin(t * 7.3)), I = (.35 + S.thr * 1.1) * (1 + .5 * bk) * (1 - .45 * gf),   /* 점액에 붙잡히면 불꽃이 힘겹게 깜빡임 */ len = (.35 + S.thr * 1.1) * K * (1 + .8 * bk);   /* 가속 중엔 불꽃이 길고 밝음 (힘을 더 냄) */
     flames.forEach((f, i) => { v.copy(ENG[i]).applyMatrix4(sm.matrixWorld); const u = f.material.uniforms; u.uA.value.copy(v); u.uB.value.copy(v).addScaledVector(fw, -len * (.9 + .1 * Math.sin(t * 50 + i))); u.uW.value = .1 * K * (1 + S.thr * .4); u.uI.value = I; u.uT.value = t; });
