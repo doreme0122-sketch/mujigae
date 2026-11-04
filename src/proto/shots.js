@@ -11,9 +11,9 @@
    무게: 꼬리 한 장 · 머리 한 장 · 부스러기 한 장 · 바닥 흔적 한 장 · 모으는 빛 한 장 · 조준 고리 한 장 = 그리기 6번 (탄 종류가 늘어도 같음) */
 import * as THREE from 'three';
 import * as A from '../core/audio.js';
-import { FLY } from './flight.js?v=11041530';
-import { BH } from './blackhole.js?v=11041530';
-import { hitWall } from './rocks.js?v=11041530';
+import { FLY } from './flight.js?v=11041537';
+import { BH } from './blackhole.js?v=11041537';
+import { hitWall } from './rocks.js?v=11041537';
 
 /* 비교표 그대로. heatT: 쉬지 않고 쏘면 과열까지(초) · coolT: 과열 뒤 다시 쏠 때까지(초) · cryB/wallB: 수정·벽에서 튕기는 횟수
    kind: 그림 결 (0 기본 · 1 서리 · 2 따뜻한 빛 · 3 빛 창 · 4 쇳물 · 5 불티 · 6 바늘 · 7 활) */
@@ -418,7 +418,8 @@ export function makeShots({ B, crystals, bh, FS, say, mobs, onKill, onDamage, on
       vig.style.opacity = 0; return; }
     FS.turnCap = .001;   /* 멈췄다 베는 동안 방향은 누른 순간 그대로 */
     const R = c.reach + .6;
-    if (SL.st === 1) { const k = Math.min(1, e / W); FS.dashUntil = t + dt * 2; FS.dashVx = 0; FS.dashVz = 0;   /* ① 멈춤: 칼을 뽑음 (휘두를 시안이면 칼이 시작 쪽으로 당겨짐) */
+    if (SL.st === 1) { sec.visible = false; fan.visible = false; cutL.visible = false; for (const tr of trails) tr.mesh.visible = false;   /* 새로 벨 준비: 지난 자국은 모두 지움 */
+      const k = Math.min(1, e / W); FS.dashUntil = t + dt * 2; FS.dashVx = 0; FS.dashVz = 0;   /* ① 멈춤: 칼을 뽑음 (휘두를 시안이면 칼이 시작 쪽으로 당겨짐) */
       const sw0 = sty.sweeps(SL.sg)[0], a = sw0 ? dir + sw0[0] * D2R * (.6 + .4 * k) : dir;
       drawBlade(FS.x, FS.z, a, c.reach + 1, .32, .7 + .3 * k, .04); bdM.uniforms.uRev.value = Math.min(1, k * 1.25); vig.style.opacity = (.8 * k).toFixed(2);
       if (Math.random() < dt * 70) { const bx = -Math.sin(a), bz = -Math.cos(a), r = .8 + Math.random() * (c.reach + .8) * k, a2 = Math.random() * 6.283, px_ = FS.x + bx * r, pz_ = FS.z + bz * r, sx = px_ + Math.cos(a2) * 1.6, sz = pz_ + Math.sin(a2) * 1.6; emit(sx, FLY.HOVER, sz, (px_ - sx) * 7, 0, (pz_ - sz) * 7, .7, .95, 1.3, .05, .14, 0, 0, 0); }   /* 둘레 빛이 칼로 빨려 듦 */
@@ -453,7 +454,7 @@ export function makeShots({ B, crystals, bh, FS, say, mobs, onKill, onDamage, on
           const H = SL.ah || (SL.ah = []); H.push([t, bladeA[0]]); while (H.length > 2 && H[0][0] < t - .06) H.shift(); const span = bladeA[0] - H[0][1];   /* 지난 0.06초 동안 칼이 지난 각 */
           if (!useSec) drawFan(FS.x, FS.z, bladeA[0], span, bladeA[1], 1); } else { bladeM.visible = false; fan.visible = false; } }
       if (k >= 1) { FS.vx *= .2; FS.vz *= .2; SL.st = 3; SL.t2 = t; bladeM.visible = false; fan.visible = false; SL.ah = null; for (const tr of trails) tr.prevA = null; } return; }
-    if (SL.st === 3) { const ce = t - SL.t2; bladeM.visible = false; fan.visible = false; vig.style.opacity = 0; if (sty === STY.A) { sec.visible = true; secM.uniforms.uP.value = 1; secM.uniforms.uFade.value = Math.min(1, ce / .1) * .75; secM.uniforms.uT.value = t; }
+    if (SL.st === 3) { const ce = t - SL.t2; bladeM.visible = false; fan.visible = false; vig.style.opacity = 0; sec.visible = sty === STY.A; if (sty === STY.A) { secM.uniforms.uP.value = 1; secM.uniforms.uFade.value = Math.min(1, ce / .1) * .75; secM.uniforms.uT.value = t; }
       if (ce >= CD) {   /* ③ '쩡': 자국(또는 선)이 벌어지며 터짐 · 한꺼번에 베임 · 짧게 멈칫 */
         SL.st = 0; SL.tc = t; for (const j of SL.pend) if (j.on && j.dieT < 0) cutHit(j, t, c); if (SL.pend.length) FS.stopUntil = performance.now() + 60;
         if (sty === STY.D) drawCrescent(FS.x, FS.z, dir, c.reach + .4); else { const sw0 = sty.sweeps(SL.sg)[0], ka = dir + Math.sign(sw0[1] - sw0[0]) * 1.57 * D2R * 57.3; FS.kx = -Math.sin(ka) * .6; FS.kz = -Math.cos(ka) * .6; FS.kT = performance.now(); }
