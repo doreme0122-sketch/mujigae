@@ -10,9 +10,9 @@
    무게: 기체 한 대 + 불꽃 띠 몇 장 + 꼬리 띠 하나 + 불티 점 묶음 하나 + 그림자 판 하나 */
 import * as THREE from 'three';
 import { buildShip, engineSpots } from '../core/ships/build.js';
-import { flameMesh } from './sortie.js?v=11041632';
-import { MAP } from './mapfloor.js?v=11041632';
-import { applyShipHeat, heatVis } from './shipheat.js?v=11041632';
+import { flameMesh } from './sortie.js?v=11041635';
+import { MAP } from './mapfloor.js?v=11041635';
+import { applyShipHeat, heatVis } from './shipheat.js?v=11041635';
 
 export const FLY = { LEN: 2, HOVER: .7, R: .8, SPEEDS: [9, 12, 15, 18], TURN: 7, ACC: .22, TURNMAX: 9,
   BASE: 9, SHIELD: 3, BOOST: 5, BOOSTK: 1.5 };   /* 기지 고리(반지름 9m)를 벗어나는 순간: 보호막 3초 · 가속 5초(1.5배) — 기지 출구 앞 매복에 바로 당하지 않게 */
@@ -134,7 +134,8 @@ export async function makeFlight(renderer, B, start, face) {
     /* 벽: 벽을 파고드는 힘만 없애고 벽을 따라가는 힘은 남김 → 비스듬히 닿으면 벽을 타고 미끄러짐, 정면이면 거의 멈춤
        ① 가려던 곳이 막혔으면 닿기 직전까지 감 ② 닿은 벽이 보는 쪽(바깥 방향)을 구함 ③ 그 방향 속도만 빼고 남은 시간만큼 다시 감 (꺾인 벽은 세 번까지)
        들이받은 세기(벽 쪽 속도)만큼 불티 */
-    if (t < (S.dashUntil || 0)) { S.vx = S.dashVx; S.vz = S.dashVz; }   /* 빛 칼날 도약: 베는 동안 앞으로 확 나감 (벽 미끄러짐은 아래 그대로) */
+    if (t < (S.dashUntil || 0)) { S.vx = S.dashVx; S.vz = S.dashVz; S.dashOn = true; }
+    else if (S.dashOn) { S.dashOn = false; const k = S.dashEndK ?? 1; S.vx *= k; S.vz *= k; S.dashEndK = 1; }   /* 밀림이 끝나는 순간 남은 속도를 줄여 정해 둔 거리에서 딱 멈춤 (반동 뒤 미끄러져 더 가던 것) */   /* 빛 칼날 도약: 베는 동안 앞으로 확 나감 (벽 미끄러짐은 아래 그대로) */
     const ex = S.ex || 0, ez = S.ez || 0; S.vx += ex; S.vz += ez;                                   /* 바깥 힘(블랙홀 소용돌이 흐름)을 실어 같이 움직임 — 벽 미끄러짐도 같이 적용 */
     let hitV = 0, rem = dt;
     for (let it = 0; it < 3 && rem > 1e-5; it++) {
