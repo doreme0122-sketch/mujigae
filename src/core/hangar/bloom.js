@@ -30,9 +30,9 @@ export function makeBloom(renderer, bo = {}){
     fragmentShader:`precision highp float;in vec2 vU;out vec4 o;uniform sampler2D t;uniform vec2 px;
       void main(){ vec3 s=texture(t,vU+px*vec2(-1.,-1.)).rgb+texture(t,vU+px*vec2(1.,-1.)).rgb+texture(t,vU+px*vec2(-1.,1.)).rgb+texture(t,vU+px*vec2(1.,1.)).rgb; o=vec4(s*.25,1.); }`});
   const comp=new THREE.RawShaderMaterial({glslVersion:THREE.GLSL3,
-    uniforms:{t:{value:null},b1:{value:null},b2:{value:null},b3:{value:null},k:{value:.28},warp:{value:new THREE.Vector4(.5,.5,0,0)},lens:{value:new THREE.Vector4(.5,.5,0,0)},asp:{value:1}},
+    uniforms:{t:{value:null},b1:{value:null},b2:{value:null},b3:{value:null},k:{value:.28},warp:{value:new THREE.Vector4(.5,.5,0,0)},lens:{value:new THREE.Vector4(.5,.5,0,0)},haze:{value:new THREE.Vector4(.5,.5,0,0)},hT:{value:0},asp:{value:1}},
     vertexShader:'in vec3 position;in vec2 uv;out vec2 vU;void main(){vU=uv;gl_Position=vec4(position.xy,0.,1.);}',
-    fragmentShader:`precision highp float;in vec2 vU;out vec4 o;uniform sampler2D t,b1,b2,b3;uniform float k,asp;uniform vec4 warp,lens;
+    fragmentShader:`precision highp float;in vec2 vU;out vec4 o;uniform sampler2D t,b1,b2,b3;uniform float k,asp,hT;uniform vec4 warp,lens,haze;
       void main(){ vec2 uv=vU;
         if(lens.w>0.){ vec2 d=(uv-lens.xy)*vec2(asp,1.); float r=length(d)+1e-5, R=max(lens.z,1e-3);   /* 블랙홀: 둘레 공간이 휘감기며(소용돌이) 가운데로 끌려 보임 */
           float sw=lens.w*2.4*exp(-r/(R*1.3)), cs=cos(sw), sn=sin(sw); d=mat2(cs,-sn,sn,cs)*d;
@@ -40,6 +40,8 @@ export function makeBloom(renderer, bo = {}){
         if(warp.w>0.){ vec2 d=(vU-warp.xy)*vec2(asp,1.); float r=length(d)+1e-5, R=warp.z;      /* 공간이 일그러지는 파동: 센 첫 물결 + 뒤따르는 약한 물결 둘 */
           float w=exp(-(((r-R)/.035)*((r-R)/.035)))-exp(-(((r-R+.05)/.035)*((r-R+.05)/.035)))*.6+(exp(-(((r-R*.72)/.03)*((r-R*.72)/.03)))-exp(-(((r-R*.72+.04)/.03)*((r-R*.72+.04)/.03)))*.6)*.45+(exp(-(((r-R*.48)/.025)*((r-R*.48)/.025))))*.2;
           uv-=d/r/vec2(asp,1.)*w*warp.w; }
+        if(haze.w>0.){ vec2 d=(uv-haze.xy)*vec2(asp,1.); float f=exp(-dot(d,d)/max(haze.z*haze.z,1e-6));   /* 열 아지랑이: 달아오른 총구 앞 공기만 투명하게 일렁임 */
+          uv+=vec2(sin(uv.y*260.+hT*11.+sin(uv.x*120.+hT*3.)*2.),cos(uv.x*240.-hT*9.+sin(uv.y*90.)*2.))*haze.w*f*.0022; }
         vec3 c=texture(t,uv).rgb + (texture(b1,uv).rgb*.45+texture(b3,uv).rgb*.45+texture(b2,uv).rgb*.6)*k;
         c=c/(1.+c*.52);
         o=vec4(pow(max(c,0.),vec3(1./2.2)),1.); }`});
@@ -54,6 +56,8 @@ export function makeBloom(renderer, bo = {}){
     /* 공간 일그러짐 파동 (화면 좌표 중심 cx,cy · 반지름 r · 세기 s, 0이면 꺼짐) */
     warp(cx,cy,r,s,asp){ comp.uniforms.warp.value.set(cx,cy,r,s); comp.uniforms.asp.value=asp||1; },
     /* 블랙홀 둘레 휘어 보임 (화면 좌표 중심 · 반지름 · 세기, 0이면 꺼짐) */
+    /* 열 아지랑이 (화면 좌표 중심 · 반지름 · 세기, 0이면 꺼짐) */
+    haze(cx,cy,r,s,t){ comp.uniforms.haze.value.set(cx,cy,r,s); comp.uniforms.hT.value=t; },
     lens(cx,cy,r,s,asp){ comp.uniforms.lens.value.set(cx,cy,r,s); if(asp) comp.uniforms.asp.value=asp; },
     render(W,H,off){
       if(off){ comp.uniforms.t.value=rtS.texture; comp.uniforms.b1.value=rtS.texture; comp.uniforms.b2.value=rtS.texture; comp.uniforms.b3.value=rtS.texture; const k=comp.uniforms.k.value; comp.uniforms.k.value=0; run(comp,null); comp.uniforms.k.value=k; return; }   /* 빛 번짐 끔: 밝기 정리만 */
