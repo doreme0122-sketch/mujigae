@@ -5,15 +5,15 @@
    무게: 바닥 판 하나 + 기체 둘 + 빛 알갱이 한 묶음 + 그림자 판 둘 */
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
-import { makeBloom } from '../core/hangar/bloom.js?v=11042303';
-import { makePerf } from './perf.js?v=11042303';
+import { makeBloom } from '../core/hangar/bloom.js?v=11042316';
+import { makePerf } from './perf.js?v=11042316';
 import { buildShip, engineSpots } from '../core/ships/build.js';
 import { makeGlow } from '../preview/glow.js';
-import { makeFlight, FLY } from './flight.js?v=11042303';
-import { makeFloorLab, LAB, JOIN, sdBlob, sdRoad, blobR } from './floorlab.js?v=11042303';
-import { makeMassWall, STYLES } from './wallmass.js?v=11042303';
-import { makeIceWall } from './icewall.js?v=11042303';
-import { iceWallMaterial, snowMaterial } from './icewall.js?v=11042303';
+import { makeFlight, FLY } from './flight.js?v=11042316';
+import { makeFloorLab, LAB, JOIN, sdBlob, sdRoad, blobR } from './floorlab.js?v=11042316';
+import { makeMassWall, STYLES } from './wallmass.js?v=11042316';
+import { makeIceWall } from './icewall.js?v=11042316';
+import { iceWallMaterial, snowMaterial } from './icewall.js?v=11042316';
 
 const $ = s => document.querySelector(s), clamp = THREE.MathUtils.clamp;
 const VIEWS = [{ id: 'game', name: '게임 시점', h: 42, tilt: .38 }, { id: 'near', name: '가까이', h: 18, tilt: .6 }, { id: 'far', name: '멀리', h: 90, tilt: .3 }];
@@ -50,7 +50,7 @@ export async function start(canvas, onProgress = () => {}) {
   walls.add(makeMassWall('obsidian', ring(JOIN.lava, 2.1, Math.PI), { uT: UT, seed: 3, out: outOf(JOIN.lava) }));
   /* 빙하 얼음 벽 보기: 가운데 문이 있는 벽 한 줄 + 오른쪽에 토막 셋을 따로 (낮은 · 높은 · 문 옆) */
   const GAL = { z: -12, xs: [-12, 12], kinds: [] }, gal = new THREE.Group(); scene.add(gal); gal.visible = false;
-  const north = (x, z, nx, nz) => nz < 0 ? 1 : -1, galTags = [], iceM = iceWallMaterial(UT), snowM = snowMaterial();
+  const north = (x, z, nx, nz) => nz < 0 ? 1 : -1, galTags = [], iceM = iceWallMaterial(UT), snowM = snowMaterial(UT);
   const line = (a, b, ph) => { const pts = []; for (let x = a; x <= b + 1e-6; x += 1) pts.push([x, GAL.z + Math.sin(x * .12 + ph) * 1.2]); return pts; };
   const wl = makeIceWall(line(-34, -4, 0), { uT: UT, mat: iceM, smat: snowM, seed: 11, out: north, doors: [false, true] }); gal.add(wl);
   gal.add(makeIceWall(line(4, 34, 1), { uT: UT, mat: iceM, smat: snowM, seed: 12, out: north, doors: [true, false] }));
@@ -144,7 +144,7 @@ export async function start(canvas, onProgress = () => {}) {
     /* 카메라: 내 기체를 따라감 */
     { const lx = FS.x + FS.vx * .35, lz = FS.z + FS.vz * .35, k = Math.min(1, dt * 5); cam.x += (lx - cam.x) * k; cam.z += (lz - cam.z) * k; }
     cam.h += (cam.H - cam.h) * Math.min(1, dt * 3); cam.tilt += (cam.T - cam.tilt) * Math.min(1, dt * 3);
-    camera.position.set(cam.x, cam.h * Math.cos(cam.tilt), cam.z + cam.h * Math.sin(cam.tilt)); camera.lookAt(cam.x, 0, cam.z); camera.updateMatrixWorld();
+    camera.position.set(cam.x, cam.h * Math.cos(cam.tilt), cam.z + cam.h * Math.sin(cam.tilt)); camera.lookAt(cam.x, 0, cam.z); const ov = window.__camOv; if (ov) { camera.position.set(ov[0], ov[1], ov[2]); camera.lookAt(ov[3], ov[4], ov[5]); }   /* 시험용: 원하는 자리에서 보기 */ camera.updateMatrixWorld();
     lab.mesh.position.set(Math.round(cam.x / 4) * 4, 0, Math.round(cam.z / 4) * 4);
     drawHud(HM, FS.x, FLY.HOVER, FS.z, dt); drawHud(HF, E.x, FLY.HOVER, E.z, dt);
     renderer.setRenderTarget(bloom.scene); renderer.clear(); renderer.render(scene, camera);

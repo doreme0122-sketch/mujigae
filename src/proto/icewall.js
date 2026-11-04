@@ -11,7 +11,8 @@
    무게: 벽 한 줄 = 얼음 1번 + 눈 1번 그리기 */
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { iceMaterial, block } from './ice.js';
+import { iceMaterial, block } from './ice.js?v=11042316';
+import { SNOW_GLSL } from './snowtone.js?v=11042316';
 
 const hs = (x, y, z) => { const s = Math.sin(x * 127.1 + y * 311.7 + z * 74.7) * 43758.5453; return s - Math.floor(s); };
 const vn = (x, y, z) => { const ix = Math.floor(x), iy = Math.floor(y), iz = Math.floor(z), fx = x - ix, fy = y - iy, fz = z - iz, u = fx * fx * (3 - 2 * fx), v = fy * fy * (3 - 2 * fy), w = fz * fz * (3 - 2 * fz);
@@ -46,22 +47,15 @@ export function iceWallMaterial(uT) {
   m.customProgramCacheKey = () => 'ice-wall-ref';
   return m;
 }
-export function snowMaterial() {
-  const m = new THREE.MeshStandardMaterial({ color: 0xbccbdc, roughness: .88, metalness: 0, envMapIntensity: .4, emissive: 0x0a1626, emissiveIntensity: .55 });
-  m.onBeforeCompile = sh => {
-    sh.vertexShader = 'varying vec3 vSw; varying vec3 vSn;\n' + sh.vertexShader.replace('#include <project_vertex>', '#include <project_vertex>\n vSw=(modelMatrix*vec4(transformed,1.)).xyz; vSn=normalize(mat3(modelMatrix)*objectNormal);');
-    sh.fragmentShader = `varying vec3 vSw; varying vec3 vSn; float sh1(vec3 p){ return fract(sin(dot(p,vec3(127.1,311.7,74.7)))*43758.5453); }
-      float sn(vec3 p){ vec3 i=floor(p),f=fract(p); f=f*f*(3.-2.*f); return mix(mix(mix(sh1(i),sh1(i+vec3(1,0,0)),f.x),mix(sh1(i+vec3(0,1,0)),sh1(i+vec3(1,1,0)),f.x),f.y),mix(mix(sh1(i+vec3(0,0,1)),sh1(i+vec3(1,0,1)),f.x),mix(sh1(i+vec3(0,1,1)),sh1(i+vec3(1,1,1)),f.x),f.y),f.z); }\n` + sh.fragmentShader
-      .replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>
-        { float drift=sn(vSw*1.3)*.6+sn(vSw*4.)*.4; diffuseColor.rgb*=.86+.26*drift;
-          diffuseColor.rgb=mix(diffuseColor.rgb*vec3(.72,.86,1.12),diffuseColor.rgb,smoothstep(-.2,.8,vSn.y));
-          float sp=step(.988,sh1(floor(vSw*22.)))*smoothstep(.3,.9,vSn.y); totalEmissiveRadiance+=vec3(.9,.95,1.)*sp*.8; }`); };
-  m.customProgramCacheKey = () => 'snow-ref';
-  return m;
+export function snowMaterial(uT) {
+  /* 바닥 눈과 같은 계산(snowtone.js)으로 색을 냄 → 벽 눈 = 바닥 눈 */
+  return new THREE.ShaderMaterial({ uniforms: { uT: uT || { value: 0 }, uSun: { value: new THREE.Vector3(-.45, .78, -.42).normalize() } },
+    vertexShader: 'varying vec3 vW; varying vec3 vN; void main(){ vec4 w=modelMatrix*vec4(position,1.); vW=w.xyz; vN=normalize(mat3(modelMatrix)*normal); gl_Position=projectionMatrix*viewMatrix*w; }',
+    fragmentShader: 'precision highp float; varying vec3 vW; varying vec3 vN; uniform float uT; uniform vec3 uSun;\n' + SNOW_GLSL +
+      'void main(){ vec3 n=normalize(vN); if(!gl_FrontFacing) n=-n; gl_FragColor=vec4(snowTone(n,normalize(cameraPosition-vW),vW,uSun,uT),1.); }' });
 }
-
 export function makeIceWall(path, opt = {}) {
-  const uT = opt.uT || { value: 0 }, mat = opt.mat || iceWallMaterial(uT), smat = opt.smat || snowMaterial(), doors = opt.doors || [true, true];
+  const uT = opt.uT || { value: 0 }, mat = opt.mat || iceWallMaterial(uT), smat = opt.smat || snowMaterial(uT), doors = opt.doors || [true, true];
   const seed = opt.seed || 3, R = (() => { let s = seed * 7919 + 7; return () => (s = (s * 9301 + 49297) % 233280) / 233280; })(), o = seed * 1.3;
   const curve = new THREE.CatmullRomCurve3(path.map(p => new THREE.Vector3(p[0], 0, p[1])), false, 'centripetal'), len = curve.getLength();
   const Hm = opt.H || 3.7, W = 1., DS = .2, N = Math.max(4, Math.round(len / DS));
@@ -96,14 +90,23 @@ export function makeIceWall(path, opt = {}) {
   const tri = (a, b, c, ga, gb, gc) => { if (FL) { P.push(...a, ...c, ...b); G.push(ga, gc, gb); } else { P.push(...a, ...b, ...c); G.push(ga, gb, gc); } };
   for (let i = 0; i < N; i++) for (let k = 0; k < M - 1; k++) { const a = pt(i, k), b = pt(i + 1, k), c = pt(i, k + 1), d = pt(i + 1, k + 1), g = (ii, kk) => S[ii][kk][2];
     tri(a, c, b, g(i, k), g(i, k + 1), g(i + 1, k)); tri(b, c, d, g(i + 1, k), g(i, k + 1), g(i + 1, k + 1)); }
-  for (const i of [0, N]) { const c = [fr[i].x, fr[i].h * .5, fr[i].z]; for (let k = 0; k < M - 1; k++) { const a = pt(i, k), b = pt(i, k + 1); i === 0 ? tri(a, c, b, .3, .3, .3) : tri(a, b, c, .3, .3, .3); } }
+  /* 끝 단면: 단면 테두리를 그대로 따라 세모로 나눠 막음(가운데 한 점 부채 X → 들어간 곳이 겹치거나 비지 않음) · 바깥(길 방향)을 보게 */
+  const capPoly = (i, ring, glow, out) => { const f = fr[i], dir = i === 0 ? -1 : 1, tx = f.tx * dir, tz = f.tz * dir;
+    const tris = THREE.ShapeUtils.triangulateShape(ring.map(q => new THREE.Vector2(q[0], q[1])), []);
+    const W3 = q => [f.x + f.nx * q[0], q[1], f.z + f.nz * q[0]];
+    for (const [x, y, z] of tris) { const A = W3(ring[x]), B = W3(ring[y]), C = W3(ring[z]);
+      const ux = B[0] - A[0], uy = B[1] - A[1], uz = B[2] - A[2], vx = C[0] - A[0], vy = C[1] - A[1], vz = C[2] - A[2];
+      const nx = uy * vz - uz * vy, nz = ux * vy - uy * vx; const ok = nx * tx + nz * tz >= 0;
+      if (ok) out.push(A, B, C); else out.push(A, C, B); if (glow) G.push(glow, glow, glow); } };
+  for (const i of [0, N]) { const L = []; capPoly(i, S[i].map(q => [q[0], q[1]]), .3, L); for (const q of L) P.push(...q); }
   const ice = []; { const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(P, 3)); g.setAttribute('aG', new THREE.Float32BufferAttribute(G, 1)); g.computeVertexNormals(); ice.push(g); }
   const snow = [];
   /* ④ 눈: 윗단 전체 + 앞 모서리로 둥글게 넘쳐 흘러내림 */
-  { const Q = [], iT = RF.length - 1, top = (i, k) => { const f = fr[i], s = S[i], fe = s[iT], be = s[iT + 4], t = .32 + vn(f.d * .9, 1, o) * .22, drip = vn(f.d * 1.7, 2, o);
+  { const Q = [], iT = RF.length - 1, top = (i, k, loc) => { const f = fr[i], s = S[i], fe = s[iT], be = s[iT + 4], t = .32 + vn(f.d * .9, 1, o) * .22, drip = vn(f.d * 1.7, 2, o);
       const sec = [[fe[0] - .12, fe[1] - .35 - drip * .5], [fe[0] - .2, fe[1] + t * .55], [fe[0] + .3, f.h + t], [s[iT + 2][0], s[iT + 2][1] + t * 1.05], [be[0] - .35, f.h + t * .9], [be[0] + .12, be[1] + t * .4], [be[0] + .1, be[1] - .3]][k];
-      return [f.x + f.nx * sec[0], sec[1], f.z + f.nz * sec[0]]; };
+      return loc ? sec : [f.x + f.nx * sec[0], sec[1], f.z + f.nz * sec[0]]; };
     for (let i = 0; i < N; i++) for (let k = 0; k < 6; k++) { const a = top(i, k), b = top(i + 1, k), c = top(i, k + 1), d = top(i + 1, k + 1); FL ? Q.push(...a, ...b, ...c, ...b, ...d, ...c) : Q.push(...a, ...c, ...b, ...b, ...c, ...d); }
+    for (const i of [0, N]) { const L = []; capPoly(i, [0, 1, 2, 3, 4, 5, 6].map(k => top(i, k, true)), 0, L); for (const q of L) Q.push(...q); }   /* 눈 끝도 막음 (속이 비어 보이지 않게) */
     const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(Q, 3)); g.computeVertexNormals(); snow.push(g); }
   /* ⑤ 고드름: 앞 모서리에서 아주 촘촘히 (긴 것 사이사이 짧은 것) · 뒤 모서리도 드문드문 */
   const icicle = (x, y, z, l, r) => { const g = new THREE.ConeGeometry(r, l, 5, 2); const P2 = g.attributes.position; for (let j = 0; j < P2.count; j++) { const yy = P2.getY(j); P2.setX(j, P2.getX(j) * (1 + (yy / l) * .3)); } g.rotateX(Math.PI); g.rotateY(R() * 6); g.translate(x, y - l / 2, z); return prep(g, .45); };

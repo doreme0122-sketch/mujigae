@@ -4,6 +4,7 @@
    · 멀어질수록 깊은 색으로 가라앉힘 (가까운 싸움터가 또렷하게)
    0 금속 판 · 1 이끼 낀 암반 · 2 결정 섞인 모래 · 3 은은한 평지 · 4 보스존 별빛 우주(보이지 않는 유리 바닥 + 아래로 깊은 별 세 겹) */
 import * as THREE from 'three';
+import { SNOW_GLSL } from './snowtone.js?v=11042316';
 
 function bakeNoise(N = 256) {
   const hash = (x, y, p) => { x = ((x % p) + p) % p; y = ((y % p) + p) % p; const s = Math.sin(x * 127.1 + y * 311.7) * 43758.5453; return s - Math.floor(s); };
@@ -62,6 +63,8 @@ export function makeFloorLab() {
          · 눈: 하얗고 푸른 눈 · 바람에 쓸린 잔물결 · 반짝임 · 그늘은 푸름
          · 드러난 얼음: 맑은 청록 · 속 푸른 금빛(벽과 같은 빛) · 하늘을 비추는 매끈한 면
          · 눈과 얼음 경계: 얇은 서리 테 · 작은 얼음 부스러기 · edge = 벽 가까이일수록 눈이 두꺼움(발치 눈밭과 이어짐) */
+      ${SNOW_GLSL}
+      float gSnow;   /* iceGround가 남기는 '여기가 눈인지' (문턱 처리에 씀) */
       /* 얼음 판 나눔: 가장 가까운 판까지 거리(금까지 거리) + 판 번호 */
       vec3 vor(vec2 x){ vec2 n=floor(x), f=fract(x), mg=vec2(0.), mr=vec2(0.); float md=8.;
         for(int j=-1;j<=1;j++) for(int i=-1;i<=1;i++){ vec2 g=vec2(float(i),float(j)); vec2 o=vec2(h2(n+g),h2(n+g+17.3))*.85+.075; vec2 r=g+o-f; float d=dot(r,r); if(d<md){ md=d; mr=r; mg=g; } }
@@ -84,10 +87,8 @@ export function makeFloorLab() {
         vec2 wd=vec2(.82,.57); float rp=cos(dot(p,wd)*1.9+N4(p*.05).g*8.)*.07;   /* 바람 물결 */
         vec3 nS=normalize(vec3(-gS.x*(1.-dep)*26.-wd.x*rp+(N4(p*.7).b-.5)*.05, 1., -gS.y*(1.-dep)*26.-wd.y*rp+(N4(p*.7+.3).b-.5)*.05));
         float dS=dot(nS,uSun);
-        vec3 snowLit=vec3(.86,.9,.95), snowSh=vec3(.5,.62,.8);
-        vec3 cs=mix(snowSh,snowLit,smoothstep(.35,.92,dS))*(.95+.06*N4(p*.25).a);
-        cs+=vec3(.06)*pow(max(dot(nS,normalize(uSun-rd)),0.),24.);
-        vec2 gq=p*4.; float gh=h2(floor(gq)); if(gh>.97){ vec2 gf=fract(gq)-.5; cs+=vec3(.5,.6,.7)*exp(-dot(gf,gf)*70.)*fract(gh*41.+uT*.3); }   /* 반짝임 */
+        vec3 snowLit=SNOW_LIT, snowSh=SNOW_SH;
+        vec3 cs=snowTone(nS,-rd,vec3(p.x,0.,p.y),uSun,uT);                       /* 벽 눈과 같은 계산 */
         /* 얼음 판 */
         float tilt=v.z; vec3 nI=normalize(vec3((v.y-.5)*.14,1.,(v.z-.5)*.14));
         vec3 ib=mix(vec3(.24,.54,.76),vec3(.45,.74,.9),v.y)*(.92+.12*N4(p*.08).r);
@@ -105,7 +106,7 @@ export function makeFloorLab() {
         ci=mix(ci,mix(snowSh,snowLit,.6),dust*.45);
         vec3 c=mix(ci,cs,snow);
         float rim=snow*(1.-smoothstep(.0,.25,dep))*smoothstep(.3,.9,dS); c+=vec3(.05)*rim;   /* 해 받는 눈 언덕 턱 */
-        return c; }
+        gSnow=snow; return c; }
       void main(){
         vec3 ro=cameraPosition, rd=normalize(vW-ro); vec2 p=vW.xz; float dist=length(p-ro.xz); vec3 c;
         if(uK<.5){ /* 금속 판: 4m 판 · 이음매 · 모서리로 갈수록 살짝 둥글게 깎임(빛 받는 턱) · 볼트 · 긁힘 · 얼룩 */
@@ -169,8 +170,8 @@ export function makeFloorLab() {
             if(ice){ /* 얼음 땅: 벽에 맞춘 눈·얼음 땅 · 벽 가까이일수록 눈 두껍게 · 문턱 얇은 곳은 아래 유리·별이 비침 */
               float thin=doorZ*smoothstep(-3.,0.,sd);
               land=iceGround(p,rd,smoothstep(-7.,-1.5,sI));
-              land=mix(land,sky*1.3+vec3(.004,.012,.02),thin*.35);
-              land=mix(land,vec3(.05,.08,.11),lip*.8);
+              land=mix(land,sky*1.3+vec3(.004,.012,.02),thin*.35*(1.-gSnow));                    /* 유리가 비치는 건 얼음 부분만 · 눈은 그대로 하얗게 */
+              land=mix(land,mix(vec3(.05,.08,.11),SNOW_SH*.85,gSnow),lip*.8);            /* 부서진 옆면: 얼음은 짙게, 눈은 눈 그늘색 */
             } else { /* 용암: 검은 현무암 껍질 · 숨 쉬듯 빛나는 붉은 결 · 부서진 옆면은 속이 붉게 */
               float e=.35; float h=N4(p*.035+.4).r*.6+N4(p*.14).b*.4, hx=N4((p+vec2(e,0.))*.035+.4).r*.6+N4((p+vec2(e,0.))*.14).b*.4, hz=N4((p+vec2(0.,e))*.035+.4).r*.6+N4((p+vec2(0.,e))*.14).b*.4;
               vec3 n=normalize(vec3(-(hx-h)/e*2.,1.,-(hz-h)/e*2.));
