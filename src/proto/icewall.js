@@ -88,7 +88,11 @@ export function makeIceWall(path, opt = {}) {
     const base = W + foot + (vn(f.d * .35 + side * 9, yk * 2, o) - .5) * .35 + lean; return [side * (base + off), y, (1 - off / PMAX) * (.4 + .6 * (1 - yk))]; };
   const section = f => { const out = [];
     for (const yk of RF) out.push(faceRow(f, -1, yk));
-    out.push([-W + .25 + (vn(f.d * .8, 3, o) - .5) * .2, f.h + .05, .05], [(vn(f.d * .6, 5, o) - .5) * .6, f.h + .12 + vn(f.d * .4, 6, o) * .15, .05], [W - .25, f.h + .03, .05]);
+    /* 윗면: 바위 윗면처럼 불규칙하게 — 길이 방향으로 0.6~1.4m 칸마다 높이·기울기가 제각각인 각진 판 (가끔 위로 솟은 덩이) */
+    const dw = f.d + (vn(f.d * .23, 8, o) - .5) * 2.6;
+    for (let k = 0; k < 5; k++) { const cw = .6 + hs(Math.floor(dw / 1.3), k, seed) * .8, cell = Math.floor((dw + k * .37) / cw), fr2 = (dw + k * .37) / cw - cell;
+      const lift = (hs(cell, k * 3 + 1, seed) - .5) * .7 + (hs(cell, 9, seed) > .9 ? .6 : 0), tilt = (hs(cell, k + 5, seed) - .5) * .5 * (fr2 - .5);
+      out.push([-W + .15 + k / 4 * (2 * W - .3) + (hs(cell, k + 11, seed) - .5) * .25, f.h + .02 + lift + tilt, .05]); }
     for (let k = RB.length - 1; k >= 0; k--) out.push(faceRow(f, 1, RB[k]));
     return out; };
   const S = fr.map(section), M = S[0].length, P = [], G = [];
@@ -99,15 +103,16 @@ export function makeIceWall(path, opt = {}) {
   for (const i of [0, N]) { const c = [fr[i].x, fr[i].h * .5, fr[i].z]; for (let k = 0; k < M - 1; k++) { const a = pt(i, k), b = pt(i, k + 1); i === 0 ? tri(a, c, b, .3, .3, .3) : tri(a, b, c, .3, .3, .3); } }
   const ice = []; { const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(P, 3)); g.setAttribute('aG', new THREE.Float32BufferAttribute(G, 1)); g.computeVertexNormals(); ice.push(g); }
   const snow = [];
-  /* ④ 눈: 윗단 전체 + 앞 모서리로 둥글게 넘쳐 흘러내림 */
-  { const Q = [], iT = RF.length - 1, top = (i, k) => { const f = fr[i], s = S[i], fe = s[iT], be = s[iT + 4], t = .32 + vn(f.d * .9, 1, o) * .22, drip = vn(f.d * 1.7, 2, o);
-      const sec = [[fe[0] - .12, fe[1] - .35 - drip * .5], [fe[0] - .2, fe[1] + t * .55], [fe[0] + .3, f.h + t], [s[iT + 2][0], s[iT + 2][1] + t * 1.05], [be[0] - .35, f.h + t * .9], [be[0] + .12, be[1] + t * .4], [be[0] + .1, be[1] - .3]][k];
-      return [f.x + f.nx * sec[0], sec[1], f.z + f.nz * sec[0]]; };
-    for (let i = 0; i < N; i++) for (let k = 0; k < 6; k++) { const a = top(i, k), b = top(i + 1, k), c = top(i, k + 1), d = top(i + 1, k + 1); FL ? Q.push(...a, ...b, ...c, ...b, ...d, ...c) : Q.push(...a, ...c, ...b, ...b, ...c, ...d); }
+  /* ④ 눈: 윗면의 각진 판 모양 그대로 따라 쌓임 (바위 위 눈과 같은 방식) · 바람 쪽으로 쏠림 · 곳마다 두께가 다름 · 앞 모서리는 살짝 넘쳐 흘러내림 */
+  { const A = ice[0].attributes.position, Nn = ice[0].attributes.normal, Q = [], a = new THREE.Vector3(), nn = new THREE.Vector3(), wind = new THREE.Vector3(R() - .5, 0, R() - .5).normalize();
+    for (let t = 0; t < A.count; t += 3) { nn.fromBufferAttribute(Nn, t); a.fromBufferAttribute(A, t); if (a.y < 1.2) continue;
+      const up = nn.y + nn.dot(wind) * .3; if (up < .45) continue;
+      for (let k = 0; k < 3; k++) { a.fromBufferAttribute(A, t + k); const th = (.12 + .3 * vn(a.x * .7, 3, a.z * .7) + .08 * vn(a.x * 3, a.y * 3, a.z * 3)) * Math.min(1, (up - .45) * 2.5);
+        Q.push(a.x + nn.x * th * .2, a.y + th, a.z + nn.z * th * .2); } }
     const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(Q, 3)); g.computeVertexNormals(); snow.push(g); }
   /* ⑤ 고드름: 앞 모서리에서 아주 촘촘히 (긴 것 사이사이 짧은 것) · 뒤 모서리도 드문드문 */
   const icicle = (x, y, z, l, r) => { const g = new THREE.ConeGeometry(r, l, 5, 2); const P2 = g.attributes.position; for (let j = 0; j < P2.count; j++) { const yy = P2.getY(j); P2.setX(j, P2.getX(j) * (1 + (yy / l) * .3)); } g.rotateX(Math.PI); g.rotateY(R() * 6); g.translate(x, y - l / 2, z); return prep(g, .45); };
-  for (let i = 0; i <= N; i++) for (const side of [-1, 1]) { const f = fr[i], s = S[i][side < 0 ? RF.length - 1 : RF.length + 3]; if (side > 0 && R() < .6) continue;
+  for (let i = 0; i <= N; i++) for (const side of [-1, 1]) { const f = fr[i], s = S[i][side < 0 ? RF.length - 1 : RF.length + 5]; if (side > 0 && R() < .6) continue;
     const longOne = R() < .35, l = longOne ? 1.1 + R() * 1.6 : .35 + R() * .7, v = s[0] + side * .06, y = f.h - .1;
     if (R() < .82) ice.push(icicle(f.x + f.nx * v + f.tx * (R() - .5) * .15, y, f.z + f.nz * v + f.tz * (R() - .5) * .15, l, (longOne ? .13 : .08) + R() * .06)); }
   /* ⑥ 뾰족한 결정 기둥 */
