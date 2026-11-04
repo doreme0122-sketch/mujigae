@@ -11,9 +11,9 @@
    무게: 꼬리 한 장 · 머리 한 장 · 부스러기 한 장 · 바닥 흔적 한 장 · 모으는 빛 한 장 · 조준 고리 한 장 = 그리기 6번 (탄 종류가 늘어도 같음) */
 import * as THREE from 'three';
 import * as A from '../core/audio.js';
-import { FLY } from './flight.js?v=11041257';
-import { BH } from './blackhole.js?v=11041257';
-import { hitWall } from './rocks.js?v=11041257';
+import { FLY } from './flight.js?v=11041258';
+import { BH } from './blackhole.js?v=11041258';
+import { hitWall } from './rocks.js?v=11041258';
 
 /* 비교표 그대로. heatT: 쉬지 않고 쏘면 과열까지(초) · coolT: 과열 뒤 다시 쏠 때까지(초) · cryB/wallB: 수정·벽에서 튕기는 횟수
    kind: 그림 결 (0 기본 · 1 서리 · 2 따뜻한 빛 · 3 빛 창 · 4 쇳물 · 5 불티 · 6 바늘 · 7 활) */
@@ -180,8 +180,8 @@ export function makeShots({ B, crystals, bh, FS, say, mobs, onKill, onDamage, on
         vec3 col = mix(uC * uC * 1.2 + .15, vec3(1.2, .5, .15), smoothstep(.5, 1., uHeat));
         float k = line * (.35 + .4 * flow + 1.1 * min(en, 1.)) + halo * (.6 + en) + inner + tick;
         vec3 bc = vec3(0.); for (int i = 0; i < 3; i++) { vec4 b = uB[i]; if (b.z < 0.) continue; vec2 d = vP - b.xy; float dd = dot(d, d), age = b.w;
-          float bead = exp(-dd * 7.) * (.22 + 1.4 * b.z) + exp(-dd * 1.2) * .16 * b.z + exp(-pow(max(sqrt(dd) - .55, 0.) * 9., 2.)) * step(sqrt(dd), .75) * .25, pop = b.z * exp(-age * 4.) * exp(-pow(max(sqrt(dd) - age * 5., 0.) * 6., 2.)) * step(sqrt(dd), age * 5. + .4);   /* 켜지는 순간 그 구슬에서 빛 고리가 퍼짐 */
-          bc += vec3(.8, .9, 1.25) * (bead + pop * .8) + vec3(.4, .5, .9) * exp(-dd * 14.) * .3; }   /* 꺼진 구슬은 빈 자리만 옅게 */
+          float rd = sqrt(dd), bead = exp(-dd * 30.) * (.15 + 1.8 * b.z) + exp(-dd * 3.) * .1 * b.z + exp(-(rd - .42) * (rd - .42) * 260.) * (.12 + .35 * b.z) * (.75 + .25 * sin(uT * 3. + b.x)), pop = b.z * exp(-age * 4.) * exp(-pow(max(sqrt(dd) - age * 5., 0.) * 6., 2.)) * step(sqrt(dd), age * 5. + .4);   /* 켜지는 순간 그 구슬에서 빛 고리가 퍼짐 */
+          bc += vec3(.8, .9, 1.25) * (bead + pop * .8) + vec3(.4, .5, .9) * exp(-dd * 40.) * .15; }   /* 꺼진 구슬은 빈 자리만 옅게 */
         gl_FragColor = vec4(col * k * uA + bc * uA, 1.); }` });
   const rg = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), rgM); rg.rotation.x = -Math.PI / 2; rg.position.y = .06; rg.renderOrder = 4; rg.frustumCulled = false; rg.visible = false; G.add(rg);
   let rgA = 0, rgR = 10;
