@@ -4,12 +4,12 @@
      크리티컬 반사 = 닿기 직전(누른 뒤 0.1초 안에 닿음)에 딱 맞춤 → 쏜 사람에게 자동으로 꽂힘 · 속도 2.5배 · 그 순간 화면이 아주 짧게 멈칫
      반사될 때마다 더 빨라지고 1.5배 세짐 → 넷째부터는 달아올라 반사 안 됨 (주고받기가 끝없이 이어지지 않게)
    · 상대 기체: 내 둘레를 돌며 박자 맞춰 쏨 · 7초마다 내 등 뒤로 돌아 들어와 쏨(뒤돌기 시험) · 내가 돌려보낸 탄은 상대도 반사해 옴(주고받기)
-   · 뒤돌기 불이익 셋(켜고 끄며 비교): ① 천천히 돌기 ② 크게 돌면 느려짐 ③ 도는 중엔 크리티컬 안 됨
+   · 뒤돌기 불이익: ① 천천히 돌기만 (사용자 확정 · flight 기본)
    무게: 상대 기체 한 대 · 탄 머리 한 장 · 꼬리 한 장 · 불티 한 장 · 반사 막 한 장 */
 import * as THREE from 'three';
 import * as A from '../core/audio.js';
 import { buildShip } from '../core/ships/build.js';
-import { FLY } from './flight.js?v=11041341';
+import { FLY } from './flight.js?v=11041403';
 
 export const DUEL = { WIN: .25, CRIT: .1, CD: .55, ARC: 60 * Math.PI / 180, REACH: 1.6, NORMAL: 1.3, CRITK: 2.5, DMGK: 1.5, MAXR: 3, SPEED: 20, DMG: 8, ORBIT: 14 };
 const NB = 40, NT = 12, NP = 260;
@@ -111,11 +111,9 @@ export async function makeDuel({ renderer, scene, B, fly, FS, cam, say, ui, avoi
   const P = document.createElement('div'); P.id = 'duelP'; P.hidden = true; ui.appendChild(P);
   P.innerHTML = `<b>반사 시험</b><div class="r">반사 버튼(컴퓨터: E · 시프트)을 누르면 기체 앞쪽 120°에 0.25초 막이 생겨요. 닿기 직전 0.1초 안에 누르면 크리티컬 — 상대에게 꽂혀요. 넷째 반사부터는 달아올라 반사가 안 돼요.</div>
     <div class="hp"><span>나</span><i><s class="me" style="background:linear-gradient(90deg,#7dff9a,#b9ff4a)"></s></i><span class="meN">100</span><span>상대</span><i><s class="fo" style="background:linear-gradient(90deg,#ff5a8a,#ff9ab8)"></s></i><span class="foN">100</span></div>
-    <div class="ct"><em class="nC">0</em>크리티컬 · <em class="nN">0</em>보통 · <em class="nM">0</em>맞음 · 가장 긴 주고받기 <em class="nR">0</em></div>
-    <div class="tg"><button type="button" data-k="turnLimit"><i></i>① 천천히 돌기 (뒤돌기 0.35초)</button><button type="button" data-k="brakeOn"><i></i>② 크게 돌면 0.3초 느려짐</button><button type="button" data-k="critTurn"><i></i>③ 도는 중엔 크리티컬 안 됨</button></div>`;
+    <div class="ct"><em class="nC">0</em>크리티컬 · <em class="nN">0</em>보통 · <em class="nM">0</em>맞음 · 가장 긴 주고받기 <em class="nR">0</em></div>`;
   ['pointerdown', 'pointermove', 'pointerup'].forEach(e => P.addEventListener(e, ev => ev.stopPropagation()));
-  const OPT = { turnLimit: false, brakeOn: false, critTurn: false };
-  P.querySelectorAll('.tg button').forEach(bt => bt.addEventListener('pointerdown', e => { e.preventDefault(); const k = bt.dataset.k; OPT[k] = !OPT[k]; bt.classList.toggle('on', OPT[k]); FS.turnLimit = OPT.turnLimit; FS.brakeOn = OPT.brakeOn; }));
+  const OPT = { critTurn: false };   /* 뒤돌기 불이익은 ① 천천히 돌기만 (flight 기본) */
   const meS = P.querySelector('.me'), foS = P.querySelector('.fo'), meN = P.querySelector('.meN'), foN = P.querySelector('.foN'), nC = P.querySelector('.nC'), nN = P.querySelector('.nN'), nM = P.querySelector('.nM'), nR = P.querySelector('.nR');
   const W = document.createElement('div'); W.id = 'duelW'; document.body.appendChild(W);
   const words = Array.from({ length: 14 }, () => { const el = document.createElement('b'); W.appendChild(el); return { el, t0: -9, p: new THREE.Vector3(), big: 0 }; }); let wI = 0;
@@ -145,9 +143,9 @@ export async function makeDuel({ renderer, scene, B, fly, FS, cam, say, ui, avoi
   /* ── 시작 · 끝 ── */
   const api = { active: false, BU, E, R };
   api.start = () => { if (!spot) spot = findSpot(); const [x, z] = spot; fly.userData.moveTo(x, z + 6, 0); cam.x = x; cam.z = z + 6; E.x = x; E.z = z - 10; E.hp = 100; E.oa = Math.atan2(E.x - FS.x, E.z - FS.z); E.mode = 'orbit'; E.modeT = 0; E.fireT = 1.5;
-    FS.hp = 100; cnt = { c: 0, n: 0, m: 0 }; maxRally = 0; G.visible = true; P.hidden = false; rb.style.display = 'block'; api.active = true; FS.turnLimit = OPT.turnLimit; FS.brakeOn = OPT.brakeOn;
+    FS.hp = 100; cnt = { c: 0, n: 0, m: 0 }; maxRally = 0; G.visible = true; P.hidden = false; rb.style.display = 'block'; api.active = true;
     say?.('반사 시험 — 상대가 쏘는 탄을 반사 버튼으로 돌려보내세요'); };
-  api.stop = () => { G.visible = false; P.hidden = true; rb.style.display = 'none'; api.active = false; FS.turnLimit = false; FS.brakeOn = false; for (const k of BU) k.on = false; };
+  api.stop = () => { G.visible = false; P.hidden = true; rb.style.display = 'none'; api.active = false; for (const k of BU) k.on = false; };
   /* ── 매 장면 ── */
   const v3 = new THREE.Vector3(), tmp = [0, 0];
   api.update = (t, dt, px, camera, cw, ch) => { tNow = t; if (!api.active) return;

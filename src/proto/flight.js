@@ -10,9 +10,9 @@
    무게: 기체 한 대 + 불꽃 띠 몇 장 + 꼬리 띠 하나 + 불티 점 묶음 하나 + 그림자 판 하나 */
 import * as THREE from 'three';
 import { buildShip, engineSpots } from '../core/ships/build.js';
-import { flameMesh } from './sortie.js?v=11041341';
-import { MAP } from './mapfloor.js?v=11041341';
-import { applyShipHeat, heatVis } from './shipheat.js?v=11041341';
+import { flameMesh } from './sortie.js?v=11041403';
+import { MAP } from './mapfloor.js?v=11041403';
+import { applyShipHeat, heatVis } from './shipheat.js?v=11041403';
 
 export const FLY = { LEN: 2, HOVER: .7, R: .8, SPEEDS: [9, 12, 15, 18], TURN: 7, ACC: .22, TURNMAX: 9,
   BASE: 9, SHIELD: 3, BOOST: 5, BOOSTK: 1.5 };   /* 기지 고리(반지름 9m)를 벗어나는 순간: 보호막 3초 · 가속 5초(1.5배) — 기지 출구 앞 매복에 바로 당하지 않게 */
@@ -79,7 +79,7 @@ export async function makeFlight(renderer, B, start, face) {
   const up = e => { if (e.pointerId !== pid) return; pid = null; inp.x = inp.y = 0; pad.style.display = 'none'; }; addEventListener('pointerup', up); addEventListener('pointercancel', up);
   addEventListener('keydown', e => keys.add(e.key.toLowerCase())); addEventListener('keyup', e => keys.delete(e.key.toLowerCase()));
 
-  const S = { x: start[0], z: start[1], vx: 0, vz: 0, head: face, mh: face, aim: null, aimK: 0, bank: 0, speed: FLY.SPEEDS[1], thr: 0, hit: 0, armed: true, shield: 0, boost: 0, pop: 0 };
+  const S = { turnLimit: true, x: start[0], z: start[1], vx: 0, vz: 0, head: face, mh: face, aim: null, aimK: 0, bank: 0, speed: FLY.SPEEDS[1], thr: 0, hit: 0, armed: true, shield: 0, boost: 0, pop: 0 };
   const fw = new THREE.Vector3(), v = new THREE.Vector3(), c = new THREE.Vector3();
   const free = (x, z) => { if (B.blocked(x, z)) return false; for (let k = 0; k < 8; k++) { const a = k * Math.PI / 4; if (B.blocked(x + Math.cos(a) * FLY.R, z + Math.sin(a) * FLY.R)) return false; } return true; };
   /* 닿은 벽이 보는 쪽: 기체 둘레 16곳 중 막힌 곳들의 반대쪽 평균 */
@@ -116,7 +116,7 @@ export async function makeFlight(renderer, B, start, face) {
     if (S.brakeOn && S.tacc > 1.57 && t > (S.brakeUntil || 0)) { S.brakeUntil = t + .3; S.tacc = 0; }   /* 시험 ② 크게 돌면 0.3초 40% 느려짐 (옆으로 미끄러지며 브레이크) */
     S.aimK += ((S.aim != null ? 1 : 0) - S.aimK) * Math.min(1, dt * 8);
     { const want = S.aim != null ? S.aim : (m > .08 ? S.mh : S.head); let d = want - S.head; d = Math.atan2(Math.sin(d), Math.cos(d));
-      const lim = S.turnLimit ? FLY.TURNMAX * dt : 1e9;   /* 시험 ① 천천히 돌기: 바라보는 쪽만 1초에 9라디안까지 (뒤돌기 0.35초) · 가는 쪽은 그대로 바로 바뀜 */
+      const lim = S.turnLimit ? FLY.TURNMAX * dt : 1e9;   /* 천천히 돌기 (사용자 2026-11-04 확정): 바라보는 쪽만 1초에 9라디안까지 (뒤돌기 0.35초) · 가는 쪽은 그대로 바로 바뀜 */
       if (S.aim != null) { const k = THREE.MathUtils.clamp(d * Math.min(1, dt * 16), -lim, lim); S.head += k; turn = k / Math.max(dt, .05); }   /* 쏘는 동안: 쏘는 쪽을 바라봄 (이동은 조이스틱 쪽 그대로) */
       else if (m > .08) { const k = THREE.MathUtils.clamp(d, -lim, lim); S.head += k; turn = k / Math.max(dt, .05); }
       const rem = Math.abs(Math.atan2(Math.sin(want - S.head), Math.cos(want - S.head))); S.turning = rem > .3 || Math.abs(turn) > 4; }   /* 아직 도는 중인지 (시험 ③: 도는 중엔 크리티컬 반사 안 됨) */   /* 미는 쪽으로 바로 돎 (사용자 2026-11-03). 꺾은 크기만큼 짧게 기울어 꺾었다는 느낌만 남김 */   /* 미는 쪽으로 바로 돎 (사용자 2026-11-03). 꺾은 크기만큼 짧게 기울어 꺾었다는 느낌만 남김 */
