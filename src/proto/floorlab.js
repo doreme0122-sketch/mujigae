@@ -4,7 +4,7 @@
    · 멀어질수록 깊은 색으로 가라앉힘 (가까운 싸움터가 또렷하게)
    0 금속 판 · 1 이끼 낀 암반 · 2 결정 섞인 모래 · 3 은은한 평지 · 4 보스존 별빛 우주(보이지 않는 유리 바닥 + 아래로 깊은 별 세 겹) */
 import * as THREE from 'three';
-import { SNOW_GLSL, SNOW_U } from './snowtone.js?v=11050004';
+import { SNOW_GLSL, SNOW_U } from './snowtone.js?v=11050009';
 
 function bakeNoise(N = 256) {
   const hash = (x, y, p) => { x = ((x % p) + p) % p; y = ((y % p) + p) % p; const s = Math.sin(x * 127.1 + y * 311.7) * 43758.5453; return s - Math.floor(s); };
@@ -142,7 +142,7 @@ export function makeFloorLab() {
           float sdS=min(sdBlob(p-so,vec2(-30.,0.),0.),sdBlob(p-so,vec2(30.,0.),2.1));
           float needS=smoothstep(.6,-.4,max(abs(p.y-so.y)-4.,abs(p.x-so.x)-30.))*mix(-.05,1.02,smoothstep(-3.4,0.,sdS));
           float landM=smoothstep(-.06,.06,keepF)*step(sd,0.);
-          float lip=landM*(1.-smoothstep(.0,.45,keepF))*doorZ;        /* 부서진 가장자리: 땅의 두께가 보이는 옆면 (문턱에서만) */
+          float lip=landM*(1.-smoothstep(.0,.45,keepF))*doorZ*smoothstep(.0,.12,need);   /* 실제로 부서지는 자리(문 앞 가장자리)에만 · 땅 한가운데엔 안 묻음 */        /* 부서진 가장자리: 땅의 두께가 보이는 옆면 (문턱에서만) */
           vec3 sky=deep(ro,rd);
           vec3 land=vec3(0.);
           if(landM>.01){
