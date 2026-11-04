@@ -11,9 +11,9 @@
    무게: 꼬리 한 장 · 머리 한 장 · 부스러기 한 장 · 바닥 흔적 한 장 · 모으는 빛 한 장 · 조준 고리 한 장 = 그리기 6번 (탄 종류가 늘어도 같음) */
 import * as THREE from 'three';
 import * as A from '../core/audio.js';
-import { FLY } from './flight.js?v=11041600';
-import { BH } from './blackhole.js?v=11041600';
-import { hitWall } from './rocks.js?v=11041600';
+import { FLY } from './flight.js?v=11041604';
+import { BH } from './blackhole.js?v=11041604';
+import { hitWall } from './rocks.js?v=11041604';
 
 /* 비교표 그대로. heatT: 쉬지 않고 쏘면 과열까지(초) · coolT: 과열 뒤 다시 쏠 때까지(초) · cryB/wallB: 수정·벽에서 튕기는 횟수
    kind: 그림 결 (0 기본 · 1 서리 · 2 따뜻한 빛 · 3 빛 창 · 4 쇳물 · 5 불티 · 6 바늘 · 7 활) */
@@ -534,7 +534,7 @@ export function makeShots({ B, crystals, bh, FS, say, mobs, onKill, onDamage, on
     emit(FS.x + dx * 1.1, FLY.HOVER, FS.z + dz * 1.1, FS.vx, 0, FS.vz, 1.1, 1.2, .9, big ? .9 + k * .5 : .55, big ? .1 : .06, 3, 0);   /* 쏘는 불빛 */
     if (c.kind === 5) for (let i = 0; i < 10; i++) { const a = base + (Math.random() - .5) * sp * 1.2, s = 6 + Math.random() * 8; emit(FS.x + dx * 1.2, FLY.HOVER, FS.z + dz * 1.2, -Math.sin(a) * s, .5 + Math.random(), -Math.cos(a) * s, 1.3, 1, .6, .05 + Math.random() * .04, .12 + Math.random() * .12); }   /* 흩뿌림: 총구에서 불티가 확 퍼짐 */
     if (c.kind === 4) for (let i = 0; i < 8; i++) { const a = base + Math.PI + (Math.random() - .5) * 1.6, s = 2 + Math.random() * 3; emit(FS.x + dx * .8, FLY.HOVER, FS.z + dz * .8, -Math.sin(a) * s, 1 + Math.random(), -Math.cos(a) * s, 1.2, .5, .15, .07, .3 + Math.random() * .3); }   /* 무거운 탄: 뒤로 튀는 쇳물 방울 */
-    if (c.selfPush) { FS.vx -= dx * c.selfPush / .22; FS.vz -= dz * c.selfPush / .22; }   /* 근접탄: 쏜 사람도 뒤로 밀려남 → 쏠수록 거리가 벌어져 넉백만 계속 거는 게 저절로 막힘 */
+    if (c.selfPush) { FS.vx -= dx * c.selfPush / .11; FS.vz -= dz * c.selfPush / .11; }   /* 근접탄: 쏜 사람도 뒤로 밀려남 → 쏠수록 거리가 벌어져 넉백만 계속 거는 게 저절로 막힘 */
     FS.rc = Math.min(2, pick(c.recoil, k)); if (c.shake) FS.shake = Math.max(FS.shake || 0, c.shake);
     if (c.kind === 3 && lv >= 3) FS.shake = Math.max(FS.shake || 0, .3);
     play(c.snd, k); };
