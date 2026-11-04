@@ -10,9 +10,9 @@
    ⑦ 발치: 눈 덮인 큰 얼음 바위(1~2m) + 작은 조각 · 앞쪽 땅에 들쭉날쭉한 눈밭이 깔림
    무게: 벽 한 줄 = 얼음 1번 + 눈 1번 그리기 */
 import * as THREE from 'three';
-import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { iceMaterial, block } from './ice.js?v=11042317';
-import { SNOW_GLSL } from './snowtone.js?v=11042317';
+import { mergeGeometries, mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js';
+import { iceMaterial, block } from './ice.js?v=11042330';
+import { SNOW_GLSL } from './snowtone.js?v=11042330';
 
 const hs = (x, y, z) => { const s = Math.sin(x * 127.1 + y * 311.7 + z * 74.7) * 43758.5453; return s - Math.floor(s); };
 const vn = (x, y, z) => { const ix = Math.floor(x), iy = Math.floor(y), iz = Math.floor(z), fx = x - ix, fy = y - iy, fz = z - iz, u = fx * fx * (3 - 2 * fx), v = fy * fy * (3 - 2 * fy), w = fz * fz * (3 - 2 * fz);
@@ -21,6 +21,7 @@ const vn = (x, y, z) => { const ix = Math.floor(x), iy = Math.floor(y), iz = Mat
 /* 모든 얼음 조각에 같은 속성(위치·노멀·aG 빛 세기)을 맞춤 → 한 묶음으로 합침 */
 const prep = (g, glow = .15) => { const n = g.index ? g.toNonIndexed() : g; for (const k of Object.keys(n.attributes)) if (k !== 'position' && k !== 'normal' && k !== 'aG') n.deleteAttribute(k);
   if (!n.attributes.normal) n.computeVertexNormals(); if (!n.attributes.aG) n.setAttribute('aG', new THREE.Float32BufferAttribute(new Float32Array(n.attributes.position.count).fill(glow), 1)); return n; };
+const smoothG = Q => { const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(Q, 3)); const m = mergeVertices(g, 1e-4); m.computeVertexNormals(); return m; };
 const prepS = g => { const n = g.index ? g.toNonIndexed() : g; for (const k of Object.keys(n.attributes)) if (k !== 'position' && k !== 'normal') n.deleteAttribute(k); if (!n.attributes.normal) n.computeVertexNormals(); return n; };
 
 /* 얼음 재질: 승인된 얼음 + 더 맑은 청록 + 조각 틈(aG)과 속 금에서 새는 빛 + 모서리 빛 + 서리 반짝임 */
@@ -102,17 +103,19 @@ export function makeIceWall(path, opt = {}) {
   const ice = []; { const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(P, 3)); g.setAttribute('aG', new THREE.Float32BufferAttribute(G, 1)); g.computeVertexNormals(); ice.push(g); }
   const snow = [];
   /* ④ 눈: 윗단 전체 + 앞 모서리로 둥글게 넘쳐 흘러내림 */
-  { const Q = [], iT = RF.length - 1, top = (i, k, loc) => { const f = fr[i], s = S[i], fe = s[iT], be = s[iT + 4], t = .32 + vn(f.d * .9, 1, o) * .22, drip = vn(f.d * 1.7, 2, o);
-      const sec = [[fe[0] - .12, fe[1] - .35 - drip * .5], [fe[0] - .2, fe[1] + t * .55], [fe[0] + .3, f.h + t], [s[iT + 2][0], s[iT + 2][1] + t * 1.05], [be[0] - .35, f.h + t * .9], [be[0] + .12, be[1] + t * .4], [be[0] + .1, be[1] - .3]][k];
+  /* 눈이 얹히는 모서리 자리는 앞뒤 단면 몇 개를 고르게 평균 → 얼음 조각의 잔 들쭉날쭉이 눈에 세로 줄무늬로 옮지 않게 */
+  const avgS = (i, k) => { let v = 0, y = 0, n = 0; for (let j = Math.max(0, i - 4); j <= Math.min(N, i + 4); j++) { const w = 5 - Math.abs(j - i); v += S[j][k][0] * w; y += S[j][k][1] * w; n += w; } return [v / n, y / n]; };
+  const SM = fr.map((_, i) => { const iT = RF.length - 1; return [0, 1, 2, 3, 4].map(k => avgS(i, iT + k)); });
+  { const Q = [], iT = RF.length - 1, top = (i, k, loc) => { const f = fr[i], fe = SM[i][0], be = SM[i][4], t = .32 + vn(f.d * .9, 1, o) * .22, drip = vn(f.d * 1.7, 2, o);
+      const sec = [[fe[0] - .12, fe[1] - .35 - drip * .5], [fe[0] - .2, fe[1] + t * .55], [fe[0] + .3, f.h + t], [SM[i][2][0], SM[i][2][1] + t * 1.05], [be[0] - .35, f.h + t * .9], [be[0] + .12, be[1] + t * .4], [be[0] + .1, be[1] - .3]][k];
       return loc ? sec : [f.x + f.nx * sec[0], sec[1], f.z + f.nz * sec[0]]; };
     for (let i = 0; i < N; i++) for (let k = 0; k < 6; k++) { const a = top(i, k), b = top(i + 1, k), c = top(i, k + 1), d = top(i + 1, k + 1); FL ? Q.push(...a, ...b, ...c, ...b, ...d, ...c) : Q.push(...a, ...c, ...b, ...b, ...c, ...d); }
-    for (const i of [0, N]) { const L = []; capPoly(i, [0, 1, 2, 3, 4, 5, 6].map(k => top(i, k, true)), 0, L); for (const q of L) Q.push(...q); }   /* 눈 끝도 막음 (속이 비어 보이지 않게) */
+    snow.push(smoothG(Q)); Q.length = 0;   /* 윗면 눈: 매끈한 면(꼭짓점 노멀을 이웃과 고르게) */
+    for (const i of [0, N]) { const L = [], ring = [0, 1, 2, 3, 4, 5, 6].map(k => top(i, k, true)).concat([4, 3, 2, 1, 0].map(k => SM[i][k]));
+      capPoly(i, ring, 0, L); const dir = i === 0 ? -1 : 1, ex = fr[i].tx * dir * .015, ez = fr[i].tz * dir * .015; for (const q of L) Q.push(q[0] + ex, q[1], q[2] + ez); }
+    /* 눈 끝 막음: 눈 겉면 ~ 얼음 윗면 사이만 채움(얼음 단면과 같은 자리에 겹치면 둘이 번갈아 깜빡이며 깨져 보임) + 1.5cm 바깥으로 */
     const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(Q, 3)); g.computeVertexNormals(); snow.push(g); }
-  /* ⑤ 고드름: 앞 모서리에서 아주 촘촘히 (긴 것 사이사이 짧은 것) · 뒤 모서리도 드문드문 */
-  const icicle = (x, y, z, l, r) => { const g = new THREE.ConeGeometry(r, l, 5, 2); const P2 = g.attributes.position; for (let j = 0; j < P2.count; j++) { const yy = P2.getY(j); P2.setX(j, P2.getX(j) * (1 + (yy / l) * .3)); } g.rotateX(Math.PI); g.rotateY(R() * 6); g.translate(x, y - l / 2, z); return prep(g, .45); };
-  for (let i = 0; i <= N; i++) for (const side of [-1, 1]) { const f = fr[i], s = S[i][side < 0 ? RF.length - 1 : RF.length + 3]; if (side > 0 && R() < .6) continue;
-    const longOne = R() < .35, l = longOne ? 1.1 + R() * 1.6 : .35 + R() * .7, v = s[0] + side * .06, y = f.h - .1;
-    if (R() < .82) ice.push(icicle(f.x + f.nx * v + f.tx * (R() - .5) * .15, y, f.z + f.nz * v + f.tz * (R() - .5) * .15, l, (longOne ? .13 : .08) + R() * .06)); }
+  /* ⑤ 고드름: 없앰 (사용자 2026-11-04) */
   /* ⑥ 뾰족한 결정 기둥 */
   const spire = (d, v, hh, r, tilt) => { const i = Math.round(d / len * N), f = fr[Math.min(N, Math.max(0, i))]; const g = new THREE.CylinderGeometry(0, r, hh, 5 + Math.floor(R() * 2), 3);
     const P2 = g.attributes.position; for (let j = 0; j < P2.count; j++) { P2.setX(j, P2.getX(j) * (1 + (R() - .5) * .25)); P2.setZ(j, P2.getZ(j) * (.75 + R() * .3)); }
@@ -135,7 +138,7 @@ export function makeIceWall(path, opt = {}) {
   { const Q = [], sk = (i, k) => { const f = fr[i], reach = 2.4 + vn(f.d * .3, 4, o) * 3.2, vv = -(W + .2 + [0, .6, reach * .55, reach][k] + (k ? 0 : 0)), y = [.55, .32, .14, -.04][k] + (k < 3 ? (vn(f.d * 1.5, k, o) - .5) * .1 : 0);
       return [f.x + f.nx * vv, y, f.z + f.nz * vv]; };
     for (let i = 0; i < N; i++) for (let k = 0; k < 3; k++) { const a = sk(i, k), b = sk(i + 1, k), c = sk(i, k + 1), d = sk(i + 1, k + 1); (!FL) ? Q.push(...a, ...b, ...c, ...b, ...d, ...c) : Q.push(...a, ...c, ...b, ...b, ...c, ...d); }
-    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(Q, 3)); g.computeVertexNormals(); snow.push(g); }
+    snow.push(smoothG(Q)); }   /* 발치 눈밭도 매끈하게 */
   const grp = new THREE.Group(); grp.add(new THREE.Mesh(mergeGeometries(ice.map(g => prep(g))), mat), new THREE.Mesh(mergeGeometries(snow.map(prepS)), smat));
   grp.userData = { mat, smat, len };
   return grp;
