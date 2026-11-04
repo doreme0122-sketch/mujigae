@@ -10,9 +10,9 @@
    무게: 기체 한 대 + 불꽃 띠 몇 장 + 꼬리 띠 하나 + 불티 점 묶음 하나 + 그림자 판 하나 */
 import * as THREE from 'three';
 import { buildShip, engineSpots } from '../core/ships/build.js';
-import { flameMesh } from './sortie.js?v=11041418';
-import { MAP } from './mapfloor.js?v=11041418';
-import { applyShipHeat, heatVis } from './shipheat.js?v=11041418';
+import { flameMesh } from './sortie.js?v=11041433';
+import { MAP } from './mapfloor.js?v=11041433';
+import { applyShipHeat, heatVis } from './shipheat.js?v=11041433';
 
 export const FLY = { LEN: 2, HOVER: .7, R: .8, SPEEDS: [9, 12, 15, 18], TURN: 7, ACC: .22, TURNMAX: 9,
   BASE: 9, SHIELD: 3, BOOST: 5, BOOSTK: 1.5 };   /* 기지 고리(반지름 9m)를 벗어나는 순간: 보호막 3초 · 가속 5초(1.5배) — 기지 출구 앞 매복에 바로 당하지 않게 */
@@ -116,7 +116,7 @@ export async function makeFlight(renderer, B, start, face) {
     if (S.brakeOn && S.tacc > 1.57 && t > (S.brakeUntil || 0)) { S.brakeUntil = t + .3; S.tacc = 0; }   /* 시험 ② 크게 돌면 0.3초 40% 느려짐 (옆으로 미끄러지며 브레이크) */
     S.aimK += ((S.aim != null ? 1 : 0) - S.aimK) * Math.min(1, dt * 8);
     { const want = S.aim != null ? S.aim : (m > .08 ? S.mh : S.head); let d = want - S.head; d = Math.atan2(Math.sin(d), Math.cos(d));
-      const lim = S.turnLimit ? FLY.TURNMAX * dt : 1e9;   /* 천천히 돌기 (사용자 2026-11-04 확정): 바라보는 쪽만 1초에 9라디안까지 (뒤돌기 0.35초) · 가는 쪽은 그대로 바로 바뀜 */
+      const lim = (S.turnCap ? S.turnCap : S.turnLimit ? FLY.TURNMAX : 1e4) * dt;   /* 모아 쏘기·빛줄기 중엔 더 느리게 (shots가 turnCap을 정함) */   /* 천천히 돌기 (사용자 2026-11-04 확정): 바라보는 쪽만 1초에 9라디안까지 (뒤돌기 0.35초) · 가는 쪽은 그대로 바로 바뀜 */
       if (S.aim != null) { const k = THREE.MathUtils.clamp(d * Math.min(1, dt * 16), -lim, lim); S.head += k; turn = k / Math.max(dt, .05); }   /* 쏘는 동안: 쏘는 쪽을 바라봄 (이동은 조이스틱 쪽 그대로) */
       else if (m > .08) { const k = THREE.MathUtils.clamp(d, -lim, lim); S.head += k; turn = k / Math.max(dt, .05); }
       const rem = Math.abs(Math.atan2(Math.sin(want - S.head), Math.cos(want - S.head))); S.turning = rem > .3 || Math.abs(turn) > 4; }   /* 아직 도는 중인지 (시험 ③: 도는 중엔 크리티컬 반사 안 됨) */   /* 미는 쪽으로 바로 돎 (사용자 2026-11-03). 꺾은 크기만큼 짧게 기울어 꺾었다는 느낌만 남김 */   /* 미는 쪽으로 바로 돎 (사용자 2026-11-03). 꺾은 크기만큼 짧게 기울어 꺾었다는 느낌만 남김 */
@@ -134,6 +134,7 @@ export async function makeFlight(renderer, B, start, face) {
     /* 벽: 벽을 파고드는 힘만 없애고 벽을 따라가는 힘은 남김 → 비스듬히 닿으면 벽을 타고 미끄러짐, 정면이면 거의 멈춤
        ① 가려던 곳이 막혔으면 닿기 직전까지 감 ② 닿은 벽이 보는 쪽(바깥 방향)을 구함 ③ 그 방향 속도만 빼고 남은 시간만큼 다시 감 (꺾인 벽은 세 번까지)
        들이받은 세기(벽 쪽 속도)만큼 불티 */
+    if (t < (S.dashUntil || 0)) { S.vx = S.dashVx; S.vz = S.dashVz; }   /* 빛 칼날 도약: 베는 동안 앞으로 확 나감 (벽 미끄러짐은 아래 그대로) */
     const ex = S.ex || 0, ez = S.ez || 0; S.vx += ex; S.vz += ez;                                   /* 바깥 힘(블랙홀 소용돌이 흐름)을 실어 같이 움직임 — 벽 미끄러짐도 같이 적용 */
     let hitV = 0, rem = dt;
     for (let it = 0; it < 3 && rem > 1e-5; it++) {
