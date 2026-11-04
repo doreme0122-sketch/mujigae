@@ -2,24 +2,24 @@
    날아 보기: 1번 기지에서 기체를 조이스틱으로 몰아 맵 크기·길·문을 몸으로 확인(지금 있는 땅 이름 · 출발 뒤 걸린 시간 · 속도 바꾸기)
    보기: 날아 보기·지역 보기는 기체를 따라감, 맵 전체는 가운데 고정(끌어서 이동). 두 손가락(휠)로 확대. 시작 기지 자리는 빛 고리(다음 단계에서 진짜 기지) */
 import * as THREE from 'three';
-import { makeBloom } from '../core/hangar/bloom.js?v=11041456';
-import { makeMapFloor, MAP, toWorld } from './mapfloor.js?v=11041456';
-import { makePerf } from './perf.js?v=11041456';
+import { makeBloom } from '../core/hangar/bloom.js?v=11041501';
+import { makeMapFloor, MAP, toWorld } from './mapfloor.js?v=11041501';
+import { makePerf } from './perf.js?v=11041501';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
-import { makeFlight, loadBlock, FLY } from './flight.js?v=11041456';
-import { makeWalls } from './walls.js?v=11041456';
-import { makeMotes } from './motes.js?v=11041456';
-import { makeBushes } from './bushes.js?v=11041456';
-import { makeVision } from './vision.js?v=11041456';
-import { makeHide } from './hideviz.js?v=11041456';
-import { makeWardsOnMap, WARDS } from './wardsight.js?v=11041456';
-import { makeBlackHole } from './blackhole.js?v=11041456';
-import { makeBossCrystals } from './bosscrystals.js?v=11041456';
-import { makeShots } from './shots.js?v=11041456';
-import { makeJellies } from './jelly.js?v=11041456';
-import { makeMobFx } from './mobfx.js?v=11041456';
-import { makeHunt } from './hunt.js?v=11041456';
-import { makeRange } from './range.js?v=11041456';
+import { makeFlight, loadBlock, FLY } from './flight.js?v=11041501';
+import { makeWalls } from './walls.js?v=11041501';
+import { makeMotes } from './motes.js?v=11041501';
+import { makeBushes } from './bushes.js?v=11041501';
+import { makeVision } from './vision.js?v=11041501';
+import { makeHide } from './hideviz.js?v=11041501';
+import { makeWardsOnMap, WARDS } from './wardsight.js?v=11041501';
+import { makeBlackHole } from './blackhole.js?v=11041501';
+import { makeBossCrystals } from './bosscrystals.js?v=11041501';
+import { makeShots } from './shots.js?v=11041501';
+import { makeJellies } from './jelly.js?v=11041501';
+import { makeMobFx } from './mobfx.js?v=11041501';
+import { makeHunt } from './hunt.js?v=11041501';
+import { makeRange } from './range.js?v=11041501';
 
 const $ = s => document.querySelector(s), clamp = THREE.MathUtils.clamp;
 const VIEWS = [{ name: '날아 보기', h: 42, tilt: .38 }, { name: '지역 보기', h: 160, tilt: .25 }, { name: '맵 전체', h: 520, tilt: .02 }];
@@ -40,9 +40,9 @@ export async function start(canvas, onProgress = () => {}, opt = {}) {
   renderer.toneMapping = THREE.NoToneMapping; renderer.autoClear = false; renderer.setClearColor(0, 1);
   const scene = new THREE.Scene(), camera = new THREE.PerspectiveCamera(40, 1, 1, 3000), bloom = makeBloom(renderer, { samples: 0 });
   onProgress(.2);
-  const floor = await makeMapFloor(renderer, './assets/map/v7.png?v=11041456');
-  const J = await (await fetch('./assets/map/v7.json?v=11041456')).json();
-  const BLK = await loadBlock('./assets/map/v7.png?v=11041456');                  /* 벽 판정 = 바닥에 그린 벽 그림 그대로 */
+  const floor = await makeMapFloor(renderer, './assets/map/v7.png?v=11041501');
+  const J = await (await fetch('./assets/map/v7.json?v=11041501')).json();
+  const BLK = await loadBlock('./assets/map/v7.png?v=11041501');                  /* 벽 판정 = 바닥에 그린 벽 그림 그대로 */
   const UT = { value: 0 }, WALL = makeWalls(BLK, floor, J.ridges, UT); floor.mat.uniforms.uWf.value = WALL.fieldTex;   /* 바닥도 같은 벽 지도로 */
   scene.add(WALL.real); scene.add(WALL.mesh); WALL.mesh.visible = false;   /* 승인된 벽 5종 · 맵 전체 보기에서만 가벼운 한 덩어리 벽(멀리서 보는 지도) */
   { const pm = new THREE.PMREMGenerator(renderer); scene.environment = pm.fromScene(new RoomEnvironment(), .04).texture; scene.environmentIntensity = .6; pm.dispose(); }
@@ -152,7 +152,8 @@ export async function start(canvas, onProgress = () => {}, opt = {}) {
       const [wo, wd] = wards.userData.nearest(FS.x, FS.z), wS = wo.w.userData.S, wTxt = wS.cap >= 0 ? ` · 와드 차지 ${Math.ceil(WARDS.CAP * (1 - wS.cap))}초` : wS.own === 'mine' && wd < 12 ? ' · 내 와드' : '';
       hud.textContent = `${J.names[BLK.region(FS.x, FS.z)] || ''}${expN ? ' · 경험치 ' + expN : ''} · ${clock < 0 ? '출발 전' : '출발 뒤 ' + (t - clock).toFixed(1) + '초'} · ${mv.toFixed(1)}m/초${FS.shield > 0 ? ' · 보호막 ' + FS.shield.toFixed(1) : ''}${FS.boost > 0 ? ' · 가속 ' + FS.boost.toFixed(1) : ''}${wTxt}`; }
     cam.h += (cam.H - cam.h) * Math.min(1, dt * 3); cam.tilt += (cam.T - cam.tilt) * Math.min(1, dt * 3);
-    camera.position.set(cam.x, cam.h * Math.cos(cam.tilt), cam.z + cam.h * Math.sin(cam.tilt)); camera.lookAt(cam.x, 0, cam.z); camera.updateMatrixWorld();
+    { const kk = FS.kT ? Math.exp(-(performance.now() - FS.kT) / 70) * Math.sin(Math.min(1, (performance.now() - FS.kT) / 40) * 1.57) : 0, kx = (FS.kx || 0) * kk, kz = (FS.kz || 0) * kk;   /* 칼 간 쪽으로 한 번 밀렸다 돌아오는 흔들림 */
+      camera.position.set(cam.x + kx, cam.h * Math.cos(cam.tilt), cam.z + cam.h * Math.sin(cam.tilt) + kz); camera.lookAt(cam.x + kx, 0, cam.z + kz); } camera.updateMatrixWorld();
     bh.userData.update(t, dt, fly, FS, camera, bloom, Wd, Hd, say);                                   /* 흐름은 다음 장면의 움직임에 실림 */
     vision.on = sightOn && view < 2; vision.update(t, dt, FS.x, FS.z, camera);   /* 맵 전체 보기는 지도라서 가리지 않음 */
     { hideEl.classList.toggle('on', inBush); if (inBush) { v.set(FS.x, FLY.HOVER, FS.z).project(camera); hideEl.style.transform = `translate(${(v.x * .5 + .5) * cw}px,${(-v.y * .5 + .5) * ch}px)`; } }

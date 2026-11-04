@@ -11,9 +11,9 @@
    무게: 꼬리 한 장 · 머리 한 장 · 부스러기 한 장 · 바닥 흔적 한 장 · 모으는 빛 한 장 · 조준 고리 한 장 = 그리기 6번 (탄 종류가 늘어도 같음) */
 import * as THREE from 'three';
 import * as A from '../core/audio.js';
-import { FLY } from './flight.js?v=11041456';
-import { BH } from './blackhole.js?v=11041456';
-import { hitWall } from './rocks.js?v=11041456';
+import { FLY } from './flight.js?v=11041501';
+import { BH } from './blackhole.js?v=11041501';
+import { hitWall } from './rocks.js?v=11041501';
 
 /* 비교표 그대로. heatT: 쉬지 않고 쏘면 과열까지(초) · coolT: 과열 뒤 다시 쏠 때까지(초) · cryB/wallB: 수정·벽에서 튕기는 횟수
    kind: 그림 결 (0 기본 · 1 서리 · 2 따뜻한 빛 · 3 빛 창 · 4 쇳물 · 5 불티 · 6 바늘 · 7 활) */
@@ -296,15 +296,30 @@ export function makeShots({ B, crystals, bh, FS, say, mobs, onKill, onDamage, on
   const bdG = new THREE.BufferGeometry(); bdG.setAttribute('position', new THREE.BufferAttribute(bdP, 3)); bdG.setAttribute('aU', new THREE.BufferAttribute(bdU, 2)); bdG.setIndex(bdI);
   const bdM = new THREE.ShaderMaterial({ ...AB, side: THREE.DoubleSide, uniforms: { uA: { value: 0 }, uT: { value: 0 } },
     vertexShader: 'attribute vec2 aU; varying vec2 vU; void main(){ vU = aU; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.); }',
-    fragmentShader: `uniform float uA, uT; varying vec2 vU; void main(){ float u = vU.x, v = vU.y; float core = exp(-v * v * 9.), glow = exp(-v * v * 1.6) * .35, flick = .85 + .15 * sin(uT * 70. + u * 9.);
-      float edge = exp(-(v - .55) * (v - .55) * 30.) * .6;   /* 한쪽 날이 더 밝음 */
-      vec3 c = mix(vec3(.6, .9, 1.25), vec3(1.4, 1.42, 1.45), smoothstep(.2, .9, u)) * (core * 1.3 + glow + edge) * flick * smoothstep(0., .15, u);
-      gl_FragColor = vec4(c * uA, 1.); }` });
+    fragmentShader: `uniform float uA, uT; varying vec2 vU; void main(){ float u = vU.x, v = vU.y;   /* 곡도: v 1 = 날(하얗게 달아오름) · v -1 = 등(어두운 푸른 쇠빛) */
+      float edgeL = exp(-(v - .78) * (v - .78) * 60.) * 1.7, face = smoothstep(-1., .9, v) * .55, back = exp(-(v + .85) * (v + .85) * 40.) * .25, glow = exp(-v * v * 1.2) * .25;
+      float ripple = .8 + .2 * sin(u * 26. - uT * 40.), tipF = smoothstep(.55, 1., u), root = smoothstep(0., .12, u);   /* 날 따라 흐르는 빛 · 끝으로 갈수록 뜨거움 */
+      vec3 c = vec3(1.45, 1.47, 1.5) * edgeL * (.6 + .6 * tipF) * ripple + mix(vec3(.35, .55, .85), vec3(.9, 1.05, 1.3), tipF) * face + vec3(.25, .45, .8) * back + vec3(.5, .8, 1.2) * glow;
+      gl_FragColor = vec4(c * root * uA, 1.); }` });
   const bladeM = new THREE.Mesh(bdG, bdM); bladeM.frustumCulled = false; bladeM.renderOrder = 9; bladeM.visible = false; G.add(bladeM);
-  const drawBlade = (x, z, a, len, wid, al) => { const dx = -Math.sin(a), dz = -Math.cos(a), px_ = -dz, pz_ = dx, y = FLY.HOVER + .05;
-    for (let i = 0; i < 10; i++) { const q = i / 9, r = .7 + len * q, w = .03 + wid * Math.sin(Math.min(1, q * 1.15) * Math.PI) * (q < .87 ? 1 : (1 - q) / .13);
-      bdP.set([x + dx * r + px_ * w, y, z + dz * r + pz_ * w, x + dx * r - px_ * w, y, z + dz * r - pz_ * w], i * 6); bdU.set([q, 1, q, -1], i * 4); }
+  /* 칼: 살짝 휜 곡도. bend = 휘두르는 반대쪽으로 끝이 휘는 정도(힘이 실림) · edgeSide = 날이 향한 쪽(+1/-1) */
+  const drawBlade = (x, z, a, len, wid, al, bend = .12, edgeSide = 1) => { const dx = -Math.sin(a), dz = -Math.cos(a), px_ = -dz, pz_ = dx, y = FLY.HOVER + .05;
+    for (let i = 0; i < 10; i++) { const q = i / 9, r = .7 + len * q, w = .03 + wid * Math.sin(Math.min(1, q * 1.15) * Math.PI) * (q < .87 ? 1 : (1 - q) / .13), off = -bend * q * q * len * edgeSide;   /* 끝으로 갈수록 휨 */
+      const cx = x + dx * r + px_ * off, cz = z + dz * r + pz_ * off, e = edgeSide;
+      bdP.set([cx + px_ * w * e, y, cz + pz_ * w * e, cx - px_ * w * e, y, cz - pz_ * w * e], i * 6); bdU.set([q, 1, q, -1], i * 4); }
     bdG.attributes.position.needsUpdate = bdG.attributes.aU.needsUpdate = true; bdM.uniforms.uA.value = al; bladeM.visible = al > .01; };
+  /* 휘두르는 잔상: 칼이 지난 0.06초 동안의 면을 부채꼴로 채움 (칼끝 쪽이 가장 밝고 뒤쪽은 빠르게 사라짐) */
+  const NF = 14, fnP = new Float32Array(NF * 2 * 3), fnU = new Float32Array(NF * 2 * 2), fnI = []; for (let i = 0; i < NF - 1; i++) { const p = i * 2; fnI.push(p, p + 1, p + 2, p + 1, p + 3, p + 2); }
+  const fnG = new THREE.BufferGeometry(); fnG.setAttribute('position', new THREE.BufferAttribute(fnP, 3)); fnG.setAttribute('aU', new THREE.BufferAttribute(fnU, 2)); fnG.setIndex(fnI);
+  const fnM = new THREE.ShaderMaterial({ ...AB, side: THREE.DoubleSide, uniforms: { uA: { value: 0 }, uT: { value: 0 } },
+    vertexShader: 'attribute vec2 aU; varying vec2 vU; void main(){ vU = aU; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.); }',
+    fragmentShader: `uniform float uA, uT; varying vec2 vU; void main(){ float q = vU.x, r = vU.y;   /* q: 0 지금 칼 → 1 뒤쪽 · r: 0 뿌리 → 1 칼끝 */
+      float fade = pow(1. - q, 2.2), rad = smoothstep(.05, .5, r) * (.35 + .65 * r * r), lines = .7 + .3 * pow(max(sin(r * 34. + q * 3. - uT * 30.) * .5 + .5, 0.), 3.);
+      vec3 c = mix(vec3(.45, .7, 1.1), vec3(1.2, 1.25, 1.35), r * r) * fade * rad * lines * .55;
+      gl_FragColor = vec4(c * uA, 1.); }` });
+  const fan = new THREE.Mesh(fnG, fnM); fan.frustumCulled = false; fan.renderOrder = 8; fan.visible = false; G.add(fan);
+  const drawFan = (x, z, a, span, rr, al) => { const y = FLY.HOVER - .02; for (let i = 0; i < NF; i++) { const q = i / (NF - 1), aa = a - span * q, dx = -Math.sin(aa), dz = -Math.cos(aa); fnP.set([x + dx * .9, y, z + dz * .9, x + dx * rr, y, z + dz * rr], i * 6); fnU.set([q, 0, q, 1], i * 4); }
+    fnG.attributes.position.needsUpdate = fnG.attributes.aU.needsUpdate = true; fnM.uniforms.uA.value = al; fan.visible = al > .01; };
   /* 바닥 초승달 자국 */
   const NSA = 40, saP = new Float32Array(NSA * 2 * 3), saU = new Float32Array(NSA * 2 * 2), saI = [];
   for (let i = 0; i < NSA - 1; i++) { const p = i * 2; saI.push(p, p + 1, p + 2, p + 1, p + 3, p + 2); }
@@ -339,7 +354,10 @@ export function makeShots({ B, crystals, bh, FS, say, mobs, onKill, onDamage, on
           float streak = .55 + .45 * pow(max(sin(u * 44. - uT * 20. + v * 5.) * .5 + .5, 0.), 4.), hot = smoothstep(uHead - .35, uHead, u) * step(u, uHead + .001);   /* 찢기듯 흐르는 결 · 칼끝 가까이가 가장 뜨거움 */
           vec3 fr = clamp(abs(fract(o * .9 + u * .3 + uT * .5 + vec3(0., .33, .67)) * 6. - 3.) - 1., 0., 1.);
           float fringe = exp(-(v - 1.) * (v - 1.) * 30.) * (.6 + .8 * uB);
-          vec3 c = vec3(1.35, 1.38, 1.42) * edge * (.55 + .6 * hot + .4 * uB) + vec3(.5, .85, 1.2) * body * streak * (.5 + .6 * hot) + fr * fringe;
+          float wind = 0.; for (int i = 0; i < 4; i++) { float vk = -.35 + float(i) * .27, dash = smoothstep(.25, .6, fract(u * 3.5 - uT * 7. + float(i) * .37)) * smoothstep(1., .7, fract(u * 3.5 - uT * 7. + float(i) * .37)); wind += exp(-(v - vk) * (v - vk) * 900.) * dash * (1. - uB); }   /* 안쪽 바람 줄: 칼이 간 쪽으로 흘러감 */
+          float sp1 = exp(-(v - .8 - .22 * uB) * (v - .8 - .22 * uB) * 220.), sp2 = exp(-(v - .8 + .4 * uB) * (v - .8 + .4 * uB) * 220.), gap = exp(-(v - .7) * (v - .7) * 18.) * uB * (1. - uB) * 4.;   /* 쩡: 날 자국이 두 줄로 갈라지며 가운데가 하얗게 터짐 */
+          edge = mix(edge, (sp1 + sp2) * 2.2, step(.001, uB));
+          vec3 c = vec3(1.35, 1.38, 1.42) * (edge * (.55 + .6 * hot + .4 * uB) + gap) + vec3(.5, .85, 1.2) * (body * streak * (.5 + .6 * hot) + wind * .9) + fr * fringe;
           gl_FragColor = vec4(c * uA, 1.); }` });
     const mesh = new THREE.Mesh(g, m); mesh.frustumCulled = false; mesh.renderOrder = 8; mesh.visible = false; G.add(mesh); return { P, U, g, m, mesh, pts: [] }; });
   const drawTrail = (tr, wid) => { const n = tr.pts.length; if (n < 2) { tr.mesh.visible = false; return; } tr.mesh.visible = true;
@@ -355,7 +373,7 @@ export function makeShots({ B, crystals, bh, FS, say, mobs, onKill, onDamage, on
     D: { name: '일자 발도', sw: .12, lunge: 3, sweeps: () => [] } };                                                                      /* 찌르듯 지나가며 일자로 가름 (이전 판) */
   SHOT.blade.styles = Object.fromEntries(Object.entries(STY).map(([k, v]) => [k, v.name]));
   const SL = { st: 0, t0: -9, ang: 0, x0: 0, z0: 0, hit: [], pend: [], sg: 1 };
-  const slash = t => { if (SL.st) return; const c = cfg; SL.st = 1; SL.t0 = t; SL.ang = FS.head; SL.c = c; SL.hit.length = 0; SL.pend.length = 0; SL.sg = -SL.sg; SL.sty = STY[c.style] || STY.A;
+  const slash = t => { if (SL.st) return; const c = cfg; SL.st = 1; SL.touched = 0; SL.t0 = t; SL.ang = FS.head; SL.c = c; SL.hit.length = 0; SL.pend.length = 0; SL.sg = -SL.sg; SL.sty = STY[c.style] || STY.A;
     for (const tr of trails) { tr.pts.length = 0; tr.mesh.visible = false; tr.m.uniforms.uB.value = 0; }
     FS.dashUntil = t + (c.windup || .18); FS.dashVx = 0; FS.dashVz = 0;   /* 움직이던 중이어도 딱 멈춤 */
     if (A.live()) { const cc = A.ctx, t0 = cc.currentTime, o = cc.createOscillator(), g = cc.createGain(); o.type = 'sine'; o.frequency.setValueAtTime(420, t0); o.frequency.exponentialRampToValueAtTime(1600, t0 + .18); o.connect(g); A.env(g, t0, .02, .035, .2); A.out(g, .3); o.start(t0); o.stop(t0 + .25); } };   /* 칼 뽑는 소리: 쇳소리가 올라감 */
@@ -365,10 +383,10 @@ export function makeShots({ B, crystals, bh, FS, say, mobs, onKill, onDamage, on
     for (let i = 0; i < 10; i++) { const a = Math.random() * 6.283, v = 3 + Math.random() * 5; emit(j.x, j.y - .2, j.z, Math.cos(a) * v, Math.random() * 2.5, Math.sin(a) * v, .7, 1, 1.3, .07, .3); } };
   const angIn = (a, a0, a1) => { const d = a1 - a0, t = Math.atan2(Math.sin(a - a0), Math.cos(a - a0)); if (Math.abs(d) >= 6.28) return true; return d >= 0 ? t >= -.02 && t <= d + .02 : t <= .02 && t >= d - .02; };   /* a가 a0 → a1 사이를 칼이 지난 자리인지 */
   const slashStep = (t, dt) => { const c = SL.c || SHOT.blade, sty = SL.sty || STY.A, e = t - SL.t0, W = c.windup || .18, SW = sty.sw, CD = c.cutDelay || .1, dir = SL.ang, dx = -Math.sin(dir), dz = -Math.cos(dir);
-    clM.uniforms.uT.value = bdM.uniforms.uT.value = saM.uniforms.uT.value = t; for (const tr of trails) tr.m.uniforms.uT.value = t;
+    clM.uniforms.uT.value = bdM.uniforms.uT.value = saM.uniforms.uT.value = fnM.uniforms.uT.value = t; for (const tr of trails) tr.m.uniforms.uT.value = t;
     for (const g of ghosts) { const k = 1 - (t - g.t0) / .28; g.g.visible = k > 0; if (k > 0) g.m.uniforms.uA.value = k * k * .9; }
     { const ce = t - (SL.tc || -9), k = Math.max(0, 1 - ce / .7); arc.visible = k > 0 && sty === STY.D; saM.uniforms.uA.value = k * k; }
-    if (!SL.st) { bladeM.visible = false; const ce = t - (SL.tc || -9);
+    if (!SL.st) { bladeM.visible = false; fan.visible = false; const ce = t - (SL.tc || -9);
       if (ce < .45) { const k = ce / .45; if (sty === STY.D) { cutL.visible = true; clM.uniforms.uOpen.value = Math.min(1, k * 3); clM.uniforms.uA.value = Math.max(0, 1 - k) ** 1.5; } for (const tr of trails) { tr.m.uniforms.uB.value = Math.min(1, k * 4); tr.m.uniforms.uA.value = Math.max(0, 1 - k) ** 1.3; tr.m.uniforms.uHead.value = 1; } }
       else { cutL.visible = false; for (const tr of trails) tr.mesh.visible = false; }
       vig.style.opacity = 0; return; }
@@ -393,18 +411,23 @@ export function makeShots({ B, crystals, bh, FS, say, mobs, onKill, onDamage, on
       else { let bladeA = null;   /* 시안 A·B·C: 칼이 정해진 각을 따라 휘둘러지고 칼끝 자리를 기록 */
         sws.forEach(([a0, a1, u0, u1, dr], si) => { if (k < u0) return; const kk = Math.min(1, (k - u0) / (u1 - u0)), ease = 1 - Math.pow(1 - kk, 2.2), off = (a0 + (a1 - a0) * ease) * D2R, a = dir + off, rr = R + dr, bx = -Math.sin(a), bz = -Math.cos(a), tr = trails[si];
           if (kk < 1 || tr.pts.length < 2) { tr.pts.push([FS.x + bx * rr, FS.z + bz * rr, FS.x + bx * .9, FS.z + bz * .9]); drawTrail(tr, .85); tr.m.uniforms.uA.value = 1; tr.m.uniforms.uHead.value = 1; }
-          if (kk < 1) bladeA = [a, rr];
+          if (kk < 1) bladeA = [a, rr, a1 - a0];
           /* 맞음: 이번 장면에 칼이 지난 각 사이 + 반경 안 */
           const pa = tr.prevA ?? (dir + a0 * D2R); if (mobs) for (const j of mobs.userData.list) { if (!j.on || j.dieT > 0 || SL.hit.includes(j)) continue; const jx = j.x - FS.x, jz = j.z - FS.z, d = Math.hypot(jx, jz); if (d > rr + .62 * j.s) continue;
-            const ja = Math.atan2(-jx, -jz); if (angIn(ja, pa, a) || d < 1.2) { SL.hit.push(j); SL.pend.push(j); } }
+            const ja = Math.atan2(-jx, -jz); if (angIn(ja, pa, a) || d < 1.2) { SL.hit.push(j); SL.pend.push(j);
+              for (let i = 0; i < 12; i++) { const s2 = Math.sign(a1 - a0), v = 4 + Math.random() * 6, sa = a + s2 * 1.57 + (Math.random() - .5) * 1.2; emit(j.x, j.y - .15, j.z, -Math.sin(sa) * v, Math.random() * 2, -Math.cos(sa) * v, 1.3, 1.2, .9, .06 + Math.random() * .04, .2 + Math.random() * .15); }   /* 닿는 순간 불꽃: 칼이 간 쪽으로 튐 */
+              if (!SL.touched) { SL.touched = 1; FS.stopUntil = performance.now() + 35; thud(.05); }   /* 첫 닿음에 아주 잠깐 멈칫 */
+              const ka = a + Math.sign(a1 - a0) * 1.57; FS.kx = -Math.sin(ka) * .45; FS.kz = -Math.cos(ka) * .45; FS.kT = performance.now(); } }   /* 화면이 칼 간 쪽으로 한 번 밀렸다 돌아옴 */
           tr.prevA = a;
           if (kk < 1 && Math.random() < dt * 120) emit(FS.x + bx * rr, FLY.HOVER, FS.z + bz * rr, -bz * 5 * Math.sign(a1 - a0) + (Math.random() - .5) * 2, Math.random() * 1.5, bx * 5 * Math.sign(a1 - a0) + (Math.random() - .5) * 2, 1.1, 1.2, 1.35, .06, .18 + Math.random() * .12, 0, 1); });   /* 칼끝 불티 */
-        if (bladeA) drawBlade(FS.x, FS.z, bladeA[0], bladeA[1] - .6, .22, 1); else bladeM.visible = false; }
-      if (k >= 1) { SL.st = 3; SL.t2 = t; bladeM.visible = false; for (const tr of trails) tr.prevA = null; } return; }
-    if (SL.st === 3) { const ce = t - SL.t2; bladeM.visible = false; vig.style.opacity = 0;
+        if (bladeA) { const sgn = Math.sign(bladeA[2] || 1); drawBlade(FS.x, FS.z, bladeA[0], bladeA[1] - .6, .24, 1, .14, -sgn);
+          const H = SL.ah || (SL.ah = []); H.push([t, bladeA[0]]); while (H.length > 2 && H[0][0] < t - .06) H.shift(); const span = bladeA[0] - H[0][1];   /* 지난 0.06초 동안 칼이 지난 각 */
+          drawFan(FS.x, FS.z, bladeA[0], span, bladeA[1], 1); } else { bladeM.visible = false; fan.visible = false; } }
+      if (k >= 1) { SL.st = 3; SL.t2 = t; bladeM.visible = false; fan.visible = false; SL.ah = null; for (const tr of trails) tr.prevA = null; } return; }
+    if (SL.st === 3) { const ce = t - SL.t2; bladeM.visible = false; fan.visible = false; vig.style.opacity = 0;
       if (ce >= CD) {   /* ③ '쩡': 자국(또는 선)이 벌어지며 터짐 · 한꺼번에 베임 · 짧게 멈칫 */
         SL.st = 0; SL.tc = t; for (const j of SL.pend) if (j.on && j.dieT < 0) cutHit(j, t, c); if (SL.pend.length) FS.stopUntil = performance.now() + 60;
-        if (sty === STY.D) drawCrescent(FS.x, FS.z, dir, c.reach + .4); FS.shake = Math.max(FS.shake || 0, .35);
+        if (sty === STY.D) drawCrescent(FS.x, FS.z, dir, c.reach + .4); else { const sw0 = sty.sweeps(SL.sg)[0], ka = dir + Math.sign(sw0[1] - sw0[0]) * 1.57 * D2R * 57.3; FS.kx = -Math.sin(ka) * .6; FS.kz = -Math.cos(ka) * .6; FS.kT = performance.now(); }
         for (const tr of trails) for (let i = 0; i < 14 && tr.pts.length > 1; i++) { const p = tr.pts[Math.floor(Math.random() * tr.pts.length)], a = Math.random() * 6.283, v = 2 + Math.random() * 5; emit(p[0], FLY.HOVER, p[1], Math.cos(a) * v, .5 + Math.random() * 1.5, Math.sin(a) * v, 1.2, 1.25, 1.4, .06 + Math.random() * .04, .25 + Math.random() * .2); }
         if (A.live()) { hiss('highpass', 4500, .7, .12, .12, 0, .35); osc('sine', 2900, 2800, .3, .05); osc('sine', 120, 60, .25, .1); } } } };   /* 쩡: 높은 쇳소리 + 묵직한 울림 */
   /* ── 버튼 ── */
