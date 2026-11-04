@@ -4,7 +4,7 @@
    · 맞은 해파리 위에 피해 숫자가 떠오름 (튕겨서 맞으면 ×1.5 표시 · 쓰러뜨린 한 방은 크게)
    · 아래: 사냥터 / 수정 기둥 / 숨을 곳으로 바로 옮기기 · 해파리 다시 채우기 */
 import * as THREE from 'three';
-import { SHOT, SHOT_IDS } from './shots.js?v=11041242';
+import { SHOT, SHOT_IDS } from './shots.js?v=11041257';
 
 const css = `
 #rgSel{position:fixed;top:calc(env(safe-area-inset-top,0px) + 10px);left:50%;transform:translateX(-50%);display:grid;grid-template-columns:repeat(5,auto);gap:5px;z-index:7;touch-action:none}
@@ -43,16 +43,16 @@ export function makeRange({ shots, fly, FS, cam, hunt, jel, crystals, bushes, sa
   /* ── 지금 탄 카드 ── */
   const card = document.createElement('div'); card.id = 'rgCard'; document.body.appendChild(card);
   const f1 = v => Array.isArray(v) ? (v.length === 3 ? v.join(' → ') + ' (1·2·3단계)' : `${v[0]} ~ ${v[1]}`) : `${v}`;
-  const traits = c => [c.n > 1 ? `한 번에 ${c.n}발 (${c.pat === 'v' ? 'V자' : '부채꼴'} ${c.ang}°)` : '', c.chargeT ? `누르는 동안 세 단계로 모임 (${c.chargeT}초면 3단계) · 떼면 나감 · 3단계는 1마리 꿰뚫음 · 모으는 동안 나갈 길이 보임` : '',
+  const traits = c => [c.n > 1 ? `한 번에 ${c.n}발 (${c.pat === 'v' ? 'V자' : '부채꼴'} ${c.ang}°)` : '', c.chargeT ? `누르는 동안 세 단계로 모임 (${c.chargeTH.join(' · ')}초) · 단계마다 사거리 ${c.range.join(' → ')}m · 떼면 나감 · 3단계는 1마리 꿰뚫음 · 모으는 동안 나갈 길이 보임` : '',
     c.pierce ? `${c.pierce + 1}마리까지 꿰뚫음 (뒤는 ${Math.round((c.pierceK || .7) * 100)}%)` : '', c.wallB ? `모든 벽에서 ${c.wallB}번 튕김` : '', c.cryB ? `수정에서 ${c.cryB}번 튕김` : '수정에서 안 튕김',
     c.knock ? `밀어내기 ${c.knock}m` : '', c.curve ? '노린 적 쪽으로 휘어 들어감 (번갈아 왼쪽·오른쪽)' : '', c.slow ? `맞을 때마다 ${c.slow * 100}% 느리게 · 최대 ${c.slowMax * 100}% · ${c.slowT}초` : '',
     c.reveal ? `맞은 둘레 ${c.reveal}m를 ${c.revealT}초 밝힘 (안개·숨을 곳)` : '', `쏠 때 ${Math.round((c.chargeSlow || c.fireSlow) * 100)}% 느려짐`].filter(Boolean).join(' · ');
-  const dpsOf = c => c.chargeT ? `${Math.round(c.dmg[c.dmg.length - 1] / (1 / c.rate) * 10) / 10}` : `${Math.round(c.rate * (Array.isArray(c.dmg) ? c.dmg[1] : c.dmg) * (c.n || 1) * 10) / 10}`;
+  const dpsOf = c => c.chargeT ? `${Math.round(c.dmg[c.dmg.length - 1] / Math.max(c.chargeT, 1 / c.rate) * 10) / 10}` : `${Math.round(c.rate * (Array.isArray(c.dmg) ? c.dmg[1] : c.dmg) * (c.n || 1) * 10) / 10}`;
   let liveB, liveS, heatI;
   const fillCard = id => { const c = SHOT[id]; card.style.setProperty('--c', rgb(c.col));
     card.innerHTML = `<div class="nm"><b>${c.name}</b><span>${c.role}</span></div>
       <dl><dt>연사</dt><dd>${c.chargeT ? '최대 ' : ''}${c.rate}회/초</dd><dt>한 발 피해</dt><dd>${f1(c.dmg)}${c.n > 1 ? ` × ${c.n}` : ''}</dd><dt>표의 1초당 피해</dt><dd>${dpsOf(c)}${c.n > 1 ? ' (다 맞을 때)' : ''}</dd>
-      <dt>탄 속도 · 사거리</dt><dd>${c.speed}m/초 · ${c.range}m</dd><dt>과열 · 식음</dt><dd>${c.chargeT ? '꽉 3발' : c.heatT + '초'} · ${c.coolT}초</dd></dl>
+      <dt>탄 속도 · 사거리</dt><dd>${c.speed}m/초 · ${f1(c.range).replace(' (1·2·3단계)', '')}m</dd><dt>과열 · 식음</dt><dd>${c.chargeT ? '꽉 3발' : c.heatT + '초'} · ${c.coolT}초</dd></dl>
       <div class="fx">${traits(c)}</div>
       <div class="live"><div class="big"><b>0</b><span>잰 1초당 피해</span></div><div class="sub">쏘기 시작하면 잽니다</div><div class="bar"><i></i></div></div>`;
     liveB = card.querySelector('.big b'); liveS = card.querySelector('.sub'); heatI = card.querySelector('.bar i'); };
