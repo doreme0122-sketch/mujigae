@@ -11,9 +11,9 @@
    무게: 꼬리 한 장 · 머리 한 장 · 부스러기 한 장 · 바닥 흔적 한 장 · 모으는 빛 한 장 · 조준 고리 한 장 = 그리기 6번 (탄 종류가 늘어도 같음) */
 import * as THREE from 'three';
 import * as A from '../core/audio.js';
-import { FLY } from './flight.js?v=11041134';
-import { BH } from './blackhole.js?v=11041134';
-import { hitWall } from './rocks.js?v=11041134';
+import { FLY } from './flight.js?v=11041136';
+import { BH } from './blackhole.js?v=11041136';
+import { hitWall } from './rocks.js?v=11041136';
 
 /* 비교표 그대로. heatT: 쉬지 않고 쏘면 과열까지(초) · coolT: 과열 뒤 다시 쏠 때까지(초) · cryB/wallB: 수정·벽에서 튕기는 횟수
    kind: 그림 결 (0 기본 · 1 서리 · 2 따뜻한 빛 · 3 빛 창 · 4 쇳물 · 5 불티 · 6 바늘 · 7 활) */
@@ -262,7 +262,8 @@ export function makeShots({ B, crystals, bh, FS, say, mobs, onKill, onDamage, on
       if (b.dead >= 0) { b.dead += dt; if (b.dead > .09) b.on = false; continue; }                           /* 사라질 때 꼬리가 머리 쪽으로 따라 들어감 */
       b.age += dt; if (b.age > b.life) { b.dead = 0; if (bc.kind === 5) emit(b.x, FLY.HOVER, b.z, 0, 0, 0, .9, .7, .4, .25, .1, 0, 0); continue; }
       /* 휘는 탄: 노리는 적(없으면 조준한 쪽 앞 자리)으로 고개를 틈 — 처음엔 천천히, 갈수록 세게 */
-      if (bc.curve) { const ok = b.tg && b.tg.on && b.tg.dieT < 0, tx = ok ? b.tg.x : b.tx, tz = ok ? b.tg.z : b.tz;
+      if (bc.curve) { if (!(b.tg && b.tg.on && b.tg.dieT < 0) && S.lock && !b.bo) b.tg = S.lock;   /* 노리던 적이 먼저 쓰러지면 지금 조준한 적으로 갈아탐 */
+        const ok = b.tg && b.tg.on && b.tg.dieT < 0, tx = ok ? b.tg.x : b.tx, tz = ok ? b.tg.z : b.tz;
         const va = Math.atan2(b.vz, b.vx), ta = Math.atan2(tz - b.z, tx - b.x); let d = ta - va; d = Math.atan2(Math.sin(d), Math.cos(d));
         const sp = Math.hypot(b.vx, b.vz), dist = Math.max(.5, Math.hypot(tx - b.x, tz - b.z)), w = Math.min(9, Math.max(1.2, 2 * sp * Math.abs(Math.sin(d)) / dist)), rot = Math.sign(d) * Math.min(Math.abs(d), dt * w), na = va + rot;   /* 지금 자리에서 표적까지 꼭 닿는 활을 그리며 돎 (가까우면 더 세게) */ b.vx = Math.cos(na) * sp; b.vz = Math.sin(na) * sp; }
       /* 블랙홀이 탄을 휨 */
