@@ -134,14 +134,16 @@ export function makeIceWall(path, opt = {}) {
   const uT = opt.uT || { value: 0 }, mat = opt.mat || iceWallMaterial(uT), smat = opt.smat || snowMaterial(), doors = opt.doors || [true, true];
   const seed = opt.seed || 3, R = (() => { let s = seed * 7919; return () => (s = (s * 9301 + 49297) % 233280) / 233280; })(), o = seed * 1.3;
   const curve = new THREE.CatmullRomCurve3(path.map(p => new THREE.Vector3(p[0], 0, p[1])), false, 'centripetal'), len = curve.getLength();
-  const Hm = opt.H || 4.6, W = 2.4, STEP = .6, DS = .32, N = Math.max(4, Math.round(len / DS));
+  const Hm = opt.H || 6.2, W = 3.9, STEP = .35, DS = .32, N = Math.max(4, Math.round(len / DS));
   /* 윗단: 구간(2.5~5m)마다 높이 한 단씩 */
   const seg = []; for (let d = 0; d < len;) { const L2 = 2.5 + R() * 2.5; seg.push([d, d + L2, (R() - .5) * 2.4]); d += L2; }
-  const topH = d => { const sgi = seg.find(q => d >= q[0] && d < q[1]) || seg[seg.length - 1];
-    let h = Hm * (1 + .16 * Math.sin(d * .11 + o)) + sgi[2] * STEP;
-    const ds = doors[0] ? d : 1e9, de = doors[1] ? len - d : 1e9, dd = Math.min(ds, de); h += Math.exp(-dd * dd / 10) * Hm * .55;   /* 문 양옆 가장 높이 */
-    if (!doors[0] && d < 2.5) h *= .45 + .55 * d / 2.5; if (!doors[1] && len - d < 2.5) h *= .45 + .55 * (len - d) / 2.5;
-    return Math.round(h / STEP) * STEP; };
+  /* 산맥: 봉우리 여러 개(높이 제각각) 사이로 안장처럼 낮은 등이 이어짐 */
+  const pk = []; for (let d = R() * 4; d < len + 4; d += 5 + R() * 6) pk.push([d, .55 + R() * .9, 2.2 + R() * 2.2]);
+  const topH = d => { let h = Hm * .55 * (1 + .12 * Math.sin(d * .23 + o));
+    for (const [d0, k, w] of pk) { const x = (d - d0) / w; h = Math.max(h, Hm * (.55 + k * .6) * Math.max(0, 1 - Math.abs(x)) ** .85); }
+    const ds = doors[0] ? d : 1e9, de = doors[1] ? len - d : 1e9, dd = Math.min(ds, de); h = Math.max(h, Hm * 1.15 * Math.exp(-dd * dd / 9));   /* 문 양옆 우뚝 */
+    if (!doors[0] && d < 3) h *= .35 + .65 * d / 3; if (!doors[1] && len - d < 3) h *= .35 + .65 * (len - d) / 3;
+    return h + (vn(d * 1.7, 1, o) - .5) * .5; };
   const flute = (d, side) => { const a = vn(d * .9 + side * 17 + o, 0, 0), b = vn(d * 2.6 + side * 31, 3, 0); return (a - .5) * .9 + (b - .5) * .35 + Math.abs(Math.sin(d * 3.1 + side * 2 + o * 3)) * .18; };   /* 세로 결 깊이 */
   const p = new THREE.Vector3(), tg = new THREE.Vector3(), frames = [];
   for (let i = 0; i <= N; i++) { const d = i / N * len; curve.getPointAt(i / N, p); curve.getTangentAt(i / N, tg); let nx = -tg.z, nz = tg.x; const sg = opt.out ? opt.out(p.x, p.z, nx, nz) : 1; nx *= sg; nz *= sg;
@@ -158,10 +160,11 @@ export function makeIceWall(path, opt = {}) {
     for (const yk of ROWS) { const y = Math.max(.9, f.h * yk), small = (vn(f.d * 3.2 + side * 5, yk * 7, o) - .5) * .32, mid = (vn(f.d * 1.4 + side * 3, yk * 3.3, o) - .5) * .45;
       const led = ledges.reduce((acc, l) => acc + (yk > l ? .16 : 0), 0), flare = Math.max(0, .45 - yk) * 1.1;
       const over = yk > .9 ? Math.max(0, vn(f.d * .6 + side * 11, 2, o) - .45) * 1.1 : 0;        /* 처마: 위가 앞으로 튀어나옴 */
-      pts.push([side * (W + flare + big + mid + small - led + over * 1 - spallAt(f.d, yk, side)) + lean * yk, y]); }
+      const taper = W * (1 - Math.pow(yk, 1.15) * .78);                                          /* 위로 갈수록 좁아져 산비탈처럼 */
+      pts.push([side * (taper + flare * 1.6 + big * (.6 + .4 * (1 - yk)) + mid + small - led * .6 + over * .6 - spallAt(f.d, yk, side)) + lean * yk, y]); }
     return pts; };
   const section = f => { const fr = face(f, -1), bk = face(f, 1).reverse(), h = f.h;
-    const top = [[fr[fr.length - 1][0] + .35, h], [-.6 + (vn(f.d * .9, 4, o) - .5) * .5, h + .1 + vn(f.d * .5, 9, o) * .18], [.6 + (vn(f.d * .9, 6, o) - .5) * .5, h + .06], [bk[0][0] - .3, h]];
+    const top = [[fr[fr.length - 1][0] + .2, h + .05], [-.25 + (vn(f.d * .9, 4, o) - .5) * .4, h + .3 + vn(f.d * .5, 9, o) * .3], [.25 + (vn(f.d * .9, 6, o) - .5) * .4, h + .22], [bk[0][0] - .2, h + .02]];   /* 꼭대기는 좁은 등줄기 */
     return [...fr, ...top, ...bk]; };
   const P = [], put = (f, v, y) => P.push(f.x + f.nx * v, y, f.z + f.nz * v);
   const S0 = frames.map(section), M = S0[0].length;
@@ -173,17 +176,19 @@ export function makeIceWall(path, opt = {}) {
   const ice = []; { const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(P, 3)); g.computeVertexNormals(); ice.push(g); }
   const snow = [];
   /* 눈 덮개: 윗단 위에 도톰하게, 앞뒤 모서리를 조금 넘쳐 흘러내림 */
-  { const Q = [], nF = ROWS.length + 2, sp = (i, k) => { const f = frames[i], s = S0[i], fe = s[nF - 1], t0 = s[nF], t1 = s[nF + 1], t2 = s[nF + 2], t3 = s[nF + 3], be = s[nF + 4];
-      const sec = [[fe[0] + .05, fe[1] - .22], [t0[0] - .08, f.h + .1], [t1[0], t1[1] + .24 + vn(f.d * 1.3, 2, o) * .16], [t2[0], t2[1] + .22 + vn(f.d * 1.3, 5, o) * .16], [t3[0] + .08, f.h + .1], [be[0] - .05, be[1] - .22]][k];
-      return [f.x + f.nx * sec[0], sec[1], f.z + f.nz * sec[0]]; };
-    for (let i = 0; i < N; i++) for (let k = 0; k < 5; k++) { const a = sp(i, k), b = sp(i + 1, k), c = sp(i, k + 1), d = sp(i + 1, k + 1); FL ? Q.push(...a, ...b, ...c, ...b, ...d, ...c) : Q.push(...a, ...c, ...b, ...b, ...c, ...d); }
+  { const Q = [], nF = ROWS.length + 2, iUp = 2 + ROWS.indexOf(.7), nS = (nF - iUp) * 2 + 4;   /* 눈: 꼭대기 + 위쪽 비탈 (높이 70%부터) */
+    const sp = (i, k) => { const f = frames[i], s = S0[i], list = [...s.slice(iUp, nF), ...s.slice(nF, nF + 4), ...s.slice(nF + 4, nF + 4 + (nF - iUp))];
+      const [v, y] = list[k], out = (k < nF - iUp ? -1 : k >= nF - iUp + 4 ? 1 : 0), th = .14 + vn(f.d * 1.3, k, o) * .14;
+      return [f.x + f.nx * (v + out * th), y + th * (out ? .4 : 1) - (k === 0 || k === list.length - 1 ? .35 : 0), f.z + f.nz * (v + out * th)]; };
+    const M2 = (nF - iUp) * 2 + 4;
+    for (let i = 0; i < N; i++) for (let k = 0; k < M2 - 1; k++) { const a = sp(i, k), b = sp(i + 1, k), c = sp(i, k + 1), d = sp(i + 1, k + 1); FL ? Q.push(...a, ...b, ...c, ...b, ...d, ...c) : Q.push(...a, ...c, ...b, ...b, ...c, ...d); }
     const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(Q, 3)); g.computeVertexNormals(); snow.push(g); }
   /* 고드름: 윗단 앞·뒤 모서리를 따라 촘촘히 (길이 들쭉날쭉) */
-  for (let i = 0; i <= N; i += 1) for (const side of [-1, 1]) { if (R() < .25) continue; const f = frames[i], s = S0[i][side < 0 ? ROWS.length + 1 : ROWS.length + 6];
+  for (let i = 0; i <= N; i += 1) for (const side of [-1, 1]) { if (R() < .25) continue; const f = frames[i], iUp = 2 + ROWS.indexOf(.7), s = S0[i][side < 0 ? iUp : S0[i].length - 1 - iUp];
     const len2 = .3 + R() * R() * 1.7, v = s[0] + side * .1, y = s[1] - .05; ice.push(icicle(f.x + f.nx * v + f.tx * (R() - .5) * .2, y, f.z + f.nz * v + f.tz * (R() - .5) * .2, len2, .06 + R() * .07)); }
   /* 뾰족한 결정: 길이 8~12m마다 하나 (윗단 뒤쪽에서) */
   for (let d = 4 + R() * 4; d < len - 2; d += 8 + R() * 5) { const i = Math.round(d / len * N), f = frames[i], hh = 1.6 + R() * 1.8;
-    const g = new THREE.ConeGeometry(.4 + R() * .2, hh, 5, 1); g.rotateY(R() * 6); g.rotateZ((R() - .5) * .35); g.rotateX((R() - .5) * .3); g.translate(f.x + f.nx * .8, f.h + hh / 2, f.z + f.nz * .8); ice.push(clean(g)); }
+    const g = new THREE.ConeGeometry(.4 + R() * .2, hh, 5, 1); g.rotateY(R() * 6); g.rotateZ((R() - .5) * .35); g.rotateX((R() - .5) * .3); g.translate(f.x + f.nx * .3, f.h + hh / 2 - .2, f.z + f.nz * .3); ice.push(clean(g)); }
   /* 떨어진 얼음 바위 (앞·뒤 발치) */
   for (let d = 1 + R() * 2; d < len - 1; d += 2.2 + R() * 3) { const i = Math.round(d / len * N), f = frames[i], side = R() < .5 ? -1 : 1, sc = .4 + R() * .65, g = only(block(seed * 13 + Math.floor(d)).clone());
     g.scale(sc, sc * (.7 + R() * .4), sc); g.rotateY(R() * 6); const v = side * (W + 1.4 + R() * 1.1); g.translate(f.x + f.nx * v, sc * .12, f.z + f.nz * v); ice.push(g); }
