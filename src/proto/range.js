@@ -4,7 +4,8 @@
    · 맞은 해파리 위에 피해 숫자가 떠오름 (튕겨서 맞으면 ×1.5 표시 · 쓰러뜨린 한 방은 크게)
    · 아래: 사냥터 / 수정 기둥 / 숨을 곳으로 바로 옮기기 · 해파리 다시 채우기 */
 import * as THREE from 'three';
-import { SHOT, SHOT_IDS } from './shots.js?v=11041258';
+import { SHOT, SHOT_IDS } from './shots.js?v=11041339';
+import { makeDuel } from './duel.js?v=11041339';
 
 const css = `
 #rgSel{position:fixed;top:calc(env(safe-area-inset-top,0px) + 10px);left:50%;transform:translateX(-50%);display:grid;grid-template-columns:repeat(5,auto);gap:5px;z-index:7;touch-action:none}
@@ -31,7 +32,7 @@ const css = `
 #rgNums b.kill{color:#fff}
 #rgNums b sup{font-family:var(--kr);font-size:.6em;margin-left:2px;color:#e8d6ff}`;
 
-export function makeRange({ shots, fly, FS, cam, hunt, jel, crystals, bushes, say }) {
+export function makeRange({ shots, fly, FS, cam, hunt, jel, crystals, bushes, say, renderer, scene, B }) {
   const st = document.createElement('style'); st.textContent = css; document.head.appendChild(st);
   const rgb = c => c.map(v => Math.min(255, Math.round(Math.sqrt(v) * 255))).join(',');
   /* ── 탄 고르기 ── */
@@ -79,9 +80,14 @@ export function makeRange({ shots, fly, FS, cam, hunt, jel, crystals, bushes, sa
     ['숨을 곳', () => { const b = bushes.list.reduce((m, o) => !m || Math.hypot(o.x - FS.x, o.z - FS.z) < Math.hypot(m.x - FS.x, m.z - FS.z) ? o : m, null); if (b) go(b.x + 8, b.z, -Math.PI / 2, '숨을 곳 — 비추는 탄으로 밝혀 보세요'); }],
     ['해파리 다시', () => { hunt.refill(); say?.('쓰러진 떼를 다시 채웠어요'); }],
   ];
-  spots.forEach(([n, f]) => { const b = document.createElement('button'); b.type = 'button'; b.textContent = n; b.onclick = f; tour.appendChild(b); });
+  /* 반사 시험: 상대 기체가 쏘는 탄을 반사로 돌려보내 봄 (누르면 켜고 · 다시 누르면 끔) */
+  let duel = null, duelBusy = false;
+  spots.push(['반사 시험', async b => { if (duelBusy) return; if (!duel) { duelBusy = true; b.textContent = '준비 중…'; duel = await makeDuel({ renderer, scene, B, fly, FS, cam, say, ui: document.querySelector('#ui'), avoid: (x, z) => jel.userData.list.some(j => j.on && Math.hypot(j.x - x, j.z - z) < 34) }); duelBusy = false; }
+    if (duel.active) { duel.stop(); card.hidden = false; b.textContent = '반사 시험'; b.classList.remove('on'); } else { duel.start(); card.hidden = true; b.textContent = '반사 시험 끝'; b.classList.add('on'); } }]);
+  spots.forEach(([n, f]) => { const b = document.createElement('button'); b.type = 'button'; b.textContent = n; b.addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); f(b); }); tour.appendChild(b); });
   /* ── 매 장면 ── */
-  const update = (t, camera, cw, ch) => {
+  const update = (t, camera, cw, ch, dt = 0, px = 600) => {
+    duel?.update(t, dt, px, camera, cw, ch);
     for (const n of nums) { const e = t - n.t0; if (e > 1) { if (n.el.style.opacity !== '0') n.el.style.opacity = 0; continue; }
       v.copy(n.p).project(camera); const k = e / 1, pop = e < .08 ? .7 + e / .08 * .5 : 1.2 - Math.min(.2, (e - .08) * 1.2) * (n.big ? .5 : 1);
       const x = (v.x * .5 + .5) * cw + n.dx * Math.sqrt(k), y = (-v.y * .5 + .5) * ch - 46 * (1 - (1 - k) * (1 - k));   /* 툭 튀어 오르며 커졌다가 천천히 떠오르며 사라짐 */
@@ -89,5 +95,5 @@ export function makeRange({ shots, fly, FS, cam, hunt, jel, crystals, bushes, sa
     const S = shots.userData.S; heatI.style.width = (S.heat * 100).toFixed(0) + '%';
     if (M.t0 >= 0) { const span = Math.max(.5, (t - M.last > 1.5 ? M.last : t) - M.t0 + .15), dps = M.sum / span;
       liveB.textContent = dps.toFixed(1); liveS.textContent = `${span.toFixed(1)}초 · ${M.hits}번 맞힘 · 합 ${Math.round(M.sum)}${M.kills ? ` · ${M.kills}마리 쓰러뜨림` : ''}${t - M.last > 1.5 ? ' · 멈춤' : ''}`; } };
-  return { dmg, kill, update };
+  return { dmg, kill, update, get duel() { return duel; } };
 }
