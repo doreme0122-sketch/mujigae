@@ -11,9 +11,9 @@
    무게: 꼬리 한 장 · 머리 한 장 · 부스러기 한 장 · 바닥 흔적 한 장 · 모으는 빛 한 장 · 조준 고리 한 장 = 그리기 6번 (탄 종류가 늘어도 같음) */
 import * as THREE from 'three';
 import * as A from '../core/audio.js';
-import { FLY } from './flight.js?v=11041441';
-import { BH } from './blackhole.js?v=11041441';
-import { hitWall } from './rocks.js?v=11041441';
+import { FLY } from './flight.js?v=11041456';
+import { BH } from './blackhole.js?v=11041456';
+import { hitWall } from './rocks.js?v=11041456';
 
 /* 비교표 그대로. heatT: 쉬지 않고 쏘면 과열까지(초) · coolT: 과열 뒤 다시 쏠 때까지(초) · cryB/wallB: 수정·벽에서 튕기는 횟수
    kind: 그림 결 (0 기본 · 1 서리 · 2 따뜻한 빛 · 3 빛 창 · 4 쇳물 · 5 불티 · 6 바늘 · 7 활) */
@@ -30,7 +30,7 @@ export const SHOT = {
   /* 단거리 (6~12m): 파고들어 끝냄 · 약 32 */
   scatter: { name: '흩뿌림', role: '단거리', rate: 1.6, dmg: 4, speed: 22, range: 10, R: .14, heatT: 3.5, coolT: 2.5, n: 5, pat: 'fan', ang: 26, jit: 2, spd: .12, cryB: 0, wallB: 0, knock: .06, aimR: 10, fireSlow: .45, recoil: 1.6, col: [1, .86, .62], tail: 1.6, W: .16, head: .6, kind: 5, snd: 'scatter', look: '하얀 불티 알갱이' },
   heavy:   { name: '무거운 탄', role: '단거리', rate: 2.5, dmg: 13, speed: 22, range: 12, R: .45, heatT: 4, coolT: 2.5, n: 1, jit: 0, cryB: 1, wallB: 0, knock: 4, aimR: 12, fireSlow: .6, recoil: 2, shake: .22, col: [1, .55, .2], tail: 3.6, W: .62, head: 2, kind: 4, snd: 'boom', look: '주황 쇳물 덩어리 + 굵은 꼬리' },
-  blade:   { name: '빛 칼날', role: '단거리', blade: 1, rate: 1.6, dmg: 20, range: 4.8, reach: 1.8, width: 1.5, swing: .12, windup: .18, cutDelay: .1, heatT: 3, coolT: 2, aimR: 0, fireSlow: .3, recoil: .6, noReflect: 1, lunge: 3, col: [.85, 1, 1.1], kind: 0, snd: 'swish', look: '발도: 멈췄다 번개처럼 앞으로 베며 나감 · 반사 안 됨' },
+  blade:   { name: '빛 칼날', role: '단거리', blade: 1, rate: 1.6, dmg: 20, range: 4.8, reach: 1.8, width: 1.5, swing: .12, windup: .18, cutDelay: .1, style: 'A', heatT: 3, coolT: 2, aimR: 0, fireSlow: .3, recoil: .6, noReflect: 1, lunge: 3, col: [.85, 1, 1.1], kind: 0, snd: 'swish', look: '발도: 멈췄다 번개처럼 앞으로 베며 나감 · 반사 안 됨' },
 };
 export const SHOT_IDS = Object.keys(SHOT);
 const rngOf = (c, lv = 3) => Array.isArray(c.range) ? c.range[Math.max(0, Math.min(c.range.length, lv) - 1)] : c.range;   /* 모아 쏘기는 단계마다 사거리가 늘어남 */
@@ -328,38 +328,84 @@ export function makeShots({ B, crystals, bh, FS, say, mobs, onKill, onDamage, on
     g.traverse(o => { if (o.isMesh) { o.material = m; o.renderOrder = 8; } }); g.visible = false; G.add(g); ghosts.push({ g, m, t0: -9 }); }
   /* 숨 참기: 화면 가장자리 어둡게 (글 한 장) */
   const vig = document.createElement('div'); vig.style.cssText = 'position:fixed;inset:0;pointer-events:none;z-index:3;opacity:0;background:radial-gradient(ellipse at 50% 50%,rgba(0,0,0,0) 45%,rgba(0,2,8,.55) 100%)'; document.body.appendChild(vig);
-  const SL = { st: 0, t0: -9, ang: 0, x0: 0, z0: 0, hit: [], pend: [] };
-  const slash = t => { if (SL.st) return; const c = cfg; SL.st = 1; SL.t0 = t; SL.ang = FS.head; SL.c = c; SL.hit.length = 0; SL.pend.length = 0;
+  /* ── 휘두른 자국 (시안 A·B·C): 칼끝이 실제로 지나간 자리(기체가 앞으로 나가며 휘두르므로 휘어진 초승달)를 기록해 띠로 그림 · 두 장 (B는 두 번 벰) ── */
+  const NTR = 36, trails = [0, 1].map(() => { const P = new Float32Array(NTR * 2 * 3), U = new Float32Array(NTR * 2 * 2), I = []; for (let i = 0; i < NTR - 1; i++) { const p = i * 2; I.push(p, p + 1, p + 2, p + 1, p + 3, p + 2); }
+    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(P, 3)); g.setAttribute('aU', new THREE.BufferAttribute(U, 2)); g.setIndex(I);
+    const m = new THREE.ShaderMaterial({ ...AB, side: THREE.DoubleSide, uniforms: { uA: { value: 0 }, uT: { value: 0 }, uB: { value: 0 }, uHead: { value: 1 } },
+      vertexShader: 'attribute vec2 aU; varying vec2 vU; void main(){ vU = aU; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.); }',
+      fragmentShader: `uniform float uA, uT, uB, uHead; varying vec2 vU;   /* x: 자국 따라 0(시작) → 1(칼끝) · y: 안쪽 -1 → 바깥 날 1 · uB: '쩡' 터짐 0 → 1 */
+        void main(){ float u = vU.x, v = vU.y, o = v * .5 + .5;
+          float edge = exp(-(v - .8) * (v - .8) * mix(70., 12., uB)) * (1.5 + 1.5 * uB), body = smoothstep(-1., .2, v) * smoothstep(1.05, .7, v) * (.4 + .5 * uB);
+          float streak = .55 + .45 * pow(max(sin(u * 44. - uT * 20. + v * 5.) * .5 + .5, 0.), 4.), hot = smoothstep(uHead - .35, uHead, u) * step(u, uHead + .001);   /* 찢기듯 흐르는 결 · 칼끝 가까이가 가장 뜨거움 */
+          vec3 fr = clamp(abs(fract(o * .9 + u * .3 + uT * .5 + vec3(0., .33, .67)) * 6. - 3.) - 1., 0., 1.);
+          float fringe = exp(-(v - 1.) * (v - 1.) * 30.) * (.6 + .8 * uB);
+          vec3 c = vec3(1.35, 1.38, 1.42) * edge * (.55 + .6 * hot + .4 * uB) + vec3(.5, .85, 1.2) * body * streak * (.5 + .6 * hot) + fr * fringe;
+          gl_FragColor = vec4(c * uA, 1.); }` });
+    const mesh = new THREE.Mesh(g, m); mesh.frustumCulled = false; mesh.renderOrder = 8; mesh.visible = false; G.add(mesh); return { P, U, g, m, mesh, pts: [] }; });
+  const drawTrail = (tr, wid) => { const n = tr.pts.length; if (n < 2) { tr.mesh.visible = false; return; } tr.mesh.visible = true;
+    for (let i = 0; i < NTR; i++) { const q = i / (NTR - 1), f = q * (n - 1), k = Math.min(n - 2, Math.floor(f)), r = f - k, a = tr.pts[k], b = tr.pts[k + 1];
+      const ox = a[0] + (b[0] - a[0]) * r, oz = a[1] + (b[1] - a[1]) * r, ix = a[2] + (b[2] - a[2]) * r, iz = a[3] + (b[3] - a[3]) * r, th = Math.pow(Math.sin(Math.PI * q), .7) * wid;   /* 가운데 두껍고 양 끝 뾰족 */
+      const y = FLY.HOVER - .05, tx = ox + (ix - ox) * th, tz = oz + (iz - oz) * th; tr.P.set([ox, y, oz, tx, y, tz], i * 6); tr.U.set([q, 1, q, -1], i * 4); }
+    tr.g.attributes.position.needsUpdate = tr.g.attributes.aU.needsUpdate = true; };
+  /* 시안별 휘두름: [시작 각, 끝 각, 시작 시점, 끝 시점, 반경 더하기] (각은 기체 앞 기준 · 왼쪽 +) */
+  const D2R = Math.PI / 180, STY = {
+    A: { name: '반달 휘두르기', sw: .14, lunge: 3, sweeps: sg => [[sg * 80, -sg * 80, 0, 1, 0]] },                                          /* 한 번 크게 휘둘러 반달 */
+    B: { name: '두 번 베기', sw: .24, lunge: 3, sweeps: sg => [[sg * 75, -sg * 75, 0, .52, 0], [-sg * 70, sg * 70, .44, 1, .35]] },          /* 왼→오, 곧바로 오→왼 · 두 초승달이 겹침 */
+    C: { name: '회전 베기', sw: .22, lunge: 2, sweeps: sg => [[0, sg * 360, 0, 1, -.6]] },                                                 /* 한 바퀴 돌며 둘레를 다 벰 (반경 조금 작게) */
+    D: { name: '일자 발도', sw: .12, lunge: 3, sweeps: () => [] } };                                                                      /* 찌르듯 지나가며 일자로 가름 (이전 판) */
+  SHOT.blade.styles = Object.fromEntries(Object.entries(STY).map(([k, v]) => [k, v.name]));
+  const SL = { st: 0, t0: -9, ang: 0, x0: 0, z0: 0, hit: [], pend: [], sg: 1 };
+  const slash = t => { if (SL.st) return; const c = cfg; SL.st = 1; SL.t0 = t; SL.ang = FS.head; SL.c = c; SL.hit.length = 0; SL.pend.length = 0; SL.sg = -SL.sg; SL.sty = STY[c.style] || STY.A;
+    for (const tr of trails) { tr.pts.length = 0; tr.mesh.visible = false; tr.m.uniforms.uB.value = 0; }
     FS.dashUntil = t + (c.windup || .18); FS.dashVx = 0; FS.dashVz = 0;   /* 움직이던 중이어도 딱 멈춤 */
     if (A.live()) { const cc = A.ctx, t0 = cc.currentTime, o = cc.createOscillator(), g = cc.createGain(); o.type = 'sine'; o.frequency.setValueAtTime(420, t0); o.frequency.exponentialRampToValueAtTime(1600, t0 + .18); o.connect(g); A.env(g, t0, .02, .035, .2); A.out(g, .3); o.start(t0); o.stop(t0 + .25); } };   /* 칼 뽑는 소리: 쇳소리가 올라감 */
-  const cutHit = (j, t, c) => { const dx = j.x - FS.x, dz = j.z - FS.z, d = Math.hypot(dx, dz) || 1; const killed = mobs.userData.hit(j, t, -Math.sin(SL.ang), -Math.cos(SL.ang), c.dmg, { knock: .8 }); onDamage?.(j, c.dmg, c, false); onKill?.(j, killed, t);
-    for (let i = 0; i < 16; i++) { const k = (i / 15 - .5) * 1.8 * j.s, tx = Math.cos(SL.ang), tz = -Math.sin(SL.ang); emit(j.x + tx * k, j.y - .1, j.z + tz * k, (Math.random() - .5) * 2, .4 + Math.random(), (Math.random() - .5) * 2, 1.3, 1.35, 1.45, .07, .2 + Math.random() * .1, 0, 0, 3); }   /* 몸을 가로지른 칼자국 */
+  const cutHit = (j, t, c) => { const killed = mobs.userData.hit(j, t, -Math.sin(SL.ang), -Math.cos(SL.ang), c.dmg, { knock: .8 }); onDamage?.(j, c.dmg, c, false); onKill?.(j, killed, t);
+    const ta = Math.atan2(j.x - FS.x, j.z - FS.z) + Math.PI / 2, tx = Math.sin(ta), tz = Math.cos(ta);   /* 칼자국: 칼이 지나간 결(접선)로 몸을 가로지름 */
+    for (let i = 0; i < 16; i++) { const k = (i / 15 - .5) * 1.8 * j.s; emit(j.x + tx * k, j.y - .1, j.z + tz * k, (Math.random() - .5) * 2, .4 + Math.random(), (Math.random() - .5) * 2, 1.3, 1.35, 1.45, .07, .2 + Math.random() * .1, 0, 0, 3); }
     for (let i = 0; i < 10; i++) { const a = Math.random() * 6.283, v = 3 + Math.random() * 5; emit(j.x, j.y - .2, j.z, Math.cos(a) * v, Math.random() * 2.5, Math.sin(a) * v, .7, 1, 1.3, .07, .3); } };
-  const slashStep = (t, dt) => { const c = SL.c || SHOT.blade, e = t - SL.t0, W = c.windup || .18, SW = c.swing || .12, CD = c.cutDelay || .1, dir = SL.ang, dx = -Math.sin(dir), dz = -Math.cos(dir);
-    clM.uniforms.uT.value = bdM.uniforms.uT.value = saM.uniforms.uT.value = t;
+  const angIn = (a, a0, a1) => { const d = a1 - a0, t = Math.atan2(Math.sin(a - a0), Math.cos(a - a0)); if (Math.abs(d) >= 6.28) return true; return d >= 0 ? t >= -.02 && t <= d + .02 : t <= .02 && t >= d - .02; };   /* a가 a0 → a1 사이를 칼이 지난 자리인지 */
+  const slashStep = (t, dt) => { const c = SL.c || SHOT.blade, sty = SL.sty || STY.A, e = t - SL.t0, W = c.windup || .18, SW = sty.sw, CD = c.cutDelay || .1, dir = SL.ang, dx = -Math.sin(dir), dz = -Math.cos(dir);
+    clM.uniforms.uT.value = bdM.uniforms.uT.value = saM.uniforms.uT.value = t; for (const tr of trails) tr.m.uniforms.uT.value = t;
     for (const g of ghosts) { const k = 1 - (t - g.t0) / .28; g.g.visible = k > 0; if (k > 0) g.m.uniforms.uA.value = k * k * .9; }
-    { const ce = t - (SL.tc || -9), k = Math.max(0, 1 - ce / .7); arc.visible = k > 0; saM.uniforms.uA.value = k * k; }   /* 초승달 자국은 0.7초에 걸쳐 식음 */
-    if (!SL.st) { bladeM.visible = false; if (!(t - (SL.tc || -9) < .4)) cutL.visible = false; else { const k = (t - SL.tc) / .4; clM.uniforms.uOpen.value = Math.min(1, k * 3); clM.uniforms.uA.value = Math.max(0, 1 - k) ** 1.5; } vig.style.opacity = 0; return; }
+    { const ce = t - (SL.tc || -9), k = Math.max(0, 1 - ce / .7); arc.visible = k > 0 && sty === STY.D; saM.uniforms.uA.value = k * k; }
+    if (!SL.st) { bladeM.visible = false; const ce = t - (SL.tc || -9);
+      if (ce < .45) { const k = ce / .45; if (sty === STY.D) { cutL.visible = true; clM.uniforms.uOpen.value = Math.min(1, k * 3); clM.uniforms.uA.value = Math.max(0, 1 - k) ** 1.5; } for (const tr of trails) { tr.m.uniforms.uB.value = Math.min(1, k * 4); tr.m.uniforms.uA.value = Math.max(0, 1 - k) ** 1.3; tr.m.uniforms.uHead.value = 1; } }
+      else { cutL.visible = false; for (const tr of trails) tr.mesh.visible = false; }
+      vig.style.opacity = 0; return; }
     FS.turnCap = .001;   /* 멈췄다 베는 동안 방향은 누른 순간 그대로 */
-    if (SL.st === 1) { const k = Math.min(1, e / W); FS.dashUntil = t + dt * 2; FS.dashVx = 0; FS.dashVz = 0;   /* ① 멈춤: 칼을 뽑음 */
-      drawBlade(FS.x, FS.z, dir, .6 + (c.reach + .6) * k * k, .05 + .16 * k, .4 + .6 * k); vig.style.opacity = (.8 * k).toFixed(2);
-      if (Math.random() < dt * 70) { const r = .8 + Math.random() * (c.reach + .8) * k, a2 = Math.random() * 6.283, bx = FS.x + dx * r, bz = FS.z + dz * r, sx = bx + Math.cos(a2) * 1.6, sz = bz + Math.sin(a2) * 1.6; emit(sx, FLY.HOVER, sz, (bx - sx) * 7, 0, (bz - sz) * 7, .7, .95, 1.3, .05, .14, 0, 0, 0); }   /* 둘레 빛이 칼로 빨려 듦 */
-      if (e >= W) { SL.st = 2; SL.t1 = t; SL.x0 = FS.x; SL.z0 = FS.z; FS.dashUntil = t + SW; FS.dashVx = dx * c.lunge / SW; FS.dashVz = dz * c.lunge / SW; FS.rc = 1.2; play('swish'); SL.gi = 0; } return; }
-    if (SL.st === 2) { const k = Math.min(1, (t - SL.t1) / SW);   /* ② 번개처럼 앞으로 · 잔상 · 가르는 선 */
+    const R = c.reach + .6;
+    if (SL.st === 1) { const k = Math.min(1, e / W); FS.dashUntil = t + dt * 2; FS.dashVx = 0; FS.dashVz = 0;   /* ① 멈춤: 칼을 뽑음 (휘두를 시안이면 칼이 시작 쪽으로 당겨짐) */
+      const sw0 = sty.sweeps(SL.sg)[0], a = sw0 ? dir + sw0[0] * D2R * (.6 + .4 * k) : dir;
+      drawBlade(FS.x, FS.z, a, .6 + (c.reach) * k * k, .05 + .16 * k, .4 + .6 * k); vig.style.opacity = (.8 * k).toFixed(2);
+      if (Math.random() < dt * 70) { const bx = -Math.sin(a), bz = -Math.cos(a), r = .8 + Math.random() * (c.reach + .8) * k, a2 = Math.random() * 6.283, px_ = FS.x + bx * r, pz_ = FS.z + bz * r, sx = px_ + Math.cos(a2) * 1.6, sz = pz_ + Math.sin(a2) * 1.6; emit(sx, FLY.HOVER, sz, (px_ - sx) * 7, 0, (pz_ - sz) * 7, .7, .95, 1.3, .05, .14, 0, 0, 0); }   /* 둘레 빛이 칼로 빨려 듦 */
+      if (e >= W) { SL.st = 2; SL.t1 = t; SL.x0 = FS.x; SL.z0 = FS.z; FS.dashUntil = t + SW; FS.dashVx = dx * sty.lunge / SW; FS.dashVz = dz * sty.lunge / SW; FS.rc = 1.2; play('swish'); SL.gi = 0; SL.prevA = null; } return; }
+    if (SL.st === 2) { const k = Math.min(1, (t - SL.t1) / SW);   /* ② 앞으로 튀어 나가며 벰 · 잔상 */
       if (SL.gi < ghosts.length && k >= SL.gi / ghosts.length && ship) { const g = ghosts[SL.gi++]; g.g.position.copy(ship.position); g.g.quaternion.copy(ship.quaternion); g.g.scale.copy(ship.scale); g.t0 = t; }
-      drawBlade(FS.x, FS.z, dir, c.reach + .6, .2, 1); vig.style.opacity = (.8 * (1 - k)).toFixed(2);
-      const ex = FS.x + dx * c.reach, ez = FS.z + dz * c.reach, sx0 = SL.x0 - dx * .8, sz0 = SL.z0 - dz * .8;   /* 선: 출발 뒤 0.8m ~ 지금 칼끝 */
-      for (let i = 0; i < NCL; i++) { const q = i / (NCL - 1), x = sx0 + (ex - sx0) * q, z = sz0 + (ez - sz0) * q, w = 1; clP.set([x - dz * w, FLY.HOVER, z + dx * w, x + dz * w, FLY.HOVER, z - dx * w], i * 6); clU.set([q, -1, q, 1], i * 4); }
-      clG.attributes.position.needsUpdate = clG.attributes.aU.needsUpdate = true; cutL.visible = true; clM.uniforms.uOpen.value = 0; clM.uniforms.uA.value = 1;
-      /* 선 위의 적을 기억 (베임은 0.1초 뒤에 한꺼번에) */
-      if (mobs) for (const j of mobs.userData.list) { if (!j.on || j.dieT > 0 || SL.hit.includes(j)) continue; const qx = j.x - sx0, qz = j.z - sz0, L = Math.hypot(ex - sx0, ez - sz0) || 1, al = (qx * dx + qz * dz), sd = Math.abs(qx * -dz + qz * dx);
-        if (al >= -.3 && al <= L + .3 && sd <= c.width + .5 * j.s) { SL.hit.push(j); SL.pend.push(j); } }
-      if (k >= 1) { SL.st = 3; SL.t2 = t; bladeM.visible = false; } return; }
+      vig.style.opacity = (.8 * (1 - k)).toFixed(2);
+      const sws = sty.sweeps(SL.sg);
+      if (!sws.length) {   /* 시안 D: 일자로 가르는 선 */
+        drawBlade(FS.x, FS.z, dir, c.reach + .6, .2, 1);
+        const ex = FS.x + dx * c.reach, ez = FS.z + dz * c.reach, sx0 = SL.x0 - dx * .8, sz0 = SL.z0 - dz * .8;
+        for (let i = 0; i < NCL; i++) { const q = i / (NCL - 1), x = sx0 + (ex - sx0) * q, z = sz0 + (ez - sz0) * q; clP.set([x - dz, FLY.HOVER, z + dx, x + dz, FLY.HOVER, z - dx], i * 6); clU.set([q, -1, q, 1], i * 4); }
+        clG.attributes.position.needsUpdate = clG.attributes.aU.needsUpdate = true; cutL.visible = true; clM.uniforms.uOpen.value = 0; clM.uniforms.uA.value = 1;
+        if (mobs) for (const j of mobs.userData.list) { if (!j.on || j.dieT > 0 || SL.hit.includes(j)) continue; const qx = j.x - sx0, qz = j.z - sz0, L = Math.hypot(ex - sx0, ez - sz0) || 1, al = (qx * dx + qz * dz), sd = Math.abs(qx * -dz + qz * dx);
+          if (al >= -.3 && al <= L + .3 && sd <= c.width + .5 * j.s) { SL.hit.push(j); SL.pend.push(j); } } }
+      else { let bladeA = null;   /* 시안 A·B·C: 칼이 정해진 각을 따라 휘둘러지고 칼끝 자리를 기록 */
+        sws.forEach(([a0, a1, u0, u1, dr], si) => { if (k < u0) return; const kk = Math.min(1, (k - u0) / (u1 - u0)), ease = 1 - Math.pow(1 - kk, 2.2), off = (a0 + (a1 - a0) * ease) * D2R, a = dir + off, rr = R + dr, bx = -Math.sin(a), bz = -Math.cos(a), tr = trails[si];
+          if (kk < 1 || tr.pts.length < 2) { tr.pts.push([FS.x + bx * rr, FS.z + bz * rr, FS.x + bx * .9, FS.z + bz * .9]); drawTrail(tr, .85); tr.m.uniforms.uA.value = 1; tr.m.uniforms.uHead.value = 1; }
+          if (kk < 1) bladeA = [a, rr];
+          /* 맞음: 이번 장면에 칼이 지난 각 사이 + 반경 안 */
+          const pa = tr.prevA ?? (dir + a0 * D2R); if (mobs) for (const j of mobs.userData.list) { if (!j.on || j.dieT > 0 || SL.hit.includes(j)) continue; const jx = j.x - FS.x, jz = j.z - FS.z, d = Math.hypot(jx, jz); if (d > rr + .62 * j.s) continue;
+            const ja = Math.atan2(-jx, -jz); if (angIn(ja, pa, a) || d < 1.2) { SL.hit.push(j); SL.pend.push(j); } }
+          tr.prevA = a;
+          if (kk < 1 && Math.random() < dt * 120) emit(FS.x + bx * rr, FLY.HOVER, FS.z + bz * rr, -bz * 5 * Math.sign(a1 - a0) + (Math.random() - .5) * 2, Math.random() * 1.5, bx * 5 * Math.sign(a1 - a0) + (Math.random() - .5) * 2, 1.1, 1.2, 1.35, .06, .18 + Math.random() * .12, 0, 1); });   /* 칼끝 불티 */
+        if (bladeA) drawBlade(FS.x, FS.z, bladeA[0], bladeA[1] - .6, .22, 1); else bladeM.visible = false; }
+      if (k >= 1) { SL.st = 3; SL.t2 = t; bladeM.visible = false; for (const tr of trails) tr.prevA = null; } return; }
     if (SL.st === 3) { const ce = t - SL.t2; bladeM.visible = false; vig.style.opacity = 0;
-      if (ce >= CD) {   /* ③ '쩡': 선이 벌어지며 터짐 · 한꺼번에 베임 · 짧게 멈칫 · ④ 바닥 초승달 */
+      if (ce >= CD) {   /* ③ '쩡': 자국(또는 선)이 벌어지며 터짐 · 한꺼번에 베임 · 짧게 멈칫 */
         SL.st = 0; SL.tc = t; for (const j of SL.pend) if (j.on && j.dieT < 0) cutHit(j, t, c); if (SL.pend.length) FS.stopUntil = performance.now() + 60;
-        drawCrescent(FS.x, FS.z, dir, c.reach + .4); FS.shake = Math.max(FS.shake || 0, .35);
-        const L = Math.hypot(FS.x + dx * c.reach - SL.x0, FS.z + dz * c.reach - SL.z0); for (let i = 0; i < 30; i++) { const q = Math.random(), x = SL.x0 + dx * (q * L), z = SL.z0 + dz * (q * L), s2 = (Math.random() < .5 ? -1 : 1) * (2 + Math.random() * 5); emit(x, FLY.HOVER, z, -dz * s2, .5 + Math.random() * 1.5, dx * s2, 1.2, 1.25, 1.4, .06 + Math.random() * .04, .25 + Math.random() * .2); }
+        if (sty === STY.D) drawCrescent(FS.x, FS.z, dir, c.reach + .4); FS.shake = Math.max(FS.shake || 0, .35);
+        for (const tr of trails) for (let i = 0; i < 14 && tr.pts.length > 1; i++) { const p = tr.pts[Math.floor(Math.random() * tr.pts.length)], a = Math.random() * 6.283, v = 2 + Math.random() * 5; emit(p[0], FLY.HOVER, p[1], Math.cos(a) * v, .5 + Math.random() * 1.5, Math.sin(a) * v, 1.2, 1.25, 1.4, .06 + Math.random() * .04, .25 + Math.random() * .2); }
         if (A.live()) { hiss('highpass', 4500, .7, .12, .12, 0, .35); osc('sine', 2900, 2800, .3, .05); osc('sine', 120, 60, .25, .1); } } } };   /* 쩡: 높은 쇳소리 + 묵직한 울림 */
   /* ── 버튼 ── */
   const st = document.createElement('style'); st.textContent = `
