@@ -22,7 +22,14 @@ export const LAB = [
   { id: 'rock', name: '이끼 암반', tip: '울퉁불퉁한 돌바닥이에요. 낮은 곳엔 이끼가 끼고, 군데군데 금이 가 있어요.' },
   { id: 'sand', name: '결정 모래', tip: '바람이 만든 모래 물결 사이로 작은 결정이 박혀 있어요. 보는 각도에 따라 결정이 반짝여요.' },
   { id: 'plain', name: '은은한 평지', tip: '무늬를 거의 없앤 바닥이에요. 고운 결과 큰 얼룩만 있어서 탄과 기체가 가장 또렷해요.' },
-  { id: 'void', name: '보스존 별빛 우주', tip: '보이지 않는 유리 바닥 아래로 별이 세 겹으로 깊어요. 가까운 별은 빨리, 먼 별은 느리게 흘러요. 기체 둘레만 유리 결이 은은하게 살아나고, 그림자가 유리 위에 떨어져요.' }];
+  { id: 'void', name: '보스존 별빛 우주', tip: '바닥도 그림자도 없는 진짜 우주예요(블랙홀이 돌아다니는 곳). 아래로 별이 세 겹으로 깊어서, 가까운 별은 빨리, 먼 별은 느리게 흘러요.' },
+  { id: 'join', name: '얼음·용암 + 유리 길', tip: '왼쪽 얼음 땅, 오른쪽 용암 땅. 둘을 잇는 큰길은 별빛 위 유리예요. 땅은 길 쪽으로 갈수록 얇아지다 조각으로 부서져 우주에 떠요. 얼음은 서리가 유리로 번지고, 용암은 붉은 틈이 비쳐요. 벽 틈이 곧 문이에요.' }];
+
+/* 이음 시험 자리 (그림과 JS가 같은 식): 얼음 땅 가운데 (-30,0) · 용암 땅 (30,0) · 큰길 = 두 가운데를 잇는 폭 8m 띠 */
+export const JOIN = { ice: [-30, 0], lava: [30, 0], R: 22, roadW: 4, roadX: 30 };
+export const blobR = (dx, dz, R, ph) => { const a = Math.atan2(dz, dx); return R * (1 + .1 * Math.sin(3 * a + 1.3 + ph) + .06 * Math.sin(5 * a - .7 + ph * 2) + .04 * Math.sin(9 * a + 2 + ph)); };
+export const sdBlob = (x, z, c, ph) => Math.hypot(x - c[0], z - c[1]) - blobR(x - c[0], z - c[1], JOIN.R, ph);
+export const sdRoad = (x, z) => Math.max(Math.abs(z) - JOIN.roadW, Math.abs(x) - JOIN.roadX);
 
 export function makeFloorLab() {
   const noise = bakeNoise();
@@ -43,6 +50,13 @@ export function makeFloorLab() {
         float tw=.65+.35*sin(uT*(1.+h*3.)+h*40.); float r=.05+.09*fract(h*13.);
         vec3 col=mix(vec3(.7,.8,1.15),vec3(1.1,.95,.8),fract(h*7.));
         return col*(exp(-d*d/(r*r))*1.4+exp(-d/(r*5.))*.12)*br*tw; }
+      /* 깊은 우주: 성운 + 별 세 겹 */
+      vec3 deep(vec3 ro, vec3 rd){ vec2 dq=ro.xz+rd.xz*((ro.y+320.)/max(-rd.y,.05)); vec4 nb=N4(dq*.0016+vec2(uT*.0008,0.)); vec4 nb2=N4(dq*.0045-vec2(0.,uT*.001));
+        float cloud=smoothstep(.38,.85,nb.r)*(.6+.6*nb2.g);
+        vec3 c=vec3(.004,.005,.012)+mix(vec3(.03,.018,.06),vec3(.012,.035,.07),nb.g)*cloud*.6+vec3(.05,.03,.07)*pow(cloud,3.)*.35;
+        c+=starLayer(ro,rd,320.,16.,.86,.55,3.1); c+=starLayer(ro,rd,140.,7.,.9,.6,7.3); c+=starLayer(ro,rd,48.,3.4,.95,.5,1.7); return c; }
+      float blobR(vec2 q, float R, float ph){ float a=atan(q.y,q.x); return R*(1.+.1*sin(3.*a+1.3+ph)+.06*sin(5.*a-.7+ph*2.)+.04*sin(9.*a+2.+ph)); }
+      float sdBlob(vec2 p, vec2 c, float ph){ vec2 q=p-c; return length(q)-blobR(q,22.,ph); }
       void main(){
         vec3 ro=cameraPosition, rd=normalize(vW-ro); vec2 p=vW.xz; float dist=length(p-ro.xz); vec3 c;
         if(uK<.5){ /* 금속 판: 4m 판 · 이음매 · 모서리로 갈수록 살짝 둥글게 깎임(빛 받는 턱) · 볼트 · 긁힘 · 얼룩 */
@@ -80,21 +94,57 @@ export function makeFloorLab() {
           vec3 n=normalize(vec3((g-.5)*.06+(g2-.5)*.08, 1., (N4(p*.5+.4).a-.5)*.06));
           vec3 base=vec3(.17,.19,.22)*(.88+.22*a)+vec3(.012)*(g2-.5);
           c=lit(base,n,rd,.06,20.);
-        } else { /* 보스존: 깊은 성운 + 별 세 겹(깊을수록 느리게 흐름) + 보이지 않는 유리 */
-          vec2 dq=ro.xz+rd.xz*((ro.y+320.)/max(-rd.y,.05)); vec4 nb=N4(dq*.0016+vec2(uT*.0008,0.)); vec4 nb2=N4(dq*.0045-vec2(0.,uT*.001));
-          float cloud=smoothstep(.38,.85,nb.r)*(.6+.6*nb2.g);
-          c=vec3(.004,.005,.012)+mix(vec3(.03,.018,.06),vec3(.012,.035,.07),nb.g)*cloud*.6+vec3(.05,.03,.07)*pow(cloud,3.)*.35;
-          c+=starLayer(ro,rd,320.,16.,.86,.55,3.1);
-          c+=starLayer(ro,rd,140.,7.,.9,.6,7.3);
-          c+=starLayer(ro,rd,48.,3.4,.95,.5,1.7);
-          /* 유리: 멀리 갈수록 하늘을 비추는 막(시선이 눕는 만큼) · 기체 둘레만 육각 결이 살아남 · 엔진 빛이 유리에 비침 */
-          float fr=pow(1.-max(-rd.y,0.),4.); c+=vec3(.12,.16,.28)*fr*.35;
-          vec2 hp=p*.55; vec2 r=vec2(1.,1.732); vec2 ha=mod(hp,r)-r*.5, hb=mod(hp-r*.5,r)-r*.5; vec2 hg=dot(ha,ha)<dot(hb,hb)?ha:hb;
-          vec2 ah=abs(hg); float hd=max(dot(ah,normalize(vec2(1.,1.732))),ah.x); float edge=1.-smoothstep(.0,.035,abs(hd-.5));
-          float near=0.; vec3 refl=vec3(0.);
-          for(int i=0;i<2;i++){ vec4 s=uShips[i]; if(s.w<.5) continue; vec2 d=p-s.xz; float r2=dot(d,d);
-            near=max(near,exp(-r2/22.)); refl+=(s.w>1.5?vec3(1.,.35,.45):vec3(.35,.55,1.2))*exp(-r2/5.)*.07; }
-          c+=vec3(.35,.55,.95)*edge*near*.16+refl;
+        } else if(uK<4.5){ /* 보스존: 바닥도 그림자도 없는 우주 */
+          c=deep(ro,rd);
+        } else { /* 이음 시험: 얼음 땅 · 용암 땅 · 둘을 잇는 별빛 유리 큰길 */
+          float sI=sdBlob(p,vec2(-30.,0.),0.), sL=sdBlob(p,vec2(30.,0.),2.1);
+          float road=max(abs(p.y)-4.,abs(p.x)-30.);
+          bool ice=sI<sL; float sd=min(sI,sL);
+          /* 땅은 길에서 멀어질수록 단단, 길 쪽 3m는 조각으로 부서짐(구멍 사이로 우주) */
+          /* 조각: 길에서 4m 안쪽은 땅이 조각으로 부서져 떠 있음 — 길에 가까울수록 조각이 작고 드묾 */
+          float isl=N4(p*.085+(ice?0.:.37)).r*.6+N4(p*.24).g*.4; isl=clamp((isl-.5)*3.2+.5,0.,1.);
+          float need=mix(1.02,-.05,smoothstep(.4,6.,road));          /* 이만큼 넘어야 땅이 남음 (길에 가까울수록 높음) */
+          float keep=(isl-need)*5.;                                  /* >0 이면 땅이 남음 */
+          float landM=smoothstep(-.06,.06,keep)*step(sd,0.)*step(0.,road);
+          float lip=landM*(1.-smoothstep(.0,.45,keep));             /* 부서진 가장자리: 땅의 두께가 보이는 턱 */
+          float thin=1.-smoothstep(.0,4.5,road);                    /* 길 가까이 땅이 얇아짐 */
+          vec3 sky=deep(ro,rd);
+          if(landM>.01){ vec3 land;
+            if(ice){ /* 얼음: 깊은 청록 얼음판 · 속에서 빛나는 금 · 눈 쌓인 곳 · 얇은 곳은 아래 별이 비침 */
+              float e=.35; float h=N4(p*.03).r*.7+N4(p*.11).b*.3, hx=N4((p+vec2(e,0.))*.03).r*.7+N4((p+vec2(e,0.))*.11).b*.3, hz=N4((p+vec2(0.,e))*.03).r*.7+N4((p+vec2(0.,e))*.11).b*.3;
+              vec3 n=normalize(vec3(-(hx-h)/e*1.4,1.,-(hz-h)/e*1.4));
+              float cr=abs(N4(p*.045+.6).g-.5), crack=1.-smoothstep(.003,.012,cr);
+              float snow=smoothstep(.55,.72,N4(p*.06+.2).r);
+              vec3 base=mix(vec3(.05,.17,.26),vec3(.18,.36,.48),h); base=mix(base,vec3(.62,.72,.8),snow*.85);
+              land=lit(base,n,rd,.9*(1.-snow*.7),70.)*.13+vec3(.12,.4,.6)*crack*(1.-snow)*(1.-thin*.5);
+              land=mix(land,sky*1.3+vec3(.004,.012,.02),thin*.6*(1.-snow));   /* 얇은 얼음 아래로 별이 비침 */
+              land+=vec3(.3,.42,.55)*lip;
+            } else { /* 용암: 검은 현무암 껍질 · 숨 쉬듯 빛나는 붉은 결 · 길 쪽으로 결이 넓어짐 */
+              float e=.35; float h=N4(p*.035+.4).r*.6+N4(p*.14).b*.4, hx=N4((p+vec2(e,0.))*.035+.4).r*.6+N4((p+vec2(e,0.))*.14).b*.4, hz=N4((p+vec2(0.,e))*.035+.4).r*.6+N4((p+vec2(0.,e))*.14).b*.4;
+              vec3 n=normalize(vec3(-(hx-h)/e*2.,1.,-(hz-h)/e*2.));
+              float v=abs(N4(p*.04+.9).g-.5), w=.01+.03*thin, vein=1.-smoothstep(w*.3,w,v);
+              float pulse=.7+.3*sin(uT*1.6+N4(p*.02).r*12.);
+              vec3 base=mix(vec3(.05,.045,.045),vec3(.1,.085,.08),h);
+              land=lit(base,n,rd,.25,40.)*.13*(1.-vein)+vec3(1.1,.28,.04)*vein*pulse*(.45+.55*thin);
+              land+=vec3(.9,.25,.04)*lip*(.5+.5*pulse);               /* 부서진 가장자리는 속이 붉게 비침 */
+            }
+            c=mix(sky,land,landM);
+          } else if(road<0.){ /* 유리 길: 별빛 위에 놓인 유리 — 하늘이 비치는 막 · 가장자리 유리 턱이 빛을 받음 · 땅 쪽 가장자리에 서리/열기가 번짐 */
+            float fr=pow(1.-max(-rd.y,0.),4.); c=sky+vec3(.12,.16,.28)*fr*.35;
+            float ed=-road; float bevel=exp(-ed*ed*2.2);
+            /* 육각 유리 결: 늘 은은하게 + 기체 둘레에서 살아남 · 결 위로 빛이 천천히 흐름 */
+            vec2 hp=p*.55; vec2 r=vec2(1.,1.732); vec2 ha=mod(hp,r)-r*.5, hb=mod(hp-r*.5,r)-r*.5; vec2 hg=dot(ha,ha)<dot(hb,hb)?ha:hb;
+            vec2 ah=abs(hg); float hd=max(dot(ah,normalize(vec2(1.,1.732))),ah.x); float edge=1.-smoothstep(.0,.035,abs(hd-.5));
+            float near=0.; vec3 refl=vec3(0.);
+            for(int i=0;i<2;i++){ vec4 s=uShips[i]; if(s.w<.5) continue; vec2 d=p-s.xz; float r2=dot(d,d);
+              near=max(near,exp(-r2/40.)); refl+=(s.w>1.5?vec3(1.,.35,.45):vec3(.35,.55,1.2))*exp(-r2/5.)*.07; }
+            float flow=pow(.5+.5*sin(p.x*.35-uT*1.4),6.);
+            c+=vec3(.35,.55,.95)*edge*(.03+near*.18+flow*.04)+refl;
+            c+=vec3(.5,.65,1.)*bevel*.1;                                 /* 유리 가장자리 턱이 빛을 받음 */
+            float nearLand=step(sd,1.5);
+            if(ice){ float fz=smoothstep(.5,.8,N4(p*.5).b)*exp(-ed*1.4)*nearLand; c+=vec3(.45,.65,.85)*fz*.22; }
+            else { float hz=exp(-ed*1.5)*nearLand; c+=vec3(.5,.12,.02)*hz*(.12+.05*sin(uT*1.6+p.x)); }
+          } else { c=sky; }
         }
         if(uK<3.5) c*=.13;   /* 화면에 나올 때 밝게 올라가므로 실제 값은 어둡게 — 우주 게임 밤 바닥 밝기 */
         /* 멀어질수록 깊은 색으로 가라앉음 (보스존은 우주가 원래 깊으니 약하게) */
