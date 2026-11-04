@@ -4,7 +4,7 @@
    · 멀어질수록 깊은 색으로 가라앉힘 (가까운 싸움터가 또렷하게)
    0 금속 판 · 1 이끼 낀 암반 · 2 결정 섞인 모래 · 3 은은한 평지 · 4 보스존 별빛 우주(보이지 않는 유리 바닥 + 아래로 깊은 별 세 겹) */
 import * as THREE from 'three';
-import { SNOW_GLSL, SNOW_U } from './snowtone.js?v=11050843';
+import { SNOW_GLSL, SNOW_U } from './snowtone.js?v=11050856';
 
 function bakeNoise(N = 256) {
   const hash = (x, y, p) => { x = ((x % p) + p) % p; y = ((y % p) + p) % p; const s = Math.sin(x * 127.1 + y * 311.7) * 43758.5453; return s - Math.floor(s); };
@@ -25,7 +25,8 @@ export const LAB = [
   { id: 'plain', name: '은은한 평지', tip: '무늬를 거의 없앤 바닥이에요. 고운 결과 큰 얼룩만 있어서 탄과 기체가 가장 또렷해요.' },
   { id: 'void', name: '보스존 별빛 우주', tip: '바닥도 그림자도 없는 진짜 우주예요(블랙홀이 돌아다니는 곳). 아래로 별이 세 겹으로 깊어서, 가까운 별은 빨리, 먼 별은 느리게 흘러요.' },
   { id: 'join', name: '얼음·용암 + 유리 길', tip: '맨 밑은 별빛 유리 한 장, 지역 땅은 그 위에 덮인 껍질이에요. 지역 안은 끝까지 땅이고, 문(벽 틈) 안쪽만 땅이 조각으로 부서져 아래 유리가 드러나요. 문을 나서면 유리 다리가 우주를 건너요. 유리엔 테두리가 없어요.' },
-  { id: 'walls', name: '빙하 얼음 벽', tip: '벽 한 줄이 처음부터 끝까지 한 덩어리 절벽이에요. 앞뒤 면은 수직 절벽에 세로 결이 깊게 패여 있고, 윗단은 구간마다 한 단씩 높이가 달라 계단처럼 층져요. 윗단엔 눈이 덮이고 고드름이 늘어져요. 문 양옆이 가장 높이 솟았다가 수직으로 끊겨요.' }];
+  { id: 'walls', name: '빙하 얼음 벽', tip: '벽 한 줄이 처음부터 끝까지 한 덩어리 절벽이에요. 앞뒤 면은 수직 절벽에 세로 결이 깊게 패여 있고, 윗단은 구간마다 한 단씩 높이가 달라 계단처럼 층져요. 윗단엔 눈이 덮이고 고드름이 늘어져요. 문 양옆이 가장 높이 솟았다가 수직으로 끊겨요.' },
+  { id: 'lavawalls', name: '용암 바위 벽', tip: '검은 현무암 절벽 한 덩어리예요. 바위 겉에 빛나는 금이 그물처럼 퍼져 있고, 윗단에서 넘친 용암이 앞면을 타고 흘러내려 발치에 고여요. 문 양옆엔 날카로운 바위 뿔이 솟아요.' }];
 
 /* 이음 시험 자리 (그림과 JS가 같은 식): 얼음 땅 가운데 (-30,0) · 용암 땅 (30,0) · 큰길 = 두 가운데를 잇는 폭 8m 띠 */
 export const JOIN = { ice: [-30, 0], lava: [30, 0], R: 22, roadW: 4, roadX: 30 };
@@ -88,7 +89,7 @@ export function makeFloorLab() {
         gSnow=0.; return ci; }
       /* 입구 바닥 (시안): 2 = 깨져 벌어진 틈 → 문 둘레 바닥에 부딪힌 자리처럼 방사형 금 · 3 = 빛나는 문턱 → 두 벽 끝을 잇는 빛 줄(숨 쉬듯 밝아졌다 어두워짐 = 지나갈 수 있는 살아 있는 문) */
       vec3 doorFx(vec2 p, vec3 c){
-        for(int i=0;i<2;i++){ if((uK>5.5)!=(i==1)) continue;                 /* 이음 장면은 그 문만, 벽 칸은 그 문만 */
+        for(int i=0;i<2;i++){ if((uK>5.5&&uK<6.5)!=(i==1)) continue;                 /* 이음 장면은 그 문만, 벽 칸은 그 문만 */
           vec4 D=uDoor[i]; vec2 a=D.xy, b=D.zw, ab=b-a; if(dot(ab,ab)<.01) continue;
           if(uGate>1.5&&uGate<2.5){ /* 깨져 벌어진 틈: 무언가 부딪혀 뚫고 간 자리 — 가운데는 하얗게 으스러진 가루, 둘레로 금이 제멋대로 뻗어 나감(길이·굵기 제각각), 부서진 둥근 금은 조각조각 끊김 */
             vec2 m=(a+b)*.5, q=p-m; float r=length(q); if(r>8.) continue; float an=atan(q.y,q.x)/6.2832;
@@ -110,6 +111,14 @@ export function makeFloorLab() {
             vec3 gl=vec3(.12,.55,1.)*band*under*.9*br*endk;                              /* 밝은 얼음 위에서도 보이게: 색을 섞어 바꾸고(더하기만 하면 묻힘) 금은 빛 번짐이 날 만큼 밝게 */
             c=mix(c,c*vec3(.55,.8,1.1)+gl,min(1.,band*.75)); c+=vec3(.6,.9,1.3)*crk*band*1.6*br*endk; } }
         return c; }
+      /* 용암 땅: 검은 현무암 껍질 · 숨 쉬듯 빛나는 붉은 결 (thin = 문턱 얇은 곳일수록 결이 굵고 밝음) */
+      vec3 lavaGround(vec2 p, vec3 rd, float thin){
+        float e=.35; float h=N4(p*.035+.4).r*.6+N4(p*.14).b*.4, hx=N4((p+vec2(e,0.))*.035+.4).r*.6+N4((p+vec2(e,0.))*.14).b*.4, hz=N4((p+vec2(0.,e))*.035+.4).r*.6+N4((p+vec2(0.,e))*.14).b*.4;
+        vec3 n=normalize(vec3(-(hx-h)/e*2.,1.,-(hz-h)/e*2.));
+        float v=abs(N4(p*.04+.9).g-.5), w=.01+.03*thin, vein=1.-smoothstep(w*.3,w,v);
+        float pulse=.7+.3*sin(uT*1.6+N4(p*.02).r*12.);
+        vec3 base=mix(vec3(.05,.045,.045),vec3(.1,.085,.08),h);
+        return lit(base,n,rd,.25,40.)*.13*(1.-vein)+vec3(1.1,.28,.04)*vein*pulse*(.45+.55*thin); }
       void main(){
         vec3 ro=cameraPosition, rd=normalize(vW-ro); vec2 p=vW.xz; float dist=length(p-ro.xz); vec3 c;
         if(uK<.5){ /* 금속 판: 4m 판 · 이음매 · 모서리로 갈수록 살짝 둥글게 깎임(빛 받는 턱) · 볼트 · 긁힘 · 얼룩 */
@@ -147,6 +156,8 @@ export function makeFloorLab() {
           vec3 n=normalize(vec3((g-.5)*.06+(g2-.5)*.08, 1., (N4(p*.5+.4).a-.5)*.06));
           vec3 base=vec3(.17,.19,.22)*(.88+.22*a)+vec3(.012)*(g2-.5);
           c=lit(base,n,rd,.06,20.);
+        } else if(uK>6.5){ /* 용암 바위 벽 칸: 용암 땅 */
+          c=lavaGround(p,rd,0.);
         } else if(uK>5.5){ /* 얼음 벽 칸: 얼음 땅 (벽 줄 z=-12 가까이 눈 두껍게) */
           c=doorFx(p,iceGround(p,rd,smoothstep(9.,2.,abs(p.y+12.))));
         } else if(uK<4.5){ /* 보스존: 바닥도 그림자도 없는 우주 */
@@ -175,12 +186,8 @@ export function makeFloorLab() {
               land=doorFx(p,iceGround(p,rd,smoothstep(-7.,-1.5,sI)));
               land=mix(land,mix(vec3(.05,.08,.11),SNOW_SH*.85,gSnow),lip*.8);            /* 부서진 옆면: 얼음은 짙게, 눈은 눈 그늘색 */
             } else { /* 용암: 검은 현무암 껍질 · 숨 쉬듯 빛나는 붉은 결 · 부서진 옆면은 속이 붉게 */
-              float e=.35; float h=N4(p*.035+.4).r*.6+N4(p*.14).b*.4, hx=N4((p+vec2(e,0.))*.035+.4).r*.6+N4((p+vec2(e,0.))*.14).b*.4, hz=N4((p+vec2(0.,e))*.035+.4).r*.6+N4((p+vec2(0.,e))*.14).b*.4;
-              vec3 n=normalize(vec3(-(hx-h)/e*2.,1.,-(hz-h)/e*2.));
-              float thin=doorZ*smoothstep(-3.,0.,sd); float v=abs(N4(p*.04+.9).g-.5), w=.01+.03*thin, vein=1.-smoothstep(w*.3,w,v);
-              float pulse=.7+.3*sin(uT*1.6+N4(p*.02).r*12.);
-              vec3 base=mix(vec3(.05,.045,.045),vec3(.1,.085,.08),h);
-              land=lit(base,n,rd,.25,40.)*.13*(1.-vein)+vec3(1.1,.28,.04)*vein*pulse*(.45+.55*thin);
+              float thin=doorZ*smoothstep(-3.,0.,sd); float pulse=.7+.3*sin(uT*1.6+N4(p*.02).r*12.);
+              land=lavaGround(p,rd,thin);
               land=mix(land,vec3(.5,.13,.02)*(.6+.4*pulse),lip*.85);
             } }
           vec3 g=sky;

@@ -11,16 +11,17 @@
    무게: 벽 한 줄 = 얼음 1번 + 눈 1번 그리기 */
 import * as THREE from 'three';
 import { mergeGeometries, mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js';
-import { iceMaterial, block } from './ice.js?v=11050843';
-import { SNOW_GLSL, SNOW_U } from './snowtone.js?v=11050843';
+import { iceMaterial, block } from './ice.js?v=11050856';
+import { SNOW_GLSL, SNOW_U } from './snowtone.js?v=11050856';
 
 const hs = (x, y, z) => { const s = Math.sin(x * 127.1 + y * 311.7 + z * 74.7) * 43758.5453; return s - Math.floor(s); };
 const vn = (x, y, z) => { const ix = Math.floor(x), iy = Math.floor(y), iz = Math.floor(z), fx = x - ix, fy = y - iy, fz = z - iz, u = fx * fx * (3 - 2 * fx), v = fy * fy * (3 - 2 * fy), w = fz * fz * (3 - 2 * fz);
   const L = (a, b, t) => a + (b - a) * t, c = (dx, dy, dz) => hs(ix + dx, iy + dy, iz + dz);
   return L(L(L(c(0, 0, 0), c(1, 0, 0), u), L(c(0, 1, 0), c(1, 1, 0), u), v), L(L(c(0, 0, 1), c(1, 0, 1), u), L(c(0, 1, 1), c(1, 1, 1), u), v), w); };
 /* 모든 얼음 조각에 같은 속성(위치·노멀·aG 빛 세기)을 맞춤 → 한 묶음으로 합침 */
-const prep = (g, glow = .15) => { const n = g.index ? g.toNonIndexed() : g; for (const k of Object.keys(n.attributes)) if (k !== 'position' && k !== 'normal' && k !== 'aG') n.deleteAttribute(k);
-  if (!n.attributes.normal) n.computeVertexNormals(); if (!n.attributes.aG) n.setAttribute('aG', new THREE.Float32BufferAttribute(new Float32Array(n.attributes.position.count).fill(glow), 1)); return n; };
+const prep = (g, glow = .15) => { const n = g.index ? g.toNonIndexed() : g; for (const k of Object.keys(n.attributes)) if (k !== 'position' && k !== 'normal' && k !== 'aG' && k !== 'aF') n.deleteAttribute(k);
+  if (!n.attributes.normal) n.computeVertexNormals(); if (!n.attributes.aG) n.setAttribute('aG', new THREE.Float32BufferAttribute(new Float32Array(n.attributes.position.count).fill(glow), 1));
+  if (!n.attributes.aF) n.setAttribute('aF', new THREE.Float32BufferAttribute(new Float32Array(n.attributes.position.count), 1)); return n; };   /* aF = 용암 폭포 자리 (얼음은 늘 0) */
 const smoothG = Q => { const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(Q, 3)); const m = mergeVertices(g, 1e-4); m.computeVertexNormals(); return m; };
 const prepS = g => { const n = g.index ? g.toNonIndexed() : g; for (const k of Object.keys(n.attributes)) if (k !== 'position' && k !== 'normal') n.deleteAttribute(k); if (!n.attributes.normal) n.computeVertexNormals(); return n; };
 
@@ -55,8 +56,68 @@ export function snowMaterial(uT) {
     fragmentShader: 'precision highp float; varying vec3 vW; varying vec3 vN; uniform float uT; uniform vec3 uSun;\n' + SNOW_GLSL +
       'void main(){ vec3 n=normalize(vN); if(!gl_FrontFacing) n=-n; gl_FragColor=vec4(snowTone(n,normalize(cameraPosition-vW),vW,uSun,uT),1.); }' });
 }
+/* ── 용암 바위 벽 재질 (사용자 참고 그림 2026-11-05) ──
+   ① 검붉은 현무암 몸통: 면마다 조금씩 다른 어두운 바위색 · 위를 향한 면은 식은 재처럼 살짝 회색
+   ② 겉의 빛나는 금: 바위 겉에 그물처럼 퍼진 주황 금, 굵은 금 속은 노랗게 더 뜨거움 · 아래쪽(땅 가까이)일수록 더 뜨겁게 빛남 · 천천히 숨 쉼
+   ③ 조각 사이 틈(aG): 깊은 골에서 붉은 빛이 새어 나옴
+   ④ 용암 폭포(aF): 윗단에서 넘친 용암이 앞면을 타고 흘러내림 — 세로로 늘어진 흐름 무늬가 아래로 흐르고, 가운데는 노랗게, 가장자리는 식어 붉고 검은 껍질 */
+const LNOISE = `float lh(vec3 p){ return fract(sin(dot(p,vec3(127.1,311.7,74.7)))*43758.5453); }
+/* 깨진 판 금: 2D 판 나눔에서 '가장 가까운 두 판 중심까지 거리 차' = 금까지 거리 (0이면 금 위) · 판 번호도 돌려줌 */
+vec2 lvor(vec2 x){ vec2 n=floor(x), f=fract(x); float d1=8., d2=8., id=0.;
+  for(int j=-1;j<=1;j++) for(int i=-1;i<=1;i++){ vec2 g=vec2(float(i),float(j)); vec2 o=vec2(lh(vec3(n+g,1.)),lh(vec3(n+g,2.)))*.8+.1; float d=length(g+o-f);
+    if(d<d1){ d2=d1; d1=d; id=lh(vec3(n+g,3.)); } else if(d<d2) d2=d; }
+  return vec2(d2-d1,id); }
+float lnz(vec3 p){ vec3 i=floor(p),f=fract(p); f=f*f*(3.-2.*f); return mix(mix(mix(lh(i),lh(i+vec3(1,0,0)),f.x),mix(lh(i+vec3(0,1,0)),lh(i+vec3(1,1,0)),f.x),f.y),mix(mix(lh(i+vec3(0,0,1)),lh(i+vec3(1,0,1)),f.x),mix(lh(i+vec3(0,1,1)),lh(i+vec3(1,1,1)),f.x),f.y),f.z); }`;
+export function lavaRockMaterial(uT) {
+  const m = new THREE.MeshStandardMaterial({ color: 0x070404, roughness: .95, metalness: 0, flatShading: true, envMapIntensity: .04 });
+  m.onBeforeCompile = sh => { sh.uniforms.uT = uT;
+    sh.vertexShader = 'attribute float aG; attribute float aF; varying float vG; varying float vF; varying vec3 vIw; varying vec3 vNw;\n' + sh.vertexShader.replace('#include <project_vertex>', '#include <project_vertex>\n vG=aG; vF=aF; vIw=(modelMatrix*vec4(transformed,1.)).xyz; vNw=normalize(mat3(modelMatrix)*objectNormal);');
+    sh.fragmentShader = 'uniform float uT; varying float vG; varying float vF; varying vec3 vIw; varying vec3 vNw;\n' + LNOISE + '\n' + sh.fragmentShader
+      .replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>
+      { float fh=lh(floor(vNw*5.)+floor(vIw*.8)); diffuseColor.rgb*=(.65+.6*fh)*.45;   /* 검은 현무암: 해가 세도 숯처럼 어둡게 */                                   /* 면마다 다른 바위색 */
+        diffuseColor.rgb=mix(diffuseColor.rgb,vec3(.2,.18,.17),smoothstep(.6,.95,vNw.y)*.35);                    /* 위 면: 식은 재 */
+        /* 겉 금: 바위 면이 보는 쪽 평면에 판을 나눠 금을 그음(옆면은 길이·높이, 윗면은 바닥 평면) — 큰 판 금 + 그 안의 잔금 */
+        vec3 an=abs(vNw); vec2 uv=an.y>.7?vIw.xz:(an.x>an.z?vIw.zy:vIw.xy); uv+=vec2(lnz(vIw*.7),lnz(vIw*.7+4.))*.5;
+        vec2 v1=lvor(uv*vec2(1.1,.8)), v2=lvor(uv*2.6+7.);
+        float wv=.05+.05*lnz(vIw*.4); float low=smoothstep(2.4,.0,vIw.y);
+        float hotz=smoothstep(.42,.68,lnz(vIw*.45+2.)+low*.25);                                                     /* 뜨거운 곳만 금이 벌어져 빛남 (나머지는 식어 어두운 금) */
+        float crack=smoothstep(wv,0.,v1.x)*hotz, crack2=smoothstep(.04,0.,v2.x)*.5*step(.55,v2.y)*hotz, cold=smoothstep(.035,0.,v1.x)*(1.-hotz);
+        float halo=smoothstep(.2,0.,v1.x)*.12*hotz;
+        float seam=pow(clamp(vG,0.,1.),1.5);
+        float pulse=.82+.18*sin(uT*1.2+lnz(vIw*.18)*9.);
+        diffuseColor.rgb*=.8+.4*v1.y;                                                                                 /* 판마다 바위색이 조금씩 다름 */
+        float L=crack+crack2+cold*.6; diffuseColor.rgb*=1.-min(1.,L)*.9;
+        totalEmissiveRadiance+=(mix(vec3(.75,.12,.01),vec3(1.,.5,.06),crack*crack)*(crack*.95+crack2*.6)+vec3(.45,.06,.0)*halo)*pulse*(.5+.6*low)
+                              +vec3(.7,.14,.02)*seam*(.25+.8*low)*pulse;
+        if(vF>.02){ /* 용암 폭포 */
+          float s1=lnz(vec3(vIw.x*2.6,vIw.y*.55+uT*1.1,vIw.z*2.6)), s2=lnz(vec3(vIw.x*6.,vIw.y*1.3+uT*1.9,vIw.z*6.)+3.);
+          float cov=smoothstep(.18,.55,vF+(lnz(vIw*1.4+uT*.2)-.5)*.35);
+          float core=smoothstep(.45,.95,vF)*(.55+.45*s1);
+          float crust=smoothstep(.35,.15,vF)*smoothstep(.55,.8,s2);                                               /* 가장자리 식은 껍질 */
+          diffuseColor.rgb=mix(diffuseColor.rgb,vec3(.06,.015,.0),cov);
+          totalEmissiveRadiance=mix(totalEmissiveRadiance,mix(vec3(.85,.18,.01),vec3(1.,.58,.1),core)*(.7+.35*s2)*(1.-crust*.75),cov); } }`); };
+  m.customProgramCacheKey = () => 'lava-wall-ref';
+  return m;
+}
+/* 용암 윗단·발치 웅덩이 재질: 식어 갈라진 검은 껍질 판 사이로 녹은 용암이 흐름 · 낮은 곳(발치 웅덩이)은 녹은 곳이 훨씬 넓음 · 흐름이 천천히 일렁임 */
+export function lavaTopMaterial(uT) {
+  return new THREE.ShaderMaterial({ uniforms: { uT: uT || { value: 0 }, uSun: { value: new THREE.Vector3(-.45, .78, -.42).normalize() } },
+    vertexShader: 'varying vec3 vW; varying vec3 vN; void main(){ vec4 w=modelMatrix*vec4(position,1.); vW=w.xyz; vN=normalize(mat3(modelMatrix)*normal); gl_Position=projectionMatrix*viewMatrix*w; }',
+    fragmentShader: 'precision highp float; varying vec3 vW; varying vec3 vN; uniform float uT; uniform vec3 uSun;\n' + LNOISE + `
+      void main(){ vec3 n=normalize(vN); if(!gl_FrontFacing) n=-n; vec2 p=vW.xz;
+        vec2 wq=vec2(lnz(vec3(p*.5,1.)),lnz(vec3(p*.5,5.)))*.6; vec2 v1=lvor(p*.9+wq), v2=lvor(p*2.3+wq*2.+9.);
+        float lowk=smoothstep(.9,.15,vW.y);
+        float pool=smoothstep(.62,.78,lnz(vec3(p*.3,7.)))*lowk*.85;
+        float hz=smoothstep(.38,.62,lnz(vec3(p*.35,11.))+lowk*.2); float m=max(max(smoothstep(.06+.08*lowk,.0,v1.x)*hz,smoothstep(.05,.0,v2.x)*.6*step(.4,v2.y)),pool);   /* 껍질 판 사이 금으로 녹은 용암 · 낮은 곳일수록 금이 넓음 */
+        float sh=lnz(vec3(p*3.,uT*.6)); float pulse=.85+.15*sin(uT*1.5+lnz(vec3(p*.15,1.))*10.);
+        vec3 lava=mix(vec3(.8,.14,.01),vec3(1.,.55,.08),smoothstep(.55,1.,m)*(.6+.4*sh))*pulse;
+        float d=max(dot(n,uSun),0.); vec3 crust=vec3(.016,.012,.011)*(.35+.9*d)*(.7+.6*v1.y)+vec3(.03,.006,.0)*lowk;
+        crust+=vec3(.6,.12,.02)*smoothstep(.12,.0,abs(m-.5))*.25;                                                      /* 껍질 가장자리 붉게 달아오름 */
+        gl_FragColor=vec4(mix(crust,lava,smoothstep(.35,.65,m)),1.); }` });
+}
 export function makeIceWall(path, opt = {}) {
-  const uT = opt.uT || { value: 0 }, mat = opt.mat || iceWallMaterial(uT), smat = opt.smat || snowMaterial(uT), doors = opt.doors || [true, true];
+  const LV = opt.kind === 'lava';   /* 용암 바위 벽: 같은 뼈대(한 덩어리 절벽·둥근 끝·문기둥) + 재질·폭포·웅덩이만 다름 */
+  const uT = opt.uT || { value: 0 }, mat = opt.mat || (LV ? lavaRockMaterial(uT) : iceWallMaterial(uT)), smat = opt.smat || (LV ? lavaTopMaterial(uT) : snowMaterial(uT)), doors = opt.doors || [true, true];
   const seed = opt.seed || 3, R = (() => { let s = seed * 7919 + 7; return () => (s = (s * 9301 + 49297) % 233280) / 233280; })(), o = seed * 1.3;
   /* 입구 모양 (시안 비교, 사용자 2026-11-05): pillar 결정 문기둥 · arch 부서진 아치 · breach 깨져 벌어진 틈 · sill 빛나는 문턱
      입구 것은 따로 뽑는 수(RG)로 → 입구만 바뀌고 나머지 벽은 시안마다 똑같음 */
@@ -80,6 +141,10 @@ export function makeIceWall(path, opt = {}) {
     for (const s of L) { const dd = d - s.d - s.lean * yk * 2; if (Math.abs(dd) > s.w) continue; const t0 = (yk - s.y0) / Math.max(.05, s.y1 - s.y0); if (t0 < 0 || t0 > 1.05) continue;
       const env = Math.min(1, t0 / .25, (1.05 - t0) / .3); if (env <= 0) continue; const v = s.p * (1 - Math.abs(dd) / s.w) * env; if (v > m) { m = v; } }
     return m; };
+  /* 용암 폭포 자리: 6~11m마다 하나, 폭 0.5~1.1m (문 가까이는 비움) */
+  const FALLS = []; if (LV) { const RF2 = (() => { let s = seed * 3571 + 5; return () => (s = (s * 9301 + 49297) % 233280) / 233280; })();
+    for (let d = 3 + RF2() * 4; d < len - 3; d += 6 + RF2() * 5) FALLS.push([d, .5 + RF2() * .6]); }
+  const fallAt = d => { let m = 0; for (const [c, w] of FALLS) m = Math.max(m, Math.exp(-Math.pow((d - c) / w, 2))); return m; };
   const p = new THREE.Vector3(), tg = new THREE.Vector3(), fr = [];
   for (let i = 0; i <= N; i++) { const d = i / N * len; curve.getPointAt(i / N, p); curve.getTangentAt(i / N, tg); let nx = -tg.z, nz = tg.x; const sg = opt.out ? opt.out(p.x, p.z, nx, nz) : 1; nx *= sg; nz *= sg;
     fr.push({ d, x: p.x, z: p.z, nx, nz, tx: tg.x, tz: tg.z, h: topH(d), sg }); }
@@ -90,16 +155,16 @@ export function makeIceWall(path, opt = {}) {
   /* 단면: 앞면(아래→위) 줄 · 윗단 · 뒷면(위→아래) 줄 — 줄마다 (v, y, 빛) */
   const RF = [0, .06, .13, .21, .3, .4, .5, .6, .7, .79, .87, .94, 1], RB = [0, .2, .45, .7, .9, 1];
   const faceRow = (f, side, yk) => { const y = Math.max(-.3, -.3 + (f.h + .3) * yk), off = shardOff(f.d, yk, side), foot = Math.max(0, .18 - yk) * 2, lean = -.06 * yk;
-    const base = W + foot + (vn(f.d * .35 + side * 9, yk * 2, o) - .5) * .35 + lean; return [side * (base + off) * f.sv, y, (1 - off / PMAX) * (.4 + .6 * (1 - yk))]; };
+    const base = W + foot + (vn(f.d * .35 + side * 9, yk * 2, o) - .5) * .35 + lean; return [side * (base + off) * f.sv, y, (1 - off / PMAX) * (.4 + .6 * (1 - yk)), side < 0 ? fallAt(f.d + (vn(yk * 3, f.d, o) - .5) * .35) * (.55 + .45 * yk) : 0]; };   /* 앞면만 폭포 · 위에서 넘쳐 아래로 갈수록 조금 가늘어짐 */
   const section = f => { const out = [];
     for (const yk of RF) out.push(faceRow(f, -1, yk));
-    out.push([(-W + .25 + (vn(f.d * .8, 3, o) - .5) * .2) * f.sv, f.h + .05 * f.sv, .05], [(vn(f.d * .6, 5, o) - .5) * .6 * f.sv, f.h + (.12 + vn(f.d * .4, 6, o) * .15) * f.sv, .05], [(W - .25) * f.sv, f.h + .03 * f.sv, .05]);
+    { const fa = fallAt(f.d); out.push([(-W + .25 + (vn(f.d * .8, 3, o) - .5) * .2) * f.sv, f.h + .05 * f.sv, .05, fa], [(vn(f.d * .6, 5, o) - .5) * .6 * f.sv, f.h + (.12 + vn(f.d * .4, 6, o) * .15) * f.sv, .05, fa * .5], [(W - .25) * f.sv, f.h + .03 * f.sv, .05, 0]); }
     for (let k = RB.length - 1; k >= 0; k--) out.push(faceRow(f, 1, RB[k]));
     return out; };
-  const S = fr.map(section), M = S[0].length, P = [], G = [];
+  const S = fr.map(section), M = S[0].length, P = [], G = [], F = [];
   const pt = (i, k) => { const f = fr[i], [v, y] = S[i][k]; return [f.x + f.nx * v, y, f.z + f.nz * v]; };
-  const tri = (a, b, c, ga, gb, gc) => { if (FL) { P.push(...a, ...c, ...b); G.push(ga, gc, gb); } else { P.push(...a, ...b, ...c); G.push(ga, gb, gc); } };
-  for (let i = 0; i < N; i++) for (let k = 0; k < M - 1; k++) { const a = pt(i, k), b = pt(i + 1, k), c = pt(i, k + 1), d = pt(i + 1, k + 1), g = (ii, kk) => S[ii][kk][2];
+  const tri = (a, b, c, ga, gb, gc) => { if (FL) { P.push(...a, ...c, ...b); G.push(ga[0], gc[0], gb[0]); F.push(ga[1], gc[1], gb[1]); } else { P.push(...a, ...b, ...c); G.push(ga[0], gb[0], gc[0]); F.push(ga[1], gb[1], gc[1]); } };
+  for (let i = 0; i < N; i++) for (let k = 0; k < M - 1; k++) { const a = pt(i, k), b = pt(i + 1, k), c = pt(i, k + 1), d = pt(i + 1, k + 1), g = (ii, kk) => [S[ii][kk][2], S[ii][kk][3] || 0];
     tri(a, c, b, g(i, k), g(i, k + 1), g(i + 1, k)); tri(b, c, d, g(i + 1, k), g(i, k + 1), g(i + 1, k + 1)); }
   /* 끝 단면: 단면 테두리를 그대로 따라 세모로 나눠 막음(가운데 한 점 부채 X → 들어간 곳이 겹치거나 비지 않음) · 바깥(길 방향)을 보게 */
   const capPoly = (i, ring, glow, out) => { const f = fr[i], dir = i === 0 ? -1 : 1, tx = f.tx * dir, tz = f.tz * dir;
@@ -108,9 +173,9 @@ export function makeIceWall(path, opt = {}) {
     for (const [x, y, z] of tris) { const A = W3(ring[x]), B = W3(ring[y]), C = W3(ring[z]);
       const ux = B[0] - A[0], uy = B[1] - A[1], uz = B[2] - A[2], vx = C[0] - A[0], vy = C[1] - A[1], vz = C[2] - A[2];
       const nx = uy * vz - uz * vy, nz = ux * vy - uy * vx; const ok = nx * tx + nz * tz >= 0;
-      if (ok) out.push(A, B, C); else out.push(A, C, B); if (glow) G.push(glow, glow, glow); } };
+      if (ok) out.push(A, B, C); else out.push(A, C, B); if (glow) { G.push(glow, glow, glow); F.push(0, 0, 0); } } };
   for (const i of [0, N]) { const L = []; capPoly(i, S[i].map(q => [q[0], q[1]]), .3, L); for (const q of L) P.push(...q); }
-  const ice = []; { const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(P, 3)); g.setAttribute('aG', new THREE.Float32BufferAttribute(G, 1)); g.computeVertexNormals(); ice.push(g); }
+  const ice = []; { const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(P, 3)); g.setAttribute('aG', new THREE.Float32BufferAttribute(G, 1)); g.setAttribute('aF', new THREE.Float32BufferAttribute(F, 1)); g.computeVertexNormals(); ice.push(g); }
   const snow = [];
   /* ④ 눈: 윗단 전체 + 앞 모서리로 둥글게 넘쳐 흘러내림 */
   /* 눈이 얹히는 모서리 자리는 앞뒤 단면 몇 개를 고르게 평균 → 얼음 조각의 잔 들쭉날쭉이 눈에 세로 줄무늬로 옮지 않게 */
@@ -132,11 +197,16 @@ export function makeIceWall(path, opt = {}) {
     const P2 = g.attributes.position; for (let j = 0; j < P2.count; j++) { P2.setX(j, P2.getX(j) * (1 + (R() - .5) * .25)); P2.setZ(j, P2.getZ(j) * (.75 + R() * .3)); }
     g.rotateY(R() * 6); g.rotateZ(tilt * (R() < .5 ? -1 : 1)); g.rotateX((R() - .5) * tilt); g.translate(f.x + f.nx * v, f.h + hh / 2 - .3, f.z + f.nz * v); ice.push(prep(g, .55)); };
   /* 결정 하나: 육각 기둥 + 뾰족한 끝, 기울기(lx,lz 쪽으로 lean) — 문기둥용 */
-  const crystal = (x, z, y0, hh, r, lx, lz, lean, glow) => { const body = new THREE.CylinderGeometry(r * .92, r, hh * .76, 6, 2), tip = new THREE.ConeGeometry(r * .92, hh * .24, 6, 1);
-    body.translate(0, hh * .38, 0); tip.translate(0, hh * .76 + hh * .12, 0); const g = mergeGeometries([body.toNonIndexed(), tip.toNonIndexed()]);
+  const crystal = (x, z, y0, hh, r, lx, lz, lean, glow) => { let g;
+    if (LV) { /* 용암: 결정 대신 날카롭게 깨진 바위 뿔 — 5모 뿔, 마디마다 크게 어긋나 거칠게 */
+      g = new THREE.CylinderGeometry(r * .06, r * 1.1, hh, 5, 4).toNonIndexed(); const P3 = g.attributes.position;
+      for (let j = 0; j < P3.count; j++) { const yy = P3.getY(j) / hh + .5, k = 1 + (hs(Math.round(P3.getX(j) * 40), Math.round(yy * 4), seed) - .5) * .45; P3.setX(j, P3.getX(j) * k); P3.setZ(j, P3.getZ(j) * k * .85); }
+      g.translate(0, hh / 2, 0); }
+    else { const body = new THREE.CylinderGeometry(r * .92, r, hh * .76, 6, 2), tip = new THREE.ConeGeometry(r * .92, hh * .24, 6, 1);
+    body.translate(0, hh * .38, 0); tip.translate(0, hh * .76 + hh * .12, 0); g = mergeGeometries([body.toNonIndexed(), tip.toNonIndexed()]); }
     const P2 = g.attributes.position; for (let j = 0; j < P2.count; j++) { const yy = P2.getY(j); P2.setX(j, P2.getX(j) * (1 + (hs(j % 7, seed, 1) - .5) * .15)); P2.setZ(j, P2.getZ(j) * (.8 + hs(j % 5, seed, 2) * .25)); }
     g.rotateY(RG() * 6); const q = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), new THREE.Vector3(lx * lean, 1, lz * lean).normalize()); g.applyQuaternion(q);
-    g.translate(x, y0, z); ice.push(prep(g, glow)); };
+    g.translate(x, y0, z); g.computeVertexNormals(); ice.push(prep(g, LV ? glow * .5 : glow)); };
   /* 결정 하나를 아무 방향(dv)으로 · cut = 끝을 비스듬히 부러뜨린 단면(뾰족한 끝 대신, 단면 속빛 세게) */
   const crystalDir = (x, y, z, dv, hh, r, glow, cut) => { const body = new THREE.CylinderGeometry(r * .9, r, hh * (cut ? 1 : .76), 6, 2); body.translate(0, hh * (cut ? .5 : .38), 0);
     let g; if (cut) { g = body.toNonIndexed(); const P2 = g.attributes.position, tilt = new THREE.Vector3(RG() - .5, 1.4, RG() - .5).normalize();
@@ -176,7 +246,7 @@ export function makeIceWall(path, opt = {}) {
   function rockAt(x, z, s, bk = Math.floor(RG() * 999), Rr = RG) { const g = prep(block(seed * 31 + bk).clone(), .2), sy = s * (.75 + Rr() * .45); const R = Rr;
     g.scale(s * (.9 + R() * .4), sy, s * (.8 + R() * .3)); g.rotateY(R() * 6); g.translate(x, sy * .25, z); ice.push(g);
     /* 바위 위 눈: 바위 윗면 모양 그대로 따라 쌓임 (각진 면엔 각지게) · 바람 쪽으로 쏠림 · 바위마다 양이 다름(안 덮인 것도) */
-    const amt = R(); if (amt > .2) { const th = (amt > .75 ? .2 : amt > .45 ? .11 : .05) * Math.min(1.4, s + .3), wind = new THREE.Vector3(R() - .5, 0, R() - .5).normalize(), lim = .42 - amt * .15;
+    const amt = R(); if (amt > .2 && !LV) { const th = (amt > .75 ? .2 : amt > .45 ? .11 : .05) * Math.min(1.4, s + .3), wind = new THREE.Vector3(R() - .5, 0, R() - .5).normalize(), lim = .42 - amt * .15;
       g.computeVertexNormals(); const A = g.attributes.position, Nn = g.attributes.normal, Q = [], a = new THREE.Vector3(), nn = new THREE.Vector3();
       for (let t = 0; t < A.count; t += 3) { nn.fromBufferAttribute(Nn, t); if (nn.y + nn.dot(wind) * .35 < lim) continue;
         for (let k = 0; k < 3; k++) { a.fromBufferAttribute(A, t + k); const w = th * (.6 + .8 * vn(a.x * 3, a.y * 3, a.z * 3)) * Math.min(1, (nn.y - lim + .15) * 2);
@@ -184,7 +254,7 @@ export function makeIceWall(path, opt = {}) {
       if (Q.length) { const c = new THREE.BufferGeometry(); c.setAttribute('position', new THREE.Float32BufferAttribute(Q, 3)); c.computeVertexNormals(); snow.push(c); } } };
   for (let d = .5 + R(); d < len - .3; d += .9 + R() * 2.2) { const big = R() < .35; rock(d, -(W + 1.2 + R() * (big ? 1.6 : 2.6)), big ? .9 + R() * .9 : .25 + R() * .4); }
   for (let d = 1 + R() * 2; d < len - .5; d += 2.5 + R() * 4) rock(d, W + 1.1 + R() * 1.2, .3 + R() * .6);
-  /* 앞쪽 땅 눈밭 (들쭉날쭉한 가장자리) */
+  /* 앞쪽 땅 눈밭 (들쭉날쭉한 가장자리) · 용암 벽은 같은 자리가 흘러내린 용암이 고인 웅덩이 */
   { const Q = [], sk = (i, k) => { const f = fr[i], reach = 2.4 + vn(f.d * .3, 4, o) * 3.2, vv = -(W * f.sv + .2 + [0, .6, reach * .55, reach][k] * f.sc)   /* 벽 끝으로 갈수록 발치 눈밭도 둥글게 줄어듦 */, y = [.55, .32, .14, -.04][k] + (k < 3 ? (vn(f.d * 1.5, k, o) - .5) * .1 : 0);
       return [f.x + f.nx * vv, y, f.z + f.nz * vv]; };
     for (let i = 0; i < N; i++) for (let k = 0; k < 3; k++) { const a = sk(i, k), b = sk(i + 1, k), c = sk(i, k + 1), d = sk(i + 1, k + 1); (!FL) ? Q.push(...a, ...b, ...c, ...b, ...d, ...c) : Q.push(...a, ...c, ...b, ...b, ...c, ...d); }
