@@ -4,8 +4,8 @@
    · 맞은 해파리 위에 피해 숫자가 떠오름 (튕겨서 맞으면 ×1.5 표시 · 쓰러뜨린 한 방은 크게)
    · 아래: 사냥터 / 수정 기둥 / 숨을 곳으로 바로 옮기기 · 해파리 다시 채우기 */
 import * as THREE from 'three';
-import { SHOT, SHOT_IDS } from './shots.js?v=11041635';
-import { makeDuel } from './duel.js?v=11041635';
+import { SHOT, SHOT_IDS } from './shots.js?v=11041642';
+import { makeDuel } from './duel.js?v=11041642';
 
 const css = `
 #rgSel{position:fixed;top:calc(env(safe-area-inset-top,0px) + 10px);left:50%;transform:translateX(-50%);display:flex;flex-direction:column;align-items:flex-start;gap:4px;z-index:7;touch-action:none}
@@ -92,10 +92,14 @@ export function makeRange({ shots, fly, FS, cam, hunt, jel, crystals, bushes, sa
      밀려나면 잠깐 굳었다 제자리로 돌아옴 · 옆에 벽이 있는 트인 자리 (튕김 시험) */
   let dummies = [], trainOn = false; const tags = [];
   const tagBox = document.createElement('div'); tagBox.style.cssText = 'position:fixed;inset:0;pointer-events:none;z-index:4'; document.body.appendChild(tagBox);
+  const clear = (x, z, r) => { if (B.blocked(x, z)) return false; for (let k = 0; k < 12; k++) { const a = k / 12 * 6.283; if (B.blocked(x + Math.cos(a) * r, z + Math.sin(a) * r)) return false; } return true; };
+  const SPOTS = [[0, 0], [5, 0], [20, 0], [14, -7], [12, 8], [6, 8], [18, 8], [6, -6]];   /* 기체 · 허수아비들 (움직이는 것은 오가는 끝까지) */
   const findTrain = () => { let best = null, bs = -1;
     for (let x = -170; x <= 170; x += 4) for (let z = -170; z <= 170; z += 4) { if (B.blocked(x, z) || B.region(x, z) === 17 || Math.hypot(x, z) < 75 || (rooms || []).some(([rx, rz]) => Math.hypot(rx - x, rz - z) < 34)) continue;   /* 태어나는 방 근처는 뺌 */ if (jel.userData.list.some(j => j.on && !j.dummy && Math.hypot(j.x - x, j.z - z) < 32)) continue;
       let free = 0; for (let rr = 3; rr <= 21; rr += 3) { let ok = true; for (let k = 0; k < 24; k++) { const a = k / 24 * 6.283; if (B.blocked(x + Math.cos(a) * rr, z + Math.sin(a) * rr)) { ok = false; break; } } if (!ok) break; free = rr; }
       let wall = 0; for (let k = 0; k < 24; k++) { const a = k / 24 * 6.283; for (let rr = free + 1; rr <= free + 8; rr += 1) if (B.blocked(x + Math.cos(a) * rr, z + Math.sin(a) * rr)) { wall++; break; } }   /* 바로 바깥에 벽이 있으면 좋음 */
+      if (free < 9) continue;   /* 너무 좁은 곳은 뺌 */
+      if (!SPOTS.every(([ox, oz]) => { if (!clear(x - 10 + ox, z + oz, 1.6)) return false; const L = Math.hypot(ox, oz); for (let d = 1; d < L; d += 1) if (B.blocked(x - 10 + ox * d / L, z + oz * d / L)) return false; return true; })) continue;   /* 기체에서 허수아비까지 가는 길에도 벽 없음 */   /* 기체 자리·허수아비 자리 하나하나 둘레 1.6m 비었는지 */
       const sc = Math.min(free, 21) + Math.min(wall, 8) * .3; if (sc > bs) { bs = sc; best = [x, z]; } }
     return best; };
   const startTrain = () => { const sp = findTrain(); if (!sp) { say?.('트인 자리를 못 찾았어요'); return; } const [cx, cz] = sp, x = cx - 10, z = cz; fly.userData.moveTo(x, z, -Math.PI / 2); cam.x = x; cam.z = z;   /* 나는 왼쪽에서 오른쪽(+x)을 봄 — 화면 가로가 길어서 멀리 선 것까지 보임 */

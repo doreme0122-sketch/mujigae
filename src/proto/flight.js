@@ -10,9 +10,9 @@
    무게: 기체 한 대 + 불꽃 띠 몇 장 + 꼬리 띠 하나 + 불티 점 묶음 하나 + 그림자 판 하나 */
 import * as THREE from 'three';
 import { buildShip, engineSpots } from '../core/ships/build.js';
-import { flameMesh } from './sortie.js?v=11041635';
-import { MAP } from './mapfloor.js?v=11041635';
-import { applyShipHeat, heatVis } from './shipheat.js?v=11041635';
+import { flameMesh } from './sortie.js?v=11041642';
+import { MAP } from './mapfloor.js?v=11041642';
+import { applyShipHeat, heatVis } from './shipheat.js?v=11041642';
 
 export const FLY = { LEN: 2, HOVER: .7, R: .8, SPEEDS: [9, 12, 15, 18], TURN: 7, ACC: .22, TURNMAX: 9,
   BASE: 9, SHIELD: 3, BOOST: 5, BOOSTK: 1.5 };   /* 기지 고리(반지름 9m)를 벗어나는 순간: 보호막 3초 · 가속 5초(1.5배) — 기지 출구 앞 매복에 바로 당하지 않게 */
@@ -137,6 +137,7 @@ export async function makeFlight(renderer, B, start, face) {
     if (t < (S.dashUntil || 0)) { S.vx = S.dashVx; S.vz = S.dashVz; S.dashOn = true; }
     else if (S.dashOn) { S.dashOn = false; const k = S.dashEndK ?? 1; S.vx *= k; S.vz *= k; S.dashEndK = 1; }   /* 밀림이 끝나는 순간 남은 속도를 줄여 정해 둔 거리에서 딱 멈춤 (반동 뒤 미끄러져 더 가던 것) */   /* 빛 칼날 도약: 베는 동안 앞으로 확 나감 (벽 미끄러짐은 아래 그대로) */
     const ex = S.ex || 0, ez = S.ez || 0; S.vx += ex; S.vz += ez;                                   /* 바깥 힘(블랙홀 소용돌이 흐름)을 실어 같이 움직임 — 벽 미끄러짐도 같이 적용 */
+    if (!free(S.x, S.z)) { out: for (let r = .25; r <= 6; r += .25) for (let k = 0; k < 16; k++) { const a = k * Math.PI / 8, x = S.x + Math.cos(a) * r, z = S.z + Math.sin(a) * r; if (free(x, z)) { S.x = x; S.z = z; break out; } } }   /* 어쩌다 벽에 묻혀 있으면(옮겨진 자리·밀림) 가장 가까운 빈 곳으로 꺼냄 — 묻힌 채로는 어느 쪽으로도 못 움직여 갇히던 것 */
     let hitV = 0, rem = dt;
     for (let it = 0; it < 3 && rem > 1e-5; it++) {
       const tx2 = S.x + S.vx * rem, tz2 = S.z + S.vz * rem;
