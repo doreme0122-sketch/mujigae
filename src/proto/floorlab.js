@@ -36,9 +36,9 @@ export function makeFloorLab() {
   const noise = bakeNoise();
   const ships = Array.from({ length: 2 }, () => new THREE.Vector4(0, 0, 0, 0));
   const mat = new THREE.ShaderMaterial({ depthWrite: true,
-    uniforms: { uN: { value: noise }, uK: { value: 0 }, uT: { value: 0 }, uSun: { value: new THREE.Vector3(-.45, .78, -.42).normalize() }, uShips: { value: ships } },
+    uniforms: { uN: { value: noise }, uK: { value: 0 }, uT: { value: 0 }, uSun: { value: new THREE.Vector3(-.45, .78, -.42).normalize() }, uShips: { value: ships }, uIV: { value: 0 } },
     vertexShader: 'varying vec3 vW; void main(){ vec4 w=modelMatrix*vec4(position,1.); vW=w.xyz; gl_Position=projectionMatrix*viewMatrix*w; }',
-    fragmentShader: `precision highp float; varying vec3 vW; uniform sampler2D uN; uniform float uK, uT; uniform vec3 uSun; uniform vec4 uShips[2];
+    fragmentShader: `precision highp float; varying vec3 vW; uniform sampler2D uN; uniform float uK, uT; uniform vec3 uSun; uniform vec4 uShips[2]; uniform float uIV;
       float h2(vec2 p){ p=fract(p*vec2(123.34,456.21)); p+=dot(p,p+45.32); return fract(p.x*p.y); }
       vec4 N4(vec2 p){ return texture2D(uN,p); }
       const vec3 SUN=vec3(1.,.94,.86), SKY=vec3(.42,.48,.62), GND=vec3(.16,.12,.1);
@@ -58,6 +58,34 @@ export function makeFloorLab() {
         c+=starLayer(ro,rd,320.,16.,.86,.55,3.1); c+=starLayer(ro,rd,140.,7.,.9,.6,7.3); c+=starLayer(ro,rd,48.,3.4,.95,.5,1.7); return c; }
       float blobR(vec2 q, float R, float ph){ float a=atan(q.y,q.x); return R*(1.+.1*sin(3.*a+1.3+ph)+.06*sin(5.*a-.7+ph*2.)+.04*sin(9.*a+2.+ph)); }
       float sdBlob(vec2 p, vec2 c, float ph){ vec2 q=p-c; return length(q)-blobR(q,22.,ph); }
+      /* 얼음 땅 (벽에 맞춤): 눈 많이(uIV 0) / 얼음 많이 + 눈 조금(uIV 1)
+         · 눈: 하얗고 푸른 눈 · 바람에 쓸린 잔물결 · 반짝임 · 그늘은 푸름
+         · 드러난 얼음: 맑은 청록 · 속 푸른 금빛(벽과 같은 빛) · 하늘을 비추는 매끈한 면
+         · 눈과 얼음 경계: 얇은 서리 테 · 작은 얼음 부스러기 · edge = 벽 가까이일수록 눈이 두꺼움(발치 눈밭과 이어짐) */
+      vec3 iceGround(vec2 p, vec3 rd, float edge){
+        vec2 wd=normalize(vec2(.8,.55)); float rip=sin(dot(p,wd)*2.4+N4(p*.05).g*9.)*.5+.5;
+        float cov=N4(p*.022).r*.65+N4(p*.075).g*.35+rip*.06;
+        float th=mix(.36,.66,uIV)-edge*.45;                                       /* 이 값보다 높으면 눈 */
+        float snow=smoothstep(th-.03,th+.04,cov); float dust=smoothstep(th-.08,th-.01,cov)*(1.-snow)*smoothstep(.45,.7,N4(p*.4).g+rip*.25);  /* 경계 앞 얼음 위에 흩날려 앉은 얇은 눈가루 */
+        float rim=exp(-pow((cov-th)/.018,2.))*(1.-snow*.4);                         /* 경계 서리 테 */
+        /* 눈 */
+        vec3 nS=normalize(vec3(-wd.x*cos(dot(p,wd)*2.4)*.06+(N4(p*.6).b-.5)*.08,1.,-wd.y*cos(dot(p,wd)*2.4)*.06+(N4(p*.6+.3).b-.5)*.08));
+        vec3 sb=vec3(.86,.91,.97)*(.9+.14*N4(p*.3).a);
+        vec3 cs=lit(sb,nS,rd,.06,10.)*.62; cs=mix(cs*vec3(.8,.9,1.12),cs,smoothstep(.0,1.,nS.y*2.-1.));
+        vec2 gq=p*3.6; float gh=h2(floor(gq)); if(gh>.975){ vec2 gf=fract(gq)-.5; cs+=vec3(.9,.95,1.)*exp(-dot(gf,gf)*60.)*.9; }
+        /* 드러난 얼음 */
+        vec3 nI=normalize(vec3((N4(p*.12).b-.5)*.12,1.,(N4(p*.12+.5).b-.5)*.12));
+        float cr1=abs(N4(p*.035+.6).g-.5), cr2=abs(N4(p*.09+.2).r-.5);
+        float crack=smoothstep(.007,.0,cr1)*smoothstep(.35,.6,N4(p*.05+.3).b)+smoothstep(.005,.0,cr2)*.45, halo=smoothstep(.05,.0,cr1)*.25;  /* 금은 군데군데만 · 가늘게 */
+        float deep=N4(p*.018+.9).r;
+        vec3 ib=mix(vec3(.04,.26,.4),vec3(.14,.52,.66),deep); float bub=step(.985,h2(floor(p*5.)))*smoothstep(.4,.8,deep);  /* 갇힌 공기방울 */
+        vec3 ci=lit(ib,nI,rd,1.2,90.)*.3+vec3(.55,.8,.95)*crack*.32+vec3(.1,.45,.7)*halo*.22+vec3(.03,.14,.22)*deep*.3+vec3(.4,.6,.7)*bub*.25;
+        float fr=pow(1.-max(-rd.y,0.),3.); ci+=vec3(.15,.25,.38)*fr*.25;            /* 매끈한 얼음이 하늘을 비춤 */
+        /* 작은 부스러기 */
+        vec2 cq=p*1.7; vec2 cc=floor(cq); float ch=h2(cc+7.); vec3 c=mix(ci,cs,snow);
+        if(ch>.93){ vec2 cf=fract(cq)-.5-vec2(h2(cc)-.5,h2(cc+3.)-.5)*.5; float r=length(cf); c=mix(c,mix(vec3(.12,.3,.42),vec3(.5,.58,.68),snow)*.45,smoothstep(.12,.06,r)); c*=1.-smoothstep(.16,.1,length(cf+vec2(.06,.05)))*.25; }
+        c=mix(c,cs*.85,dust*.4); c+=vec3(.6,.7,.82)*rim*.35;
+        return c; }
       void main(){
         vec3 ro=cameraPosition, rd=normalize(vW-ro); vec2 p=vW.xz; float dist=length(p-ro.xz); vec3 c;
         if(uK<.5){ /* 금속 판: 4m 판 · 이음매 · 모서리로 갈수록 살짝 둥글게 깎임(빛 받는 턱) · 볼트 · 긁힘 · 얼룩 */
@@ -95,6 +123,8 @@ export function makeFloorLab() {
           vec3 n=normalize(vec3((g-.5)*.06+(g2-.5)*.08, 1., (N4(p*.5+.4).a-.5)*.06));
           vec3 base=vec3(.17,.19,.22)*(.88+.22*a)+vec3(.012)*(g2-.5);
           c=lit(base,n,rd,.06,20.);
+        } else if(uK>5.5){ /* 얼음 벽 칸: 얼음 땅 (벽 줄 z=-12 가까이 눈 두껍게) */
+          c=iceGround(p,rd,smoothstep(9.,2.,abs(p.y+12.)));
         } else if(uK<4.5){ /* 보스존: 바닥도 그림자도 없는 우주 */
           c=deep(ro,rd);
         } else { /* 이음 시험: 얼음 땅 · 용암 땅 · 둘을 잇는 별빛 유리 큰길 */
@@ -116,14 +146,10 @@ export function makeFloorLab() {
           vec3 sky=deep(ro,rd);
           vec3 land=vec3(0.);
           if(landM>.01){
-            if(ice){ /* 얼음: 깊은 청록 얼음판 · 속에서 빛나는 금 · 눈 · 문턱 쪽 얇은 얼음 아래로 유리·별이 비침 */
-              float e=.35; float h=N4(p*.03).r*.7+N4(p*.11).b*.3, hx=N4((p+vec2(e,0.))*.03).r*.7+N4((p+vec2(e,0.))*.11).b*.3, hz=N4((p+vec2(0.,e))*.03).r*.7+N4((p+vec2(0.,e))*.11).b*.3;
-              vec3 n=normalize(vec3(-(hx-h)/e*1.4,1.,-(hz-h)/e*1.4));
-              float cr=abs(N4(p*.045+.6).g-.5), crack=1.-smoothstep(.003,.012,cr);
-              float snow=smoothstep(.55,.72,N4(p*.06+.2).r); float thin=doorZ*smoothstep(-3.,0.,sd);
-              vec3 base=mix(vec3(.05,.17,.26),vec3(.18,.36,.48),h); base=mix(base,vec3(.62,.72,.8),snow*.85);
-              land=lit(base,n,rd,.9*(1.-snow*.7),70.)*.13+vec3(.12,.4,.6)*crack*(1.-snow)*(1.-thin*.5);
-              land=mix(land,sky*1.3+vec3(.004,.012,.02),thin*.55*(1.-snow));
+            if(ice){ /* 얼음 땅: 벽에 맞춘 눈·얼음 땅 · 벽 가까이일수록 눈 두껍게 · 문턱 얇은 곳은 아래 유리·별이 비침 */
+              float thin=doorZ*smoothstep(-3.,0.,sd);
+              land=iceGround(p,rd,smoothstep(-7.,-1.5,sI));
+              land=mix(land,sky*1.3+vec3(.004,.012,.02),thin*.35);
               land=mix(land,vec3(.05,.08,.11),lip*.8);
             } else { /* 용암: 검은 현무암 껍질 · 숨 쉬듯 빛나는 붉은 결 · 부서진 옆면은 속이 붉게 */
               float e=.35; float h=N4(p*.035+.4).r*.6+N4(p*.14).b*.4, hx=N4((p+vec2(e,0.))*.035+.4).r*.6+N4((p+vec2(e,0.))*.14).b*.4, hz=N4((p+vec2(0.,e))*.035+.4).r*.6+N4((p+vec2(0.,e))*.14).b*.4;
