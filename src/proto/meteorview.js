@@ -9,11 +9,11 @@
    무게: 빛 가닥 700개는 한 묶음으로 한 번에(위치는 셰이더가 계산), 부스러기는 점 묶음 한 번 */
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
-import { makeBloom } from '../core/hangar/bloom.js?v=11041547';
-import { makePad } from '../core/hangar/pad.js?v=11041547';
-import { makeGoldStar } from './goldstar.js?v=11041547';
-import { makePerf } from './perf.js?v=11041547';
-import { makeMeteor, METEOR } from './meteor.js?v=11041547';
+import { makeBloom } from '../core/hangar/bloom.js?v=11041558';
+import { makePad } from '../core/hangar/pad.js?v=11041558';
+import { makeGoldStar } from './goldstar.js?v=11041558';
+import { makePerf } from './perf.js?v=11041558';
+import { makeMeteor, METEOR } from './meteor.js?v=11041558';
 
 const $ = s => document.querySelector(s), clamp = THREE.MathUtils.clamp;
 const { FALL } = METEOR, LINGER = .8, REST = .7, CYCLE = REST + FALL + LINGER;

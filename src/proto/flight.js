@@ -10,9 +10,9 @@
    무게: 기체 한 대 + 불꽃 띠 몇 장 + 꼬리 띠 하나 + 불티 점 묶음 하나 + 그림자 판 하나 */
 import * as THREE from 'three';
 import { buildShip, engineSpots } from '../core/ships/build.js';
-import { flameMesh } from './sortie.js?v=11041547';
-import { MAP } from './mapfloor.js?v=11041547';
-import { applyShipHeat, heatVis } from './shipheat.js?v=11041547';
+import { flameMesh } from './sortie.js?v=11041558';
+import { MAP } from './mapfloor.js?v=11041558';
+import { applyShipHeat, heatVis } from './shipheat.js?v=11041558';
 
 export const FLY = { LEN: 2, HOVER: .7, R: .8, SPEEDS: [9, 12, 15, 18], TURN: 7, ACC: .22, TURNMAX: 9,
   BASE: 9, SHIELD: 3, BOOST: 5, BOOSTK: 1.5 };   /* 기지 고리(반지름 9m)를 벗어나는 순간: 보호막 3초 · 가속 5초(1.5배) — 기지 출구 앞 매복에 바로 당하지 않게 */
@@ -126,7 +126,7 @@ export async function makeFlight(renderer, B, start, face) {
     if (S.armed && Math.hypot(S.x - start[0], S.z - start[1]) > FLY.BASE) { S.armed = false; S.shield = FLY.SHIELD; S.boost = FLY.BOOST; }
     if (S.shield > 0 && (S.shield -= dt) <= 0) { S.shield = 0; S.pop = .3; }
     if (S.boost > 0) S.boost = Math.max(0, S.boost - dt);
-    const bk = Math.min(1, S.boost / .6) * (1 - S.aimK), spd = S.speed * (1 + (FLY.BOOSTK - 1) * bk * bk * (3 - 2 * bk)) * (1 - .5 * (S.goo || 0)) * (t < (S.brakeUntil || 0) ? .6 : 1);   /* 해파리 점액 위: 50% 느려짐 (30%는 거의 안 느껴졌음 · 사용자) */
+    const bk = Math.min(1, S.boost / .6) * (1 - S.aimK), spd = S.speed * (1 + (FLY.BOOSTK - 1) * bk * bk * (3 - 2 * bk)) * (1 - .5 * (S.goo || 0)) * (t < (S.brakeUntil || 0) ? .6 : 1) * (1 - (S.extraSlow || 0));   /* 빛 칼날 자세 잡는 동안 30% 느려짐 */   /* 해파리 점액 위: 50% 느려짐 (30%는 거의 안 느껴졌음 · 사용자) */
     const sl = 1 - (S.fireSlow ?? .5) * S.aimK,   /* 쏘는 동안 느려지는 정도는 탄마다 (무거운 탄 60% · 모으는 중 65% …) */ tx = -Math.sin(S.mh) * spd * sl * m * (m > .08), tz = -Math.cos(S.mh) * spd * sl * m * (m > .08)   /* 쏘는 동안 느려짐 */, a = Math.min(1, dt / FLY.ACC);
     S.vx += (tx - S.vx) * a; S.vz += (tz - S.vz) * a;
     { const cap = S.speed * 1.9 * sl * (1 - .5 * (S.goo || 0)) + 1e-3, v = Math.hypot(S.vx, S.vz); if (v > cap && (S.aimK > .5 || (S.goo || 0) > .5)) { const k = Math.max(cap / v, 1 - dt * 6); S.vx *= k; S.vz *= k; } }   /* 쏘는 중·점액 위에선 가속 중이어도 확실히 느려짐 */

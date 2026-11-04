@@ -231,7 +231,7 @@ export function makeJellies(uT) {
       if (t < (j.kbUntil || 0)) { j.vx *= Math.exp(-dt * 4); j.vz *= Math.exp(-dt * 4); } else { j.vx *= Math.exp(-dt * 1.1); j.vz *= Math.exp(-dt * 1.1); }
       const nx = j.x + j.vx * dt, nz = j.z + j.vz * dt; if (!ctx.blocked || !ctx.blocked(nx, nz)) { j.x = nx; j.z = nz; } else { j.vx *= -.4; j.vz *= -.4; }
       /* 쏘기: 신호(몸이 부풀며 밝아짐 0.6초) → 느린 빛 방울 */
-      if (j.alert > .8 && ds < 16) { j.cd = (j.cd ?? 1.5 + Math.random() * 2) - dt * (1 - slw);   /* 서리 맞으면 뱉는 박자도 느려짐 */
+      if (j.alert > .8 && ds < 16 && !(t < (j.kbUntil || 0))) { j.cd = (j.cd ?? 1.5 + Math.random() * 2) - dt * (1 - slw);   /* 서리 맞으면 뱉는 박자도 느려짐 */
         if (j.cd <= .6 && !j.tell) { j.tell = t; }
         if (j.cd <= 0) { j.cd = (j.strong ? 2.2 : 3.2) + Math.random() * 1.5; j.tell = 0; ctx.spit?.(j, dsx / (ds || 1), dsz / (ds || 1)); j.ph = 0; } }
       else { j.tell = 0; } } };
@@ -243,7 +243,7 @@ export function makeJellies(uT) {
       if (!o.alarmAt || at < o.alarmAt) { if (t < (o.alarmUntil || 0) - 6) continue; o.alarmAt = at; signals.push({ a: j, b: o, t0: t, t1: at }); } } };
   /* 해파리 빛이 이 자리를 얼마나 비추나 (0~1): 숨을 곳에 있어도 해파리 빛 안이면 드러남 (사용자 2026-11-04) */
   G.userData.litAt = (x, z) => { let L = 0; for (const j of list) { if (!j.on || j.dieT > 0) continue; const r = (4.5 + 2.5 * j.alert) * j.s, d = Math.hypot(x - j.x, z - j.z); if (d < r) L = Math.max(L, 1 - (d / r) * (d / r)); } return L; };
-  G.userData.hit = (j, t, dx, dz, dmg = 4, o = {}) => { if (!j.on || j.dieT > 0) return false; if (!j.dummy && t - (j.sigT || -9) > 1.5) { j.sigT = t; alarm(j, t); } j.alarmUntil = t + 8; j.hitT = t; const km = (o.knock || 0) * (j.strong ? .5 : 1), kb = (j.strong ? .12 : .25) + km * 4; j.vx += dx * kb; j.vz += dz * kb; if (km > 0) j.kbUntil = Math.max(j.kbUntil || 0, t + .2 + km * .08);   /* 밀어내기: 잠깐 헤엄을 못 치고 밀려남 (밀린 거리 ≈ knock m · 센 몹은 절반) · 빠르게 밀리는 만큼 몸이 기울고 촉수가 끌려감 */ j.alert = 1; j.hp -= dmg;   /* 움찔 + 밀어내기(탄마다 m · 센 몹은 절반만 밀림) */
+  G.userData.hit = (j, t, dx, dz, dmg = 4, o = {}) => { if (!j.on || j.dieT > 0) return false; if (!j.dummy && t - (j.sigT || -9) > 1.5) { j.sigT = t; alarm(j, t); } j.alarmUntil = t + 8; j.hitT = t; const km = (o.knock || 0) * (j.strong ? .5 : 1), kb = (j.strong ? .12 : .25) + km * 4; j.vx += dx * kb; j.vz += dz * kb; if (km > 0) j.kbUntil = Math.max(j.kbUntil || 0, t + (o.stun ?? .2 + km * .08));   /* 근접탄: 밀려나는 동안 굳음 (흩뿌림 0.2초 · 무거운 탄 0.5초) — 이동도 공격도 못 함 */   /* 밀어내기: 잠깐 헤엄을 못 치고 밀려남 (밀린 거리 ≈ knock m · 센 몹은 절반) · 빠르게 밀리는 만큼 몸이 기울고 촉수가 끌려감 */ j.alert = 1; j.hp -= dmg;   /* 움찔 + 밀어내기(탄마다 m · 센 몹은 절반만 밀림) */
     if (o.slow) { j.slowK = Math.min(o.slowMax || .3, (t < (j.slowUntil || 0) ? j.slowK : 0) + o.slow); j.slowUntil = t + (o.slowT || 2); }   /* 서리: 맞을 때마다 10%씩 느려짐 · 최대 30% · 2초 */
     if (j.dummy) { j.hp = j.maxHp; return false; }   /* 허수아비: 체력 끝없음 */
     if (j.hp <= 0) { j.dieT = t; return true; } return false; };

@@ -4,8 +4,8 @@
    · 맞은 해파리 위에 피해 숫자가 떠오름 (튕겨서 맞으면 ×1.5 표시 · 쓰러뜨린 한 방은 크게)
    · 아래: 사냥터 / 수정 기둥 / 숨을 곳으로 바로 옮기기 · 해파리 다시 채우기 */
 import * as THREE from 'three';
-import { SHOT, SHOT_IDS } from './shots.js?v=11041547';
-import { makeDuel } from './duel.js?v=11041547';
+import { SHOT, SHOT_IDS } from './shots.js?v=11041558';
+import { makeDuel } from './duel.js?v=11041558';
 
 const css = `
 #rgSel{position:fixed;top:calc(env(safe-area-inset-top,0px) + 10px);left:50%;transform:translateX(-50%);display:flex;flex-direction:column;align-items:flex-start;gap:4px;z-index:7;touch-action:none}
@@ -53,7 +53,7 @@ export function makeRange({ shots, fly, FS, cam, hunt, jel, crystals, bushes, sa
   const f1 = v => Array.isArray(v) ? (v.length === 3 ? v.join(' → ') + ' (1·2·3단계)' : `${v[0]} ~ ${v[1]}`) : `${v}`;
   const traits = c => [c.n > 1 ? `한 번에 ${c.n}발 (${c.pat === 'v' ? 'V자' : '부채꼴'} ${c.ang}°)` : '', c.chargeT ? `누르는 동안 세 단계로 모임 (${c.chargeTH.join(' · ')}초) · 단계마다 사거리 ${c.range.join(' → ')}m · 떼면 나감 · 3단계는 1마리 꿰뚫음 · 모으는 동안 나갈 길이 보임` : '',
     c.pierce ? `${c.pierce + 1}마리까지 꿰뚫음 (뒤는 ${Math.round((c.pierceK || .7) * 100)}%)` : '', c.wallB && !c.beam ? `모든 벽에서 ${c.wallB}번 튕김` : '', c.blade ? '' : c.cryB ? `수정에서 ${c.cryB}번 튕김` : '수정에서 안 튕김',
-    c.knock ? `밀어내기 ${c.knock}m` : '', c.beam ? `누르는 동안 이어지는 빛 · 오래 비출수록 세짐 (${c.rampT}초에 ${c.dps[0]} → ${c.dps[1]}) · 벽·수정에서 ${c.wallB}번까지 꺾임` : '', c.prism ? '튕기는 순간 세 갈래 무지개로 갈라짐 (하나당 60%)' : '', c.homing ? '보이는 적을 쫓아감 (느림)' : '', c.blade ? `누르면 0.18초 멈췄다가 앞으로 ${c.lunge}m 튀어 나가며 벰 · 0.1초 뒤 한꺼번에 베임 · 자동 조준·끌기 없음 · 반사 안 됨` : '', c.curve ? '노린 적 쪽으로 휘어 들어감 (번갈아 왼쪽·오른쪽)' : '', c.slow ? `맞을 때마다 ${c.slow * 100}% 느리게 · 최대 ${c.slowMax * 100}% · ${c.slowT}초` : '',
+    c.knock ? `밀어내기 ${c.knock}m` : '', c.beam ? `누르는 동안 이어지는 빛 · 오래 비출수록 세짐 (${c.rampT}초에 ${c.dps[0]} → ${c.dps[1]}) · 벽·수정에서 ${c.wallB}번까지 꺾임` : '', c.prism ? '튕기는 순간 세 갈래 무지개로 갈라짐 (하나당 60%)' : '', c.homing ? '보이는 적을 쫓아감 (느림)' : '', c.blade ? `누르고 있으면 자세를 잡고 바닥에 베일 반달이 보임(30% 느려짐) · 떼면 바라보는 쪽으로 ${c.lunge}m 튀어 나가며 벰 · 세 번에 과열 · 자동 조준·끌기 없음 · 반사 안 됨` : '', c.selfPush ? `쏘면 나도 ${c.selfPush}m 밀려남 · 맞은 적은 ${c.stun}초 굳음` : '', c.curve ? '노린 적 쪽으로 휘어 들어감 (번갈아 왼쪽·오른쪽)' : '', c.slow ? `맞을 때마다 ${c.slow * 100}% 느리게 · 최대 ${c.slowMax * 100}% · ${c.slowT}초` : '',
     c.reveal ? `맞은 둘레 ${c.reveal}m를 ${c.revealT}초 밝힘 (안개·숨을 곳)` : '', `쏠 때 ${Math.round((c.chargeSlow || c.fireSlow) * 100)}% 느려짐`].filter(Boolean).join(' · ');
   const dpsOf = c => c.beam ? `${c.dps[0]} → ${c.dps[1]}` : c.blade ? `${Math.round(c.dmg * c.rate)} (베인 한 마리당)` : c.chargeT ? `${Math.round(c.dmg[c.dmg.length - 1] / Math.max(c.chargeT, 1 / c.rate) * 10) / 10}` : `${Math.round(c.rate * (Array.isArray(c.dmg) ? c.dmg[1] : c.dmg) * (c.n || 1) * 10) / 10}`;
   let liveB, liveS, heatI;
@@ -99,7 +99,7 @@ export function makeRange({ shots, fly, FS, cam, hunt, jel, crystals, bushes, sa
       const sc = Math.min(free, 21) + Math.min(wall, 8) * .3; if (sc > bs) { bs = sc; best = [x, z]; } }
     return best; };
   const startTrain = () => { const sp = findTrain(); if (!sp) { say?.('트인 자리를 못 찾았어요'); return; } const [cx, cz] = sp, x = cx - 10, z = cz; fly.userData.moveTo(x, z, -Math.PI / 2); cam.x = x; cam.z = z;   /* 나는 왼쪽에서 오른쪽(+x)을 봄 — 화면 가로가 길어서 멀리 선 것까지 보임 */
-    const P = [[8, 0, '서 있음 · 8m'], [20, 0, '서 있음 · 20m'], [14, -7, '서서 쏨', 'shooter'], [12, 8, '좌우로 움직임', 'mover']];
+    const P = [[5, 0, '서 있음 · 5m'], [20, 0, '서 있음 · 20m'], [14, -7, '서서 쏨', 'shooter'], [12, 8, '좌우로 움직임', 'mover']];
     dummies = []; for (const [ox, oz, name, kind] of P) { const j = jel.userData.add(x + ox, z + oz, { group: 9000 + dummies.length, strong: kind === 'shooter' }); Object.assign(j, { dummy: true, shooter: kind === 'shooter', mover: kind === 'mover', base: [x + ox, z + oz], mAng: 0, name }); j.home = [x + ox, z + oz]; dummies.push(j); }
     for (let i = 0; i < 5; i++) { const a = i / 5 * 6.283, ox = 6 + Math.cos(a) * 1.6, oz = -6 + Math.sin(a) * 1.6; const j = jel.userData.add(x + ox, z + oz, { group: 9100 }); Object.assign(j, { dummy: true, base: [x + ox, z + oz], name: i ? '' : '무리 다섯' }); j.home = [x + ox, z + oz]; dummies.push(j); }
     for (const t of tags) t.remove(); tags.length = 0; for (const j of dummies) { const el = document.createElement('div'); el.style.cssText = 'position:absolute;left:0;top:0;font-size:10.5px;letter-spacing:.05em;color:rgba(255,220,200,.85);white-space:nowrap;text-shadow:0 1px 3px #000;transition:opacity .2s'; el.textContent = j.name || ''; tagBox.appendChild(el); tags.push(el); }
