@@ -11,9 +11,9 @@
    무게: 꼬리 한 장 · 머리 한 장 · 부스러기 한 장 · 바닥 흔적 한 장 · 모으는 빛 한 장 · 조준 고리 한 장 = 그리기 6번 (탄 종류가 늘어도 같음) */
 import * as THREE from 'three';
 import * as A from '../core/audio.js';
-import { FLY } from './flight.js?v=11041433';
-import { BH } from './blackhole.js?v=11041433';
-import { hitWall } from './rocks.js?v=11041433';
+import { FLY } from './flight.js?v=11041434';
+import { BH } from './blackhole.js?v=11041434';
+import { hitWall } from './rocks.js?v=11041434';
 
 /* 비교표 그대로. heatT: 쉬지 않고 쏘면 과열까지(초) · coolT: 과열 뒤 다시 쏠 때까지(초) · cryB/wallB: 수정·벽에서 튕기는 횟수
    kind: 그림 결 (0 기본 · 1 서리 · 2 따뜻한 빛 · 3 빛 창 · 4 쇳물 · 5 불티 · 6 바늘 · 7 활) */
@@ -304,12 +304,12 @@ export function makeShots({ B, crystals, bh, FS, say, mobs, onKill, onDamage, on
   const bladeM = new THREE.Mesh(bdG, bdM); bladeM.frustumCulled = false; bladeM.renderOrder = 9; bladeM.visible = false; G.add(bladeM);
   const SL = { t0: -9, ang: 0, sg: 1, hit: [] };
   /* 준비(0.18초): 칼이 휘두를 반대쪽 뒤로 당겨지며 빛이 모이고 기체가 살짝 젖혀짐 → 베기(0.18초): 앞으로 3m 확 도약하며 휘두름 */
-  const slash = t => { const c = cfg; SL.t0 = t + (c.windup || 0); SL.w0 = t; SL.ang = S.aimA; SL.sg = -SL.sg; SL.hit.length = 0; SL.c = c; SL.go = 0; if (A.live()) osc('sine', 300, 900, c.windup || .1, .03); };
-  const slashGo = t => { const c = SL.c; SL.go = 1; SL.ang = S.lock ? Math.atan2(-(S.lock.x - FS.x), -(S.lock.z - FS.z)) : S.aimA; play('swish'); FS.rc = c.recoil;
+  const slash = t => { const c = cfg; SL.t0 = t + (c.windup || 0); SL.w0 = t; SL.ang = FS.head; SL.sg = -SL.sg; SL.hit.length = 0; SL.c = c; SL.go = 0; if (A.live()) osc('sine', 300, 900, c.windup || .1, .03); };
+  const slashGo = t => { const c = SL.c; SL.go = 1; SL.ang = FS.head; play('swish'); FS.rc = c.recoil;
     const dx = -Math.sin(SL.ang), dz = -Math.cos(SL.ang), sw = c.swing || .18; FS.dashUntil = t + sw; FS.dashVx = dx * (c.lunge || 0) / sw; FS.dashVz = dz * (c.lunge || 0) / sw; };   /* 베는 동안 앞으로 3m 확 도약 */
   /* 세상 각(쏘는 쪽 a) → 칼 방향 벡터: (-sin a, -cos a) */
   const slashStep = (t, dt) => { const c = SL.c || SHOT.blade, e = t - SL.t0, sw = c.swing || .18, fade = .22;
-    if (e < 0 && t >= SL.w0) {   /* 준비: 칼이 휘두를 반대쪽(시작 끝) 너머로 당겨지며 빛이 모임 */
+    if (e < 0 && t >= SL.w0) { SL.ang = FS.head;   /* 준비: 칼이 휘두를 반대쪽(시작 끝) 너머로 당겨지며 빛이 모임 */
       const k = (t - SL.w0) / Math.max(.01, c.windup || .1), a = SL.ang + SL.sg * (.5 * c.arc * Math.PI / 180 + .25 * k), dx = -Math.sin(a), dz = -Math.cos(a), px_ = -dz, pz_ = dx, y = FLY.HOVER - .1, R = c.range * (.55 + .2 * k);
       arc.visible = false; bladeM.visible = true; bdM.uniforms.uA.value = .35 + .5 * k; bdM.uniforms.uT.value = t;
       for (let i = 0; i < 10; i++) { const q = i / 9, r = .9 + (R - .9) * q, w = .04 + .12 * Math.sin(Math.min(1, q * 1.15) * Math.PI) * (q < .87 ? 1 : (1 - q) / .13); bdP.set([FS.x + dx * r + px_ * w, y + .02, FS.z + dz * r + pz_ * w, FS.x + dx * r - px_ * w, y + .02, FS.z + dz * r - pz_ * w], i * 6); bdU.set([q, 1, q, -1], i * 4); }
@@ -430,7 +430,8 @@ export function makeShots({ B, crystals, bh, FS, say, mobs, onKill, onDamage, on
       if (!want && !(S.ch > 0)) { S.lock = null; S.lockLost = null; } }
     if (want) S.aimA = I.held && I.drag ? I.ang : S.lock ? Math.atan2(-(S.lock.x - FS.x), -(S.lock.z - FS.z)) : t < (S.next || 0) ? S.aimA : (I.key ? FS.mh ?? FS.head : S.aimA0 ?? FS.head);
     if (!want) S.aimA0 = FS.head;
-    FS.aim = want ? S.aimA : null; FS.fireSlow = c.fireSlow;
+    if (c.blade) { S.aimA = FS.head; S.lock = null; }   /* 빛 칼날: 늘 기체 앞쪽만 벰 — 끌어도 방향이 안 바뀌고 자동 조준도 없음 (사용자 2026-11-04) */
+    FS.aim = want && !c.blade ? S.aimA : null; FS.fireSlow = c.fireSlow;
     const heatPer = c.heatT ? 1 / (c.heatT * c.rate) : 0, cool = .7 / (c.coolT * .8);
     FS.turnCap = (c.chargeT && S.ch > 0) || (c.beam && shooting) ? 1.22 : null;   /* 모으는 동안·비추는 동안 조준이 아주 느리게 돎 (1초에 70°) */
     beamStep(t, dt, !!(c.beam && shooting), c); slashStep(t, dt);
