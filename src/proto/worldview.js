@@ -2,36 +2,47 @@
    날아 보기: 1번 기지에서 기체를 조이스틱으로 몰아 맵 크기·길·문을 몸으로 확인(지금 있는 땅 이름 · 출발 뒤 걸린 시간 · 속도 바꾸기)
    보기: 날아 보기·지역 보기는 기체를 따라감, 맵 전체는 가운데 고정(끌어서 이동). 두 손가락(휠)로 확대. 시작 기지 자리는 빛 고리(다음 단계에서 진짜 기지) */
 import * as THREE from 'three';
-import { makeBloom } from '../core/hangar/bloom.js?v=11041138';
-import { makeMapFloor, MAP, toWorld } from './mapfloor.js?v=11041138';
-import { makePerf } from './perf.js?v=11041138';
+import { makeBloom } from '../core/hangar/bloom.js?v=11041208';
+import { makeMapFloor, MAP, toWorld } from './mapfloor.js?v=11041208';
+import { makePerf } from './perf.js?v=11041208';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
-import { makeFlight, loadBlock, FLY } from './flight.js?v=11041138';
-import { makeWalls } from './walls.js?v=11041138';
-import { makeMotes } from './motes.js?v=11041138';
-import { makeBushes } from './bushes.js?v=11041138';
-import { makeVision } from './vision.js?v=11041138';
-import { makeHide } from './hideviz.js?v=11041138';
-import { makeWardsOnMap, WARDS } from './wardsight.js?v=11041138';
-import { makeBlackHole } from './blackhole.js?v=11041138';
-import { makeBossCrystals } from './bosscrystals.js?v=11041138';
-import { makeShots } from './shots.js?v=11041138';
-import { makeJellies } from './jelly.js?v=11041138';
-import { makeMobFx } from './mobfx.js?v=11041138';
-import { makeHunt } from './hunt.js?v=11041138';
-import { makeRange } from './range.js?v=11041138';
+import { makeFlight, loadBlock, FLY } from './flight.js?v=11041208';
+import { makeWalls } from './walls.js?v=11041208';
+import { makeMotes } from './motes.js?v=11041208';
+import { makeBushes } from './bushes.js?v=11041208';
+import { makeVision } from './vision.js?v=11041208';
+import { makeHide } from './hideviz.js?v=11041208';
+import { makeWardsOnMap, WARDS } from './wardsight.js?v=11041208';
+import { makeBlackHole } from './blackhole.js?v=11041208';
+import { makeBossCrystals } from './bosscrystals.js?v=11041208';
+import { makeShots } from './shots.js?v=11041208';
+import { makeJellies } from './jelly.js?v=11041208';
+import { makeMobFx } from './mobfx.js?v=11041208';
+import { makeHunt } from './hunt.js?v=11041208';
+import { makeRange } from './range.js?v=11041208';
 
 const $ = s => document.querySelector(s), clamp = THREE.MathUtils.clamp;
 const VIEWS = [{ name: '날아 보기', h: 42, tilt: .38 }, { name: '지역 보기', h: 160, tilt: .25 }, { name: '맵 전체', h: 520, tilt: .02 }];
 
 export async function start(canvas, onProgress = () => {}, opt = {}) {
+    /* 오류 보기 (임시 · 폰에서 화면이 까만 원인 찾기): 오류·셰이더 실패·그래픽 끊김을 화면 왼쪽 아래에 글자로 띄움 */
+  const dg = document.createElement('div'); dg.style.cssText = 'position:fixed;left:max(16px,env(safe-area-inset-left,0px));bottom:calc(env(safe-area-inset-bottom,0px) + 34px);max-width:60vw;max-height:45vh;overflow:auto;padding:6px 9px;background:rgba(40,0,0,.82);border:1px solid #ff7a5a;border-radius:8px;color:#ffd9cc;font:11px/1.45 monospace;white-space:pre-wrap;z-index:30;pointer-events:none'; dg.hidden = true; document.body.appendChild(dg);
+  const dgL = []; const dgAdd = m => { m = String(m).slice(0, 400); if (dgL.includes(m) || dgL.length > 12) return; dgL.push(m); dg.hidden = false; dg.textContent = dgL.join('\n'); };
+  addEventListener('error', e => dgAdd('오류: ' + (e.message || e) + (e.filename ? ' @' + e.filename.split('/').pop() + ':' + e.lineno : '')));
+  addEventListener('unhandledrejection', e => dgAdd('오류(약속): ' + (e.reason?.message || e.reason)));
+  { const ce = console.error.bind(console); console.error = (...a) => { dgAdd('콘솔: ' + a.map(x => x?.stack || x?.message || x).join(' ')); ce(...a); };
+    const cw = console.warn.bind(console); console.warn = (...a) => { const s = a.join(' '); if (/shader|program|WebGL|GL_/i.test(s)) dgAdd('경고: ' + s); cw(...a); }; }
+  canvas.addEventListener('webglcontextlost', () => dgAdd('그래픽 끊김 (webglcontextlost)'));
+  window.__dgAdd = dgAdd;
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: false, powerPreference: 'high-performance' });
+  renderer.debug.onShaderError = (gl, prog, vs, fs) => { dgAdd('셰이더 실패: ' + (gl.getProgramInfoLog(prog) || '') + ' | ' + (gl.getShaderInfoLog(vs) || '') + ' | ' + (gl.getShaderInfoLog(fs) || '')); };
+  { const gl = renderer.getContext(), ex = gl.getExtension('WEBGL_debug_renderer_info'); window.__gpu = ex ? gl.getParameter(ex.UNMASKED_RENDERER_WEBGL) : gl.getParameter(gl.RENDERER); }
   renderer.toneMapping = THREE.NoToneMapping; renderer.autoClear = false; renderer.setClearColor(0, 1);
   const scene = new THREE.Scene(), camera = new THREE.PerspectiveCamera(40, 1, 1, 3000), bloom = makeBloom(renderer, { samples: 0 });
   onProgress(.2);
-  const floor = await makeMapFloor(renderer, './assets/map/v7.png?v=11041138');
-  const J = await (await fetch('./assets/map/v7.json?v=11041138')).json();
-  const BLK = await loadBlock('./assets/map/v7.png?v=11041138');                  /* 벽 판정 = 바닥에 그린 벽 그림 그대로 */
+  const floor = await makeMapFloor(renderer, './assets/map/v7.png?v=11041208');
+  const J = await (await fetch('./assets/map/v7.json?v=11041208')).json();
+  const BLK = await loadBlock('./assets/map/v7.png?v=11041208');                  /* 벽 판정 = 바닥에 그린 벽 그림 그대로 */
   const UT = { value: 0 }, WALL = makeWalls(BLK, floor, J.ridges, UT); floor.mat.uniforms.uWf.value = WALL.fieldTex;   /* 바닥도 같은 벽 지도로 */
   scene.add(WALL.real); scene.add(WALL.mesh); WALL.mesh.visible = false;   /* 승인된 벽 5종 · 맵 전체 보기에서만 가벼운 한 덩어리 벽(멀리서 보는 지도) */
   { const pm = new THREE.PMREMGenerator(renderer); scene.environment = pm.fromScene(new RoomEnvironment(), .04).texture; scene.environmentIntensity = .6; pm.dispose(); }
@@ -153,7 +164,8 @@ export async function start(canvas, onProgress = () => {}, opt = {}) {
     renderer.setRenderTarget(bloom.scene); renderer.clear(); floor.render(camera, bloom.scene); renderer.render(scene, camera); renderer.render(vision.scene, vision.cam0); if (sightOn && view < 2) renderer.render(beaconScene, camera);
     range?.update(t, camera, cw, ch);
     bloom.render(Wd, Hd, !perf.st.bloom); perf.tick(dt);
-  } catch (err) { console.error('[맵]', err); } });
+    if (!window.__dgOk && t > 4) { window.__dgOk = 1; const gl = renderer.getContext(), px = new Uint8Array(4), pk = []; for (const [fx, fy] of [[.5, .5], [.25, .3], [.75, .7]]) { gl.readPixels(gl.drawingBufferWidth * fx | 0, gl.drawingBufferHeight * fy | 0, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, px); pk.push(px.slice(0, 3).join(',')); } dgAdd('화면 점 색: ' + pk.join(' / ')); if (!dgL.length) dgAdd('오류 없음 · 그리기 ' + renderer.info.render.calls + '번 · ' + window.__gpu + ' · ' + Wd + '×' + Hd + ' · 빛 번짐 ' + (perf.st.bloom ? '켬' : '끔')); else dgAdd('그래픽: ' + window.__gpu); }
+  } catch (err) { console.error('[맵]', err); dgAdd('매 장면 오류: ' + (err?.stack || err).toString().split('\n').slice(0, 3).join(' / ')); } });
   { const v = (import.meta.url.match(/v=(\d+)/) || [])[1] || '개발'; const el = document.createElement('div'); el.textContent = '7안 · 판 번호 ' + v;   /* 어떤 버전이 열렸는지 바로 확인 */
     el.style.cssText = 'position:fixed;left:max(18px,env(safe-area-inset-left,0px));bottom:calc(env(safe-area-inset-bottom,0px) + 14px);font-size:11px;color:rgba(185,255,74,.7);pointer-events:none'; document.body.appendChild(el); }
   if (opt.range) { range = makeRange({ shots, fly, FS, cam, hunt, jel, crystals, bushes, say }); $('#head b').textContent = '기본탄 시험장'; $('#head span').hidden = true; hud.style.display = 'none'; }
