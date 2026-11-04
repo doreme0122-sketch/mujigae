@@ -4,7 +4,7 @@
    · 멀어질수록 깊은 색으로 가라앉힘 (가까운 싸움터가 또렷하게)
    0 금속 판 · 1 이끼 낀 암반 · 2 결정 섞인 모래 · 3 은은한 평지 · 4 보스존 별빛 우주(보이지 않는 유리 바닥 + 아래로 깊은 별 세 겹) */
 import * as THREE from 'three';
-import { SNOW_GLSL, SNOW_U } from './snowtone.js?v=11050013';
+import { SNOW_GLSL, SNOW_U } from './snowtone.js?v=11050019';
 
 function bakeNoise(N = 256) {
   const hash = (x, y, p) => { x = ((x % p) + p) % p; y = ((y % p) + p) % p; const s = Math.sin(x * 127.1 + y * 311.7) * 43758.5453; return s - Math.floor(s); };
@@ -137,7 +137,7 @@ export function makeFloorLab() {
           float isl=N4(p*.085+(ice?0.:.37)).r*.6+N4(p*.24).g*.4; isl=clamp((isl-.5)*3.2+.5,0.,1.);
           float doorZ=smoothstep(.6,-.4,road);                        /* 길 띠 안 (문 앞) */
           float need=doorZ*mix(-.05,1.02,smoothstep(-3.4,0.,sd));      /* 문에 가까울수록 많이 부서짐 · 지역 깊숙이는 온전 */
-          float keepF=(isl-need)*5.;
+          float keepF=(isl-need)*5.+smoothstep(.02,-.02,need);   /* 부서지지 않는 자리(need≤0)는 땅이 늘 온전 — 띠 가장자리에 유리가 반쯤 비쳐 회색 줄이 생기던 것 막음 */
           vec2 so=-uSun.xz/uSun.y*.35; float isl2=N4((p-so)*.085+(ice?0.:.37)).r*.6+N4((p-so)*.24).g*.4; isl2=clamp((isl2-.5)*3.2+.5,0.,1.);
           float sdS=min(sdBlob(p-so,vec2(-30.,0.),0.),sdBlob(p-so,vec2(30.,0.),2.1));
           float needS=smoothstep(.6,-.4,max(abs(p.y-so.y)-4.,abs(p.x-so.x)-30.))*mix(-.05,1.02,smoothstep(-3.4,0.,sdS));
@@ -174,7 +174,7 @@ export function makeFloorLab() {
             float nearL=smoothstep(-.9,0.,keepF)*step(sd,.3);
             if(ice){ float fz=smoothstep(.45,.8,N4(p*.5).b)*nearL; g+=vec3(.45,.65,.85)*fz*.18; }
             else g+=vec3(.5,.12,.02)*nearL*(.12+.05*sin(uT*1.6+p.x));
-            float keepS=(isl2-needS)*5.; float sh=smoothstep(-.5,.1,keepS)*step(sdS,0.);
+            float keepS=(isl2-needS)*5.+smoothstep(.02,-.02,needS); float sh=smoothstep(-.5,.1,keepS)*step(sdS,0.);
             g*=1.-sh*.6; }
           c=glassHere?mix(g,land,landM):(sd<0.?land:sky);
         }
