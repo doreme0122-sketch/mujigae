@@ -5,14 +5,13 @@
    무게: 바닥 판 하나 + 기체 둘 + 빛 알갱이 한 묶음 + 그림자 판 둘 */
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
-import { makeBloom } from '../core/hangar/bloom.js?v=11042052';
-import { makePerf } from './perf.js?v=11042052';
+import { makeBloom } from '../core/hangar/bloom.js?v=11042108';
+import { makePerf } from './perf.js?v=11042108';
 import { buildShip, engineSpots } from '../core/ships/build.js';
 import { makeGlow } from '../preview/glow.js';
-import { makeFlight, FLY } from './flight.js?v=11042052';
-import { makeFloorLab, LAB, JOIN, sdBlob, sdRoad, blobR } from './floorlab.js?v=11042052';
-import { makeIceRidge } from './ice.js?v=11042052';
-import { makeRidge, updateRidge } from './rocks.js?v=11042052';
+import { makeFlight, FLY } from './flight.js?v=11042108';
+import { makeFloorLab, LAB, JOIN, sdBlob, sdRoad, blobR } from './floorlab.js?v=11042108';
+import { makeMassWall, STYLES } from './wallmass.js?v=11042108';
 
 const $ = s => document.querySelector(s), clamp = THREE.MathUtils.clamp;
 const VIEWS = [{ id: 'game', name: '게임 시점', h: 42, tilt: .38 }, { id: 'near', name: '가까이', h: 18, tilt: .6 }, { id: 'far', name: '멀리', h: 90, tilt: .3 }];
@@ -31,7 +30,8 @@ export async function start(canvas, onProgress = () => {}) {
   /* 내 기체: 맵과 같은 비행 (둘레 AREA m 밖은 막힘) */
   const sdI = (x, z) => sdBlob(x, z, JOIN.ice, 0), sdL = (x, z) => sdBlob(x, z, JOIN.lava, 2.1);
   const onRoad = (x, z) => sdRoad(x, z) < 0, inLand = (x, z) => Math.min(sdI(x, z), sdL(x, z)) < 0;
-  const B = { blocked: (x, z) => { if (K !== 5) return Math.hypot(x, z) > AREA;
+  const B = { blocked: (x, z) => { if (K === 6) { if (Math.abs(x) > 90 || z > 30 || z < -30) return true; const ok = GAL.xs.some(cx => Math.abs(x - cx) < 15.5 && Math.abs(x - cx) > 3.6); return ok && Math.abs(z - GAL.z) < 2.2; }
+      if (K !== 5) return Math.hypot(x, z) > AREA;
       if (onRoad(x, z)) return false; const sd = Math.min(sdI(x, z), sdL(x, z)); return sd > -1.4; },   /* 이음 시험: 땅 밖(우주)·벽 띠는 막힘, 큰길은 벽 틈(문)으로 지나감 */
     region: () => 0 };
   const fly = await makeFlight(renderer, B, [0, 8], 0); scene.add(fly); const FS = fly.userData.S;
@@ -43,8 +43,16 @@ export async function start(canvas, onProgress = () => {}) {
   /* 벽: 얼음 땅 둘레 = 빙하 얼음 · 용암 땅 둘레 = 흑요석. 큰길이 지나는 자리만 비움(벽 틈 = 문) */
   const UT = { value: 0 }, walls = new THREE.Group(); scene.add(walls); walls.visible = false;
   const ring = (c, ph, gapAt) => { const pts = [], ag = .27; for (let a = gapAt + ag; a <= gapAt + Math.PI * 2 - ag + 1e-6; a += .045) { const r = blobR(Math.cos(a), Math.sin(a), JOIN.R, ph); pts.push([c[0] + Math.cos(a) * r, c[1] + Math.sin(a) * r]); } return pts; };
-  walls.add(makeIceRidge(ring(JOIN.ice, 0, 0), { uT: UT, seed: 4, noTaper: true }));
-  const obs = makeRidge('obsidian', ring(JOIN.lava, 2.1, Math.PI), { uT: UT, seed: 3, float: true, noTaper: true }); walls.add(obs);
+  const outOf = c => (x, z, nx, nz) => ((x - c[0]) * nx + (z - c[1]) * nz) > 0 ? 1 : -1;
+  walls.add(makeMassWall('ice', ring(JOIN.ice, 0, 0), { uT: UT, seed: 4, out: outOf(JOIN.ice) }));
+  walls.add(makeMassWall('obsidian', ring(JOIN.lava, 2.1, Math.PI), { uT: UT, seed: 3, out: outOf(JOIN.lava) }));
+  /* 벽 다섯 가지: 북쪽(z=-14)에 나란히, 가운데마다 문 틈 8m */
+  const GAL = { z: -9, xs: [-64, -32, 0, 32, 64], kinds: ['obsidian', 'ice', 'crystal', 'ruins', 'coral'] }, gal = new THREE.Group(); scene.add(gal); gal.visible = false;
+  const north = (x, z, nx, nz) => nz < 0 ? 1 : -1, galTags = [];
+  GAL.kinds.forEach((k, i) => { const cx = GAL.xs[i], line = (a, b) => { const pts = []; for (let x = a; x <= b + 1e-6; x += 1) pts.push([x, GAL.z + Math.sin(x * .2 + i) * .8]); return pts; };
+    gal.add(makeMassWall(k, line(cx - 15, cx - 4), { uT: UT, seed: 11 + i * 3, out: north, doors: [false, true] }));
+    gal.add(makeMassWall(k, line(cx + 4, cx + 15), { uT: UT, seed: 12 + i * 3, out: north, doors: [true, false] }));
+    const el = document.createElement('div'); el.className = 'tag'; el.innerHTML = `<b>${STYLES[k].name}</b>`; el.style.opacity = 0; $('#tags').appendChild(el); galTags.push({ el, p: new THREE.Vector3(cx, 9, GAL.z) }); });
   onProgress(.85);
   /* 그림자: 해 반대쪽으로 살짝 비켜, 높을수록 넓고 옅게 */
   const shM = () => new THREE.ShaderMaterial({ transparent: true, depthWrite: false, uniforms: { uA: { value: .5 }, uS: { value: 1 } },
@@ -85,7 +93,7 @@ export async function start(canvas, onProgress = () => {}) {
   const tip = () => { $('#tip').hidden = false; $('#tip b').textContent = LAB[K].name; $('#tip span').textContent = LAB[K].tip; $('#head b').textContent = '바닥 시험장 · ' + LAB[K].name; };
   const tour = $('#tour');
   LAB.forEach((f, i) => { const b = document.createElement('button'); b.type = 'button'; b.textContent = f.name; b.className = 'fl';
-    b.addEventListener('pointerdown', e => { e.stopPropagation(); const was = K; K = i; lab.set(i); walls.visible = i === 5; if (i === 5 && was !== 5) { fly.userData.moveTo(-40, 0, -Math.PI / 2); E.x = -30; E.z = 12; } else if (was === 5 && i !== 5) fly.userData.moveTo(0, 8, 0); tour.querySelectorAll('.fl').forEach(x => x.classList.toggle('on', x === b)); tip(); }); tour.appendChild(b); });
+    b.addEventListener('pointerdown', e => { e.stopPropagation(); const was = K; K = i; lab.set(i === 6 ? 3 : i); walls.visible = i === 5; gal.visible = i === 6; if (i === 5 && was !== 5) { fly.userData.moveTo(-40, 0, -Math.PI / 2); E.x = -30; E.z = 12; } else if (i === 6 && was !== 6) { fly.userData.moveTo(0, 4, 0); E.x = 10; E.z = 14; } else if ((was === 5 || was === 6) && i < 5) fly.userData.moveTo(0, 8, 0); tour.querySelectorAll('.fl').forEach(x => x.classList.toggle('on', x === b)); tip(); }); tour.appendChild(b); });
   { const sep = document.createElement('i'); sep.style.cssText = 'width:1px;align-self:stretch;background:rgba(185,255,74,.25);margin:0 4px'; tour.appendChild(sep); }
   VIEWS.forEach(v => { const b = document.createElement('button'); b.type = 'button'; b.textContent = v.name; b.className = 'vw';
     b.addEventListener('pointerdown', e => { e.stopPropagation(); cam.H = v.h; cam.T = v.tilt; tour.querySelectorAll('.vw').forEach(x => x.classList.toggle('on', x === b)); }); tour.appendChild(b); });
@@ -117,7 +125,8 @@ export async function start(canvas, onProgress = () => {}) {
       if (Math.hypot(b.x - hx, b.z - hz) < 1.1) { flash(b.x, b.z, b.mine ? [.6, 1.3, .7] : [1.4, .5, .5]); if (b.mine) { HF.hp = Math.max(.05, HF.hp - .018); HF.heat += .07; } else HM.hp = Math.max(.05, HM.hp - .03); bolts.splice(i, 1); continue; }
       if (b.life <= 0) bolts.splice(i, 1); }
     HM.hp = Math.min(1, HM.hp + dt * .03); HF.hp = Math.min(1, HF.hp + dt * .05);
-    UT.value = t; if (walls.visible) updateRidge(obs, t, dt, null);
+    UT.value = t;
+    for (const g of galTags) { v3.copy(g.p).project(camera); const on = gal.visible && v3.z < 1 && Math.abs(v3.x) < 1.1 && Math.abs(v3.y) < 1.1; g.el.style.opacity = on ? 1 : 0; if (on) g.el.style.transform = `translate(${(v3.x * .5 + .5) * cw}px,${(-v3.y * .5 + .5) * ch}px) translate(-50%,-50%)`; }
     lab.ships[0].set(FS.x, 0, FS.z, 1); lab.ships[1].set(E.x, 0, E.z, 2); lab.update(t);
     glow.begin();
     for (const b of bolts) glow.add(b.x, FLY.HOVER + .3, b.z, -b.vx * .05, 0, -b.vz * .05, .2, 0, b.mine ? [.45, 1.25, .6] : [1.35, .35, .45], 1, b.x);
