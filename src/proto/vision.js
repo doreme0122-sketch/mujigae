@@ -6,7 +6,7 @@
    · 덮개는 화면 위 한 장: 화면 칸마다 '눈높이 1.5m 땅'의 보임 값을 읽어 어둡게 덮음 → 벽·바닥·알갱이 모두 한 번에 가려짐
    · 무게: 빛줄기 320가닥 × 60걸음 (가벼움) · 시야 지도 250×250 한 장 */
 import * as THREE from 'three';
-import { MAP } from './mapfloor.js?v=11041046';
+import { MAP } from './mapfloor.js?v=11041129';
 
 export const SIGHT = 30;
 export function makeVision(B, bushes, floorNoise) {
@@ -18,6 +18,7 @@ export function makeVision(B, bushes, floorNoise) {
   const ci = x => Math.floor((x + W / 2) / cellM);
   const tex = new THREE.DataTexture(tex8, N, N, THREE.RGFormat); tex.magFilter = tex.minFilter = THREE.LinearFilter; tex.needsUpdate = true;
   let myBush = 0, touched = [];
+  const temps = [], lit = new Uint8Array(N * N); let litL = [];                                  /* 잠깐 밝힌 자리 (비추는 탄 빛 꽃 4m · 2초): 안개도 걷히고 숨을 곳 속도 보임 */
   function cast(sx, sz) {
     for (const k of touched) now[k] = 0; touched = [];
     myBush = bushes.bushAt(sx, sz);
@@ -53,10 +54,15 @@ export function makeVision(B, bushes, floorNoise) {
   const scene = new THREE.Scene(); scene.add(quad); const cam0 = new THREE.Camera(), m4 = new THREE.Matrix4();
   let acc = 0;
   return { scene, cam0, mat, N, cellM, W,
+    light(x, z, r, dur, t) { temps.push({ x, z, r, t0: t, end: t + dur }); },
     reveal(c) { if (!extra[c]) { extra[c] = 1; seen[c] = 1; extraList.push(c); } },
     /* 매 장면: 빛줄기 쏘기 → 보이는 값을 서서히 따라감(둘레 45m 안만) → 시야 지도 올림 */
     update(t, dt, sx, sz, camera) {
       cast(sx, sz);
+      for (const c of litL) lit[c] = 0; litL = [];
+      for (let q = temps.length - 1; q >= 0; q--) { const o = temps[q]; if (t > o.end) { temps.splice(q, 1); continue; } const rr = o.r * Math.min(1, (t - o.t0) / .3), R = Math.ceil(rr / cellM), i0 = ci(o.x), j0 = ci(o.z);   /* 꽃이 피는 0.3초 동안 둘레가 넓어짐 */
+        for (let j = j0 - R; j <= j0 + R; j++) for (let i = i0 - R; i <= i0 + R; i++) { if (i < 0 || j < 0 || i >= N || j >= N) continue; const x = (i + .5) * cellM - W / 2 - o.x, z = (j + .5) * cellM - W / 2 - o.z; if (x * x + z * z > rr * rr) continue; const c = j * N + i;
+          if (!now[c]) { now[c] = 1; touched.push(c); } seen[c] = 1; if (!lit[c]) { lit[c] = 1; litL.push(c); } } }
       const k = Math.min(1, dt * 6), R = Math.ceil(45 / cellM), i0 = Math.max(0, ci(sx) - R), i1 = Math.min(N - 1, ci(sx) + R), j0 = Math.max(0, ci(sz) - R), j1 = Math.min(N - 1, ci(sz) + R);
       for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) { const c = j * N + i; vis[c] += (Math.max(now[c], extra[c]) - vis[c]) * k; tex8[c * 2] = vis[c] * 255; tex8[c * 2 + 1] = seen[c] * 255; }
       for (const c of extraList) { vis[c] += (1 - vis[c]) * Math.min(1, dt * 4); tex8[c * 2] = vis[c] * 255; tex8[c * 2 + 1] = 255; }   /* 와드 시야: 물결이 지나간 칸부터 차례로 걷힘 */
@@ -64,6 +70,6 @@ export function makeVision(B, bushes, floorNoise) {
       mat.uniforms.uT.value = t; mat.uniforms.uCam.value.copy(camera.position);
       mat.uniforms.uInvPV.value.copy(m4.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse).invert()); },
     /* 적·몬스터가 보이는지: 시야 안 + (수풀 안이면 같은 수풀일 때만) */
-    canSee(x, z) { const i = ci(x), j = ci(z); if (i < 0 || j < 0 || i >= N || j >= N) return false; if (extra[j * N + i]) return true; if (!now[j * N + i]) return false;   /* 와드 시야 안이면 숨을 곳 속도 보임 */ const b = bushes.bushAt(x, z); return !b || b === myBush; },
+    canSee(x, z) { const i = ci(x), j = ci(z); if (i < 0 || j < 0 || i >= N || j >= N) return false; if (extra[j * N + i] || lit[j * N + i]) return true; if (!now[j * N + i]) return false;   /* 와드 시야 안이면 숨을 곳 속도 보임 */ const b = bushes.bushAt(x, z); return !b || b === myBush; },
     set on(v) { mat.uniforms.uOn.value = v ? 1 : 0; } };
 }

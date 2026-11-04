@@ -16,7 +16,7 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 
-export const JELLY = { R: .62, Y: 2.1, MAX: 192, NT: 10, NO: 4, SEG: 18, HP: 3, HP_STRONG: 9 };
+export const JELLY = { R: .62, Y: 2.1, MAX: 192, NT: 10, NO: 4, SEG: 18, HP: 12, HP_STRONG: 36 };   /* 체력은 피해 숫자로 (비교표: 잔챙이 12 = 연발탄 3발 · 센 몹 36 = 9발) */
 const AB = { transparent: true, depthWrite: false, blending: THREE.AdditiveBlending };
 /* 몸 색: 바탕(차가운 청록) · 속 기관(따뜻한 살구) · 경계(붉은 주황) */
 export const JCOL = { body: new THREE.Vector3(.32, .9, 1.0), core: new THREE.Vector3(1.0, .62, .42), alert: new THREE.Vector3(1.0, .32, .2) };
@@ -218,13 +218,13 @@ export function makeJellies(uT) {
         if (d < keep) { ax += dx / d * (keep - d) * 2.2; az += dz / d * (keep - d) * 2.2; } }                  /* 서로 부딪히지 않게 비킴 */
       if (j.alert > .5) { const want = j.strong ? 8 : 7; ax += dsx / (ds || 1) * (ds - want) * .25 * j.alert; az += dsz / (ds || 1) * (ds - want) * .25 * j.alert; }   /* 경계: 기체 쪽을 향해 알맞은 거리를 둠 */
       /* 오므림 박자: 경계하면 빨라짐. 오므리는 순간 가고 싶은 쪽으로 밀어냄(헤엄) */
-      const rate = j.rate * (1 + .55 * j.alert), pc = squeeze(j.ph); j.ph += dt * rate; const nc = squeeze(j.ph), push = Math.max(0, nc - pc);
-      const al = Math.hypot(ax, az) || 1, thrust = Math.min(1.6, al) * (j.strong ? 2.4 : 3.2);
+      const slw = t < (j.slowUntil || 0) ? j.slowK : (j.slowK = 0), rate = j.rate * (1 + .55 * j.alert) * (1 - slw), pc = squeeze(j.ph); j.ph += dt * rate; const nc = squeeze(j.ph), push = Math.max(0, nc - pc);
+      const al = Math.hypot(ax, az) || 1, thrust = Math.min(1.6, al) * (j.strong ? 2.4 : 3.2) * (1 - slw);
       j.vx += ax / al * thrust * push * 2.2; j.vz += az / al * thrust * push * 2.2;
       j.vx *= Math.exp(-dt * 1.1); j.vz *= Math.exp(-dt * 1.1);
       const nx = j.x + j.vx * dt, nz = j.z + j.vz * dt; if (!ctx.blocked || !ctx.blocked(nx, nz)) { j.x = nx; j.z = nz; } else { j.vx *= -.4; j.vz *= -.4; }
       /* 쏘기: 신호(몸이 부풀며 밝아짐 0.6초) → 느린 빛 방울 */
-      if (j.alert > .8 && ds < 16) { j.cd = (j.cd ?? 1.5 + Math.random() * 2) - dt;
+      if (j.alert > .8 && ds < 16) { j.cd = (j.cd ?? 1.5 + Math.random() * 2) - dt * (1 - slw);   /* 서리 맞으면 뱉는 박자도 느려짐 */
         if (j.cd <= .6 && !j.tell) { j.tell = t; }
         if (j.cd <= 0) { j.cd = (j.strong ? 2.2 : 3.2) + Math.random() * 1.5; j.tell = 0; ctx.spit?.(j, dsx / (ds || 1), dsz / (ds || 1)); j.ph = 0; } }
       else { j.tell = 0; } } };
@@ -236,7 +236,8 @@ export function makeJellies(uT) {
       if (!o.alarmAt || at < o.alarmAt) { if (t < (o.alarmUntil || 0) - 6) continue; o.alarmAt = at; signals.push({ a: j, b: o, t0: t, t1: at }); } } };
   /* 해파리 빛이 이 자리를 얼마나 비추나 (0~1): 숨을 곳에 있어도 해파리 빛 안이면 드러남 (사용자 2026-11-04) */
   G.userData.litAt = (x, z) => { let L = 0; for (const j of list) { if (!j.on || j.dieT > 0) continue; const r = (4.5 + 2.5 * j.alert) * j.s, d = Math.hypot(x - j.x, z - j.z); if (d < r) L = Math.max(L, 1 - (d / r) * (d / r)); } return L; };
-  G.userData.hit = (j, t, dx, dz, dmg = 1) => { if (!j.on || j.dieT > 0) return false; if (t - (j.sigT || -9) > 1.5) { j.sigT = t; alarm(j, t); } j.alarmUntil = t + 8; j.hitT = t; j.vx += dx * (j.strong ? 1.2 : 2.6); j.vz += dz * (j.strong ? 1.2 : 2.6); j.alert = 1; j.hp -= dmg;
+  G.userData.hit = (j, t, dx, dz, dmg = 4, o = {}) => { if (!j.on || j.dieT > 0) return false; if (t - (j.sigT || -9) > 1.5) { j.sigT = t; alarm(j, t); } j.alarmUntil = t + 8; j.hitT = t; const kb = (j.strong ? .35 : .7) + (o.knock || 0) * 1.1 * (j.strong ? .5 : 1); j.vx += dx * kb; j.vz += dz * kb; j.alert = 1; j.hp -= dmg;   /* 움찔 + 밀어내기(탄마다 m · 센 몹은 절반만 밀림) */
+    if (o.slow) { j.slowK = Math.min(o.slowMax || .3, (t < (j.slowUntil || 0) ? j.slowK : 0) + o.slow); j.slowUntil = t + (o.slowT || 2); }   /* 서리: 맞을 때마다 10%씩 느려짐 · 최대 30% · 2초 */
     if (j.hp <= 0) { j.dieT = t; return true; } return false; };
   return G;
 }

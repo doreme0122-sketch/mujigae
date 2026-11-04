@@ -2,35 +2,36 @@
    날아 보기: 1번 기지에서 기체를 조이스틱으로 몰아 맵 크기·길·문을 몸으로 확인(지금 있는 땅 이름 · 출발 뒤 걸린 시간 · 속도 바꾸기)
    보기: 날아 보기·지역 보기는 기체를 따라감, 맵 전체는 가운데 고정(끌어서 이동). 두 손가락(휠)로 확대. 시작 기지 자리는 빛 고리(다음 단계에서 진짜 기지) */
 import * as THREE from 'three';
-import { makeBloom } from '../core/hangar/bloom.js?v=11041046';
-import { makeMapFloor, MAP, toWorld } from './mapfloor.js?v=11041046';
-import { makePerf } from './perf.js?v=11041046';
+import { makeBloom } from '../core/hangar/bloom.js?v=11041129';
+import { makeMapFloor, MAP, toWorld } from './mapfloor.js?v=11041129';
+import { makePerf } from './perf.js?v=11041129';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
-import { makeFlight, loadBlock, FLY } from './flight.js?v=11041046';
-import { makeWalls } from './walls.js?v=11041046';
-import { makeMotes } from './motes.js?v=11041046';
-import { makeBushes } from './bushes.js?v=11041046';
-import { makeVision } from './vision.js?v=11041046';
-import { makeHide } from './hideviz.js?v=11041046';
-import { makeWardsOnMap, WARDS } from './wardsight.js?v=11041046';
-import { makeBlackHole } from './blackhole.js?v=11041046';
-import { makeBossCrystals } from './bosscrystals.js?v=11041046';
-import { makeShots } from './shots.js?v=11041046';
-import { makeJellies } from './jelly.js?v=11041046';
-import { makeMobFx } from './mobfx.js?v=11041046';
-import { makeHunt } from './hunt.js?v=11041046';
+import { makeFlight, loadBlock, FLY } from './flight.js?v=11041129';
+import { makeWalls } from './walls.js?v=11041129';
+import { makeMotes } from './motes.js?v=11041129';
+import { makeBushes } from './bushes.js?v=11041129';
+import { makeVision } from './vision.js?v=11041129';
+import { makeHide } from './hideviz.js?v=11041129';
+import { makeWardsOnMap, WARDS } from './wardsight.js?v=11041129';
+import { makeBlackHole } from './blackhole.js?v=11041129';
+import { makeBossCrystals } from './bosscrystals.js?v=11041129';
+import { makeShots } from './shots.js?v=11041129';
+import { makeJellies } from './jelly.js?v=11041129';
+import { makeMobFx } from './mobfx.js?v=11041129';
+import { makeHunt } from './hunt.js?v=11041129';
+import { makeRange } from './range.js?v=11041129';
 
 const $ = s => document.querySelector(s), clamp = THREE.MathUtils.clamp;
 const VIEWS = [{ name: '날아 보기', h: 42, tilt: .38 }, { name: '지역 보기', h: 160, tilt: .25 }, { name: '맵 전체', h: 520, tilt: .02 }];
 
-export async function start(canvas, onProgress = () => {}) {
+export async function start(canvas, onProgress = () => {}, opt = {}) {
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: false, powerPreference: 'high-performance' });
   renderer.toneMapping = THREE.NoToneMapping; renderer.autoClear = false; renderer.setClearColor(0, 1);
   const scene = new THREE.Scene(), camera = new THREE.PerspectiveCamera(40, 1, 1, 3000), bloom = makeBloom(renderer, { samples: 0 });
   onProgress(.2);
-  const floor = await makeMapFloor(renderer, './assets/map/v7.png?v=11041046');
-  const J = await (await fetch('./assets/map/v7.json?v=11041046')).json();
-  const BLK = await loadBlock('./assets/map/v7.png?v=11041046');                  /* 벽 판정 = 바닥에 그린 벽 그림 그대로 */
+  const floor = await makeMapFloor(renderer, './assets/map/v7.png?v=11041129');
+  const J = await (await fetch('./assets/map/v7.json?v=11041129')).json();
+  const BLK = await loadBlock('./assets/map/v7.png?v=11041129');                  /* 벽 판정 = 바닥에 그린 벽 그림 그대로 */
   const UT = { value: 0 }, WALL = makeWalls(BLK, floor, J.ridges, UT); floor.mat.uniforms.uWf.value = WALL.fieldTex;   /* 바닥도 같은 벽 지도로 */
   scene.add(WALL.real); scene.add(WALL.mesh); WALL.mesh.visible = false;   /* 승인된 벽 5종 · 맵 전체 보기에서만 가벼운 한 덩어리 벽(멀리서 보는 지도) */
   { const pm = new THREE.PMREMGenerator(renderer); scene.environment = pm.fromScene(new RoomEnvironment(), .04).texture; scene.environmentIntensity = .6; pm.dispose(); }
@@ -72,7 +73,9 @@ export async function start(canvas, onProgress = () => {}) {
   const beaconScene = new THREE.Scene(); beaconScene.add(jel.userData.beacon);                       /* 안개 속 등불: 시야 덮개 뒤에 그림 */
   const hunt = makeHunt(BLK, jel, SPAWN.map(p => toWorld(...p)));
   let expN = 0;
-  const shots = makeShots({ B: BLK, crystals, bh, FS, say, mobs: jel, onKill: (j, killed) => { if (killed) { mfx.userData.burst(j.x, j.y, j.z, j.strong ? 14 : 5); mfx.userData.pop(j.strong); } } }); scene.add(shots);                          /* 기본탄: 오른쪽 아래 버튼에서 끌어 조준 · 누르는 동안 쏨 · 과열 */
+  const shots = makeShots({ B: BLK, crystals, bh, FS, say, mobs: jel, onKill: (j, killed) => { if (killed) { mfx.userData.burst(j.x, j.y, j.z, j.strong ? 14 : 5); mfx.userData.pop(j.strong); range?.kill(t, j); } },
+    onDamage: (j, d, c, bo) => range?.dmg(t, j, d, c, bo), onReveal: (x, z, r, dur) => vision.light(x, z, r, dur, t) });   /* 비추는 탄: 맞은 둘레를 잠깐 밝힘 */
+  let range = null; scene.add(shots);                          /* 기본탄: 오른쪽 아래 버튼에서 끌어 조준 · 누르는 동안 쏨 · 과열 */
   const hideEl = document.createElement('div'); hideEl.id = 'hide'; hideEl.innerHTML = '<i></i><b>숨음</b>'; document.body.appendChild(hideEl);
   const motes = makeMotes(BLK, J.labels.map(o => { const [x, z] = toWorld(o.x, o.y); return [J.names.indexOf(o.n), x, z]; })); scene.add(motes.mesh);   /* 땅마다 떠다니는 알갱이 */
   /* 땅 이름: 경계를 넘으면 화면 위쪽에 잠깐 떴다 사라짐 (그 땅 안개 색 한 줄과 함께)
@@ -148,10 +151,12 @@ export async function start(canvas, onProgress = () => {}) {
     if (FS.nose && FS.heatVis > .01) { v.copy(FS.nose).project(camera); const k = Hd / (2 * Math.tan(camera.fov * Math.PI / 360)) / Math.max(1, camera.position.distanceTo(FS.nose)) / Hd;   /* 열 아지랑이: 달아오른 총구 앞 공기 */
       bloom.haze(v.x * .5 + .5, v.y * .5 + .5, Math.max(.008, .32 * k), FS.heatVis * .35, t); } else bloom.haze(.5, .5, 0, 0, t);
     renderer.setRenderTarget(bloom.scene); renderer.clear(); floor.render(camera, bloom.scene); renderer.render(scene, camera); renderer.render(vision.scene, vision.cam0); if (sightOn && view < 2) renderer.render(beaconScene, camera);
+    range?.update(t, camera, cw, ch);
     bloom.render(Wd, Hd, !perf.st.bloom); perf.tick(dt);
   } catch (err) { console.error('[맵]', err); } });
   { const v = (import.meta.url.match(/v=(\d+)/) || [])[1] || '개발'; const el = document.createElement('div'); el.textContent = '7안 · 판 번호 ' + v;   /* 어떤 버전이 열렸는지 바로 확인 */
     el.style.cssText = 'position:fixed;left:max(18px,env(safe-area-inset-left,0px));bottom:calc(env(safe-area-inset-bottom,0px) + 14px);font-size:11px;color:rgba(185,255,74,.7);pointer-events:none'; document.body.appendChild(el); }
+  if (opt.range) { range = makeRange({ shots, fly, FS, cam, hunt, jel, crystals, bushes, say }); $('#head b').textContent = '기본탄 시험장'; $('#head span').hidden = true; hud.style.display = 'none'; }
   onProgress(1);
   window.__wv = { get t() { return t; }, cam, fly: FS, wards, bh, crystals, shots, jel, hunt, mfx, wallTris: WALL.mesh.userData.tris, real: WALL.real.userData, wallRoot: WALL.real, info: renderer.info, vision, hide: () => [bushes.list.length, ...hide.count], spots: () => bushes.list.map(b => [b.why, b.size, b.shape, +b.x.toFixed(0), +b.z.toFixed(0)]), dbg: () => { const o = {}; const ex = []; scene.traverse(m => { if (m.isMesh && !m.isInstancedMesh && !m.material.customProgramCacheKey && ex.length < 3) { const w = new THREE.Vector3(); m.getWorldPosition(w); ex.push([m.geometry.type, m.parent && m.parent.type, w.x.toFixed(1), w.z.toFixed(1), m.material.type]); } }); o.ex = ex; scene.traverse(m => { if (!m.isMesh && !m.isPoints) return; const k = (m.isInstancedMesh ? 'I:' : 'M:') + (m.material.customProgramCacheKey ? m.material.customProgramCacheKey() : m.material.type); const tri = (m.geometry.index ? m.geometry.index.count : m.geometry.attributes.position.count) / 3; o[k] = o[k] || [0, 0, 0]; o[k][0]++; o[k][1] += tri * (m.count || 1); o[k][2] = tri; }); return o; } };
 }
