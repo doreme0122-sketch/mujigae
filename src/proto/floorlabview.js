@@ -5,15 +5,15 @@
    무게: 바닥 판 하나 + 기체 둘 + 빛 알갱이 한 묶음 + 그림자 판 둘 */
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
-import { makeBloom } from '../core/hangar/bloom.js?v=11042142';
-import { makePerf } from './perf.js?v=11042142';
+import { makeBloom } from '../core/hangar/bloom.js?v=11042149';
+import { makePerf } from './perf.js?v=11042149';
 import { buildShip, engineSpots } from '../core/ships/build.js';
 import { makeGlow } from '../preview/glow.js';
-import { makeFlight, FLY } from './flight.js?v=11042142';
-import { makeFloorLab, LAB, JOIN, sdBlob, sdRoad, blobR } from './floorlab.js?v=11042142';
-import { makeMassWall, STYLES } from './wallmass.js?v=11042142';
-import { makeIceWall } from './icewall.js?v=11042142';
-import { iceWallMaterial, snowMaterial } from './icewall.js?v=11042142';
+import { makeFlight, FLY } from './flight.js?v=11042149';
+import { makeFloorLab, LAB, JOIN, sdBlob, sdRoad, blobR } from './floorlab.js?v=11042149';
+import { makeMassWall, STYLES } from './wallmass.js?v=11042149';
+import { makeIceWall } from './icewall.js?v=11042149';
+import { iceWallMaterial, snowMaterial } from './icewall.js?v=11042149';
 
 const $ = s => document.querySelector(s), clamp = THREE.MathUtils.clamp;
 const VIEWS = [{ id: 'game', name: '게임 시점', h: 42, tilt: .38 }, { id: 'near', name: '가까이', h: 18, tilt: .6 }, { id: 'far', name: '멀리', h: 90, tilt: .3 }];
@@ -32,7 +32,7 @@ export async function start(canvas, onProgress = () => {}) {
   /* 내 기체: 맵과 같은 비행 (둘레 AREA m 밖은 막힘) */
   const sdI = (x, z) => sdBlob(x, z, JOIN.ice, 0), sdL = (x, z) => sdBlob(x, z, JOIN.lava, 2.1);
   const onRoad = (x, z) => sdRoad(x, z) < 0, inLand = (x, z) => Math.min(sdI(x, z), sdL(x, z)) < 0;
-  const B = { blocked: (x, z) => { if (K === 6) { if (Math.abs(x) > 90 || z > 30 || z < -30) return true; const ok = (x > -34 && x < -4) || (x > 4 && x < 34) || (x > 46 && x < 90); return ok && Math.abs(z - GAL.z) < 2.6; }
+  const B = { blocked: (x, z) => { if (K === 6) { if (Math.abs(x) > 90 || z > 30 || z < -30) return true; const ok = (x > -34 && x < -4) || (x > 4 && x < 34); return ok && Math.abs(z - GAL.z) < 3.2; }
       if (K !== 5) return Math.hypot(x, z) > AREA;
       if (onRoad(x, z)) return false; const sd = Math.min(sdI(x, z), sdL(x, z)); return sd > -1.4; },   /* 이음 시험: 땅 밖(우주)·벽 띠는 막힘, 큰길은 벽 틈(문)으로 지나감 */
     region: () => 0 };
@@ -55,10 +55,8 @@ export async function start(canvas, onProgress = () => {}) {
   const wl = makeIceWall(line(-34, -4, 0), { uT: UT, mat: iceM, smat: snowM, seed: 11, out: north, doors: [false, true] }); gal.add(wl);
   gal.add(makeIceWall(line(4, 34, 1), { uT: UT, mat: iceM, smat: snowM, seed: 12, out: north, doors: [true, false] }));
   const tagAt = (txt, x, y, z) => { const el = document.createElement('div'); el.className = 'tag'; el.innerHTML = `<b>${txt}</b>`; el.style.opacity = 0; $('#tags').appendChild(el); galTags.push({ el, p: new THREE.Vector3(x, y, z) }); };
-  tagAt('빙하 얼음 벽 · 토막을 이은 것', -19, 10, GAL.z); tagAt('문', 0, 4, GAL.z);
-  const M = wl.userData.mods; [['낮은 토막', M.low[0]], ['높은 토막', M.high[0]], ['문 옆 토막', M.door]].forEach(([nm, mod], i) => {
-    for (const [geo, mm] of [[mod.ice, iceM], [mod.snow, snowM]]) { const im = new THREE.InstancedMesh(geo, mm, 1); im.setMatrixAt(0, new THREE.Matrix4().makeTranslation(52 + i * 16, 0, GAL.z)); im.computeBoundingSphere(); gal.add(im); }
-    tagAt(nm, 52 + i * 16, 10, GAL.z); });
+  tagAt('빙하 얼음 벽 · 한 덩어리 절벽', -19, 10, GAL.z); tagAt('문', 0, 4, GAL.z);
+
   onProgress(.85);
   /* 그림자: 해 반대쪽으로 살짝 비켜, 높을수록 넓고 옅게 */
   const shM = () => new THREE.ShaderMaterial({ transparent: true, depthWrite: false, uniforms: { uA: { value: .5 }, uS: { value: 1 } },

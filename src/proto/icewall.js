@@ -99,28 +99,61 @@ export function snowMaterial() {
   return new THREE.MeshStandardMaterial({ color: 0x8ea3ba, roughness: .9, metalness: 0, envMapIntensity: .35, emissive: 0x060d18, emissiveIntensity: .5 });
 }
 
-let CACHE = null;
-/* 벽: 길을 따라 토막을 깊게 겹쳐 이음 · 문 쪽 끝은 문 토막 · 토막의 높은 뒷줄(+z)이 바깥(우주) 쪽 */
+/* 벽: 길 전체를 따라 한 장으로 뽑아낸 절벽 (토막·기둥을 잇지 않음 → 벽 한 줄 = 한 덩어리)
+   단면(앞 → 위 → 뒤): 발치 자락 → 가파른 아래 절벽 → 수직 절벽 → 윗단 앞 모서리 → 윗단 가운데(살짝 도톰) → 윗단 뒤 모서리 → 뒤 절벽 → 뒤 발치
+   · 세로 결: 앞·뒤 면이 길을 따라 깊이가 달라짐(세로로 길게 팬 홈과 튀어나온 등) — 높이 내내 같은 깊이라 세로 줄로 읽힘
+   · 계단 윗단: 윗단 높이가 구간마다 한 단씩 달라짐 → 단 사이에 작은 절벽
+   · 문 쪽 끝: 가장 높이 솟았다가 수직으로 끊김(끝 면을 막음) */
 export function makeIceWall(path, opt = {}) {
   const uT = opt.uT || { value: 0 }, mat = opt.mat || iceWallMaterial(uT), smat = opt.smat || snowMaterial(), doors = opt.doors || [true, true];
+  const seed = opt.seed || 3, R = (() => { let s = seed * 7919; return () => (s = (s * 9301 + 49297) % 233280) / 233280; })(), o = seed * 1.3;
   const curve = new THREE.CatmullRomCurve3(path.map(p => new THREE.Vector3(p[0], 0, p[1])), false, 'centripetal'), len = curve.getLength();
-  const R = (() => { let s = (opt.seed || 3) * 7919; return () => (s = (s * 9301 + 49297) % 233280) / 233280; })();
-  const V = CACHE ||= { low: [iceModule('low', 2), iceModule('low', 5)], high: [iceModule('high', 3), iceModule('high', 7)], door: iceModule('door', 4), doorL: iceModule('doorL', 4) };
-  const lists = new Map(); const add = (mod, m) => { if (!lists.has(mod)) lists.set(mod, []); lists.get(mod).push(m); };
-  const n = Math.max(1, Math.ceil((len - ICE_MOD.L * .4) / (ICE_MOD.L * .7))), p = new THREE.Vector3(), tg = new THREE.Vector3(), q = new THREE.Quaternion(), s = new THREE.Vector3();
-  for (let i = 0; i <= n; i++) { const d = THREE.MathUtils.clamp(ICE_MOD.L * .42 + i * (len - ICE_MOD.L * .84) / Math.max(1, n), 0, len), u = d / len;
-    curve.getPointAt(u, p); curve.getTangentAt(u, tg);
-    const nx = -tg.z, nz = tg.x, sgn = opt.out ? opt.out(p.x, p.z, nx, nz) : 1;
-    /* 로컬 x → 길 방향, 로컬 +z → (nx,nz). 바깥이 반대면 반 바퀴 돌림(로컬 x가 길 반대가 됨) */
-    const turned = sgn < 0, yaw = Math.atan2(-tg.z, tg.x) + (turned ? Math.PI : 0);
-    let mod;
-    if ((i === 0 && doors[0]) || (i === n && doors[1])) { const wantFwd = i === n;   /* 문이 길 끝이면 우뚝한 끝이 길 앞쪽(+길 방향)을 봐야 함 */
-      mod = (wantFwd !== turned) ? V.door : V.doorL; }
-    else mod = (Math.sin(d * .09 + 1.3) > 0 ? V.high : V.low)[Math.floor(R() * 2)];
-    q.setFromEuler(new THREE.Euler(0, yaw, 0)); s.set(.95 + R() * .1, .92 + R() * .16, 1);
-    add(mod, new THREE.Matrix4().compose(p.clone(), q.clone(), s.clone())); }
-  const grp = new THREE.Group();
-  for (const [mod, ms] of lists) for (const [geo, mm] of [[mod.ice, mat], [mod.snow, smat]]) { const im = new THREE.InstancedMesh(geo, mm, ms.length); ms.forEach((m, j) => im.setMatrixAt(j, m)); im.computeBoundingSphere(); grp.add(im); }
-  grp.userData = { mods: V, mat, smat };
+  const Hm = opt.H || 4.6, W = 2.4, STEP = .6, DS = .32, N = Math.max(4, Math.round(len / DS));
+  /* 윗단: 구간(2.5~5m)마다 높이 한 단씩 */
+  const seg = []; for (let d = 0; d < len;) { const L2 = 2.5 + R() * 2.5; seg.push([d, d + L2, (R() - .5) * 2.4]); d += L2; }
+  const topH = d => { const sgi = seg.find(q => d >= q[0] && d < q[1]) || seg[seg.length - 1];
+    let h = Hm * (1 + .16 * Math.sin(d * .11 + o)) + sgi[2] * STEP;
+    const ds = doors[0] ? d : 1e9, de = doors[1] ? len - d : 1e9, dd = Math.min(ds, de); h += Math.exp(-dd * dd / 10) * Hm * .55;   /* 문 양옆 가장 높이 */
+    if (!doors[0] && d < 2.5) h *= .45 + .55 * d / 2.5; if (!doors[1] && len - d < 2.5) h *= .45 + .55 * (len - d) / 2.5;
+    return Math.round(h / STEP) * STEP; };
+  const flute = (d, side) => { const a = vn(d * .9 + side * 17 + o, 0, 0), b = vn(d * 2.6 + side * 31, 3, 0); return (a - .5) * .9 + (b - .5) * .35 + Math.abs(Math.sin(d * 3.1 + side * 2 + o * 3)) * .18; };   /* 세로 결 깊이 */
+  const p = new THREE.Vector3(), tg = new THREE.Vector3(), frames = [];
+  for (let i = 0; i <= N; i++) { const d = i / N * len; curve.getPointAt(i / N, p); curve.getTangentAt(i / N, tg); let nx = -tg.z, nz = tg.x; const sg = opt.out ? opt.out(p.x, p.z, nx, nz) : 1; nx *= sg; nz *= sg;
+    frames.push({ d, x: p.x, z: p.z, nx, nz, tx: tg.x, tz: tg.z, h: topH(d), sg }); }
+  const FL = frames[0].sg < 0;   /* 바깥 방향을 뒤집었으면 면 순서도 뒤집음 (안 그러면 면이 안쪽을 봐 속이 비어 보임) */
+  /* 단면 점: (v 바깥 방향 거리, y) — 앞(땅 쪽, v<0) … 뒤(우주 쪽, v>0) */
+  const section = f => { const h = f.h, fr = flute(f.d, 0), bk = flute(f.d, 1), lean = .12 * Math.sin(f.d * .21 + o);
+    return [[-W - 1.4, -.3], [-W - .55 + fr * .3, .7], [-W + fr, Math.min(h * .4, 1.8)], [-W + fr * .9 + lean, h - .35], [-W + .25 + fr * .6, h],
+      [0, h + .12 + vn(f.d * .5, 9, o) * .2], [W - .3 + bk * .6, h + .05], [W + bk * .9 + lean, h - .4], [W + bk, Math.min(h * .4, 1.8)], [W + .6 + bk * .3, .7], [W + 1.5, -.3]]; };
+  const P = [], put = (f, v, y) => P.push(f.x + f.nx * v, y, f.z + f.nz * v);
+  const S0 = frames.map(section), M = S0[0].length;
+  const tri = (a, b, c) => { FL ? P.push(...a, ...c, ...b) : P.push(...a, ...b, ...c); };
+  const pt = (i, k) => { const f = frames[i], [v, y] = S0[i][k]; return [f.x + f.nx * v, y, f.z + f.nz * v]; };
+  for (let i = 0; i < N; i++) for (let k = 0; k < M - 1; k++) { const a = pt(i, k), b = pt(i + 1, k), c = pt(i, k + 1), d = pt(i + 1, k + 1); tri(a, c, b); tri(b, c, d); }
+  /* 끝 면 막기 (문 쪽은 수직 절벽) */
+  for (const i of [0, N]) { const c = [frames[i].x, frames[i].h * .5, frames[i].z]; for (let k = 0; k < M - 1; k++) { const a = pt(i, k), b = pt(i, k + 1); i === 0 ? tri(a, c, b) : tri(a, b, c); } }
+  const ice = []; { const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(P, 3)); g.computeVertexNormals(); ice.push(g); }
+  const snow = [];
+  /* 눈 덮개: 윗단 위에 도톰하게, 앞뒤 모서리를 조금 넘쳐 흘러내림 */
+  { const Q = [], sp = (i, k) => { const f = frames[i], s = S0[i]; const sec = [[s[3][0] - .12, s[3][1] - .18], [s[4][0] - .1, f.h + .08], [s[4][0] + .4, f.h + .26 + vn(f.d * 1.3, 2, o) * .14], [0, s[5][1] + .22], [s[6][0] - .4, f.h + .24 + vn(f.d * 1.3, 5, o) * .14], [s[6][0] + .1, f.h + .06], [s[7][0] + .12, s[7][1] - .2]][k]; return [f.x + f.nx * sec[0], sec[1], f.z + f.nz * sec[0]]; };
+    for (let i = 0; i < N; i++) for (let k = 0; k < 6; k++) { const a = sp(i, k), b = sp(i + 1, k), c = sp(i, k + 1), d = sp(i + 1, k + 1); FL ? Q.push(...a, ...b, ...c, ...b, ...d, ...c) : Q.push(...a, ...c, ...b, ...b, ...c, ...d); }
+    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(Q, 3)); g.computeVertexNormals(); snow.push(g); }
+  /* 고드름: 윗단 앞·뒤 모서리를 따라 촘촘히 (길이 들쭉날쭉) */
+  for (let i = 0; i <= N; i += 1) for (const side of [-1, 1]) { if (R() < .35) continue; const f = frames[i], s = S0[i][side < 0 ? 3 : 7];
+    const len2 = .3 + R() * R() * 1.7, v = s[0] + side * .1, y = s[1] - .05; ice.push(icicle(f.x + f.nx * v + f.tx * (R() - .5) * .2, y, f.z + f.nz * v + f.tz * (R() - .5) * .2, len2, .06 + R() * .07)); }
+  /* 뾰족한 결정: 길이 8~12m마다 하나 (윗단 뒤쪽에서) */
+  for (let d = 4 + R() * 4; d < len - 2; d += 8 + R() * 5) { const i = Math.round(d / len * N), f = frames[i], hh = 1.6 + R() * 1.8;
+    const g = new THREE.ConeGeometry(.4 + R() * .2, hh, 5, 1); g.rotateY(R() * 6); g.rotateZ((R() - .5) * .35); g.rotateX((R() - .5) * .3); g.translate(f.x + f.nx * .8, f.h + hh / 2, f.z + f.nz * .8); ice.push(clean(g)); }
+  /* 떨어진 얼음 바위 (앞·뒤 발치) */
+  for (let d = 1 + R() * 2; d < len - 1; d += 2.2 + R() * 3) { const i = Math.round(d / len * N), f = frames[i], side = R() < .5 ? -1 : 1, sc = .4 + R() * .65, g = only(block(seed * 13 + Math.floor(d)).clone());
+    g.scale(sc, sc * (.7 + R() * .4), sc); g.rotateY(R() * 6); const v = side * (W + 1.4 + R() * 1.1); g.translate(f.x + f.nx * v, sc * .12, f.z + f.nz * v); ice.push(g); }
+  /* 눈 자락: 발치를 따라 들쭉날쭉 (양쪽) */
+  { const Q = []; const sk = (i, k, side) => { const f = frames[i], w = (vn(f.d * .4 + side * 9, 1, o) * 1.6 + .8), vv = [W + .6, W + 1.3 + w * .5, W + 1.6 + w][k] * side, y = [.55 + vn(f.d, 4, o) * .3, .25, -.06][k]; return [f.x + f.nx * vv, y, f.z + f.nz * vv]; };
+    for (const side of [-1, 1]) for (let i = 0; i < N; i++) for (let k = 0; k < 2; k++) { const a = sk(i, k, side), b = sk(i + 1, k, side), c = sk(i, k + 1, side), d = sk(i + 1, k + 1, side);
+      if ((side < 0) !== FL) Q.push(...a, ...c, ...b, ...b, ...c, ...d); else Q.push(...a, ...b, ...c, ...b, ...d, ...c); }
+    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(Q, 3)); g.computeVertexNormals(); snow.push(g); }
+  const iceG = mergeGeometries(ice.map(only)), snowG = mergeGeometries(snow.map(only));
+  const grp = new THREE.Group(); grp.add(new THREE.Mesh(iceG, mat), new THREE.Mesh(snowG, smat));
+  grp.userData = { mat, smat, len };
   return grp;
 }
