@@ -4,7 +4,7 @@
    · 멀어질수록 깊은 색으로 가라앉힘 (가까운 싸움터가 또렷하게)
    0 금속 판 · 1 이끼 낀 암반 · 2 결정 섞인 모래 · 3 은은한 평지 · 4 보스존 별빛 우주(보이지 않는 유리 바닥 + 아래로 깊은 별 세 겹) */
 import * as THREE from 'three';
-import { SNOW_GLSL } from './snowtone.js?v=11042330';
+import { SNOW_GLSL, SNOW_U } from './snowtone.js?v=11042341';
 
 function bakeNoise(N = 256) {
   const hash = (x, y, p) => { x = ((x % p) + p) % p; y = ((y % p) + p) % p; const s = Math.sin(x * 127.1 + y * 311.7) * 43758.5453; return s - Math.floor(s); };
@@ -37,7 +37,7 @@ export function makeFloorLab() {
   const noise = bakeNoise();
   const ships = Array.from({ length: 2 }, () => new THREE.Vector4(0, 0, 0, 0));
   const mat = new THREE.ShaderMaterial({ depthWrite: true,
-    uniforms: { uN: { value: noise }, uK: { value: 0 }, uT: { value: 0 }, uSun: { value: new THREE.Vector3(-.45, .78, -.42).normalize() }, uShips: { value: ships }, uIV: { value: 0 } },
+    uniforms: { uN: { value: noise }, uK: { value: 0 }, uT: { value: 0 }, uSun: { value: new THREE.Vector3(-.45, .78, -.42).normalize() }, uShips: { value: ships }, uIV: { value: 0 }, uSG: SNOW_U.uSG },
     vertexShader: 'varying vec3 vW; void main(){ vec4 w=modelMatrix*vec4(position,1.); vW=w.xyz; gl_Position=projectionMatrix*viewMatrix*w; }',
     fragmentShader: `precision highp float; varying vec3 vW; uniform sampler2D uN; uniform float uK, uT; uniform vec3 uSun; uniform vec4 uShips[2]; uniform float uIV;
       float h2(vec2 p){ p=fract(p*vec2(123.34,456.21)); p+=dot(p,p+45.32); return fract(p.x*p.y); }
@@ -84,8 +84,7 @@ export function makeFloorLab() {
         float dep=clamp((S-th)/.1,0.,1.);                                    /* 가장자리에서 얼마나 안쪽인지 = 눈 두께 */
         /* 눈: 언덕 기울기(가장자리일수록 가파름) */
         float e=.25; vec2 gS=vec2(snowF(p+vec2(e,0.),v.y)-S, snowF(p+vec2(0.,e),v.y)-S)/e;
-        vec2 wd=vec2(.82,.57); float rp=cos(dot(p,wd)*1.9+N4(p*.05).g*8.)*.07;   /* 바람 물결 */
-        vec3 nS=normalize(vec3(-gS.x*(1.-dep)*26.-wd.x*rp+(N4(p*.7).b-.5)*.05, 1., -gS.y*(1.-dep)*26.-wd.y*rp+(N4(p*.7+.3).b-.5)*.05));
+        vec3 nS=normalize(vec3(-gS.x*(1.-dep)*26., 1., -gS.y*(1.-dep)*26.));   /* 눈 언덕 기울기만 · 결(물결·알갱이)은 snowTone 안에서 벽과 같이 */
         float dS=dot(nS,uSun);
         vec3 snowLit=SNOW_LIT, snowSh=SNOW_SH;
         vec3 cs=snowTone(nS,-rd,vec3(p.x,0.,p.y),uSun,uT);                       /* 벽 눈과 같은 계산 */

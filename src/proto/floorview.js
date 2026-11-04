@@ -1,7 +1,7 @@
 /* 지역 바닥 보기 — 기체가 구름층 위를 8자로 날며 구름을 가른다 */
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
-import { makeBloom } from '../core/hangar/bloom.js?v=11042330';
+import { makeBloom } from '../core/hangar/bloom.js?v=11042341';
 import { makePerf } from './perf.js?v=11021559';
 import { buildShip, engineSpots } from '../core/ships/build.js';
 import { makeGlow } from '../preview/glow.js';

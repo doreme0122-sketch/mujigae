@@ -11,8 +11,8 @@
    무게: 벽 한 줄 = 얼음 1번 + 눈 1번 그리기 */
 import * as THREE from 'three';
 import { mergeGeometries, mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js';
-import { iceMaterial, block } from './ice.js?v=11042330';
-import { SNOW_GLSL } from './snowtone.js?v=11042330';
+import { iceMaterial, block } from './ice.js?v=11042341';
+import { SNOW_GLSL, SNOW_U } from './snowtone.js?v=11042341';
 
 const hs = (x, y, z) => { const s = Math.sin(x * 127.1 + y * 311.7 + z * 74.7) * 43758.5453; return s - Math.floor(s); };
 const vn = (x, y, z) => { const ix = Math.floor(x), iy = Math.floor(y), iz = Math.floor(z), fx = x - ix, fy = y - iy, fz = z - iz, u = fx * fx * (3 - 2 * fx), v = fy * fy * (3 - 2 * fy), w = fz * fz * (3 - 2 * fz);
@@ -50,7 +50,7 @@ export function iceWallMaterial(uT) {
 }
 export function snowMaterial(uT) {
   /* 바닥 눈과 같은 계산(snowtone.js)으로 색을 냄 → 벽 눈 = 바닥 눈 */
-  return new THREE.ShaderMaterial({ uniforms: { uT: uT || { value: 0 }, uSun: { value: new THREE.Vector3(-.45, .78, -.42).normalize() } },
+  return new THREE.ShaderMaterial({ uniforms: { uSG: SNOW_U.uSG, uT: uT || { value: 0 }, uSun: { value: new THREE.Vector3(-.45, .78, -.42).normalize() } },
     vertexShader: 'varying vec3 vW; varying vec3 vN; void main(){ vec4 w=modelMatrix*vec4(position,1.); vW=w.xyz; vN=normalize(mat3(modelMatrix)*normal); gl_Position=projectionMatrix*viewMatrix*w; }',
     fragmentShader: 'precision highp float; varying vec3 vW; varying vec3 vN; uniform float uT; uniform vec3 uSun;\n' + SNOW_GLSL +
       'void main(){ vec3 n=normalize(vN); if(!gl_FrontFacing) n=-n; gl_FragColor=vec4(snowTone(n,normalize(cameraPosition-vW),vW,uSun,uT),1.); }' });

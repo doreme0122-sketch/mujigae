@@ -5,15 +5,16 @@
    무게: 바닥 판 하나 + 기체 둘 + 빛 알갱이 한 묶음 + 그림자 판 둘 */
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
-import { makeBloom } from '../core/hangar/bloom.js?v=11042330';
-import { makePerf } from './perf.js?v=11042330';
+import { makeBloom } from '../core/hangar/bloom.js?v=11042341';
+import { makePerf } from './perf.js?v=11042341';
 import { buildShip, engineSpots } from '../core/ships/build.js';
 import { makeGlow } from '../preview/glow.js';
-import { makeFlight, FLY } from './flight.js?v=11042330';
-import { makeFloorLab, LAB, JOIN, sdBlob, sdRoad, blobR } from './floorlab.js?v=11042330';
-import { makeMassWall, STYLES } from './wallmass.js?v=11042330';
-import { makeIceWall } from './icewall.js?v=11042330';
-import { iceWallMaterial, snowMaterial } from './icewall.js?v=11042330';
+import { makeFlight, FLY } from './flight.js?v=11042341';
+import { makeFloorLab, LAB, JOIN, sdBlob, sdRoad, blobR } from './floorlab.js?v=11042341';
+import { makeMassWall, STYLES } from './wallmass.js?v=11042341';
+import { makeIceWall } from './icewall.js?v=11042341';
+import { SNOW_U } from './snowtone.js?v=11042341';
+import { iceWallMaterial, snowMaterial } from './icewall.js?v=11042341';
 
 const $ = s => document.querySelector(s), clamp = THREE.MathUtils.clamp;
 const VIEWS = [{ id: 'game', name: '게임 시점', h: 42, tilt: .38 }, { id: 'near', name: '가까이', h: 18, tilt: .6 }, { id: 'far', name: '멀리', h: 90, tilt: .3 }];
@@ -102,7 +103,10 @@ export async function start(canvas, onProgress = () => {}) {
   /* 얼음 땅 두 가지: 눈 많이 / 얼음 많이 + 눈 조금 */
   { const sep2 = document.createElement('i'); sep2.style.cssText = 'width:1px;align-self:stretch;background:rgba(185,255,74,.25);margin:0 4px'; tour.appendChild(sep2);
     [['얼음 땅 · 눈 많이', 0], ['얼음 땅 · 얼음 많이', 1]].forEach(([nm, k], j) => { const b = document.createElement('button'); b.type = 'button'; b.textContent = nm; b.className = 'iv' + (j ? '' : ' on');
-      b.addEventListener('pointerdown', e => { e.stopPropagation(); lab.mat.uniforms.uIV.value = k; tour.querySelectorAll('.iv').forEach(x => x.classList.toggle('on', x === b)); }); tour.appendChild(b); }); }
+      b.addEventListener('pointerdown', e => { e.stopPropagation(); lab.mat.uniforms.uIV.value = k; tour.querySelectorAll('.iv').forEach(x => x.classList.toggle('on', x === b)); }); tour.appendChild(b); });
+    /* 눈 결 비교: 벽 눈과 바닥 눈이 같은 결을 씀 — 매끈 / 물결 */
+    [['눈 결 · 벽 눈처럼 매끈', 0], ['눈 결 · 바닥 눈처럼 물결', 1]].forEach(([nm, k], j) => { const b = document.createElement('button'); b.type = 'button'; b.textContent = nm; b.className = 'sg' + (j ? ' on' : '');
+      b.addEventListener('pointerdown', e => { e.stopPropagation(); SNOW_U.uSG.value = k; tour.querySelectorAll('.sg').forEach(x => x.classList.toggle('on', x === b)); }); tour.appendChild(b); }); }
   VIEWS.forEach(v => { const b = document.createElement('button'); b.type = 'button'; b.textContent = v.name; b.className = 'vw';
     b.addEventListener('pointerdown', e => { e.stopPropagation(); cam.H = v.h; cam.T = v.tilt; tour.querySelectorAll('.vw').forEach(x => x.classList.toggle('on', x === b)); }); tour.appendChild(b); });
   tour.querySelector('.vw').classList.add('on');
