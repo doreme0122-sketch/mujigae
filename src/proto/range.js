@@ -4,7 +4,7 @@
    · 맞은 해파리 위에 피해 숫자가 떠오름 (튕겨서 맞으면 ×1.5 표시 · 쓰러뜨린 한 방은 크게)
    · 아래: 사냥터 / 수정 기둥 / 숨을 곳으로 바로 옮기기 · 해파리 다시 채우기 */
 import * as THREE from 'three';
-import { SHOT, SHOT_IDS } from './shots.js?v=11041240';
+import { SHOT, SHOT_IDS } from './shots.js?v=11041242';
 
 const css = `
 #rgSel{position:fixed;top:calc(env(safe-area-inset-top,0px) + 10px);left:50%;transform:translateX(-50%);display:grid;grid-template-columns:repeat(5,auto);gap:5px;z-index:7;touch-action:none}
@@ -74,7 +74,7 @@ export function makeRange({ shots, fly, FS, cam, hunt, jel, crystals, bushes, sa
   const go = (x, z, h, m) => { fly.userData.moveTo(x, z, h); cam.x = x; cam.z = z; say?.(m); };
   const spots = [
     ['사냥터', () => { const f = flocks[flocks.length - 1] || hunt.flocks[0], g = flocks[0] || f, dx = g.x - f.x, dz = g.z - f.z, l = Math.hypot(dx, dz) || 1;   /* 센 몹 낀 떼가 보이는 자리 */
-      go(f.x + dx / l * 14, f.z + dz / l * 14, Math.atan2(dx, dz), '사냥터 — 센 몹이 낀 떼 앞'); }],
+      go(f.x + dx / l * 9, f.z + dz / l * 9, Math.atan2(dx, dz), '사냥터 — 센 몹이 낀 떼 앞'); }],
     ['수정 기둥', () => { const a = crystals.userData.gates[0], r = 24; go(Math.cos(a) * r, Math.sin(a) * r, Math.atan2(Math.cos(a), Math.sin(a)), '보스 구역 수정 — 튕김을 보세요 (튕긴 탄은 나도 맞음)'); }],
     ['숨을 곳', () => { const b = bushes.list.reduce((m, o) => !m || Math.hypot(o.x - FS.x, o.z - FS.z) < Math.hypot(m.x - FS.x, m.z - FS.z) ? o : m, null); if (b) go(b.x + 8, b.z, -Math.PI / 2, '숨을 곳 — 비추는 탄으로 밝혀 보세요'); }],
     ['해파리 다시', () => { hunt.refill(); say?.('쓰러진 떼를 다시 채웠어요'); }],
