@@ -4,7 +4,7 @@
    · 평소: 빛나지 않는다. 문양은 어두운 홈으로만 보인다.
    · 맞으면: 맞은 자리에서 가까운 문양부터 하나씩 차례로 금빛으로 켜졌다가(지름 3m 남짓) 0.8초쯤에 꺼진다. */
 import * as THREE from 'three';
-import { HITS } from './rocks.js?v=11051649';
+import { HITS } from './rocks.js?v=11051659';
 
 const rng = seed => { let s = seed * 9301 + 49297; return () => (s = (s * 9301 + 49297) % 233280) / 233280; };
 
@@ -24,7 +24,7 @@ export function pillar(seed) {
 }
 /* 쌓는 돌: 돌기둥과 같은 깎인 모서리, 윗면은 부서지지 않음 (닳아 둥그스름) */
 export function brick(seed) {
-  const R = rng(seed), g = new THREE.BoxGeometry(1, 1, 1, 3, 2, 4); g.translate(0, .5, 0);
+  const R = rng(seed), g = new THREE.BoxGeometry(1, 1, 1, 2, 1, 2); g.translate(0, .5, 0);   /* 가볍게: 잘게 나눈 면 줄임 (돌 하나 104 → 32 삼각형, 모서리 깎임은 그대로) */
   const P = g.attributes.position, v = new THREE.Vector3(), cuts = [];
   for (const sx of [-1, 1]) for (const sy of [-1, 1]) for (const sz of [-1, 1]) cuts.push([new THREE.Vector3(sx, sy * .8, sz).normalize(), .62 + R() * .1]);   /* 여덟 모서리만 닳아 깎임 */
   for (let i = 0; i < P.count; i++) { v.fromBufferAttribute(P, i); const c = new THREE.Vector3(v.x, v.y - .5, v.z);

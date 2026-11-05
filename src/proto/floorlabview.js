@@ -5,23 +5,23 @@
    무게: 바닥 판 하나 + 기체 둘 + 빛 알갱이 한 묶음 + 그림자 판 둘 */
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
-import { makeBloom } from '../core/hangar/bloom.js?v=11051649';
-import { makePerf } from './perf.js?v=11051649';
+import { makeBloom } from '../core/hangar/bloom.js?v=11051659';
+import { makePerf } from './perf.js?v=11051659';
 import { buildShip, engineSpots } from '../core/ships/build.js';
 import { makeGlow } from '../preview/glow.js';
-import { makeFlight, FLY } from './flight.js?v=11051649';
-import { makeFloorLab, LAB, JOIN, sdBlob, sdRoad, blobR } from './floorlab.js?v=11051649';
-import { makeMassWall, STYLES } from './wallmass.js?v=11051649';
-import { makeIceWall } from './icewall.js?v=11051649';
-import { SNOW_U } from './snowtone.js?v=11051649';
-import { iceWallMaterial, snowMaterial } from './icewall.js?v=11051649';
-import { makeRuinWall, ruinMaterial } from './ruins.js?v=11051649';
-import { makeCoralWall, coralMaterial, coral } from './coral.js?v=11051649';
-import { makeTrailMap } from './trailmap.js?v=11051649';
-import { makeThemedHide } from './hidetheme.js?v=11051649';
-import { makePlantBush } from './plantbush.js?v=11051649';
-import { makeCrystalWall, crystalMaterial } from './crystal.js?v=11051649';
-import { makeLavaWall, lavaWallMaterial } from './lavawall.js?v=11051649';
+import { makeFlight, FLY } from './flight.js?v=11051659';
+import { makeFloorLab, LAB, JOIN, sdBlob, sdRoad, blobR } from './floorlab.js?v=11051659';
+import { makeMassWall, STYLES } from './wallmass.js?v=11051659';
+import { makeIceWall } from './icewall.js?v=11051659';
+import { SNOW_U } from './snowtone.js?v=11051659';
+import { iceWallMaterial, snowMaterial } from './icewall.js?v=11051659';
+import { makeRuinWall, ruinMaterial } from './ruins.js?v=11051659';
+import { makeCoralWall, coralMaterial, coral } from './coral.js?v=11051659';
+import { makeTrailMap } from './trailmap.js?v=11051659';
+import { makeThemedHide } from './hidetheme.js?v=11051659';
+import { makePlantBush } from './plantbush.js?v=11051659';
+import { makeCrystalWall, crystalMaterial } from './crystal.js?v=11051659';
+import { makeLavaWall, lavaWallMaterial } from './lavawall.js?v=11051659';
 
 const $ = s => document.querySelector(s), clamp = THREE.MathUtils.clamp;
 const VIEWS = [{ id: 'game', name: '게임 시점', h: 42, tilt: .38 }, { id: 'near', name: '가까이', h: 18, tilt: .6 }, { id: 'far', name: '멀리', h: 90, tilt: .3 }];
@@ -111,7 +111,7 @@ export async function start(canvas, onProgress = () => {}) {
     const A0 = -Math.PI / 2, WIN = .73, inWin = (x, z) => Math.abs(Math.atan2(Math.sin(Math.atan2(z, x) - A0), Math.cos(Math.atan2(z, x) - A0))) < WIN;
     const sec = (x, z) => ((Math.round((Math.atan2(z, x) - A0) / (Math.PI / 5)) % 10) + 10) % 10;
     const im = iceWallMaterial(UT), sm = snowMaterial(UT), lm = lavaWallMaterial(UT), rm = ruinMaterial(UT), cm = coralMaterial(UT), xm = crystalMaterial(UT);
-    const cbig = [1, 2, 3, 4].map(q => coral(q, true, 3)), csmall = [5, 6, 7].map(q => coral(q, true, 2));
+    const cbig = [1, 2, 3, 4].map(q => coral(q, true, 2)), csmall = [5, 6, 7].map(q => coral(q, true, 1));   /* 맵: 큰 산호 갈래 2단 · 앞뒤 작은 산호는 갈래 1단 (위에서 보면 같은 덤불, 삼각형 1/4) */
     const toW = ([px, py]) => [(px - 500) * .36, (py - 500) * .36]; let seed = 100;
     for (const rd of J.ridges) { const P = rd.p.map(toW); let run = [];
       const flush = () => { if (run.length < 4) { run = []; return; } const pts = run.filter((q, i) => i === 0 || Math.hypot(q[0] - run[i - 1][0], q[1] - run[i - 1][1]) > .3); run = []; if (pts.length < 3) return;
@@ -134,7 +134,7 @@ export async function start(canvas, onProgress = () => {}) {
     for (const b of J.bushes || []) { const L = b.lobes, cx = L.reduce((a, l) => a + l[0], 0) / L.length, cz = L.reduce((a, l) => a + l[1], 0) / L.length; if (!inWin(cx, cz)) continue;
       let sxx = 0, szz = 0, sxz = 0; for (const [x, z] of L) { sxx += (x - cx) ** 2; szz += (z - cz) ** 2; sxz += (x - cx) * (z - cz); } const an = .5 * Math.atan2(2 * sxz, sxx - szz), ca = Math.cos(an), sa = Math.sin(an);
       let hl = 1, hw = 1; for (const [x, z, r] of L) { const u = (x - cx) * ca + (z - cz) * sa, v = -(x - cx) * sa + (z - cz) * ca; hl = Math.max(hl, Math.abs(u) + r * .8); hw = Math.max(hw, Math.abs(v) + r * .8); }
-      const pb = makePlantBush([cx, cz, hl, hw, an], 'M', UT, Rp); ZONE.add(pb.mesh); zonePlants.push(pb); }
+      const pb = makePlantBush([cx, cz, Math.min(hl, 5.5), Math.min(hw, 2.6), an], 'M', UT, Rp);   /* 너무 큰 네모는 덤불이 성겨 보여 줄임 */ ZONE.add(pb.mesh); zonePlants.push(pb); }
     ZONE.traverse(o => { if (o.isMesh) o.frustumCulled = true; }); };
   walls.children.forEach(w => addBlk(5, w)); galW.forEach(w => addBlk(6, w)); lgal.children.forEach(w => addBlk(7, w)); rgal.children.forEach(w => addBlk(8, w));
   const tagAt = (txt, x, y, z) => { const el = document.createElement('div'); el.className = 'tag'; el.innerHTML = `<b>${txt}</b>`; el.style.opacity = 0; $('#tags').appendChild(el); galTags.push({ el, p: new THREE.Vector3(x, y, z) }); };
@@ -238,5 +238,5 @@ export async function start(canvas, onProgress = () => {}) {
     el.style.cssText = 'position:fixed;left:max(18px,env(safe-area-inset-left,0px));bottom:calc(env(safe-area-inset-bottom,0px) + 14px);font-size:11px;color:rgba(185,255,74,.7);pointer-events:none'; document.body.appendChild(el); }
   tour.querySelectorAll('.fl')[5].dispatchEvent(new PointerEvent('pointerdown'));   /* 처음엔 새 이음 시험부터 */
   onProgress(1);
-  window.__fl = { G: { xgal, cgal, rgal, lgal, gal, walls }, blk: (k, x, z) => hitBlk(k, x, z), cam, set: i => tour.querySelectorAll('.fl')[i].dispatchEvent(new PointerEvent('pointerdown')), FS, E };
+  window.__fl = { renderer, G: { ZONE, xgal, cgal, rgal, lgal, gal, walls }, blk: (k, x, z) => hitBlk(k, x, z), cam, set: i => tour.querySelectorAll('.fl')[i].dispatchEvent(new PointerEvent('pointerdown')), FS, E };
 }

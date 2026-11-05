@@ -5,7 +5,7 @@
      가지에도 끝 쪽으로 빛이 살짝 번진다. */
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { HITS } from './rocks.js?v=11051649';
+import { HITS } from './rocks.js?v=11051659';
 
 const rng = seed => { let s = seed * 9301 + 49297; return () => (s = (s * 9301 + 49297) % 233280) / 233280; };
 
@@ -94,7 +94,7 @@ export function makeCoralRidge(path, opt = {}) {
    ② 산호 세 줄: 가운데 줄은 크게, 앞뒤 줄은 작게 비스듬히 겹쳐 자람 · 높낮이는 길게 오르내리는 물결(높게 솟은 무리 / 낮게 퍼진 곳)
    ③ 문 양옆: 가장 크게 자란 산호 둘 + 둘레에 작은 산호
    ④ 벽 주변: 떨어져 자란 작은 산호 무리 · 바닥에 굴러다니는 산호 조각(낮아서 기체가 넘어감) */
-import { block } from './ice.js?v=11051649';
+import { block } from './ice.js?v=11051659';
 export function makeCoralWall(path, opt = {}) {
   const uT = opt.uT || { value: 0 }, mat = opt.mat || coralMaterial(uT), R = rng(opt.seed || 41), doors = opt.doors || [true, true];
   /* 무게 (사용자 2026-11-05: 프리미엄 기기 40프레임 · 태블릿 끊김 — 산호 벽 삼각형 133만 개였음, 다른 벽의 60배)
@@ -107,8 +107,8 @@ export function makeCoralWall(path, opt = {}) {
   const cs = [], tg = [], BLK = [];
   const add = (x, z, s, d, big = true) => { cs.push({ g: big ? Math.floor(R() * BIG.length) : BIG.length + Math.floor(R() * SMALL.length), x, z, s, yaw: R() * 6.28, tilt: [(R() - .5) * .25, (R() - .5) * .25] }); tg.push({ x, y: s * 1.2, z, r: s * .5 }); BLK.push({ x, z, r: s * .42, top: s * 2.2 }); };
   /* ② 가운데 큰 줄 · 앞뒤 작은 줄 */
-  for (let d = .3; d < len - .2; d += .5 + R() * .35) { const a = at(d), k = wave(d) * endK(d), off = (R() - .5) * .7; add(a.p.x + a.nx * off, a.p.z + a.nz * off, (1.2 + R() * .5) * k, d); }   /* 촘촘히 → 가지가 얽혀 건너편이 안 보임 */
-  for (const side of [-1, 1]) for (let d = .2 + R() * .5; d < len - .2; d += .5 + R() * .4) { const a = at(d), k = wave(d + 3) * endK(d), off = side * (.85 + R() * .45); add(a.p.x + a.nx * off, a.p.z + a.nz * off, (.6 + R() * .35) * k, d, false); }
+  for (let d = .3; d < len - .2; d += .7 + R() * .45) { const a = at(d), k = wave(d) * endK(d), off = (R() - .5) * .7; add(a.p.x + a.nx * off, a.p.z + a.nz * off, (1.2 + R() * .5) * k, d); }   /* 촘촘히 → 가지가 얽혀 건너편이 안 보임 */
+  for (const side of [-1, 1]) for (let d = .2 + R() * .5; d < len - .2; d += .8 + R() * .5) { const a = at(d), k = wave(d + 3) * endK(d), off = side * (.85 + R() * .45); add(a.p.x + a.nx * off, a.p.z + a.nz * off, (.6 + R() * .35) * k, d, false); }
   /* ③ 문 양옆 큰 산호 */
   for (const end of [0, 1]) if (doors[end]) { const d0 = end ? len - .6 : .6, a = at(d0); add(a.p.x, a.p.z, 1.9 + R() * .3, d0);
     for (let k = 0; k < 3; k++) { const an = R() * 6.28; add(a.p.x + Math.cos(an) * 1.1, a.p.z + Math.sin(an) * 1.1, .55 + R() * .3, d0, false); } }
