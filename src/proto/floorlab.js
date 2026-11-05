@@ -4,8 +4,8 @@
    · 멀어질수록 깊은 색으로 가라앉힘 (가까운 싸움터가 또렷하게)
    0 금속 판 · 1 이끼 낀 암반 · 2 결정 섞인 모래 · 3 은은한 평지 · 4 보스존 별빛 우주(보이지 않는 유리 바닥 + 아래로 깊은 별 세 겹) */
 import * as THREE from 'three';
-import { LAVA_GLSL, vorTex } from './lavatone.js?v=11051155';
-import { SNOW_GLSL, SNOW_U } from './snowtone.js?v=11051155';
+import { LAVA_GLSL, vorTex } from './lavatone.js?v=11051201';
+import { SNOW_GLSL, SNOW_U } from './snowtone.js?v=11051201';
 
 function bakeNoise(N = 256) {
   const hash = (x, y, p) => { x = ((x % p) + p) % p; y = ((y % p) + p) % p; const s = Math.sin(x * 127.1 + y * 311.7) * 43758.5453; return s - Math.floor(s); };
@@ -197,8 +197,18 @@ export function makeFloorLab() {
         vec2 tu=(p-uTrO.xy)/uTrO.z; float wake=0.;                                                                /* 빛 길 지도(trailmap.js)에서 한 번 읽음 */
         if(tu.x>0.&&tu.x<1.&&tu.y>0.&&tu.y<1.) wake=pow(texture2D(uTrail,tu).r,1.6);
         /* 빛 길: 결을 따라 번지는 띠 — 가운데 밝고, 가장자리는 털 결 사이로 스며들며 옅어짐 */
+        /* 빛 길 (사용자 2026-11-05: 더 밝고 아름답게)
+           · 색: 갓 깨어난 가운데는 맑은 청록 → 가장자리와 식어 가는 쪽은 보라 → 다 꺼지기 직전 남는 분홍빛 여운
+           · 결을 따라 빛 물결이 흘러감(털 끝이 차례로 반짝) · 가운데 부드러운 빛 번짐
+           · 반딧불 알갱이: 깨어난 자리에서 작은 빛 점이 깜빡이며 떠오르듯 사라짐 */
         float band=smoothstep(.0,.35,wake), edge=wake*(.35+.65*hair);
-        c+=glowC*(idle+band*.06*cover+edge*.42*cover+wake*wake*.12);
+        vec3 cCore=vec3(.25,1.,.85), cMid=vec3(.55,.45,1.15), cTail=vec3(.9,.4,.85);
+        vec3 tc=mix(cTail,mix(cMid,cCore,smoothstep(.45,.9,wake)),smoothstep(.05,.4,wake));
+        float flow=.6+.4*sin(u*3.1-uT*2.4+N4(p*.2).r*6.);                                                      /* 결을 따라 흐르는 빛 물결 */
+        vec2 gq=p*2.6; vec2 gid=floor(gq); float gh=h2(gid+11.); vec2 gf=fract(gq)-.5-vec2(h2(gid+3.)-.5,h2(gid+5.)-.5)*.6;
+        float mote=step(.82,gh)*exp(-dot(gf,gf)*70.)*(.5+.5*sin(uT*(2.+gh*3.)+gh*50.))*band;                     /* 반딧불 알갱이 */
+        c+=glowC*idle;
+        c+=tc*(edge*.85*cover*flow+band*.12*cover+wake*wake*.3)+mix(cCore,vec3(1.),.4)*mote*.9;
         float m1=smoothstep(.5,.85,N4(p*.012+vec2(uT*.002,uT*.001)).r), m2=smoothstep(.55,.9,N4(p*.018-vec2(uT*.0015,0.)).g);
         c+=vec3(.015,.07,.065)*m1*.35+vec3(.055,.025,.08)*m2*.3;                                               /* 크고 옅은 성운 안개 */
         return c; }
