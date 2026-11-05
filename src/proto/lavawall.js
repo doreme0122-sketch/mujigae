@@ -12,8 +12,8 @@
    무게: 벽 한 줄 = 그리기 1번 (바위·용암·웅덩이가 한 재질, aF 값으로 용암 자리를 정함) */
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { block } from './ice.js?v=11050928';
-import { LAVA_GLSL } from './lavatone.js?v=11050928';
+import { block } from './ice.js?v=11050937';
+import { LAVA_GLSL } from './lavatone.js?v=11050937';
 
 const hs = (x, y, z) => { const s = Math.sin(x * 127.1 + y * 311.7 + z * 74.7) * 43758.5453; return s - Math.floor(s); };
 const vn = (x, y, z) => { const ix = Math.floor(x), iy = Math.floor(y), iz = Math.floor(z), fx = x - ix, fy = y - iy, fz = z - iz, u = fx * fx * (3 - 2 * fx), v = fy * fy * (3 - 2 * fy), w = fz * fz * (3 - 2 * fz);
@@ -64,22 +64,29 @@ export function makeLavaWall(path, opt = {}) {
   const seed = opt.seed || 3, R = (() => { let s = seed * 7919 + 7; return () => (s = (s * 9301 + 49297) % 233280) / 233280; })(), o = seed * 1.3;
   const curve = new THREE.CatmullRomCurve3(path.map(p => new THREE.Vector3(p[0], 0, p[1])), false, 'centripetal'), len = curve.getLength();
   const Hm = opt.H || 2.4, W = 1.15, DS = .15, N = Math.max(4, Math.round(len / DS));
-  /* ① 덩어리: 길이 · 높이 · 앞뒤 두께 · 층 · 면 기울기 · 봉우리 */
-  const BL = []; for (let d = -.3; d < len + .3;) { const l = 1.6 + R() * 1.6, peak = R() < .2;
-    const tiers = 2 + (R() < .45 ? 1 : 0), ty = []; for (let k = 1; k < tiers; k++) ty.push(k / tiers + (R() - .5) * .18);
-    BL.push({ d0: d, d1: d + l, h: Hm * (.78 + R() * .45), peak: peak ? Hm * (.25 + R() * .3) : 0, pk: .3 + R() * .4,
-      w: [W * (.85 + R() * .35), W * (.85 + R() * .35)], step: [.22 + R() * .3, .2 + R() * .25], ty, sl: [(R() - .5) * .5, (R() - .5) * .5], lean: .1 + R() * .15, ch: R() < .82, gs: R() < .3 ? .55 + R() * .45 : .06 + R() * .08 });   /* gs = 이 덩어리 앞 틈의 빛: 대부분 식어 어둡고, 몇 군데만 붉게 샘 */
-    d += l; }
-  const blk = d => BL.find(b => d >= b.d0 && d < b.d1) || BL[BL.length - 1];
-  /* 덩어리 사이 틈: 경계 0.35m 안에서 안쪽으로 파임 + 빛 */
-  const gapK = d => { const b = blk(d), e = Math.min(d - b.d0, b.d1 - d); return 1 - sstep(0, .25, e); };
-  const gapGl = d => { const i = BL.indexOf(blk(d)), b = BL[i]; return d - b.d0 < b.d1 - d ? b.gs : (BL[i + 1] || b).gs; };
+  /* ① 한 몸통 (사용자 2026-11-05: 조각조각 이어 붙인 상자처럼 보임 → 덩어리로 자르지 않음)
+     · 높이·두께는 길게 이어지는 큰 물결(바위산 능선처럼) — 경계에서 툭 바뀌는 곳이 없음
+     · 면은 '꺾이는 점'을 0.7~4m 사이 제각각 간격으로 뿌리고 그 사이를 평평하게 이음 → 크고 작은 각진 판이 섞인 한 장의 겉면 */
+  const wave = (d, k) => vn(d * .11 + k * 13, k, o) * .65 + vn(d * .33 + k * 7, k + 3, o) * .35;
+  const hAt = d => Hm * (.72 + .55 * wave(d, 1));
+  const kinks = side => { const K = []; for (let d = -1; d < len + 4;) { K.push([d, (R() - .5) * .55, (R() - .5) * .7]);   /* [자리, 튀어나옴, 기울기(위로 갈수록 들어가거나 나옴)] */ d += R() < .6 ? .7 + R() * 1.3 : 2 + R() * 2; } return K; };
+  const KN = [kinks(0), kinks(1)];
+  const facet = (si, d) => { const K = KN[si]; let j = 0; while (j < K.length - 2 && K[j + 1][0] < d) j++; const [d0, v0] = K[j], [d1, v1] = K[j + 1]; const t = Math.min(1, Math.max(0, (d - d0) / (d1 - d0))); return [v0 + (v1 - v0) * t, K[j][2] + (K[j + 1][2] - K[j][2]) * t]; };
+  /* 층 턱: 벽을 따라 비스듬히 오르내리며 이어짐 · 깊이도 생겼다 없어졌다 (가로줄 X) */
+  const tierY = (d, k, si) => [.33, .64][k] + (wave(d * .8, 20 + k + si * 5) - .5) * .3;
+  const tierD = (d, k, si) => Math.max(0, wave(d * 1.3, 30 + k + si * 3) - .38) * (k ? .55 : .75);
+  /* 틈: 드물게(6~15m마다) · 비스듬히 기울고 · 꼭대기에서 아래로 갈라져 내려오다 중간에서 끝나는 것도 · 몇 개만 아래쪽이 붉게 샘 */
+  const CR = []; for (let d = 3 + R() * 5; d < len - 2; d += 6 + R() * 9) CR.push({ c: d, lean: (R() - .5) * 1.2, w: .18 + R() * .2, y0: R() < .5 ? R() * .45 : 0, zz: .1 + R() * .25, gl: R() < .35 ? .6 + R() * .4 : .08 });
+  const crackAt = (d, yk) => { let m = 0, gl = 0; for (const C of CR) { if (yk < C.y0) continue; const cc = C.c + C.lean * (yk - .5) + Math.sin(yk * 9 + C.c) * C.zz;   /* 지그재그 */
+      const v = Math.max(0, 1 - Math.abs(d - cc) / C.w) * sstep(C.y0, C.y0 + .12, yk); if (v > m) { m = v; gl = C.gl; } } return [m, gl]; };
+  /* 용암 골: 윗면을 길게 따라가다 군데군데 끊김 */
+  const chAt = d => sstep(.35, .5, wave(d * .7, 40));
   /* ④ 폭포 (사용자 2026-11-05: 너무 일정함 → 간격·굵기·길이·모양 제각각)
      · 골이 있는 덩어리에서만, 간격 4~14m 들쭉날쭉 · 굵은 폭포(0.6~0.9m)와 가느다란 줄기(0.2~0.35m)가 섞임
      · 바닥까지 쏟아지는 것도, 중간 층 턱(ystop)에서 멈춰 옆으로 퍼지는 것도
      · 곧게 떨어지지 않고 바위 면을 따라 이리저리 휨 · 몇 개는 중간에서 두 갈래로 갈라짐 */
   const FALLS = []; { const RF2 = (() => { let s = seed * 3571 + 5; return () => (s = (s * 9301 + 49297) % 233280) / 233280; })();
-    for (let d = 2 + RF2() * 3; d < len - 2.5; d += 3 + RF2() * 7) { const b = blk(d); if (b.peak) continue;
+    for (let d = 2 + RF2() * 3; d < len - 2.5; d += 3 + RF2() * 7) { if (chAt(d) < .5) continue;
       const thick = RF2() < .45; FALLS.push({ c: d, w: thick ? .65 + RF2() * .35 : .3 + RF2() * .15, ystop: RF2() < .35 ? .25 + RF2() * .3 : 0,
         amp: .15 + RF2() * .35, ph: RF2() * 6, fq: 2 + RF2() * 3, br: RF2() < .3 ? (RF2() < .5 ? -1 : 1) : 0, hot: .75 + RF2() * .25 }); } }
   /* 높이 yk(0 바닥 ~ 1 윗단)에서 폭포가 지나가는 정도 */
@@ -92,34 +99,37 @@ export function makeLavaWall(path, opt = {}) {
     return m; };
   const fallV = d => fallAt(d, 1);
   const poolK = d => { let m = 0; for (const F of FALLS) m = Math.max(m, Math.max(0, 1 - Math.abs(d - F.c) / (F.w + .8)) * (F.ystop ? .25 : 1) * F.hot); return m; };   /* 바닥까지 온 폭포만 웅덩이를 크게 */
+  /* ② 봉우리: 능선이 높은 자리(높이 물결의 꼭대기)에서만 · 모난 삼각으로 솟음 */
+  const PK = []; for (let d = 1.5; d < len - 1.5; d += .25) { const h = hAt(d); if (h > hAt(d - .5) && h >= hAt(d + .5) && h > Hm * 1.02 && !PK.some(q => Math.abs(q.c - d) < 4)) PK.push({ c: d, h: Hm * (.25 + R() * .3), w: .9 + R() * .9 }); }
+  const PKs = d => { let m = 0; for (const q of PK) m = Math.max(m, Math.max(0, 1 - Math.abs(d - q.c) / q.w) * q.h); return m; };
   const p = new THREE.Vector3(), tg = new THREE.Vector3(), fr = [];
   for (let i = 0; i <= N; i++) { const d = i / N * len; curve.getPointAt(i / N, p); curve.getTangentAt(i / N, tg); let nx = -tg.z, nz = tg.x; const sg = opt.out ? opt.out(p.x, p.z, nx, nz) : 1; nx *= sg; nz *= sg;
-    const b = blk(d), e = Math.min(len - d, d), Lr = 1.8, c = e < Lr ? Math.sqrt(Math.max(0, 1 - Math.pow(1 - e / Lr, 2))) : 1;   /* ⑦ 끝 둥글게 */
+    const e = Math.min(len - d, d), Lr = 1.8, c = e < Lr ? Math.sqrt(Math.max(0, 1 - Math.pow(1 - e / Lr, 2))) : 1;   /* ⑦ 끝 둥글게 */
     const ds = doors[0] ? d : 1e9, de = doors[1] ? len - d : 1e9, door = Math.exp(-Math.pow(Math.min(ds, de), 2) / 10);
-    const g = gapK(d), gl = gapGl(d), fv = fallV(d), mid = (d - (b.d0 + b.d1) / 2) / (b.d1 - b.d0);
-    let h = (b.h + door * .5 * Hm / 2.4) * (.45 + .55 * c) * (1 - g * .12);
-    fr.push({ d, x: p.x, z: p.z, nx, nz, tx: tg.x, tz: tg.z, sg, b, c, g, gl, fv, mid, h }); }
+    const fv = fallV(d), [g1, gl1] = crackAt(d, 1);
+    let h = (hAt(d) + door * .5 * Hm / 2.4) * (.45 + .55 * c) * (1 - g1 * .15) - fv * .1;
+    fr.push({ d, x: p.x, z: p.z, nx, nz, tx: tg.x, tz: tg.z, sg, c, fv, h, g1, gl1, ch: chAt(d) }); }
   const FL = fr[0].sg < 0;
   /* 단면 한 장: 앞면(아래→위) · 윗면(앞 모서리 → 골 → 봉우리 → 뒤 모서리) · 뒷면(위→아래). 점마다 [v(바깥 거리), y, 틈 빛, 용암] */
   const RF = [0, .05, .11, .18, .26, .34, .42, .5, .58, .66, .74, .82, .9, .96, 1], RB = [0, .25, .5, .75, .92, 1];
-  const faceV = (f, side, yk) => { const b = f.b, si = side < 0 ? 0 : 1; let v = b.w[si] + f.mid * b.sl[si] * (b.d1 - b.d0) * .5;   /* 덩어리 면이 비스듬히 → 각진 판 */
-    for (const t0 of b.ty) { const t = t0 + (vn(f.d * .7 + si * 5, t0 * 9, o) - .5) * .22; v -= b.step[si] * sstep(t - .05, t + .05, yk) * (1 - t * .3); }   /* 층: 위층이 한 단 들어감 · 층 선이 비스듬히 오르내려 가로줄로 안 보이게 */
-    v += Math.max(0, .2 - yk) * 2.2 - b.lean * yk * (1 + (vn(f.d * .5, 2, o) - .5) * 1.2);                                                                             /* 아래가 퍼진 밑동 · 위로 갈수록 살짝 기욺 */
-    v += (vn(f.d * .9 + si * 7, yk * 3.1, o) - .5) * .22 + (Math.floor(vn(f.d * 2.3 + si * 3, yk * 5.2, o + 4) * 4) / 4 - .4) * .2;   /* 큰 면 위의 굵은 울퉁불퉁 + 떨어져 나간 자리(턱이 진 이 빠짐) */
-    v -= f.g * (.32 + .1 * yk);                                                                                               /* 덩어리 사이 V 틈 */
-    if (side < 0) v -= fallAt(f.d, yk) * .28 * (.4 + .6 * yk);                                                               /* 폭포가 지나는 자리: 앞면에 파인 홈 */
+  const faceV = (f, side, yk) => { const si = side < 0 ? 0 : 1, d = f.d; const [fo, fl] = facet(si, d); let v = W * (.8 + .45 * wave(d, 50 + si)) + fo + fl * (yk - .5);   /* 두께 물결 + 각진 판(판마다 기울기도 다름) */
+    for (let k = 0; k < 2; k++) { const t = tierY(d, k, si); v -= tierD(d, k, si) * sstep(t - .05, t + .05, yk); }   /* 층 턱 */
+    v += Math.max(0, .2 - yk) * 2.2 - (.12 + .1 * wave(d, 60)) * yk;                                                    /* 아래가 퍼진 밑동 · 위로 갈수록 살짝 기욺 */
+    v += (vn(d * .9 + si * 7, yk * 3.1, o) - .5) * .18 + (Math.floor(vn(d * 1.7 + si * 3, yk * 4.2, o + 4) * 4) / 4 - .4) * .16;   /* 굵은 울퉁불퉁 + 이 빠진 턱 */
+    const [cg] = crackAt(d, yk); v -= cg * (.35 + .1 * yk);                                                             /* 드문 틈 */
+    if (side < 0) v -= fallAt(d, yk) * .28 * (.4 + .6 * yk);                                                            /* 폭포가 지나는 홈 */
     return Math.max(.12, v * (.25 + .75 * f.c)); };
-  const section = f => { const out = [], b = f.b;
-    for (const yk of RF) { const fa = fallAt(f.d, yk), lav = fa > 0 ? sstep(0, .55, fa) : 0; out.push([-faceV(f, -1, yk), Math.max(-.3, -.3 + (f.h + .3) * yk), f.g * f.gl * (.25 + .75 * Math.pow(1 - yk, 2)), lav]); }   /* 틈 빛은 아래쪽에서만 은은히 */
-    const fe = -faceV(f, -1, 1), be = faceV(f, 1, 1), chD = b.ch && !b.peak ? .38 : 0, pk = b.peak * Math.max(0, 1 - Math.abs(f.mid - (b.pk - .5) * .5) * 2.2) * f.c;   /* 봉우리: 둥근 언덕 X, 모난 삼각 */
-    const notch = f.fv * .55;                                                                                                   /* 폭포 자리: 앞 모서리 V자로 깊게 */
-    const bump = k => (vn(f.d * 1.3, k * 2.7, o) - .5) * .22;
-    const chLav = chD ? .75 + .25 * f.fv : 0;
-    out.push([fe + .06, f.h - notch + bump(1), f.g * f.gl * .4, sstep(0, .5, f.fv)],
-      [fe * .55 + be * .45 - .05, f.h - chD - notch * .6 + bump(2) * .4 + pk * .4, f.g * f.gl * .4, chLav],                        /* 골 (용암 강) */
-      [fe * .3 + be * .7 + (b.pk - .5) * .3, f.h + pk + bump(3), f.g * f.gl * .3, 0],                                                 /* 봉우리 쪽 등줄기 */
-      [be - .06, f.h * (.96 + bump(4) * .3), f.g * f.gl * .3, 0]);
-    for (let k = RB.length - 1; k >= 0; k--) { const yk = RB[k]; out.push([faceV(f, 1, yk), Math.max(-.3, -.3 + (f.h + .3) * yk), f.g * f.gl * (.25 + .75 * Math.pow(1 - yk, 2)), 0]); }
+  const glowAt = (f, yk) => { const [cg, gl] = crackAt(f.d, yk); return cg * gl * (.25 + .75 * Math.pow(1 - yk, 2)); };
+  const section = f => { const out = [];
+    for (const yk of RF) { const fa = fallAt(f.d, yk), lav = fa > 0 ? sstep(0, .55, fa) : 0; out.push([-faceV(f, -1, yk), Math.max(-.3, -.3 + (f.h + .3) * yk), glowAt(f, yk), lav]); }
+    const fe = -faceV(f, -1, 1), be = faceV(f, 1, 1), chD = .38 * f.ch * (1 - PKs(f.d) * .8), pk = PKs(f.d) * f.c;
+    const notch = f.fv * .55;                                                                                           /* 폭포 자리: 앞 모서리 V자로 깊게 */
+    const bump = k => (vn(f.d * 1.3, k * 2.7, o) - .5) * .22, gt = glowAt(f, 1) * .5;
+    out.push([fe + .06, f.h - notch + bump(1), gt, sstep(0, .5, f.fv)],
+      [fe * .55 + be * .45 - .05, f.h - chD - notch * .6 + bump(2) * .4 + pk * .3, gt, chD > .05 ? .75 + .25 * f.fv : 0],   /* 골 (용암 강) */
+      [fe * .3 + be * .7, f.h + pk + bump(3), gt * .6, 0],                                                                  /* 등줄기 (봉우리는 여기서 솟음) */
+      [be - .06, f.h * (.96 + bump(4) * .3), gt * .6, 0]);
+    for (let k = RB.length - 1; k >= 0; k--) { const yk = RB[k]; out.push([faceV(f, 1, yk), Math.max(-.3, -.3 + (f.h + .3) * yk), glowAt(f, yk), 0]); }
     return out; };
   const S = fr.map(section), M = S[0].length, P = [], G = [], F = [];
   const pt = (i, k) => { const f = fr[i], q = S[i][k]; return [f.x + f.nx * q[0], q[1], f.z + f.nz * q[0]]; };
@@ -138,9 +148,8 @@ export function makeLavaWall(path, opt = {}) {
     g.translate(0, hh / 2, 0); g.rotateY(RG() * 6); g.applyQuaternion(new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), new THREE.Vector3(lx * lean, 1, lz * lean).normalize()));
     g.translate(x, y0, z); parts.push(prep(g, .25)); };
   /* ② 봉우리 덩어리 위엔 날카로운 바위 뿔 1~2개 (그림의 뾰족한 산꼭대기) */
-  for (const b of BL) if (b.peak) { const dm = Math.min(len - .5, Math.max(.5, (b.d0 + b.d1) / 2 + (b.pk - .5) * .5 * (b.d1 - b.d0))), i = Math.round(dm / len * N), f = fr[Math.min(N, Math.max(0, i))];
-    if (f.c < .9) continue; const cnt = RG() < .5 ? 1 : 2;
-    for (let k = 0; k < cnt; k++) spike(f.x + f.tx * (k - .5) * .7 * (cnt - 1), f.z + f.tz * (k - .5) * .7 * (cnt - 1), f.h + b.peak * .6, Hm * (.45 + RG() * .45) / (k + 1), .45 + RG() * .2, f.nx * (RG() - .5), f.nz * (RG() - .5), .25); }
+  for (const q of PK) { const i = Math.round(q.c / len * N), f = fr[Math.min(N, Math.max(0, i))]; if (f.c < .9) continue; const cnt = RG() < .5 ? 1 : 2;
+    for (let k = 0; k < cnt; k++) spike(f.x + f.tx * (k - .5) * .7 * (cnt - 1), f.z + f.tz * (k - .5) * .7 * (cnt - 1), f.h + q.h * .6, Hm * (.45 + RG() * .45) / (k + 1), .45 + RG() * .2, f.nx * (RG() - .5), f.nz * (RG() - .5), .25); }
   /* ⑦ 문기둥: 둥근 끝 옆에 큰 뿔 하나 + 작은 뿔 둘, 문 바깥쪽으로 벌어짐 */
   for (const end of [0, 1]) if (doors[end]) { const f = fr[end ? N : 0], dir = end ? 1 : -1, ax = f.tx * dir, az = f.tz * dir, bx = f.x - ax * .8, bz = f.z - az * .8;
     spike(bx, bz, -.2, Hm * 1.7, .8, -ax, -az, .12);
