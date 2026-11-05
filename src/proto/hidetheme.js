@@ -17,7 +17,7 @@ const TH = {
 function gas(lobes, th, noise, R) {
   const D = [];
   for (const [lx, lz, lr] of lobes) { const n = Math.round(lr * lr * 2.2 * th.dens) + 8;
-    for (let i = 0; i < n; i++) { const a = R() * 6.28, d = Math.sqrt(R()) * lr * .85, h = R(); D.push(lx + Math.cos(a) * d, lz + Math.sin(a) * d, .2 + h * th.hgt * (1 - d / lr * .6), (1.4 + R() * 1.5) * (th.hgt < 1.5 ? .8 : 1), R(), lx, lz); } }
+    for (let i = 0; i < n; i++) { const a = R() * 6.28, sz = (1.4 + R() * 1.5) * (th.hgt < 1.5 ? .8 : 1), d = Math.sqrt(R()) * Math.max(.2, lr * .9 - sz * .3), h = R(); D.push(lx + Math.cos(a) * d, lz + Math.sin(a) * d, .2 + h * th.hgt * (1 - d / lr * .6), sz, R(), lx, lz); } }   /* 구름 가장자리 = 숨는 자리 경계 */
   D.sort((a, b) => 0);
   const q = new THREE.PlaneGeometry(1, 1), cnt = D.length / 7, g = new THREE.InstancedBufferGeometry(); g.index = q.index; g.setAttribute('position', q.attributes.position); g.setAttribute('uv', q.attributes.uv);
   const order = [...Array(cnt).keys()].sort((i, j) => D[i * 7 + 2] - D[j * 7 + 2]), A = new Float32Array(cnt * 4), B = new Float32Array(cnt * 3);
@@ -26,22 +26,22 @@ function gas(lobes, th, noise, R) {
   const v3 = a => new THREE.Vector3(...a);
   const mat = new THREE.ShaderMaterial({ transparent: true, depthWrite: false,
     uniforms: { uT: { value: 0 }, uN: { value: noise }, uShip: { value: new THREE.Vector3(0, 0, -1e4) }, uCore: { value: v3(th.core) }, uLit: { value: v3(th.lit) }, uUnder: { value: v3(th.under) }, uH: { value: th.hgt } },
-    vertexShader: `attribute vec4 iA; attribute vec3 iB; uniform float uT, uH; uniform vec3 uShip; varying vec2 vU; varying float vH, vPh, vWy;
-      void main(){ vec3 c=vec3(iA.x,iA.z,iA.y); float ph=iB.x*6.28, breathe=sin(uT*.35+ph)*.18;
+    vertexShader: `attribute vec4 iA; attribute vec3 iB; uniform float uT, uH; uniform vec3 uShip; varying vec2 vU; varying float vH, vPh, vWy, vP;
+      void main(){ vec3 c=vec3(iA.x,iA.z,iA.y); float ph=iB.x*6.28;   /* 부풀기 없앰: 경계가 늘 같은 자리 (사용자 2026-11-05) */
         vec2 rel=c.xz-iB.yz; float a=uT*.07*(fract(iB.x*7.)>.5?1.:-1.); c.xz=iB.yz+mat2(cos(a),-sin(a),sin(a),cos(a))*rel;   /* 안에서 천천히 굴러감 */
         c.y+=sin(uT*.5+ph)*.2*uH/2.5;
-        vec2 aw=c.xz-uShip.xz; float d=length(aw), push=uShip.y*smoothstep(3.5,.5,d); c.xz+=normalize(aw+1e-4)*push*2.2; c.y+=push*.5;   /* 기체가 밀고 들어가면 벌어짐 */
-        float sz=iA.w*(1.+breathe)*(1.-push*.35);
+        vec2 aw=c.xz-uShip.xz; float d=length(aw), push=uShip.y*smoothstep(2.2,.3,d);   /* 기체 둘레만 옅어짐 — 가장자리는 그대로 */
+        float sz=iA.w;
         vec3 right=vec3(viewMatrix[0][0],viewMatrix[1][0],viewMatrix[2][0]), up=vec3(viewMatrix[0][1],viewMatrix[1][1],viewMatrix[2][1]);
         float r=uT*.05*(iB.x-.5)+ph; vec2 p=mat2(cos(r),-sin(r),sin(r),cos(r))*position.xy;
-        vec3 wp=c+(right*p.x+up*p.y)*sz; vU=uv; vH=clamp(c.y/(uH+.3),0.,1.); vPh=iB.x; vWy=wp.y; gl_Position=projectionMatrix*viewMatrix*vec4(wp,1.); }`,
-    fragmentShader: `precision highp float; uniform sampler2D uN; uniform float uT; uniform vec3 uCore, uLit, uUnder; varying vec2 vU; varying float vH, vPh, vWy;
+        vec3 wp=c+(right*p.x+up*p.y)*sz; vU=uv; vH=clamp(c.y/(uH+.3),0.,1.); vPh=iB.x; vWy=wp.y; vP=push; gl_Position=projectionMatrix*viewMatrix*vec4(wp,1.); }`,
+    fragmentShader: `precision highp float; uniform sampler2D uN; uniform float uT; uniform vec3 uCore, uLit, uUnder; varying vec2 vU; varying float vH, vPh, vWy, vP;
       void main(){ vec2 q=vU-.5; float r=length(q)*2.; float n=texture2D(uN,vU*.55+vec2(vPh*3.7,vPh*1.3)+vec2(uT*.01,-uT*.008)).r;
         float m=smoothstep(1.,.25,r+(n-.5)*.7)*smoothstep(-.1,.6,vWy); if(m<.01) discard;   /* 땅에 닿는 곳은 스며들듯 옅어짐 (판이 땅을 자르는 줄 없앰) */
         vec3 c=mix(uCore,uLit*1.3,smoothstep(.05,.9,vH)*(.45+.75*n));                                    /* 아래 짙고 위는 빛을 받음 */
         c+=uUnder*pow(1.-vH,2.2)*(.35+.4*n)*(.8+.2*sin(uT*1.6+vPh*20.));                                  /* 아래에서 비추는 빛 (용암) */
         c+=uLit*smoothstep(.55,1.,r)*m*.2;
-        gl_FragColor=vec4(c,m*.86); }` });
+        gl_FragColor=vec4(c,m*.86*(1.-vP*.55)); }` });
   const mesh = new THREE.Mesh(g, mat); mesh.renderOrder = 6; mesh.frustumCulled = false; return { mesh, mat };
 }
 
@@ -85,7 +85,7 @@ function bits(lobes, th, R) {
           #else
             c=vec3(iA.x+cos(ang)*iA.z, iA.w+sin(uT*.6+iB.w)*.2, iA.y+sin(ang)*iA.z); vF=0.;
           #endif
-          vec2 aw=c.xz-uShip.xz; float d=length(aw); push=uShip.y*smoothstep(3.,.6,d); c.xz+=normalize(aw+1e-4)*push*1.8; c.y+=push*.5;
+          vec2 aw=c.xz-uShip.xz; float d=length(aw); push=uShip.y*smoothstep(1.8,.4,d); c.y+=push*.6;   /* 옆으로 밀지 않고 위로 살짝 비킴 */
           R=rot(vec3(sin(iB.w),cos(iB.w*1.7),sin(iB.w*2.3)), uT*(.3+fract(iB.w)*.6)+iB.w);
           vN=R*normal; vY=0.; gl_Position=projectionMatrix*viewMatrix*vec4(c+R*position*iB.x,1.);
         #endif
@@ -106,12 +106,28 @@ function bits(lobes, th, R) {
   const mesh = new THREE.Mesh(g, mat); mesh.frustumCulled = false; return { mesh, mat };
 }
 
+/* 발밑 경계 표시: 숨는 자리 테두리를 땅에 옅게 (그 땅의 흔적 색) · 내 기체가 안에 있으면 밝아짐 */
+const RING = { ice: [.75, .9, 1.], lava: [.9, .35, .1], ruin: [.7, .6, .42], coral: [.3, 1., .85] };
+function ring(lobes, theme) { const L = lobes.slice(0, 8), xs = L.map(l => l[0]), zs = L.map(l => l[1]), pad = 3;
+  const x0 = Math.min(...xs.map((x, i) => x - L[i][2])) - pad, x1 = Math.max(...xs.map((x, i) => x + L[i][2])) + pad, z0 = Math.min(...zs.map((z, i) => z - L[i][2])) - pad, z1 = Math.max(...zs.map((z, i) => z + L[i][2])) + pad;
+  const g = new THREE.PlaneGeometry(x1 - x0, z1 - z0); g.rotateX(-Math.PI / 2); g.translate((x0 + x1) / 2, .04, (z0 + z1) / 2);
+  const U = Array.from({ length: 8 }, (_, i) => L[i] ? new THREE.Vector3(L[i][0], L[i][1], L[i][2] * .9) : new THREE.Vector3(0, 0, -1));
+  const mat = new THREE.ShaderMaterial({ transparent: true, depthWrite: false, uniforms: { uL: { value: U }, uC: { value: new THREE.Vector3(...RING[theme]) }, uIn: { value: 0 }, uT: { value: 0 } },
+    vertexShader: 'varying vec2 vP; void main(){ vec4 w=modelMatrix*vec4(position,1.); vP=w.xz; gl_Position=projectionMatrix*viewMatrix*w; }',
+    fragmentShader: `uniform vec3 uL[8]; uniform vec3 uC; uniform float uIn, uT; varying vec2 vP;
+      void main(){ float d=1e3; for(int i=0;i<8;i++){ vec3 l=uL[i]; if(l.z<0.) continue; d=min(d,length(vP-l.xy)-l.z); }
+        float band=smoothstep(-.45,-.05,d)*smoothstep(.12,-.02,d);                                     /* 경계 바로 안쪽 띠 */
+        float inner=smoothstep(.0,-1.5,d)*.12;                                                          /* 안쪽 땅은 살짝 물듦 */
+        float a=band*(.32+.5*uIn*(.8+.2*sin(uT*3.)))+inner*(1.+uIn);
+        if(a<.004) discard; gl_FragColor=vec4(uC*a,1.); }`, blending: THREE.AdditiveBlending });
+  const m = new THREE.Mesh(g, mat); m.renderOrder = 2; return { mesh: m, mat }; }
+
 /* list: [{ lobes:[[x,z,r]...], theme:'ice'|'lava'|'ruin'|'coral' }] */
 export function makeThemedHide(list, noise) {
   const R = (() => { let s = 4242; return () => (s = (s * 9301 + 49297) % 233280) / 233280; })(), grp = new THREE.Group(), mats = [];
-  for (const b of list) { const th = TH[b.theme]; const G = gas(b.lobes, th, noise, R), Bt = bits(b.lobes, th, R); grp.add(Bt.mesh, G.mesh); mats.push(G.mat, Bt.mat); }
+  const rings = []; for (const b of list) { const th = TH[b.theme]; const G = gas(b.lobes, th, noise, R), Bt = bits(b.lobes, th, R), Rg = ring(b.lobes, b.theme); grp.add(Rg.mesh, Bt.mesh, G.mesh); mats.push(G.mat, Bt.mat); rings.push(Rg.mat); }
   const inside = (x, z) => list.findIndex(b => b.lobes.some(([lx, lz, lr]) => Math.hypot(x - lx, z - lz) < lr * .9));
   let push = 0;
   return { mesh: grp, inside, update(t, dt, x, z) { const inB = inside(x, z) >= 0, tg = inB ? 1 : 0; push += (tg - push) * Math.min(1, dt * (tg > push ? 4 : 1));
-      for (const m of mats) { m.uniforms.uT.value = t; m.uniforms.uShip.value.set(x, push, z); } return inB; } };
+      for (const m of mats) { m.uniforms.uT.value = t; m.uniforms.uShip.value.set(x, push, z); } const id = inside(x, z); rings.forEach((r, i) => { r.uniforms.uT.value = t; const k = i === id ? 1 : 0; r.uniforms.uIn.value += (k - r.uniforms.uIn.value) * Math.min(1, dt * 6); }); return inB; } };
 }
