@@ -5,18 +5,18 @@
    무게: 바닥 판 하나 + 기체 둘 + 빛 알갱이 한 묶음 + 그림자 판 둘 */
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
-import { makeBloom } from '../core/hangar/bloom.js?v=11050956';
-import { makePerf } from './perf.js?v=11050956';
+import { makeBloom } from '../core/hangar/bloom.js?v=11051010';
+import { makePerf } from './perf.js?v=11051010';
 import { buildShip, engineSpots } from '../core/ships/build.js';
 import { makeGlow } from '../preview/glow.js';
-import { makeFlight, FLY } from './flight.js?v=11050956';
-import { makeFloorLab, LAB, JOIN, sdBlob, sdRoad, blobR } from './floorlab.js?v=11050956';
-import { makeMassWall, STYLES } from './wallmass.js?v=11050956';
-import { makeIceWall } from './icewall.js?v=11050956';
-import { SNOW_U } from './snowtone.js?v=11050956';
-import { iceWallMaterial, snowMaterial } from './icewall.js?v=11050956';
-import { makeRuinRidge, ruinMaterial, updateRuins } from './ruins.js?v=11050956';
-import { makeLavaWall, lavaWallMaterial } from './lavawall.js?v=11050956';
+import { makeFlight, FLY } from './flight.js?v=11051010';
+import { makeFloorLab, LAB, JOIN, sdBlob, sdRoad, blobR } from './floorlab.js?v=11051010';
+import { makeMassWall, STYLES } from './wallmass.js?v=11051010';
+import { makeIceWall } from './icewall.js?v=11051010';
+import { SNOW_U } from './snowtone.js?v=11051010';
+import { iceWallMaterial, snowMaterial } from './icewall.js?v=11051010';
+import { makeRuinWall, ruinMaterial } from './ruins.js?v=11051010';
+import { makeLavaWall, lavaWallMaterial } from './lavawall.js?v=11051010';
 
 const $ = s => document.querySelector(s), clamp = THREE.MathUtils.clamp;
 const VIEWS = [{ id: 'game', name: '게임 시점', h: 42, tilt: .38 }, { id: 'near', name: '가까이', h: 18, tilt: .6 }, { id: 'far', name: '멀리', h: 90, tilt: .3 }];
@@ -68,9 +68,9 @@ export async function start(canvas, onProgress = () => {}) {
   /* 용암 바위 벽 보기: 얼음 벽 칸과 같은 자리·같은 모양 줄 (가운데 문) */
   const lgal = new THREE.Group(); scene.add(lgal); lgal.visible = false; { const lm = lavaWallMaterial(UT);
     lgal.add(makeLavaWall(L1, { uT: UT, mat: lm, seed: 21, out: north, doors: [false, true] }), makeLavaWall(L2, { uT: UT, mat: lm, seed: 22, out: north, doors: [true, false] })); }
-  /* 고대 유적 벽 보기: 기존 고대 유적 벽(ruins.js) 그대로 · 같은 자리 줄 (가운데 문) — 참고 그림 시안은 폐기 (사용자 2026-11-05) */
+  /* 고대 유적 벽 보기: 기존 고대 유적 돌로 쌓은 성벽(ruins.js makeRuinWall) · 떠 있는 고리 조각 없음 · 같은 자리 줄 (가운데 문) — 참고 그림 시안은 폐기 (사용자 2026-11-05) */
   const rgal = new THREE.Group(); scene.add(rgal); rgal.visible = false; { const rm = ruinMaterial(UT);
-    rgal.add(makeRuinRidge(L1, { uT: UT, mat: rm, seed: 31 }), makeRuinRidge(L2, { uT: UT, mat: rm, seed: 32 })); }
+    rgal.add(makeRuinWall(L1, { uT: UT, mat: rm, seed: 31, doors: [false, true] }), makeRuinWall(L2, { uT: UT, mat: rm, seed: 32, doors: [true, false] })); }
   const tagAt = (txt, x, y, z) => { const el = document.createElement('div'); el.className = 'tag'; el.innerHTML = `<b>${txt}</b>`; el.style.opacity = 0; $('#tags').appendChild(el); galTags.push({ el, p: new THREE.Vector3(x, y, z) }); };
   tagAt('빙하 얼음 벽 · 한 덩어리 절벽', -19, 10, GAL.z); tagAt('문', 0, 4, GAL.z);
 
@@ -147,7 +147,7 @@ export async function start(canvas, onProgress = () => {}) {
       if (Math.hypot(b.x - hx, b.z - hz) < 1.1) { flash(b.x, b.z, b.mine ? [.6, 1.3, .7] : [1.4, .5, .5]); if (b.mine) { HF.hp = Math.max(.05, HF.hp - .018); HF.heat += .07; } else HM.hp = Math.max(.05, HM.hp - .03); bolts.splice(i, 1); continue; }
       if (b.life <= 0) bolts.splice(i, 1); }
     HM.hp = Math.min(1, HM.hp + dt * .03); HF.hp = Math.min(1, HF.hp + dt * .05);
-    UT.value = t; if (rgal.visible) rgal.children.forEach(w => updateRuins(w, t));
+    UT.value = t;
     for (const g of galTags) { v3.copy(g.p).project(camera); const on = gal.visible && v3.z < 1 && Math.abs(v3.x) < 1.1 && Math.abs(v3.y) < 1.1; g.el.style.opacity = on ? 1 : 0; if (on) g.el.style.transform = `translate(${(v3.x * .5 + .5) * cw}px,${(-v3.y * .5 + .5) * ch}px) translate(-50%,-50%)`; }
     lab.ships[0].set(FS.x, 0, FS.z, 1); lab.ships[1].set(E.x, 0, E.z, 2); lab.update(t);
     glow.begin();

@@ -4,7 +4,7 @@
    · 평소: 빛나지 않는다. 문양은 어두운 홈으로만 보인다.
    · 맞으면: 맞은 자리에서 가까운 문양부터 하나씩 차례로 금빛으로 켜졌다가(지름 3m 남짓) 0.8초쯤에 꺼진다. */
 import * as THREE from 'three';
-import { HITS } from './rocks.js?v=11050956';
+import { HITS } from './rocks.js?v=11051010';
 
 const rng = seed => { let s = seed * 9301 + 49297; return () => (s = (s * 9301 + 49297) % 233280) / 233280; };
 
@@ -20,6 +20,16 @@ export function pillar(seed) {
     v.set(c.x, c.y + .5, c.z);
     const hb = v.dot(brk); if (hb > bk) v.addScaledVector(brk, -(hb - bk) * (.6 + R() * .5));                  /* 부서진 윗면 */
     P.setXYZ(i, v.x, v.y, v.z); }
+  g.deleteAttribute('uv'); const ng = g.toNonIndexed(); ng.computeVertexNormals(); return ng;
+}
+/* 쌓는 돌: 돌기둥과 같은 깎인 모서리, 윗면은 부서지지 않음 (닳아 둥그스름) */
+export function brick(seed) {
+  const R = rng(seed), g = new THREE.BoxGeometry(1, 1, 1, 3, 2, 4); g.translate(0, .5, 0);
+  const P = g.attributes.position, v = new THREE.Vector3(), cuts = [];
+  for (const sx of [-1, 1]) for (const sy of [-1, 1]) for (const sz of [-1, 1]) cuts.push([new THREE.Vector3(sx, sy * .8, sz).normalize(), .62 + R() * .1]);   /* 여덟 모서리만 닳아 깎임 */
+  for (let i = 0; i < P.count; i++) { v.fromBufferAttribute(P, i); const c = new THREE.Vector3(v.x, v.y - .5, v.z);
+    for (const [d, k] of cuts) { const h = c.dot(d); if (h > k) c.addScaledVector(d, -(h - k)); }
+    c.multiplyScalar(1 + (R() - .5) * .03); P.setXYZ(i, c.x, c.y + .5, c.z); }
   g.deleteAttribute('uv'); const ng = g.toNonIndexed(); ng.computeVertexNormals(); return ng;
 }
 /* 고리 조각: 네모난 단면이 원호를 따라 */
@@ -121,3 +131,56 @@ export function makeRuinRidge(path, opt = {}) {
 /* 떠 있는 고리 조각: 천천히 오르내리며 돈다 */
 export function updateRuins(grp, t) { for (const f of grp.userData.fl) { f.ms.position.set(f.x, f.y + Math.sin(t * .4 + f.ph) * .3, f.z);
   f.ms.rotation.set(f.tilt, f.yaw + t * f.spin, f.roll, 'YXZ'); f.ms.updateMatrixWorld(); } }
+
+/* ── 고대 유적 벽 (사용자 2026-11-05: 기존 유적 돌·돌기둥으로 멋지게, 떠 있는 고리 조각은 없앰) ──
+   같은 돌(ruinMaterial)·같은 깎인 돌덩이(pillar)를 '쌓아 올린 성벽'으로 짬
+   ① 몸통: 길게 누운 돌덩이를 단마다 엇갈려 3~5단 쌓음(아래 단일수록 길고 두껍게, 위로 갈수록 살짝 들어감) — 덩어리 사이가 비지 않게 겹침
+   ② 무너짐: 높이가 길게 오르내리는 물결 — 온전한 구간은 끝까지 쌓이고 머리돌(넓고 납작한 판돌)이 얹힘, 무너진 구간은 위 단이 빠지고 돌이 비뚤어짐
+   ③ 돌기둥: 6~9m마다 벽을 뚫고 선 굵은 기둥(벽보다 높음, 몇 개는 부러져 낮음) · 문 양옆은 가장 크고 높은 기둥 둘씩
+   ④ 떨어진 돌: 무너진 구간 양옆 바닥에 굴러떨어진 돌 · 몇 개는 벽에 기대 비스듬히
+   ⑤ 문이 없는 끝은 낮아지며 돌무더기로 끝남 */
+export function makeRuinWall(path, opt = {}) {
+  const uT = opt.uT || { value: 0 }, mat = opt.mat || ruinMaterial(uT), pg = opt.geos || [1, 2, 3, 4].map(pillar).concat([5, 6, 7, 8].map(brick)), doors = opt.doors || [true, true];
+  const R = rng(opt.seed || 21), Hm = opt.H || 2.4;
+  const curve = new THREE.CatmullRomCurve3(path.map(p => new THREE.Vector3(p[0], 0, p[1])), false, 'centripetal'), len = curve.getLength();
+  const at = d => { const u = Math.min(1, Math.max(0, d / len)), p = curve.getPointAt(u), t = curve.getTangentAt(u); return { p, t, nx: -t.z, nz: t.x, yaw: Math.atan2(t.x, t.z) }; };
+  const st = [], tg = [];
+  const put = (x, y, z, sx, sy, sz, yaw, tx = 0, tz = 0, kind = 1) => { st.push({ g: kind ? 4 + Math.floor(R() * 4) : Math.floor(R() * 4), x, y, z, s: [sx, sy, sz], q: new THREE.Quaternion().setFromEuler(new THREE.Euler(tx, yaw, tz)) }); };
+  /* 무너짐 물결 (0 = 바닥까지 무너짐 · 1 = 온전) · 문 가까이 온전 · 문 없는 끝은 무너짐 */
+  const ph = R() * 9, keep = d => { let k = .78 + .28 * Math.sin(d * .19 + ph) + .18 * Math.sin(d * .47 + ph * 2.3);
+    const ds = doors[0] ? d : 1e9, de = doors[1] ? len - d : 1e9; k = Math.max(k, 1.1 - Math.min(ds, de) / 4);
+    if (!doors[0]) k *= Math.min(1, .25 + d / 3); if (!doors[1]) k *= Math.min(1, .25 + (len - d) / 3); return Math.min(1.05, Math.max(.12, k)); };
+  /* ① 단마다 엇갈려 쌓기 */
+  const COURSES = [[.62, 1.55, 1.3], [.55, 1.42, 1.15], [.5, 1.3, 1.0], [.46, 1.2, .9], [.42, 1.1, .85]];   /* [단 높이, 두께, 돌 길이 기준] */
+  let y0 = -.18;
+  COURSES.forEach(([h, th, L], ci) => { const yTop = y0 + h;
+    for (let d = -.2 + (ci % 2) * L * .5 - R() * .3; d < len + .2;) { const l = L * (.75 + R() * .6), dc = d + l / 2, k = keep(dc);
+      if (yTop <= Hm * k + .05) { const a = at(dc), loose = 1 - Math.min(1, (Hm * k - yTop) / .8);   /* 무너지기 직전인 맨 위 돌일수록 비뚤어짐 */
+        const out = (R() - .5) * .08 + loose * (R() - .5) * .25;
+        put(a.p.x + a.nx * out, y0 - .05, a.p.z + a.nz * out, th * (.94 + R() * .1), h * (1.04 + R() * .12) + (ci ? 0 : .05), l * 1.06, a.yaw + (R() - .5) * (.04 + loose * .2), (R() - .5) * loose * .14, (R() - .5) * loose * .14);
+        tg.push({ x: a.p.x, y: y0 + h * .5, z: a.p.z, r: .7 }); }
+      d += l; }
+    y0 = yTop; });
+  /* ② 온전한 구간 위 머리돌: 넓고 납작한 판돌이 벽 위를 덮음 (조금 내민 처마) */
+  for (let d = .5; d < len - .5;) { const l = 1.2 + R() * 1.2, dc = d + l / 2, k = keep(dc), a = at(dc);
+    if (Hm * k >= y0 - .02 && R() < .85) put(a.p.x, y0 - .08, a.p.z, 1.15, .26, l * 1.02, a.yaw + (R() - .5) * .04);
+    d += l; }
+  /* ③ 돌기둥: 벽을 뚫고 선 굵은 기둥 · 문 양옆은 가장 크게 둘씩 */
+  const col = (d, big) => { const a = at(d), broken = !big && R() < .35, w = big ? 1.5 + R() * .2 : 1.15 + R() * .25, h = big ? Hm * 1.75 + R() * .5 : broken ? Hm * (.7 + R() * .4) : Hm * (1.3 + R() * .3);
+    put(a.p.x, -.25, a.p.z, w + .35, .42, w + .35, a.yaw + (R() - .5) * .1);                                   /* 받침돌 */
+    put(a.p.x, -.2, a.p.z, w, h, w * .92, a.yaw + (R() - .5) * .12, (R() - .5) * .04, (R() - .5) * .04, broken ? 0 : 1);   /* 부러진 기둥만 깨진 윗면 */
+    if (!broken) put(a.p.x, -.2 + h - .1, a.p.z, w + .3, .3, w + .3, a.yaw + (R() - .5) * .1);                   /* 머리돌 */
+    for (let j = 0; j < 4; j++) tg.push({ x: a.p.x, y: h * (j + .5) / 4, z: a.p.z, r: w * .6 }); };
+  if (doors[0]) { col(.5, true); col(2.1, false); } if (doors[1]) { col(len - .5, true); col(len - 2.1, false); }
+  for (let d = 5 + R() * 2; d < len - 4; d += 6 + R() * 3) col(d, false);
+  /* ④ 떨어진 돌: 무너진 만큼 많이 · 바닥에 구르거나 벽에 기댐 */
+  for (let d = .3; d < len; d += .6 + R() * .9) { const k = keep(d), lost = 1 - k; if (R() > .15 + lost * 1.1) continue; const a = at(d), side = R() < .7 ? -1 : 1;
+    const lean = R() < .25, s = .4 + R() * .45, off = side * (lean ? .95 + R() * .2 : 1.3 + R() * 2.4);
+    put(a.p.x + a.nx * off, -.3, a.p.z + a.nz * off, s * (1 + R() * .6), s * (.6 + R() * .5), s * (.9 + R() * .7), R() * 6.28, lean ? side * (.45 + R() * .3) : (R() - .5) * .5, (R() - .5) * .5); }
+  const grp = new THREE.Group(), m4 = new THREE.Matrix4(), sc = new THREE.Vector3(), pos = new THREE.Vector3();
+  pg.forEach((g, gi) => { const mine = st.filter(s => s.g === gi); if (!mine.length) return;
+    const im = new THREE.InstancedMesh(g, mat, mine.length); mine.forEach((s, j) => { m4.compose(pos.set(s.x, s.y, s.z), s.q, sc.set(...s.s)); im.setMatrixAt(j, m4); });
+    im.computeBoundingSphere(); grp.add(im); });
+  grp.userData = { kind: 'ruins', uT, fl: [], targets: () => tg };
+  return grp;
+}
