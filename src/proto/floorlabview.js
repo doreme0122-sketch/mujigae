@@ -5,26 +5,26 @@
    무게: 바닥 판 하나 + 기체 둘 + 빛 알갱이 한 묶음 + 그림자 판 둘 */
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
-import { makeBloom } from '../core/hangar/bloom.js?v=11052054';
-import { makePerf } from './perf.js?v=11052054';
+import { makeBloom } from '../core/hangar/bloom.js?v=11052105';
+import { makePerf } from './perf.js?v=11052105';
 import { buildShip, engineSpots } from '../core/ships/build.js';
 import { makeGlow } from '../preview/glow.js';
-import { makeFlight, FLY } from './flight.js?v=11052054';
-import { makeFloorLab, LAB, JOIN, sdBlob, sdRoad, blobR } from './floorlab.js?v=11052054';
-import { makeMassWall, STYLES } from './wallmass.js?v=11052054';
-import { makeIceWall } from './icewall.js?v=11052054';
-import { SNOW_U } from './snowtone.js?v=11052054';
-import { iceWallMaterial, snowMaterial } from './icewall.js?v=11052054';
-import { makeRuinWall, ruinMaterial } from './ruins.js?v=11052054';
-import { makeCoralWall, coralMaterial, coral } from './coral.js?v=11052054';
-import { makeTrailMap } from './trailmap.js?v=11052054';
-import { makeThemedHide } from './hidetheme.js?v=11052054';
-import { makePlantBush } from './plantbush.js?v=11052054';
-import { makeCrystalWall, crystalMaterial } from './crystal.js?v=11052054';
-import { makeLavaWall, lavaWallMaterial } from './lavawall.js?v=11052054';
-import { makeSkyCanyon } from './skycanyon.js?v=11052054';
-import { makeSkyIsle, makeCloudSea } from './skyisle.js?v=11052054';
-import { makeHeroIsle } from './heroisle.js?v=11052054';
+import { makeFlight, FLY } from './flight.js?v=11052105';
+import { makeFloorLab, LAB, JOIN, sdBlob, sdRoad, blobR } from './floorlab.js?v=11052105';
+import { makeMassWall, STYLES } from './wallmass.js?v=11052105';
+import { makeIceWall } from './icewall.js?v=11052105';
+import { SNOW_U } from './snowtone.js?v=11052105';
+import { iceWallMaterial, snowMaterial } from './icewall.js?v=11052105';
+import { makeRuinWall, ruinMaterial } from './ruins.js?v=11052105';
+import { makeCoralWall, coralMaterial, coral } from './coral.js?v=11052105';
+import { makeTrailMap } from './trailmap.js?v=11052105';
+import { makeThemedHide } from './hidetheme.js?v=11052105';
+import { makePlantBush } from './plantbush.js?v=11052105';
+import { makeCrystalWall, crystalMaterial } from './crystal.js?v=11052105';
+import { makeLavaWall, lavaWallMaterial } from './lavawall.js?v=11052105';
+import { makeSkyCanyon } from './skycanyon.js?v=11052105';
+import { makeSkyIsle, makeCloudSea } from './skyisle.js?v=11052105';
+import { makeHeroIsle } from './heroisle.js?v=11052105';
 
 const $ = s => document.querySelector(s), clamp = THREE.MathUtils.clamp;
 /* 원근 없는 카메라 (사용자 2026-11-05: 롤처럼 맵 끝과 끝이어도 크기가 같게 · 망원으로 줄이기만 하니 섬 윗면과 꼬리가 다른 빠르기로 움직여 따로 놂)
@@ -36,12 +36,12 @@ const AREA = 70;
 export async function start(canvas, onProgress = () => {}) {
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: false, powerPreference: 'high-performance' });
   renderer.toneMapping = THREE.NoToneMapping; renderer.autoClear = false; renderer.setClearColor(0, 1);
-  const scene = new THREE.Scene(), camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 1, 2600), bloom = makeBloom(renderer, { samples: 0 });
+  const scene = new THREE.Scene(), camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 1, 2600), pcam = new THREE.PerspectiveCamera(40, 1, .5, 1200), bloom = makeBloom(renderer, { samples: 0 });
   { const pm = new THREE.PMREMGenerator(renderer); scene.environment = pm.fromScene(new RoomEnvironment(), .04).texture; scene.environmentIntensity = .6; pm.dispose(); }
   const sunDir = new THREE.Vector3(-.45, .78, -.42).normalize(), sun = new THREE.DirectionalLight(0xfff0dc, 3); sun.position.copy(sunDir).multiplyScalar(20); scene.add(sun);
-  scene.add(new THREE.HemisphereLight(0x7080a8, 0x2a1810, .5));
+  { const hl = new THREE.HemisphereLight(0x7080a8, 0x2a1810, .5); scene.add(hl); hl.layers.enableAll(); sun.layers.enableAll(); }   /* 빛은 배경·캐릭터 두 번 그리기 모두에 */
   const lab = makeFloorLab(); scene.add(lab.mesh); let K = 0;
-  const glow = makeGlow(); scene.add(glow.mesh);
+  const glow = makeGlow(); scene.add(glow.mesh); glow.mesh.layers.set(1);   /* 탄 빛 = 캐릭터 쪽 */
   onProgress(.3);
   /* 내 기체: 맵과 같은 비행 (둘레 AREA m 밖은 막힘) */
   const sdI = (x, z) => sdBlob(x, z, JOIN.ice, 0), sdL = (x, z) => sdBlob(x, z, JOIN.lava, 2.1);
@@ -54,11 +54,11 @@ export async function start(canvas, onProgress = () => {}) {
       if (K !== 5) return Math.hypot(x, z) > AREA;
       if (hitBlk(5, x, z)) return true; if (onRoad(x, z)) return false; const sd = Math.min(sdI(x, z), sdL(x, z)); return sd > -1.4; },   /* 이음 시험: 땅 밖(우주)·벽 띠는 막힘, 큰길은 벽 틈(문)으로 지나감 */
     region: () => 0 };
-  const fly = await makeFlight(renderer, B, [0, 8], 0); scene.add(fly); const FS = fly.userData.S;
+  const fly = await makeFlight(renderer, B, [0, 8], 0); scene.add(fly); fly.traverse(o => o.layers.set(1)); const FS = fly.userData.S;
   fly.traverse(o => { if (o.isMesh && o.renderOrder === 1 && o.geometry.type === 'PlaneGeometry') o.userData.oldShadow = true; });
   onProgress(.6);
   /* 상대 기체 */
-  const fb = await buildShip(4, 2, 'neon-black', { renderer, size: FLY.LEN }); const foe = fb.root; scene.add(foe);
+  const fb = await buildShip(4, 2, 'neon-black', { renderer, size: FLY.LEN }); const foe = fb.root; scene.add(foe); foe.traverse(o => o.layers.set(1));
   const fsm = foe.children[0], FENG = engineSpots(fb.ship, fsm, new THREE.Box3().setFromObject(fsm).getSize(new THREE.Vector3()));
   /* 벽: 얼음 땅 둘레 = 빙하 얼음 · 용암 땅 둘레 = 흑요석. 큰길이 지나는 자리만 비움(벽 틈 = 문) */
   const UT = { value: 0 }, walls = new THREE.Group(); scene.add(walls); walls.visible = false;
@@ -248,9 +248,14 @@ export async function start(canvas, onProgress = () => {}) {
     { const vh = 2 * cam.h * Math.tan(20 * Math.PI / 180), asp = Wd / Hd; camera.top = vh / 2; camera.bottom = -vh / 2; camera.left = -vh / 2 * asp; camera.right = vh / 2 * asp; camera.updateProjectionMatrix();   /* 보이는 넓이는 전과 같게 */
       fly.userData.setPx?.(Hd / vh * cam.h * TELE); }   /* 불꽃 알갱이 크기: 원근 없는 화면에 맞춤 */
     camera.position.set(cam.x, cam.h * TELE * Math.cos(cam.tilt), cam.z + cam.h * TELE * Math.sin(cam.tilt)); camera.lookAt(cam.x, 0, cam.z); const ov = window.__camOv; if (ov) { camera.position.set(ov[0], ov[1], ov[2]); camera.lookAt(ov[3], ov[4], ov[5]); }   /* 시험용: 원하는 자리에서 보기 */ camera.updateMatrixWorld();
+    /* 배경 원근 카메라 (사용자 2026-11-05: 배경은 원근감 있게, 캐릭터만 직교로): 같은 방향 · 기체가 나는 높이에서 직교 화면과 딱 맞게(거리 cam.h, 40° 렌즈 → 그 높이에서 보이는 넓이가 같음) */
+    pcam.aspect = Wd / Hd; pcam.updateProjectionMatrix(); pcam.quaternion.copy(camera.quaternion);
+    { const d = cam.h, fx = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion); pcam.position.set(cam.x, FLY.HOVER, cam.z).addScaledVector(fx, -d); if (ov) pcam.position.copy(camera.position); } pcam.updateMatrixWorld();
     lab.mesh.position.set(Math.round(cam.x / 4) * 4, 0, Math.round(cam.z / 4) * 4);
     drawHud(HM, FS.x, FLY.HOVER, FS.z, dt); drawHud(HF, E.x, FLY.HOVER, E.z, dt);
-    renderer.setRenderTarget(bloom.scene); renderer.clear(); renderer.render(scene, camera);
+    renderer.setRenderTarget(bloom.scene); renderer.clear();
+    if (K === 13 || K === 14) { pcam.layers.set(0); renderer.render(scene, pcam); renderer.clearDepth(); camera.layers.set(1); renderer.render(scene, camera); }   /* 하늘 칸: 배경(원근) → 그 위에 기체·탄(직교) */
+    else { camera.layers.enableAll(); renderer.render(scene, camera); }
     bloom.render(Wd, Hd, !perf.st.bloom); perf.tick(dt);
   } catch (e) { console.error('[바닥 시험장]', e); } });
   { const v = (import.meta.url.match(/v=(\d+)/) || [])[1] || '개발'; const el = document.createElement('div'); el.textContent = '판 번호 ' + v;
