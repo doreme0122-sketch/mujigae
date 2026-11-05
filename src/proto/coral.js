@@ -5,7 +5,7 @@
      가지에도 끝 쪽으로 빛이 살짝 번진다. */
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { HITS } from './rocks.js?v=11051101';
+import { HITS } from './rocks.js?v=11051106';
 
 const rng = seed => { let s = seed * 9301 + 49297; return () => (s = (s * 9301 + 49297) % 233280) / 233280; };
 
@@ -94,7 +94,7 @@ export function makeCoralRidge(path, opt = {}) {
    ② 산호 세 줄: 가운데 줄은 크게, 앞뒤 줄은 작게 비스듬히 겹쳐 자람 · 높낮이는 길게 오르내리는 물결(높게 솟은 무리 / 낮게 퍼진 곳)
    ③ 문 양옆: 가장 크게 자란 산호 둘 + 둘레에 작은 산호
    ④ 벽 주변: 떨어져 자란 작은 산호 무리 · 바닥에 굴러다니는 산호 조각(낮아서 기체가 넘어감) */
-import { block } from './ice.js?v=11051101';
+import { block } from './ice.js?v=11051106';
 export function makeCoralWall(path, opt = {}) {
   const uT = opt.uT || { value: 0 }, mat = opt.mat || coralMaterial(uT), geos = opt.geos || [1, 2, 3, 4, 5, 6].map(s => coral(s)), R = rng(opt.seed || 41), doors = opt.doors || [true, true];
   const curve = new THREE.CatmullRomCurve3(path.map(p => new THREE.Vector3(p[0], 0, p[1])), false, 'centripetal'), len = curve.getLength();
@@ -110,7 +110,8 @@ export function makeCoralWall(path, opt = {}) {
   for (const end of [0, 1]) if (doors[end]) { const d0 = end ? len - .6 : .6, a = at(d0); add(a.p.x, a.p.z, 1.9 + R() * .3, d0);
     for (let k = 0; k < 3; k++) { const an = R() * 6.28; add(a.p.x + Math.cos(an) * 1.1, a.p.z + Math.sin(an) * 1.1, .55 + R() * .3, d0); } }
   /* ④ 벽 주변 작은 산호 무리 */
-  for (let d = 2 + R() * 2; d < len - 1.5; d += 3.5 + R() * 4) { const a = at(d), side = R() < .6 ? -1 : 1, off = side * (2.2 + R() * 2.2), x = a.p.x + a.nx * off, z = a.p.z + a.nz * off;
+  /* 벽 주변 구조물: 없앰 (사용자 2026-11-05: 가끔 걸리면 짜증) — opt.props 로만 켬 */
+  if (opt.props) for (let d = 2 + R() * 2; d < len - 1.5; d += 3.5 + R() * 4) { const a = at(d), side = R() < .6 ? -1 : 1, off = side * (2.2 + R() * 2.2), x = a.p.x + a.nx * off, z = a.p.z + a.nz * off;
     add(x, z, .45 + R() * .3, d); for (let k = 0; k < 1 + R() * 2; k++) { const an = R() * 6.28, rr = .5 + R() * .5; add(x + Math.cos(an) * rr, z + Math.sin(an) * rr, .28 + R() * .2, d); } }
   const grp = new THREE.Group(), m4 = new THREE.Matrix4(), sc = new THREE.Vector3(), pos = new THREE.Vector3(), q = new THREE.Quaternion(), e = new THREE.Euler();
   geos.forEach((g, gi) => { const mine = cs.filter(c => c.g === gi); if (!mine.length) return;
@@ -123,7 +124,7 @@ export function makeCoralWall(path, opt = {}) {
   for (let d = 0; d < len; d += .9 + R() * .5) { const a = at(d), k = endK(d), s = (.9 + R() * .5) * k, off = (R() - .5) * .6;
     rk(a.p.x + a.nx * off, -.28, a.p.z + a.nz * off, s * 1.15, s * (.4 + .15 * wave(d)), s * 1.4, Math.atan2(a.t.x, a.t.z) + (R() - .5) * .6);
     BLK.push({ x: a.p.x + a.nx * off, z: a.p.z + a.nz * off, r: s * .95, top: s * .5 }); }
-  for (let d = .5; d < len; d += .7 + R() * 1.4) { const a = at(d), side = R() < .65 ? -1 : 1, off = side * (1.6 + R() * 2.8), s = .1 + R() * .16;
+  if (opt.props) for (let d = .5; d < len; d += .7 + R() * 1.4) { const a = at(d), side = R() < .65 ? -1 : 1, off = side * (1.6 + R() * 2.8), s = .1 + R() * .16;
     rk(a.p.x + a.nx * off, -.05, a.p.z + a.nz * off, s * 1.6, s * .7, s, R() * 6.28); }
   const rg = mergeGeometries(rocks.map(g => { for (const k of Object.keys(g.attributes)) if (!['position', 'normal', 'aD', 'aS'].includes(k)) g.deleteAttribute(k); return g; })); rg.computeVertexNormals();
   grp.add(new THREE.Mesh(rg, mat));

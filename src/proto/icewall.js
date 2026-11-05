@@ -11,8 +11,8 @@
    무게: 벽 한 줄 = 얼음 1번 + 눈 1번 그리기 */
 import * as THREE from 'three';
 import { mergeGeometries, mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js';
-import { iceMaterial, block } from './ice.js?v=11051101';
-import { SNOW_GLSL, SNOW_U } from './snowtone.js?v=11051101';
+import { iceMaterial, block } from './ice.js?v=11051106';
+import { SNOW_GLSL, SNOW_U } from './snowtone.js?v=11051106';
 
 const hs = (x, y, z) => { const s = Math.sin(x * 127.1 + y * 311.7 + z * 74.7) * 43758.5453; return s - Math.floor(s); };
 const vn = (x, y, z) => { const ix = Math.floor(x), iy = Math.floor(y), iz = Math.floor(z), fx = x - ix, fy = y - iy, fz = z - iz, u = fx * fx * (3 - 2 * fx), v = fy * fy * (3 - 2 * fy), w = fz * fz * (3 - 2 * fz);
@@ -253,8 +253,9 @@ export function makeIceWall(path, opt = {}) {
         for (let k = 0; k < 3; k++) { a.fromBufferAttribute(A, t + k); const w = th * (.6 + .8 * vn(a.x * 3, a.y * 3, a.z * 3)) * Math.min(1, (nn.y - lim + .15) * 2);
           Q.push(a.x + nn.x * w * .15, a.y + w, a.z + nn.z * w * .15); } }
       if (Q.length) { const c = new THREE.BufferGeometry(); c.setAttribute('position', new THREE.Float32BufferAttribute(Q, 3)); c.computeVertexNormals(); snow.push(c); } } };
-  for (let d = .5 + R(); d < len - .3; d += .9 + R() * 2.2) { const big = R() < .35; rock(d, -(W + 1.2 + R() * (big ? 1.6 : 2.6)), big ? .9 + R() * .9 : .25 + R() * .4); }
-  for (let d = 1 + R() * 2; d < len - .5; d += 2.5 + R() * 4) rock(d, W + 1.1 + R() * 1.2, .3 + R() * .6);
+  /* 벽 주변 구조물: 없앰 (사용자 2026-11-05: 가끔 걸리면 짜증) — opt.props 로만 켬 */
+  if (opt.props) for (let d = .5 + R(); d < len - .3; d += .9 + R() * 2.2) { const big = R() < .35; rock(d, -(W + 1.2 + R() * (big ? 1.6 : 2.6)), big ? .9 + R() * .9 : .25 + R() * .4); }
+  if (opt.props) for (let d = 1 + R() * 2; d < len - .5; d += 2.5 + R() * 4) rock(d, W + 1.1 + R() * 1.2, .3 + R() * .6);
   /* 앞쪽 땅 눈밭 (들쭉날쭉한 가장자리) · 용암 벽은 같은 자리가 흘러내린 용암이 고인 웅덩이 */
   { const Q = [], sk = (i, k) => { const f = fr[i], reach = 2.4 + vn(f.d * .3, 4, o) * 3.2, vv = -(W * f.sv + .2 + [0, .6, reach * .55, reach][k] * f.sc)   /* 벽 끝으로 갈수록 발치 눈밭도 둥글게 줄어듦 */, y = [.55, .32, .14, -.04][k] + (k < 3 ? (vn(f.d * 1.5, k, o) - .5) * .1 : 0);
       return [f.x + f.nx * vv, y, f.z + f.nz * vv]; };

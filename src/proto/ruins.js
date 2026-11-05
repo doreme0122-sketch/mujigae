@@ -4,7 +4,7 @@
    · 평소: 빛나지 않는다. 문양은 어두운 홈으로만 보인다.
    · 맞으면: 맞은 자리에서 가까운 문양부터 하나씩 차례로 금빛으로 켜졌다가(지름 3m 남짓) 0.8초쯤에 꺼진다. */
 import * as THREE from 'three';
-import { HITS } from './rocks.js?v=11051101';
+import { HITS } from './rocks.js?v=11051106';
 
 const rng = seed => { let s = seed * 9301 + 49297; return () => (s = (s * 9301 + 49297) % 233280) / 233280; };
 
@@ -176,7 +176,8 @@ export function makeRuinWall(path, opt = {}) {
   /* ⑥ 벽 주변 부서진 기둥 (사용자 2026-11-05): 벽 앞뒤 1.5~4m에 옛 기둥이 남은 자리
      · 부러진 밑동: 받침돌 위에 깨진 윗면의 짧은 기둥(0.5~1.6m)
      · 쓰러진 토막: 부러져 나간 윗부분이 옆으로 누움(반쯤 바닥에 묻힌 듯), 머리돌이 떨어져 굴러 있기도 */
-  for (let d = 2 + R() * 3; d < len - 2; d += 4 + R() * 5) { const a = at(d), side = R() < .65 ? -1 : 1, off = side * (1.6 + R() * 2.4), x = a.p.x + a.nx * off, z = a.p.z + a.nz * off, w = .85 + R() * .3;
+  /* 벽 주변 구조물: 없앰 (사용자 2026-11-05: 가끔 걸리면 짜증) — opt.props 로만 켬 */
+  if (opt.props) for (let d = 2 + R() * 3; d < len - 2; d += 4 + R() * 5) { const a = at(d), side = R() < .65 ? -1 : 1, off = side * (1.6 + R() * 2.4), x = a.p.x + a.nx * off, z = a.p.z + a.nz * off, w = .85 + R() * .3;
     const stump = .5 + R() * 1.1; put(x, -.25, z, w + .3, .35, w + .3, R() * 6.28, 0, 0, 1);
     put(x, -.2, z, w, stump, w * .92, R() * 6.28, (R() - .5) * .06, (R() - .5) * .06, 0);
     tg.push({ x, y: stump * .5, z, r: w * .6 }); BLK.push({ x, z, r: (w + .3) * .62, top: stump - .2 });
@@ -186,7 +187,7 @@ export function makeRuinWall(path, opt = {}) {
         q: new THREE.Quaternion().setFromEuler(new THREE.Euler(0, -fa, -Math.PI / 2 + (R() - .5) * .15, 'YXZ')) });
       if (R() < .5) put(fx + Math.cos(fa) * .6, -.2, fz + Math.sin(fa) * .6, w + .25, .3, w + .25, R() * 6.28, (R() - .5) * .5, (R() - .5) * .5, 1); } }
   /* ④ 떨어진 돌: 무너진 만큼 많이 · 바닥에 구르거나 벽에 기댐 */
-  for (let d = .3; d < len; d += .6 + R() * .9) { const k = keep(d), lost = 1 - k; if (R() > .15 + lost * 1.1) continue; const a = at(d), side = R() < .7 ? -1 : 1;
+  if (opt.props) for (let d = .3; d < len; d += .6 + R() * .9) { const k = keep(d), lost = 1 - k; if (R() > .15 + lost * 1.1) continue; const a = at(d), side = R() < .7 ? -1 : 1;
     const lean = R() < .25, s = .4 + R() * .45, off = side * (lean ? .95 + R() * .2 : 1.3 + R() * 2.4);
     const fs = s * (.6 + R() * .5); BLK.push({ x: a.p.x + a.nx * off, z: a.p.z + a.nz * off, r: s * .6, top: -.3 + fs * (lean ? 1.3 : 1) });
     put(a.p.x + a.nx * off, -.3, a.p.z + a.nz * off, s * (1 + R() * .6), fs, s * (.9 + R() * .7), R() * 6.28, lean ? side * (.45 + R() * .3) : (R() - .5) * .5, (R() - .5) * .5); }
