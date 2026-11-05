@@ -4,8 +4,8 @@
    · 멀어질수록 깊은 색으로 가라앉힘 (가까운 싸움터가 또렷하게)
    0 금속 판 · 1 이끼 낀 암반 · 2 결정 섞인 모래 · 3 은은한 평지 · 4 보스존 별빛 우주(보이지 않는 유리 바닥 + 아래로 깊은 별 세 겹) */
 import * as THREE from 'three';
-import { LAVA_GLSL, vorTex } from './lavatone.js?v=11051558';
-import { SNOW_GLSL, SNOW_U } from './snowtone.js?v=11051558';
+import { LAVA_GLSL, vorTex } from './lavatone.js?v=11051608';
+import { SNOW_GLSL, SNOW_U } from './snowtone.js?v=11051608';
 
 function bakeNoise(N = 256) {
   const hash = (x, y, p) => { x = ((x % p) + p) % p; y = ((y % p) + p) % p; const s = Math.sin(x * 127.1 + y * 311.7) * 43758.5453; return s - Math.floor(s); };
@@ -31,7 +31,8 @@ export const LAB = [
   { id: 'ruinwalls', name: '고대 유적 벽', tip: '크기가 다른 돌을 엇갈려 쌓은 옛 벽이에요. 구간마다 온전하거나 반쯤 무너졌거나 돌무더기만 남았어요. 돌기둥엔 금빛 띠와 푸른 문양이 빛나고, 문 위엔 거대한 고리 조각이 떠 돌아요. 맞으면 가까운 문양부터 금빛으로 켜져요.' },
   { id: 'coralwalls', name: '성운 산호 벽', tip: '낮고 울퉁불퉁한 산호초 바위 위에 산호가 세 줄로 얽혀 자란 벽이에요. 뿌리는 청록, 가지 끝은 보랏빛이고 물속처럼 천천히 흔들려요. 맞으면 가지 끝 방울이 반딧불처럼 깜빡여요.' },
   { id: 'crystalwalls', name: '자수정 꽃 무리', tip: '크고 작은 자수정 결정이 한가운데서 꽃잎처럼 사방으로 핀 덩어리들이 바짝 붙어 벽을 이뤄요. 가운데 결정이 가장 크고 곧고, 바깥으로 갈수록 짧고 눕혀져요. 맞으면 결정 면마다 다른 색으로 빛이 꺾여요.' },
-  { id: 'plants', name: '숨을 곳 · 우주 식물', tip: '미지의 우주 식물 덤불 시안 셋이에요. 왼쪽부터 A 빛잎 덤불 · B 깃털 덤불 · C 빛버섯 무리(키 낮춤) · 맨 오른쪽 셋을 섞은 덤불. 들어가면 반투명해지고 곧은 테두리가 보여요.' }];
+  { id: 'plants', name: '숨을 곳 · 우주 식물', tip: '미지의 우주 식물 덤불 시안 셋이에요. 왼쪽부터 A 빛잎 덤불 · B 깃털 덤불 · C 빛버섯 무리(키 낮춤) · 맨 오른쪽 셋을 섞은 덤불. 들어가면 반투명해지고 곧은 테두리가 보여요.' },
+  { id: 'zone1', name: '맵 1구역', tip: '맵 7안 방 1 둘레를 실제로 깔았어요. 방 1(바깥 벽 뒤) · 얼음 사냥터 · 양옆 보물 땅(유적) · 앞 산호 정글 · 가운데 자수정 보스존 둘레. 숨을 곳은 우주 식물 덤불.' }];
 
 /* 이음 시험 자리 (그림과 JS가 같은 식): 얼음 땅 가운데 (-30,0) · 용암 땅 (30,0) · 큰길 = 두 가운데를 잇는 폭 8m 띠 */
 export const JOIN = { ice: [-30, 0], lava: [30, 0], R: 22, roadW: 4, roadX: 30 };
@@ -43,9 +44,9 @@ export function makeFloorLab() {
   const noise = bakeNoise();
   const ships = Array.from({ length: 2 }, () => new THREE.Vector4(0, 0, 0, 0));
   const mat = new THREE.ShaderMaterial({ depthWrite: true,
-    uniforms: { uVor: { value: vorTex() }, uN: { value: noise }, uK: { value: 0 }, uT: { value: 0 }, uSun: { value: new THREE.Vector3(-.45, .78, -.42).normalize() }, uShips: { value: ships }, uIV: { value: 0 }, uSG: SNOW_U.uSG, uGate: { value: 0 }, uLF: { value: Array.from({ length: 24 }, () => new THREE.Vector4(0, 0, 0, 0)) }, uLFw: { value: Array.from({ length: 24 }, () => new THREE.Vector2(0, 0)) }, uTrail: { value: null }, uTrO: { value: new THREE.Vector3(0, 0, 1) }, uDoor: { value: [new THREE.Vector4(), new THREE.Vector4()] } },
+    uniforms: { uReg: { value: null }, uVor: { value: vorTex() }, uN: { value: noise }, uK: { value: 0 }, uT: { value: 0 }, uSun: { value: new THREE.Vector3(-.45, .78, -.42).normalize() }, uShips: { value: ships }, uIV: { value: 0 }, uSG: SNOW_U.uSG, uGate: { value: 0 }, uLF: { value: Array.from({ length: 24 }, () => new THREE.Vector4(0, 0, 0, 0)) }, uLFw: { value: Array.from({ length: 24 }, () => new THREE.Vector2(0, 0)) }, uTrail: { value: null }, uTrO: { value: new THREE.Vector3(0, 0, 1) }, uDoor: { value: [new THREE.Vector4(), new THREE.Vector4()] } },
     vertexShader: 'varying vec3 vW; void main(){ vec4 w=modelMatrix*vec4(position,1.); vW=w.xyz; gl_Position=projectionMatrix*viewMatrix*w; }',
-    fragmentShader: `precision highp float; varying vec3 vW; uniform sampler2D uN; uniform float uK, uT; uniform vec3 uSun; uniform vec4 uShips[2]; uniform float uIV; uniform float uGate; uniform vec4 uLF[24]; uniform vec2 uLFw[24]; uniform sampler2D uTrail; uniform vec3 uTrO; uniform vec4 uDoor[2];
+    fragmentShader: `precision highp float; varying vec3 vW; uniform sampler2D uN; uniform float uK, uT; uniform vec3 uSun; uniform vec4 uShips[2]; uniform float uIV; uniform float uGate; uniform vec4 uLF[24]; uniform vec2 uLFw[24]; uniform sampler2D uTrail; uniform vec3 uTrO; uniform sampler2D uReg; uniform vec4 uDoor[2];
       float h2(vec2 p){ p=fract(p*vec2(123.34,456.21)); p+=dot(p,p+45.32); return fract(p.x*p.y); }
       vec4 N4(vec2 p){ return texture2D(uN,p); }
       const vec3 SUN=vec3(1.,.94,.86), SKY=vec3(.42,.48,.62), GND=vec3(.16,.12,.1);
@@ -126,6 +127,7 @@ export function makeFloorLab() {
          · 벽 재질은 화면에 낼 때 밝기 변환을 거치므로 바닥 빛은 같은 변환(pow 1/2.2)을 직접 해서 색을 맞춤 */
       /* 용암 벽까지 거리 (벽 칸: 물결 두 줄 · 이음 장면: 용암 땅 둘레) */
       float lavaWallD(vec2 p){
+        if(uK>11.5) return 99.;
         if(uK>6.5){ float d=1e3; if(p.x>-34.5&&p.x<-3.5) d=min(d,abs(p.y-(-12.+sin(p.x*.12)*1.2))); if(p.x>3.5&&p.x<34.5) d=min(d,abs(p.y-(-12.+sin(p.x*.12+1.)*1.2)));
           d=min(d,length(vec2(max(abs(p.x)-34.,0.)+max(3.5-abs(p.x),0.),p.y+12.))+1.); return d; }
         return abs(sdBlob(p,vec2(30.,0.),2.1)); }
@@ -240,9 +242,24 @@ export function makeFloorLab() {
         if(gh>.94){ vec3 gn=normalize(vec3(h2(gid+1.)-.5,.7,h2(gid+2.)-.5)); float sp=pow(max(dot(gn,hv),0.),60.)*exp(-dot(gf,gf)*50.);   /* 박힌 결정 알갱이 */
           c+=mix(vec3(.7,.5,1.2),vec3(1.,.85,1.1),fract(gh*37.))*sp*1.6; }
         return c; }
+      /* 맵 1구역 바닥 (2026-11-05): 맵 7안 지역 그림(v7.png R=지역번호×12)에서 지역을 읽어 그 땅 바닥을 깖
+         사냥터 = 방 1·3·5·7·9 얼음 / 2·4·6·8·10 용암 · 보물 땅 = 유적 판석 · 산호 정글 = 우주 이끼 · 보스존(16)·맵 밖 = 별빛 우주 · 길·방(0) = 별빛 유리 */
+      vec3 mapGround(vec2 p, vec3 ro, vec3 rd){
+        vec2 tu=(p+180.+(N4(p*.21).rg-.5)*1.6)/360.; float id=floor(texture2D(uReg,tu).r*255./12.+.5);   /* 지역 경계를 살짝 흔들어 칸 계단을 없앰 */
+        float th=atan(p.y,p.x); float sec=mod(floor((th+1.5708+.31416)/.62832),10.);
+        vec3 sky=deep(ro,rd);
+        if(id>16.5||id>15.5) return sky;
+        if(id>10.5) return ruinGround(p,rd,0.);
+        if(id>2.5&&id<3.5) return coralGround(p,rd);
+        if(id>.5&&id<1.5) return mod(sec,2.)<.5?iceGround(p,rd,0.):lavaGround(p,rd,0.);
+        /* 별빛 유리 길: 하늘이 비치는 막 + 은은한 육각 결 */
+        vec2 hp=p*.55; vec2 r=vec2(1.,1.732); vec2 ha=mod(hp,r)-r*.5, hb=mod(hp-r*.5,r)-r*.5; vec2 hg=dot(ha,ha)<dot(hb,hb)?ha:hb;
+        vec2 ah=abs(hg); float hd=max(dot(ah,normalize(vec2(1.,1.732))),ah.x); float edge=1.-smoothstep(.0,.035,abs(hd-.5));
+        float fr=pow(1.-max(-rd.y,0.),4.); return sky+vec3(.12,.16,.28)*fr*.35+vec3(.35,.55,.95)*edge*.035; }
       void main(){
         vec3 ro=cameraPosition, rd=normalize(vW-ro); gRdW=length(fwidth(rd.xz)); vec2 p=vW.xz; float dist=length(p-ro.xz); vec3 c;
-        if(uK<.5){ /* 금속 판: 4m 판 · 이음매 · 모서리로 갈수록 살짝 둥글게 깎임(빛 받는 턱) · 볼트 · 긁힘 · 얼룩 */
+        if(uK>11.5){ c=mapGround(p,ro,rd); }
+        else if(uK<.5){ /* 금속 판: 4m 판 · 이음매 · 모서리로 갈수록 살짝 둥글게 깎임(빛 받는 턱) · 볼트 · 긁힘 · 얼룩 */
           float S=4.; vec2 cl=floor(p/S), f=p-cl*S; vec2 e2=min(f,S-f); float e=min(e2.x,e2.y);
           vec2 sg=vec2(f.x<S*.5?-1.:1., f.y<S*.5?-1.:1.); float bx=1.-smoothstep(.03,.16,e2.x), bz=1.-smoothstep(.03,.16,e2.y);
           vec4 a=N4(p*.012), b=N4(vec2(p.x*.9,p.y*.035)+cl*.37);

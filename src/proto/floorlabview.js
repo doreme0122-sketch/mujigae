@@ -5,23 +5,23 @@
    무게: 바닥 판 하나 + 기체 둘 + 빛 알갱이 한 묶음 + 그림자 판 둘 */
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
-import { makeBloom } from '../core/hangar/bloom.js?v=11051558';
-import { makePerf } from './perf.js?v=11051558';
+import { makeBloom } from '../core/hangar/bloom.js?v=11051608';
+import { makePerf } from './perf.js?v=11051608';
 import { buildShip, engineSpots } from '../core/ships/build.js';
 import { makeGlow } from '../preview/glow.js';
-import { makeFlight, FLY } from './flight.js?v=11051558';
-import { makeFloorLab, LAB, JOIN, sdBlob, sdRoad, blobR } from './floorlab.js?v=11051558';
-import { makeMassWall, STYLES } from './wallmass.js?v=11051558';
-import { makeIceWall } from './icewall.js?v=11051558';
-import { SNOW_U } from './snowtone.js?v=11051558';
-import { iceWallMaterial, snowMaterial } from './icewall.js?v=11051558';
-import { makeRuinWall, ruinMaterial } from './ruins.js?v=11051558';
-import { makeCoralWall, coralMaterial, coral } from './coral.js?v=11051558';
-import { makeTrailMap } from './trailmap.js?v=11051558';
-import { makeThemedHide } from './hidetheme.js?v=11051558';
-import { makePlantBush } from './plantbush.js?v=11051558';
-import { makeCrystalWall, crystalMaterial } from './crystal.js?v=11051558';
-import { makeLavaWall, lavaWallMaterial } from './lavawall.js?v=11051558';
+import { makeFlight, FLY } from './flight.js?v=11051608';
+import { makeFloorLab, LAB, JOIN, sdBlob, sdRoad, blobR } from './floorlab.js?v=11051608';
+import { makeMassWall, STYLES } from './wallmass.js?v=11051608';
+import { makeIceWall } from './icewall.js?v=11051608';
+import { SNOW_U } from './snowtone.js?v=11051608';
+import { iceWallMaterial, snowMaterial } from './icewall.js?v=11051608';
+import { makeRuinWall, ruinMaterial } from './ruins.js?v=11051608';
+import { makeCoralWall, coralMaterial, coral } from './coral.js?v=11051608';
+import { makeTrailMap } from './trailmap.js?v=11051608';
+import { makeThemedHide } from './hidetheme.js?v=11051608';
+import { makePlantBush } from './plantbush.js?v=11051608';
+import { makeCrystalWall, crystalMaterial } from './crystal.js?v=11051608';
+import { makeLavaWall, lavaWallMaterial } from './lavawall.js?v=11051608';
 
 const $ = s => document.querySelector(s), clamp = THREE.MathUtils.clamp;
 const VIEWS = [{ id: 'game', name: '게임 시점', h: 42, tilt: .38 }, { id: 'near', name: '가까이', h: 18, tilt: .6 }, { id: 'far', name: '멀리', h: 90, tilt: .3 }];
@@ -44,7 +44,7 @@ export async function start(canvas, onProgress = () => {}) {
   const BLK = {}, addBlk = (k, grp) => { const G = BLK[k] || (BLK[k] = new Map()); for (const c of grp.userData.blockers || []) { if (c.top != null && c.top < FLY.HOVER - .2) continue;   /* 기체(0.7m 높이로 뜸) 배 밑보다 낮은 건 위로 넘어감 — 보이는 그대로 */ const x0 = Math.floor((c.x - c.r) / 2), x1 = Math.floor((c.x + c.r) / 2), z0 = Math.floor((c.z - c.r) / 2), z1 = Math.floor((c.z + c.r) / 2);
       for (let a = x0; a <= x1; a++) for (let b = z0; b <= z1; b++) { const key = a * 4096 + b; let L = G.get(key); if (!L) G.set(key, L = []); L.push(c); } } };
   const hitBlk = (k, x, z) => { const G = BLK[k]; if (!G) return false; const L = G.get(Math.floor(x / 2) * 4096 + Math.floor(z / 2)); if (!L) return false; for (const c of L) { const dx = x - c.x, dz = z - c.z; if (dx * dx + dz * dz < c.r * c.r) return true; } return false; };
-  const B = { blocked: (x, z) => { if (K >= 6) { if (Math.abs(x) > 90 || z > 30 || z < -30) return true; return hitBlk(K, x, z); }
+  const B = { blocked: (x, z) => { if (K === 12) { if (!zoneReg) return false; const r = zoneReg(x, z); return r === 17 || hitBlk(12, x, z); } if (K >= 6) { if (Math.abs(x) > 90 || z > 30 || z < -30) return true; return hitBlk(K, x, z); }
       if (K !== 5) return Math.hypot(x, z) > AREA;
       if (hitBlk(5, x, z)) return true; if (onRoad(x, z)) return false; const sd = Math.min(sdI(x, z), sdL(x, z)); return sd > -1.4; },   /* 이음 시험: 땅 밖(우주)·벽 띠는 막힘, 큰길은 벽 틈(문)으로 지나감 */
     region: () => 0 };
@@ -98,6 +98,44 @@ export async function start(canvas, onProgress = () => {}) {
   /* 숨을 곳 시안: 미지의 우주 식물 셋 (A 빛잎 · B 깃털 · C 빛버섯) */
   const PL = new THREE.Group(); scene.add(PL); PL.visible = false; const plants = []; { const Rp = (() => { let s = 31337; return () => (s = (s * 9301 + 49297) % 233280) / 233280; })();
     [['A', -22], ['B', -7.5], ['C', 7.5], ['M', 22]].forEach(([kd, x]) => { const b = makePlantBush([x, -9, 3.4, 2.2, 0], kd, UT, Rp); PL.add(b.mesh); plants.push(b); }); }   /* 맨 오른쪽 = 셋을 섞은 것 */
+  /* ── 맵 1구역 (2026-11-05: 맵 7안 방 1 둘레를 실제로 깔아 폰에서 무게 확인) ──
+     벽 줄기(v7.json ridges)를 각도 창(방 1 쪽 ±42°) 안 토막으로 잘라 벽 종류대로 세움:
+     유적 = 보물 땅 둘레 · 맵 테두리(158m 근처) · 방 둘레 / 산호 = 정글 / 나머지(사냥터 벽) = 방 1 사냥터는 얼음 · 이웃 사냥터는 방 번호 짝에 따라 얼음·용암
+     보스존 둘레 = 자수정 꽃 무리(반지름 31m, 문 10곳) · 숨을 곳 = 우주 식물 덤불 · 막힘 = 벽이 넘겨준 자리 + 맵 밖 */
+  const ZONE = new THREE.Group(); scene.add(ZONE); ZONE.visible = false; let zoneReady = null, zoneReg = null, zonePlants = [];
+  const buildZone = async () => {
+    const J = await (await fetch('./assets/map/v7.json')).json(), tex = await new THREE.TextureLoader().loadAsync('./assets/map/v7.png');
+    tex.magFilter = tex.minFilter = THREE.NearestFilter; tex.generateMipmaps = false; tex.flipY = false; lab.mat.uniforms.uReg.value = tex;
+    { const img = tex.image, c = document.createElement('canvas'); c.width = img.width; c.height = img.height; const g = c.getContext('2d'); g.drawImage(img, 0, 0); const d = g.getImageData(0, 0, img.width, img.height).data, N = img.width;
+      zoneReg = (x, z) => { const i = Math.floor((x + 180) / 360 * N), j = Math.floor((z + 180) / 360 * N); return i < 0 || j < 0 || i >= N || j >= N ? 17 : Math.round(d[(j * N + i) * 4] / 12); }; }
+    const A0 = -Math.PI / 2, WIN = .73, inWin = (x, z) => Math.abs(Math.atan2(Math.sin(Math.atan2(z, x) - A0), Math.cos(Math.atan2(z, x) - A0))) < WIN;
+    const sec = (x, z) => ((Math.round((Math.atan2(z, x) - A0) / (Math.PI / 5)) % 10) + 10) % 10;
+    const im = iceWallMaterial(UT), sm = snowMaterial(UT), lm = lavaWallMaterial(UT), rm = ruinMaterial(UT), cm = coralMaterial(UT), xm = crystalMaterial(UT);
+    const cbig = [1, 2, 3, 4].map(q => coral(q, true, 3)), csmall = [5, 6, 7].map(q => coral(q, true, 2));
+    const toW = ([px, py]) => [(px - 500) * .36, (py - 500) * .36]; let seed = 100;
+    for (const rd of J.ridges) { const P = rd.p.map(toW); let run = [];
+      const flush = () => { if (run.length < 4) { run = []; return; } const pts = run.filter((q, i) => i === 0 || Math.hypot(q[0] - run[i - 1][0], q[1] - run[i - 1][1]) > .3); run = []; if (pts.length < 3) return;
+        const m = pts[pts.length >> 1], R = Math.hypot(m[0], m[1]); let kind = rd.k === 'coral' ? 'coral' : rd.k === 'ruins' ? 'ruin' : R > 150 ? 'ruin' : (sec(m[0], m[1]) % 2 ? 'lava' : 'ice');
+        /* 앞(눈밭·바위가 놓이는 쪽) = 사냥터 쪽 */
+        const out = (x, z, nx, nz) => zoneReg(x - nx * 4, z - nz * 4) === 1 ? 1 : -1; seed++;
+        let w = null;
+        if (kind === 'ice') w = makeIceWall(pts, { uT: UT, mat: im, smat: sm, seed, out, doors: [false, false] });
+        else if (kind === 'lava') w = makeLavaWall(pts, { uT: UT, mat: lm, seed, out, doors: [false, false] });
+        else if (kind === 'ruin') w = makeRuinWall(pts, { uT: UT, mat: rm, seed, doors: [false, false] });
+        else w = makeCoralWall(pts, { uT: UT, mat: cm, big: cbig, small: csmall, seed, doors: [false, false] });
+        ZONE.add(w); addBlk(12, w); };
+      for (const q of P) { if (inWin(q[0], q[1])) run.push(q); else flush(); } flush(); }
+    /* 보스존 둘레 자수정: 문 사이 호를 토막마다 */
+    for (let k = 0; k < 10; k++) { const a0 = A0 + (k + .5) * Math.PI / 5 + .16, a1 = A0 + (k + 1.5) * Math.PI / 5 - .16, pts = []; for (let a = a0; a <= a1 + 1e-6; a += .05) pts.push([Math.cos(a) * 31, Math.sin(a) * 31]);
+      const mx = Math.cos((a0 + a1) / 2) * 31, mz = Math.sin((a0 + a1) / 2) * 31; if (!inWin(mx, mz)) continue;
+      const w = makeCrystalWall(pts, { uT: UT, mat: xm, seed: 200 + k, doors: [true, true] }); ZONE.add(w); addBlk(12, w); }
+    /* 숨을 곳: 맵이 정한 자리(덩이들) → 곧은 네모로 (덩이 무리의 긴 쪽 방향) */
+    const Rp = (() => { let s2 = 777; return () => (s2 = (s2 * 9301 + 49297) % 233280) / 233280; })();
+    for (const b of J.bushes || []) { const L = b.lobes, cx = L.reduce((a, l) => a + l[0], 0) / L.length, cz = L.reduce((a, l) => a + l[1], 0) / L.length; if (!inWin(cx, cz)) continue;
+      let sxx = 0, szz = 0, sxz = 0; for (const [x, z] of L) { sxx += (x - cx) ** 2; szz += (z - cz) ** 2; sxz += (x - cx) * (z - cz); } const an = .5 * Math.atan2(2 * sxz, sxx - szz), ca = Math.cos(an), sa = Math.sin(an);
+      let hl = 1, hw = 1; for (const [x, z, r] of L) { const u = (x - cx) * ca + (z - cz) * sa, v = -(x - cx) * sa + (z - cz) * ca; hl = Math.max(hl, Math.abs(u) + r * .8); hw = Math.max(hw, Math.abs(v) + r * .8); }
+      const pb = makePlantBush([cx, cz, hl, hw, an], 'M', UT, Rp); ZONE.add(pb.mesh); zonePlants.push(pb); }
+    ZONE.traverse(o => { if (o.isMesh) o.frustumCulled = true; }); };
   walls.children.forEach(w => addBlk(5, w)); galW.forEach(w => addBlk(6, w)); lgal.children.forEach(w => addBlk(7, w)); rgal.children.forEach(w => addBlk(8, w));
   const tagAt = (txt, x, y, z) => { const el = document.createElement('div'); el.className = 'tag'; el.innerHTML = `<b>${txt}</b>`; el.style.opacity = 0; $('#tags').appendChild(el); galTags.push({ el, p: new THREE.Vector3(x, y, z) }); };
   tagAt('빙하 얼음 벽 · 한 덩어리 절벽', -19, 10, GAL.z); tagAt('문', 0, 4, GAL.z);
@@ -138,12 +176,12 @@ export async function start(canvas, onProgress = () => {}) {
     h.now.style.width = (h.hp * 100) + '%'; h.lag.style.width = (h.lagv * 100) + '%'; const k = Math.min(1, h.heat);
     h.ht.style.width = (k * 100) + '%'; h.ht.style.background = k > .98 ? `rgba(255,60,60,${.6 + .4 * Math.sin(t * 20)})` : `rgb(255,${200 - 150 * k | 0},${80 - 60 * k | 0})`; };
   /* 버튼 */
-  const trail = makeTrailMap(renderer); lab.mat.uniforms.uTrO.value.copy(trail.origin); lab.mat.uniforms.uTrail.value = trail.tex;
+  const trail = makeTrailMap(renderer), trail2 = makeTrailMap(renderer, { cx: 0, cz: -62, span: 104 }); lab.mat.uniforms.uTrO.value.copy(trail.origin); lab.mat.uniforms.uTrail.value = trail.tex;
   const cam = { x: 0, z: 8, h: 42, H: 42, tilt: .38, T: .38 };
   const tip = () => { $('#tip').hidden = false; $('#tip b').textContent = LAB[K].name; $('#tip span').textContent = LAB[K].tip; $('#head b').textContent = '바닥 시험장 · ' + LAB[K].name; };
   const tour = $('#tour');
   LAB.forEach((f, i) => { const b = document.createElement('button'); b.type = 'button'; b.textContent = f.name; b.className = 'fl';
-    b.addEventListener('pointerdown', e => { e.stopPropagation(); const was = K; K = i; lab.set(i); walls.visible = i === 5; gal.visible = i === 6; lgal.visible = i === 7; rgal.visible = i === 8; cgal.visible = i === 9; xgal.visible = i === 10; if (i === 5 && was !== 5) { fly.userData.moveTo(-40, 0, -Math.PI / 2); E.x = -30; E.z = 12; } else if (i >= 6 && was < 6) { fly.userData.moveTo(0, 4, 0); E.x = 10; E.z = 14; } else if (was >= 5 && i < 5) fly.userData.moveTo(0, 8, 0); tour.querySelectorAll('.fl').forEach(x => x.classList.toggle('on', x === b)); tip(); }); tour.appendChild(b); });
+    b.addEventListener('pointerdown', e => { e.stopPropagation(); const was = K; K = i; lab.set(i); walls.visible = i === 5; gal.visible = i === 6; lgal.visible = i === 7; rgal.visible = i === 8; cgal.visible = i === 9; xgal.visible = i === 10; ZONE.visible = i === 12; if (i === 12) { (zoneReady ||= buildZone()).then(() => { fly.userData.moveTo(0, -166.5, 0); E.x = 0; E.z = -150; lab.mat.uniforms.uTrO.value.copy(trail2.origin); }); } else lab.mat.uniforms.uTrO.value.copy(trail.origin); if (i === 5 && was !== 5) { fly.userData.moveTo(-40, 0, -Math.PI / 2); E.x = -30; E.z = 12; } else if (i >= 6 && was < 6) { fly.userData.moveTo(0, 4, 0); E.x = 10; E.z = 14; } else if (was >= 5 && i < 5) fly.userData.moveTo(0, 8, 0); tour.querySelectorAll('.fl').forEach(x => x.classList.toggle('on', x === b)); tip(); }); tour.appendChild(b); });
   { const sep = document.createElement('i'); sep.style.cssText = 'width:1px;align-self:stretch;background:rgba(185,255,74,.25);margin:0 4px'; tour.appendChild(sep); }
   /* 비교 버튼(얼음 땅 눈 양 · 눈 결 · 입구 시안)은 모두 정해져서 없앰 (2026-11-05): 바닥 눈 없음 · 눈 결 물결 · 입구 결정 문기둥 */
   VIEWS.forEach(v => { const b = document.createElement('button'); b.type = 'button'; b.textContent = v.name; b.className = 'vw';
@@ -176,11 +214,12 @@ export async function start(canvas, onProgress = () => {}) {
       if (Math.hypot(b.x - hx, b.z - hz) < 1.1) { flash(b.x, b.z, b.mine ? [.6, 1.3, .7] : [1.4, .5, .5]); if (b.mine) { HF.hp = Math.max(.05, HF.hp - .018); HF.heat += .07; } else HM.hp = Math.max(.05, HM.hp - .03); bolts.splice(i, 1); continue; }
       if (b.life <= 0) bolts.splice(i, 1); }
     HM.hp = Math.min(1, HM.hp + dt * .03); HF.hp = Math.min(1, HF.hp + dt * .05);
-    UT.value = t; { let inH = false; for (const k in HIDE) { const h = HIDE[k]; h.mesh.visible = +k === K; if (+k === K) inH = h.update(t, dt, FS.x, FS.z); } if (K === 11) for (const b of plants) inH = b.update(t, dt, FS.x, FS.z) || inH; PL.visible = K === 11; fly.userData.setGhost?.(inH); }   /* 숨으면 내 기체 반투명 */
+    UT.value = t; { let inH = false; for (const k in HIDE) { const h = HIDE[k]; h.mesh.visible = +k === K; if (+k === K) inH = h.update(t, dt, FS.x, FS.z); } if (K === 11) for (const b of plants) inH = b.update(t, dt, FS.x, FS.z) || inH; if (K === 12) for (const b of zonePlants) inH = b.update(t, dt, FS.x, FS.z) || inH; PL.visible = K === 11; fly.userData.setGhost?.(inH); }   /* 숨으면 내 기체 반투명 */
     for (const g of galTags) { v3.copy(g.p).project(camera); const on = gal.visible && v3.z < 1 && Math.abs(v3.x) < 1.1 && Math.abs(v3.y) < 1.1; g.el.style.opacity = on ? 1 : 0; if (on) g.el.style.transform = `translate(${(v3.x * .5 + .5) * cw}px,${(-v3.y * .5 + .5) * ch}px) translate(-50%,-50%)`; }
     lab.ships[0].set(FS.x, 0, FS.z, 1); lab.ships[1].set(E.x, 0, E.z, 2); lab.update(t);
     /* 빛 길: 기체가 지난 토막을 빛 길 지도에 칠함 (기체 수와 상관없이 바닥은 한 번만 읽음) — 숨었는지와 상관없이 남김 */
-    if (K === 9) { trail.mark(0, FS.x, FS.z); trail.mark(1, E.x, E.z); trail.update(dt); lab.mat.uniforms.uTrail.value = trail.tex; }   /* 빛 길 지도에 칠함 (산호 칸에서만) */
+    if (K === 9) { trail.mark(0, FS.x, FS.z); trail.mark(1, E.x, E.z); trail.update(dt); lab.mat.uniforms.uTrail.value = trail.tex; }
+    if (K === 12) { trail2.mark(0, FS.x, FS.z); trail2.mark(1, E.x, E.z); trail2.update(dt); lab.mat.uniforms.uTrail.value = trail2.tex; }   /* 맵 1구역: 정글 쪽 빛 길 지도 */   /* 빛 길 지도에 칠함 (산호 칸에서만) */
     glow.begin();
     for (const b of bolts) glow.add(b.x, FLY.HOVER + .3, b.z, -b.vx * .05, 0, -b.vz * .05, .2, 0, b.mine ? [.45, 1.25, .6] : [1.35, .35, .45], 1, b.x);
     for (let i = fx.length - 1; i >= 0; i--) { const f = fx[i]; f.t += dt; if (f.t > .25) { fx.splice(i, 1); continue; } const k = 1 - f.t / .25; glow.add(f.x, FLY.HOVER + .3, f.z, 0, 0, 0, .5 + f.t * 3, 3, f.c, k); }

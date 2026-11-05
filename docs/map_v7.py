@@ -13,18 +13,19 @@ c = (np.arange(N) + .5) * M - 180; X, Z = np.meshgrid(c, c)
 R = np.hypot(X, Z); TH = np.arctan2(Z, X)
 A0 = -math.pi / 2; ANG = [A0 + k * 2 * math.pi / 10 for k in range(10)]
 RP = 158.                                              # 싸움터 반지름
+RS = 166.5                                             # 방 가운데 자리 (사용자 2026-11-05: 태어나는 곳을 뒤로 더 빼서 출구 끝 양옆이 바깥 유적 벽으로 이어지게 → 방은 바깥 벽 뒤 주머니, 문만 벽을 뚫음)
 ROOM = 14.; WW = 4.3; DOOR = 10.                       # 방 안 반지름 · 벽 두께(맵 어디서나 같음) · 문 폭
 play = R <= RP
 rooms = np.zeros_like(play); roomWall = np.zeros_like(play); doorCut = np.zeros_like(play)
 for a in ANG:
-    cx, cz = math.cos(a) * RP, math.sin(a) * RP; d = np.hypot(X - cx, Z - cz)
-    rooms |= d <= ROOM
-    roomWall |= (d > ROOM) & (d <= ROOM + WW)
+    cx, cz = math.cos(a) * RS, math.sin(a) * RS; d = np.hypot(X - cx, Z - cz)
+    rooms |= (d <= ROOM) & (R > RP)
+    roomWall |= (d > ROOM) & (d <= ROOM + WW) & (R > RP)
     ux, uz = -math.cos(a), -math.sin(a)                # 방에서 가운데 쪽
     along = (X - cx) * ux + (Z - cz) * uz; side = np.abs(-(X - cx) * uz + (Z - cz) * ux)
-    doorCut |= (along > 0) & (side < DOOR / 2) & (d <= ROOM + WW + .5)
+    doorCut |= (along > 0) & (side < DOOR / 2) & (R > RP - WW - .6) & (R <= RP + .5)   # 문 = 바깥 벽만 곧게 뚫음
 inside = play | rooms                                  # 다닐 수 있는 땅 (방 바깥 절반 포함)
-outerWall = play & (R > RP - WW) & ~rooms              # 싸움터 가장자리 벽 (방 자리는 뚫림)
+outerWall = play & (R > RP - WW)                       # 싸움터 가장자리 벽 (방 앞도 이어짐 · 문만 뚫림)
 # ── 보물 땅 10곳 (이웃 두 방 사이, 싸움터 가장자리에 등을 댐) ──
 # · 모양: 가장자리 쪽은 좁고(방 옆으로 지나갈 틈을 남김) 안쪽은 불룩한 주머니, 맨 안쪽 끝은 둥글게. 테두리가 반듯하지 않게 굽이침(바위 언덕을 깎아 낸 듯)
 # · 둘레는 빈틈없이 벽, 문은 셋: 왼쪽 방 쪽 · 오른쪽 방 쪽 · 가운데 쪽 (문 폭 약 6m — 길목 싸움)
@@ -141,11 +142,11 @@ print('정글 넓이(m²)', JAREA)
 wall = (outerWall | roomWall | (treWall & ~treDoor) | (linkWall & ~huntGate) | (junWall & ~junDoor)) & ~doorCut
 wall &= inside | ndi.binary_dilation(inside, iterations=6)   # 바깥 잔해 쪽으로 너무 나간 벽 조각은 정리
 blocked = wall | ~inside
-_fl, _ = ndi.label(~blocked); _sp0 = (int((math.sin(ANG[0]) * RP + 180) / M), int((math.cos(ANG[0]) * RP + 180) / M))
+_fl, _ = ndi.label(~blocked); _sp0 = (int((math.sin(ANG[0]) * RS + 180) / M), int((math.cos(ANG[0]) * RS + 180) / M))
 wall |= (~blocked) & (_fl != _fl[_sp0]); blocked = wall | ~inside                 # 어디서도 못 들어가는 작은 틈 = 바위 (애매한 자리 없음)
 # 검사: 방 10곳 모두 문으로만 싸움터와 이어지는지 · 서로 다 이어지는지
 free = ~blocked; lab, n = ndi.label(free)
-SP = [(int((math.sin(a) * RP + 180) / M), int((math.cos(a) * RP + 180) / M)) for a in ANG]
+SP = [(int((math.sin(a) * RS + 180) / M), int((math.cos(a) * RS + 180) / M)) for a in ANG]
 print('다니는 땅 덩어리', n, '· 방 10곳이 한 덩어리', len({lab[j, i] for j, i in SP}) == 1)
 # ── 보물 땅 양옆 숨을 곳 (사용자 2026-11-03): 보물 땅과 이웃 방 사이 좁은 틈을 가스·돌 숨을 곳으로 채움 ──
 # · 틈 = 싸움터 가장자리 ~ 반지름 122m, 보물 땅 벽과 방 벽 사이의 다닐 수 있는 땅 → 보물 땅 옆문이 이 숨을 곳 안으로 열림(몰래 드나듦)
@@ -209,12 +210,12 @@ img[..., 1] = np.where(wall, 255, 0)
 img[~inside & ~wall, 0] = 17 * 12
 Image.fromarray(img.astype(np.uint8), 'RGB').save('../assets/map/v7.png')
 toPx = lambda x, z: [round((x + 180) / .36, 1), round((z + 180) / .36, 1)]   # 세상 좌표 → 1000칸 그림 좌표 (예전 json과 같은 단위)
-spawns = [toPx(math.cos(a) * RP, math.sin(a) * RP) for a in ANG]
+spawns = [toPx(math.cos(a) * RS, math.sin(a) * RS) for a in ANG]
 NAMES = ['싸움터', '사냥터', '-', '산호 정글'] + ['-'] * 7 + ['보물 동굴', '웜홀 정원', '고대 금고', '별빛 광산', '숨은 동굴'] + ['무너진 중심부', '소행성 잔해']
 JUN_LAB = lambda: [dict(x=toPx(math.cos(a) * 61, math.sin(a) * 61)[0], y=toPx(math.cos(a) * 61, math.sin(a) * 61)[1], n='산호 정글', l='좁은 지름길', k='jun') for a in ANG]
 TRE_LAB = [dict(x=toPx(math.cos(m) * 136, math.sin(m) * 136)[0], y=toPx(math.cos(m) * 136, math.sin(m) * 136)[1], n=NAMES[11 + k % 5], l='보물 땅', k='tre') for k, m in enumerate(MID)]
 _old = json.load(open("../assets/map/v7.json")) if __import__("os").path.exists("../assets/map/v7.json") else {}
-json.dump(dict(W=1000, H=1000, labels=TRE_LAB + JUN_LAB(), spawns=spawns, gates=[], names=NAMES, rooms=dict(r=ROOM, wall=WW, door=DOOR, rp=RP), bushes=BUSH), open('../assets/map/v7.json', 'w'), ensure_ascii=False)
+json.dump(dict(W=1000, H=1000, labels=TRE_LAB + JUN_LAB(), spawns=spawns, gates=[], names=NAMES, rooms=dict(r=ROOM, wall=WW, door=DOOR, rp=RP, rs=RS), bushes=BUSH), open('../assets/map/v7.json', 'w'), ensure_ascii=False)
 # 그림
 Z2 = 2; im = np.zeros((N, N, 3), np.uint8); im[inside] = (52, 62, 58); im[hunt] = (58, 80, 52); im[rooms] = (40, 70, 52); im[tre] = (88, 74, 36); im[JUN] = (40, 70, 92)
 for b in BUSH:
@@ -224,7 +225,7 @@ pic = Image.fromarray(im).resize((N * Z2, N * Z2), Image.NEAREST)
 from PIL import ImageDraw, ImageFont
 d = ImageDraw.Draw(pic); f = ImageFont.truetype('/usr/share/fonts/opentype/noto/NotoSansCJK-Black.ttc', 18)
 for k, a in enumerate(ANG):
-    x, z = toPx(math.cos(a) * RP, math.sin(a) * RP); r = 9 / .36
+    x, z = toPx(math.cos(a) * RS, math.sin(a) * RS); r = 9 / .36
     d.ellipse([x - r, z - r, x + r, z + r], outline=(190, 255, 80), width=3); d.text((x - math.cos(a) * 70, z - math.sin(a) * 70), str(k + 1), fill=(190, 255, 80), font=f, anchor='mm')
 d.text((20, 20), '맵 7안 4단계 — 방 10 · 보물 땅 10 · 사냥터 10 · 둥근 길 두 겹 + 산호 정글 10', fill=(185, 255, 74), font=f)
 fs = ImageFont.truetype('/usr/share/fonts/opentype/noto/NotoSansCJK-Black.ttc', 13)
