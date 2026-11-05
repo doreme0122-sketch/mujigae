@@ -57,6 +57,13 @@ function rockMaterial(uT, uN, sun) {
         vec3 reg=mix(vec3(.21,.215,.27),vec3(.35,.355,.41),dust)*(1.-.25*max(c1.z,c2.z))+vec3(.1)*rim;
         float crk=smoothstep(.47,.5,nz(p*.05+vec2(.3,.1)))*smoothstep(.53,.5,nz(p*.05+vec2(.3,.1)))*.6;            /* 가는 금 */
         reg*=1.-crk;
+        /* 바닥 무늬를 다양하게 (사용자 2026-11-05 승인: 같은 무늬 되풀이는 느려 보임 — 큼직한 얼룩·자국이 있어야 빨라 보임) */
+        float big=nz(p*.008+3.7), streak=nz(vec2(p.x*.012+p.y*.004,p.y*.09));
+        reg=mix(reg,reg*vec3(.62,.6,.7),smoothstep(.55,.72,big)*.8);                                          /* 큼직한 짙은 현무암 얼룩 */
+        reg=mix(reg,reg*1.25+vec3(.03),smoothstep(.6,.75,nz(p*.011+9.1))*.6);                               /* 밝은 먼지 퍼짐 */
+        reg*=1.-smoothstep(.58,.7,streak)*.28;                                                               /* 길게 끌린 자국 */
+        float pb=step(.93,hh(floor(p*.9)))*smoothstep(.3,.15,length(fract(p*.9)-.5));                       /* 흩어진 작은 돌 */
+        reg=mix(reg,reg*.45,pb);
         float edge=smoothstep(vTop-.25,vTop-1.2,vW.y);                                                          /* 가장자리 부서진 턱 */
         /* 옆면·아래: 층층 지층(깊이마다 짙고 옅음이 번갈아) + 아주 희미한 광맥 */
         float sy=vW.y*.3+nz(p*.012)*1.5+nz(p*.07+vW.y*.05)*.6;
@@ -236,6 +243,27 @@ export function makeSkyCanyon(uT, sun) {
       const a = R() * 6.28, L = r0 * 2.4, g = new THREE.PlaneGeometry(L, 5.2, 1, 1); g.rotateX(-Math.PI / 2); g.rotateY(-a);
       const m = new THREE.Mesh(g, windMat(uT)); m.position.set(I.x, FLYH - .6, I.z); m.renderOrder = 3; grp.add(m); I.wind = { ux: Math.cos(a), uz: Math.sin(a), L, w: 2.4 }; } }
 
+  /* ── 더 많은 거울 결정 조각 (나보다 높이 솟아 지날 때 화면을 휙 쓸고 지나감 — 속도감 · 반사) ── */
+  const mirrors = spires.map(I => I.mirror).filter(Boolean);
+  { const P = [], free = isl.filter(I => !spires.includes(I) && !I.role); let n = 0;
+    for (const I of free) { if (n >= 8 || R() < .45) continue; n++; const th = R() * 6.28, d = R() * 4, x = I.x + Math.cos(th) * d, z = I.z + Math.sin(th) * d, H = FLYH + 3 + R() * 5 - I.top, r = .9 + R() * .7, tl = (R() - .5) * .25;
+      const c = new THREE.CylinderGeometry(r, r * 1.15, H, 6, 1); c.translate(0, H / 2, 0); const t = new THREE.ConeGeometry(r, r * 2.6, 6, 1); t.translate(0, H + r * 1.3, 0);
+      for (const g of [c, t]) { g.rotateZ(tl); g.translate(x, I.top - .5, z); const q = g.toNonIndexed(); const pa = q.attributes.position.array; for (let i = 0; i < pa.length; i++) P.push(pa[i]); }
+      const ox = Math.sin(-tl) * (FLYH - I.top);   /* 기울어진 만큼 기체 높이에서 비켜남 */
+      blockers.push({ x: x + ox, z, r: r + .7 }); mirrors.push({ x: x + ox, z, r: r * 1.05 }); }
+    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(P, 3)); g.computeVertexNormals(); grp.add(new THREE.Mesh(g, mirrorMat(uT))); }
+  /* ── 기체 바로 아래 가까운 층: 작은 바위 조각이 카메라 둘레에 깔려 휙휙 지나감 (가까운 것이 빨리 지나가야 빨라 보임) ── */
+  const NEAR = [], NN = 110; let nearM;
+  { const g = new THREE.IcosahedronGeometry(1, 0); g.setAttribute('aTop', new THREE.Float32BufferAttribute(new Array(g.attributes.position.count).fill(-999), 1));
+    nearM = new THREE.InstancedMesh(g, rock, NN); nearM.frustumCulled = false; grp.add(nearM);
+    for (let i = 0; i < NN; i++) NEAR.push({ x: (R() - .5) * 90, z: (R() - .5) * 60, y: -1.4 - Math.pow(R(), 1.5) * 4, s: .12 + Math.pow(R(), 2) * .5, a: R() * 6, w: (R() - .5) * 1.5 }); }
+  /* ── 기체 위로 가끔 스쳐 지나가는 얇은 구름 (높은 곳을 난다는 느낌 · 옅어서 싸움은 잘 보임) ── */
+  const HIGH = []; let highM;
+  { const N = 7, g = new THREE.PlaneGeometry(1, 1); g.rotateX(-Math.PI / 2); highM = new THREE.InstancedMesh(g, clouds.mesh.material.clone(), N); highM.material.uniforms = { ...clouds.mesh.material.uniforms, uA: { value: .45 } };
+    highM.material.fragmentShader = highM.material.fragmentShader.replace('gl_FragColor=vec4(vec3(.62,.62,.8)*lit,d*.42);', 'gl_FragColor=vec4(vec3(.8,.8,.95)*lit,d*.42*uA);');
+    highM.material.fragmentShader = 'uniform float uA;\n' + highM.material.fragmentShader; highM.frustumCulled = false; highM.renderOrder = 6; grp.add(highM);
+    for (let i = 0; i < N; i++) HIGH.push({ x: (R() - .5) * AX * 2.3, z: (R() - .5) * AZ * 2.3, y: 4 + R() * 3, w: 12 + R() * 14, d: 7 + R() * 8, v: 1.2 + R() * .8 }); }
+
   return {
     mesh: grp, blockers, roles,
     /* 기체가 있는 자리의 쓰임새 */
@@ -245,7 +273,7 @@ export function makeSkyCanyon(uT, sun) {
         return (vx * I.wind.ux + vz * I.wind.uz) > Math.hypot(vx, vz) * .5 ? 'wind' : null; }
       return I.role; },
     /* 거울 결정 첨탑: 탄이 맞으면 튕겨 나감 */
-    reflect: b => { for (const sp of spires) { const c = sp.mirror; if (!c) continue; const dx = b.x - c.x, dz = b.z - c.z, d = Math.hypot(dx, dz); if (d < c.r) { const nx = dx / d, nz = dz / d, dot = b.vx * nx + b.vz * nz; if (dot < 0) { b.vx -= 2 * dot * nx; b.vz -= 2 * dot * nz; } b.x = c.x + nx * c.r; b.z = c.z + nz * c.r; return true; } } return false; },
+    reflect: b => { for (const c of mirrors) { const dx = b.x - c.x, dz = b.z - c.z, d = Math.hypot(dx, dz); if (d < c.r) { const nx = dx / d, nz = dz / d, dot = b.vx * nx + b.vz * nz; if (dot < 0) { b.vx -= 2 * dot * nx; b.vz -= 2 * dot * nz; } b.x = c.x + nx * c.r; b.z = c.z + nz * c.r; return true; } } return false; },
     topAt: (x, z) => { const I = islandAt(x, z); return I ? I.top : null; },
     blocked: (x, z) => { if (Math.abs(x) > AX - 6 || Math.abs(z) > AZ - 6) return true; for (const b of blockers) { const dx = x - b.x, dz = z - b.z; if (dx * dx + dz * dz < b.r * b.r) return true; } return false; },
     update(t, dt, cx, cz) {
@@ -256,6 +284,11 @@ export function makeSkyCanyon(uT, sun) {
       for (let i = 0; i < clouds.length; i++) { const c = clouds[i]; c.x += c.v * dt; if (c.x > AX * 1.15) c.x -= AX * 2.3;
         qq.identity(); m4.compose(vv.set(c.x, c.y, c.z), qq, ss.set(c.w, 1, c.d)); clouds.mesh.setMatrixAt(i, m4); }
       clouds.mesh.instanceMatrix.needsUpdate = true;
+      for (let i = 0; i < NN; i++) { const n = NEAR[i]; let dx = n.x - cx, dz = n.z - cz; if (dx > 45) n.x -= 90; if (dx < -45) n.x += 90; if (dz > 30) n.z -= 60; if (dz < -30) n.z += 60;   /* 카메라 둘레에서 돌려 씀 */
+        n.a += n.w * dt; ee.set(n.a, n.a * .7, 0); qq.setFromEuler(ee); m4.compose(vv.set(n.x, n.y, n.z), qq, ss.set(n.s, n.s * .8, n.s)); nearM.setMatrixAt(i, m4); }
+      nearM.instanceMatrix.needsUpdate = true;
+      for (let i = 0; i < HIGH.length; i++) { const c = HIGH[i]; c.x += c.v * dt; if (c.x > AX * 1.15) c.x -= AX * 2.3; qq.identity(); m4.compose(vv.set(c.x, c.y, c.z), qq, ss.set(c.w, 1, c.d)); highM.setMatrixAt(i, m4); }
+      highM.instanceMatrix.needsUpdate = true;
       for (const A of anim) { A.m.rotation.y += A.spin * dt; if (A.bob != null) A.m.position.y = A.bob + Math.sin(t * 1.4) * .35; } } };
 }
 const FLYH = .7, v0 = new THREE.Vector3();

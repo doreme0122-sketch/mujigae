@@ -5,24 +5,24 @@
    무게: 바닥 판 하나 + 기체 둘 + 빛 알갱이 한 묶음 + 그림자 판 둘 */
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
-import { makeBloom } from '../core/hangar/bloom.js?v=11052142';
-import { makePerf } from './perf.js?v=11052142';
+import { makeBloom } from '../core/hangar/bloom.js?v=11052221';
+import { makePerf } from './perf.js?v=11052221';
 import { buildShip, engineSpots } from '../core/ships/build.js';
 import { makeGlow } from '../preview/glow.js';
-import { makeFlight, FLY } from './flight.js?v=11052142';
-import { makeFloorLab, LAB, JOIN, sdBlob, sdRoad, blobR } from './floorlab.js?v=11052142';
-import { makeMassWall, STYLES } from './wallmass.js?v=11052142';
-import { makeIceWall } from './icewall.js?v=11052142';
-import { SNOW_U } from './snowtone.js?v=11052142';
-import { iceWallMaterial, snowMaterial } from './icewall.js?v=11052142';
-import { makeRuinWall, ruinMaterial } from './ruins.js?v=11052142';
-import { makeCoralWall, coralMaterial, coral } from './coral.js?v=11052142';
-import { makeTrailMap } from './trailmap.js?v=11052142';
-import { makeThemedHide } from './hidetheme.js?v=11052142';
-import { makePlantBush } from './plantbush.js?v=11052142';
-import { makeCrystalWall, crystalMaterial } from './crystal.js?v=11052142';
-import { makeLavaWall, lavaWallMaterial } from './lavawall.js?v=11052142';
-import { makeSkyCanyon } from './skycanyon.js?v=11052142';
+import { makeFlight, FLY } from './flight.js?v=11052221';
+import { makeFloorLab, LAB, JOIN, sdBlob, sdRoad, blobR } from './floorlab.js?v=11052221';
+import { makeMassWall, STYLES } from './wallmass.js?v=11052221';
+import { makeIceWall } from './icewall.js?v=11052221';
+import { SNOW_U } from './snowtone.js?v=11052221';
+import { iceWallMaterial, snowMaterial } from './icewall.js?v=11052221';
+import { makeRuinWall, ruinMaterial } from './ruins.js?v=11052221';
+import { makeCoralWall, coralMaterial, coral } from './coral.js?v=11052221';
+import { makeTrailMap } from './trailmap.js?v=11052221';
+import { makeThemedHide } from './hidetheme.js?v=11052221';
+import { makePlantBush } from './plantbush.js?v=11052221';
+import { makeCrystalWall, crystalMaterial } from './crystal.js?v=11052221';
+import { makeLavaWall, lavaWallMaterial } from './lavawall.js?v=11052221';
+import { makeSkyCanyon } from './skycanyon.js?v=11052221';
 
 const $ = s => document.querySelector(s), clamp = THREE.MathUtils.clamp;
 const VIEWS = [{ id: 'game', name: '게임 시점', h: 42, tilt: .38 }, { id: 'near', name: '가까이', h: 18, tilt: .6 }, { id: 'far', name: '멀리', h: 90, tilt: .3 }];
@@ -160,7 +160,7 @@ export async function start(canvas, onProgress = () => {}) {
     if (tp == null) { m.visible = false; return; } const hgt = y - tp; m.position.set(x + ox, tp + .06, z + oz); m.rotation.set(-Math.PI / 2, 0, head);
     const u = m.material.uniforms; u.uS.value = 1.1 + hgt * .06; u.uA.value = clamp(.5 - hgt * .012, .22, .45); m.visible = true; };
   /* 탄: 빛 알갱이 */
-  const bolts = []; const fire = (x, z, tx, tz, mine) => { const d = Math.hypot(tx - x, tz - z) || 1, sp = mine ? 36 : 26; bolts.push({ x, z, vx: (tx - x) / d * sp, vz: (tz - z) / d * sp, life: 22 / sp, mine }); };
+  const SPD = []; const bolts = []; const fire = (x, z, tx, tz, mine) => { const d = Math.hypot(tx - x, tz - z) || 1, sp = mine ? 36 : 26; bolts.push({ x, z, vx: (tx - x) / d * sp, vz: (tz - z) / d * sp, life: 22 / sp, mine }); };
   const fx = []; const flash = (x, z, c) => fx.push({ x, z, c, t: 0 });
   /* 발밑 표시 (C안) */
   const css = document.createElement('style'); css.textContent = `
@@ -235,11 +235,19 @@ export async function start(canvas, onProgress = () => {}) {
     for (const b of bolts) glow.add(b.x, FLY.HOVER + .3, b.z, -b.vx * .05, 0, -b.vz * .05, .2, 0, b.mine ? [.45, 1.25, .6] : [1.35, .35, .45], 1, b.x);
     for (let i = fx.length - 1; i >= 0; i--) { const f = fx[i]; f.t += dt; if (f.t > .25) { fx.splice(i, 1); continue; } const k = 1 - f.t / .25; glow.add(f.x, FLY.HOVER + .3, f.z, 0, 0, 0, .5 + f.t * 3, 3, f.c, k); }
     { const hx = -Math.sin(E.head), hz = -Math.cos(E.head); for (const p of FENG) { v3.copy(p).applyMatrix4(fsm.matrixWorld); glow.add(v3.x, v3.y, v3.z, -hx * .9, 0, -hz * .9, .15, 3, [1.3, .35, .5], .9); } }
+    /* 속도선: 빨라질 때 기체 둘레로 가는 빛 줄이 뒤로 흘러감 */
+    if ((cam.bk || 0) > .05) { const sp = Math.hypot(FS.vx, FS.vz) || 1, ux = FS.vx / sp, uz = FS.vz / sp; SPD.acc = (SPD.acc || 0) + dt * 40 * cam.bk;
+      while (SPD.acc > 1) { SPD.acc--; const a = Math.random() * 6.28, r = 2 + Math.random() * 6; SPD.push({ x: FS.x + Math.cos(a) * r + ux * 4, z: FS.z + Math.sin(a) * r + uz * 4, y: FLY.HOVER + (Math.random() - .5) * 2, vx: -ux * sp * .9, vz: -uz * sp * .9, t: 0 }); } }
+    for (let i = SPD.length - 1; i >= 0; i--) { const q = SPD[i]; q.t += dt; if (q.t > .35) { SPD.splice(i, 1); continue; } q.x += q.vx * dt * .3; q.z += q.vz * dt * .3; const k = 1 - q.t / .35;
+      glow.add(q.x, q.y, q.z, q.vx * .06, 0, q.vz * .06, .05, 0, [.7, .9, 1.1], k * .6 * cam.bk, q.x); }
     glow.end(); glow.uT.value = t;
     /* 카메라: 내 기체를 따라감 */
     { const lx = FS.x + FS.vx * .35, lz = FS.z + FS.vz * .35, k = Math.min(1, dt * 5); cam.x += (lx - cam.x) * k; cam.z += (lz - cam.z) * k; }
     cam.h += (cam.H - cam.h) * Math.min(1, dt * 3); cam.tilt += (cam.T - cam.tilt) * Math.min(1, dt * 3);
-    camera.position.set(cam.x, cam.h * Math.cos(cam.tilt), cam.z + cam.h * Math.sin(cam.tilt)); camera.lookAt(cam.x, 0, cam.z); const ov = window.__camOv; if (ov) { camera.position.set(ov[0], ov[1], ov[2]); camera.lookAt(ov[3], ov[4], ov[5]); }   /* 시험용: 원하는 자리에서 보기 */ camera.updateMatrixWorld();
+    /* 빨라질 때(실제로 빨라질 때만): 카메라가 살짝 물러나 넓게 보이고, 멈추면 다시 다가옴 (사용자 2026-11-05 승인) */
+    { const bk = Math.min(1, (FS.boost || 0) / .6); cam.bk = (cam.bk || 0) + (bk - (cam.bk || 0)) * Math.min(1, dt * (bk > (cam.bk || 0) ? 4 : 1.5)); }
+    const camH = cam.h * (1 + .1 * cam.bk);
+    camera.position.set(cam.x, camH * Math.cos(cam.tilt), cam.z + camH * Math.sin(cam.tilt)); camera.lookAt(cam.x, 0, cam.z); const ov = window.__camOv; if (ov) { camera.position.set(ov[0], ov[1], ov[2]); camera.lookAt(ov[3], ov[4], ov[5]); }   /* 시험용: 원하는 자리에서 보기 */ camera.updateMatrixWorld();
     lab.mesh.position.set(Math.round(cam.x / 4) * 4, 0, Math.round(cam.z / 4) * 4);
     drawHud(HM, FS.x, FLY.HOVER, FS.z, dt); drawHud(HF, E.x, FLY.HOVER, E.z, dt);
     renderer.setRenderTarget(bloom.scene); renderer.clear(); renderer.render(scene, camera);
