@@ -5,7 +5,7 @@
    · 맞으면: 맞은 자리 근처(지름 3m 남짓) 결정 속으로 들어간 빛이 면마다 다르게 꺾여 면마다 다른 색으로 0.7초쯤 반짝인다(칠한 무지개가 아님).
      맞은 결정은 움찔 움츠러들었다가 다시 뻗는다. */
 import * as THREE from 'three';
-import { HITS } from './rocks.js?v=11051242';
+import { HITS } from './rocks.js?v=11051417';
 
 /* 결정 하나 (밑 0 ~ 기둥 끝 1 ~ 머리 꼭짓점 1.0+tip). 모든 삼각형을 바깥쪽으로 맞춘다 */
 export function prism(seed) {
@@ -145,6 +145,10 @@ export function makeCrystalWall(path, opt = {}) {
   for (let d = .9 + R() * .5; d < len - .4; d += 2.4 + R() * 1.6) { const a = at(d), side = R() < .5 ? -1 : 1, S = (.38 + R() * .2) * endK(d);   /* 틈 메우는 작은 송이 (앞뒤로 살짝 비켜) */
     flower(a.p.x + a.nx * side * .75, a.p.z + a.nz * side * .75, S); }
   for (const end of [0, 1]) if (doors[end]) { const a = at(end ? len - .7 : .7); flower(a.p.x, a.p.z, 1.65); }   /* 문 양옆 가장 큰 송이 */
+  /* 못 지나가는 자리 = 결정이 실제로 덮은 땅 그대로 (사용자 2026-11-05: 옆으로 누운 바깥 꽃잎 아래로 기체가 겹쳐 들어감)
+     결정마다 뿌리에서 끝까지 땅 위에 비친 자리를 따라 동그라미를 늘어놓음 — 낮게 누운 꽃잎도 막힘 */
+  { const ax = new THREE.Vector3(); for (const c of cs) { if (c.tiny) continue; ax.set(0, 1, 0).applyQuaternion(c.q); const L = c.h * 1.6, hl = Math.hypot(ax.x, ax.z) * L, n = Math.max(1, Math.ceil(hl / .45));
+      for (let k = 0; k <= n; k++) { const t = k / n * L * .92; BLK.push({ x: c.x + ax.x * t, z: c.z + ax.z * t, r: c.w * .42 + .08, top: c.y + ax.y * t + c.w * .4 + .6 }); } } }
   const grp = new THREE.Group(), m4 = new THREE.Matrix4(), sc = new THREE.Vector3(), pos = new THREE.Vector3();
   geos.forEach((g, gi) => { const mine = cs.filter(c => c.g === gi); if (!mine.length) return;
     const im = new THREE.InstancedMesh(g, mat, mine.length); mine.forEach((c, j) => { m4.compose(pos.set(c.x, c.y, c.z), c.q, sc.set(c.w, c.h, c.w)); im.setMatrixAt(j, m4); });

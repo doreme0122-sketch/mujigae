@@ -5,7 +5,7 @@
      가지에도 끝 쪽으로 빛이 살짝 번진다. */
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { HITS } from './rocks.js?v=11051242';
+import { HITS } from './rocks.js?v=11051417';
 
 const rng = seed => { let s = seed * 9301 + 49297; return () => (s = (s * 9301 + 49297) % 233280) / 233280; };
 
@@ -94,7 +94,7 @@ export function makeCoralRidge(path, opt = {}) {
    ② 산호 세 줄: 가운데 줄은 크게, 앞뒤 줄은 작게 비스듬히 겹쳐 자람 · 높낮이는 길게 오르내리는 물결(높게 솟은 무리 / 낮게 퍼진 곳)
    ③ 문 양옆: 가장 크게 자란 산호 둘 + 둘레에 작은 산호
    ④ 벽 주변: 떨어져 자란 작은 산호 무리 · 바닥에 굴러다니는 산호 조각(낮아서 기체가 넘어감) */
-import { block } from './ice.js?v=11051242';
+import { block } from './ice.js?v=11051417';
 export function makeCoralWall(path, opt = {}) {
   const uT = opt.uT || { value: 0 }, mat = opt.mat || coralMaterial(uT), R = rng(opt.seed || 41), doors = opt.doors || [true, true];
   /* 무게 (사용자 2026-11-05: 프리미엄 기기 40프레임 · 태블릿 끊김 — 산호 벽 삼각형 133만 개였음, 다른 벽의 60배)
