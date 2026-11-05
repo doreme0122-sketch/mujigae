@@ -125,9 +125,9 @@ export function makeSkyCanyon(uT, sun) {
       for (let l = 0; l < L; l++) for (let a = 0; a < NS; a++) { const b = (a + 1) % NS, A = base + l * NS, B = A + NS; si.push(A + a, B + a, B + b, A + a, B + b, A + b); }
       for (let a = 0; a < NS; a++) si.push(base + L * NS + a, tip, base + L * NS + (a + 1) % NS);
       const qy = (FLYH - (I.top - 1)) / H, rr = r0 * (1 - qy * .82) * (1 + .25 * Math.sin(qy * 9 + sd)) * 1.15;   /* 기체 높이에서의 굵기만큼 막음 */
-      blockers.push({ x: I.x, z: I.z, r: rr + .9 }); spires.push(I); }
+      blockers.push({ x: I.x, z: I.z, r: rr + .9 }); I.mirror = { x: I.x, z: I.z, r: rr * 1.05 }; spires.push(I); }
     const sg = new THREE.BufferGeometry(); sg.setAttribute('position', new THREE.Float32BufferAttribute(sp, 3)); sg.setAttribute('aTop', new THREE.Float32BufferAttribute(st, 1)); sg.setIndex(si); sg.computeVertexNormals();
-    grp.add(new THREE.Mesh(sg, rock)); }
+    const sgf = sg.toNonIndexed(); sgf.computeVertexNormals(); grp.add(new THREE.Mesh(sgf, mirrorMat(uT))); }   /* 거울 결정 첨탑 (사용자 2026-11-05: 나보다 높은, 이유가 있는 물체 — 반사 게임이라 탄이 튕겨 나감) */
 
   /* ── 끊긴 다리: 이웃 섬 사이를 잇던 다리가 가운데서 끊겨, 끝 토막이 아래로 처져 매달림 ── */
   { const pairs = [];
@@ -198,8 +198,54 @@ export function makeSkyCanyon(uT, sun) {
         gl_FragColor=vec4(HAZE*.55+nc+c,1.); }` }));
   abyss.renderOrder = -1; abyss.position.y = -170; grp.add(abyss);
 
+  /* ─────────── 섬마다 다른 쓰임새 (사용자 2026-11-05: 섬마다 다른 쓰임새 · 그 섬을 지나가고 싶은 느낌 · 이유가 있는 오브젝트 → 알아서) ───────────
+     와드 섬(가운데 빛 고리 돌 단 + 옆에 기체보다 높은 옛 등대 탑) · 수리 섬(빛 샘: 위를 지나면 체력이 참) · 보물 섬(금빛 사당 위에 도는 보석)
+     구름 섬(섬을 덮은 낮은 구름 속에 숨음) · 바람 섬(섬 위로 흐르는 바람길: 따라 날면 빨라짐) */
+  const roles = []; { const free = isl.filter(I => !spires.includes(I)), mr = I => I.rs.reduce((a, b) => a + b, 0) / NA;
+    const take = (fn) => { let best = null, bs = -1e9; for (const I of free) { if (I.role || Math.abs(I.x) > AX - 22 || Math.abs(I.z) > AZ - 16) continue;   /* 날 수 있는 곳 안쪽에만 */ const v = fn(I); if (v > bs) { bs = v; best = I; } } return best; };
+    const far = I => Math.min(...roles.map(r => Math.hypot(r.I.x - I.x, r.I.z - I.z)), 99);
+    const W = take(I => -Math.hypot(I.x, I.z) + mr(I)); if (W) { W.role = 'ward'; roles.push({ I: W, kind: 'ward' }); }
+    for (const k of ['heal', 'treasure', 'cloud', 'wind', 'heal', 'treasure', 'cloud', 'wind']) { const I = take(J => far(J) + mr(J) * .5 - Math.hypot(J.x, J.z) * .05); if (!I) break; I.role = k; roles.push({ I, kind: k }); } }
+  const stoneM = new THREE.MeshStandardMaterial({ color: 0x8a8796, roughness: .85, metalness: .05, flatShading: true }), mm = new THREE.Matrix4(), mq = new THREE.Quaternion(), mv = new THREE.Vector3(), ms = new THREE.Vector3();
+  const anim = [];
+  for (const { I, kind } of roles) { const y0 = I.top + .12, r0 = Math.min(...Array.from(I.rs)) * .8;
+    if (kind === 'ward') { /* 둥근 돌 단 + 빛 고리 + 등대 탑 */
+      const pad = new THREE.Mesh(new THREE.CylinderGeometry(3.2, 3.4, .5, 40), stoneM); pad.position.set(I.x, y0 + .2, I.z); grp.add(pad);
+      const ring = new THREE.Mesh(new THREE.RingGeometry(2.3, 2.7, 64).rotateX(-Math.PI / 2), glowMat(uT, [.3, 1., 1.2], 0)); ring.position.set(I.x, y0 + .47, I.z); grp.add(ring);
+      const tx = I.x + r0 * .62, tz = I.z - r0 * .3, H = FLYH + 10 - y0, segs = 7;   /* 등대 탑: 팔각 돌 마디가 위로 좁아지며 기체보다 10m 높이 */
+      for (let k = 0; k < segs; k++) { const q = k / segs, rr = 1.7 * (1 - q * .45), h = H / segs; const g = new THREE.CylinderGeometry(rr * .93, rr, h * .9, 8); const m = new THREE.Mesh(g, stoneM); m.position.set(tx, y0 + h * (k + .5), tz); m.rotation.y = k * .2; grp.add(m);
+        const band = new THREE.Mesh(new THREE.CylinderGeometry(rr * 1.04, rr * 1.04, h * .12, 8), stoneM); band.position.set(tx, y0 + h * (k + 1) - h * .05, tz); grp.add(band); }
+      const lamp = new THREE.Mesh(new THREE.OctahedronGeometry(1.1, 0), glowMat(uT, [.4, 1.1, 1.3], 1)); lamp.position.set(tx, y0 + H + 1.4, tz); grp.add(lamp); anim.push({ m: lamp, spin: .6 });
+      const cap = new THREE.Mesh(new THREE.ConeGeometry(1.4, 1.6, 8), stoneM); cap.position.set(tx, y0 + H + 3.2, tz); grp.add(cap);
+      blockers.push({ x: tx, z: tz, r: 1.9, top: 99 }); I.ward = { x: I.x, z: I.z }; }
+    if (kind === 'heal') { /* 빛 샘: 둥근 웅덩이에 잔물결 고리 · 위로 떠오르는 빛 알갱이 */
+      const pool = new THREE.Mesh(new THREE.CircleGeometry(r0 * .55, 48).rotateX(-Math.PI / 2), healMat(uT)); pool.position.set(I.x, y0 + .06, I.z); grp.add(pool);
+      const rim = new THREE.Mesh(new THREE.TorusGeometry(r0 * .55, .25, 6, 40).rotateX(Math.PI / 2), stoneM); rim.position.set(I.x, y0 + .12, I.z); grp.add(rim);
+      const N = 40, pg = new THREE.BufferGeometry(), pp = new Float32Array(N * 3), ps = new Float32Array(N); for (let i = 0; i < N; i++) { const a = R() * 6.28, d = Math.sqrt(R()) * r0 * .55; pp.set([I.x + Math.cos(a) * d, y0, I.z + Math.sin(a) * d], i * 3); ps[i] = R(); }
+      pg.setAttribute('position', new THREE.BufferAttribute(pp, 3)); pg.setAttribute('aS', new THREE.BufferAttribute(ps, 1));
+      grp.add(new THREE.Points(pg, moteMat(uT, [.35, 1.2, .8], Math.abs(y0) + 1))); }
+    if (kind === 'treasure') { /* 금빛 사당: 부서진 돌기둥 넷 + 가운데 떠서 도는 보석 */
+      for (let k = 0; k < 4; k++) { const a = k / 4 * 6.28 + .4, h = 3.5 + R() * 3, m = new THREE.Mesh(new THREE.BoxGeometry(.9, h, .9), stoneM); m.position.set(I.x + Math.cos(a) * 3, y0 + h / 2, I.z + Math.sin(a) * 3); m.rotation.set((R() - .5) * .1, a, (R() - .5) * .1); grp.add(m); }
+      const base = new THREE.Mesh(new THREE.CylinderGeometry(1.2, 1.5, .9, 6), stoneM); base.position.set(I.x, y0 + .45, I.z); grp.add(base);
+      const gem = new THREE.Mesh(new THREE.OctahedronGeometry(1, 0), glowMat(uT, [1.4, 1., .35], 1)); gem.scale.set(1.5, 2.3, 1.5); gem.position.set(I.x, y0 + 3.2, I.z); grp.add(gem); anim.push({ m: gem, spin: 1.2, bob: y0 + 3.2 }); }
+    if (kind === 'cloud') { /* 낮은 구름: 섬 윗면에서 기체 높이 위까지 덮음 → 들어가면 숨음 */
+      const N = 16, g = new THREE.PlaneGeometry(1, 1), im = new THREE.InstancedMesh(g, puffMat(uT, uN), N);
+      for (let k = 0; k < N; k++) { const a = R() * 6.28, d = Math.sqrt(R()) * r0 * .8, s2 = 6 + R() * 5; mm.compose(mv.set(I.x + Math.cos(a) * d, y0 + 2 + R() * (FLYH + 3 - y0 - 2), I.z + Math.sin(a) * d), mq.identity(), ms.set(s2, s2 * .7, 1)); im.setMatrixAt(k, mm); }
+      im.renderOrder = 4; im.frustumCulled = false; grp.add(im); I.cloudR = r0 * .9; }
+    if (kind === 'wind') { /* 바람길: 섬 위를 가로지르는 흐름 · 결이 흘러가는 방향이 빨라지는 방향 */
+      const a = R() * 6.28, L = r0 * 2.4, g = new THREE.PlaneGeometry(L, 5.2, 1, 1); g.rotateX(-Math.PI / 2); g.rotateY(-a);
+      const m = new THREE.Mesh(g, windMat(uT)); m.position.set(I.x, FLYH - .6, I.z); m.renderOrder = 3; grp.add(m); I.wind = { ux: Math.cos(a), uz: Math.sin(a), L, w: 2.4 }; } }
+
   return {
-    mesh: grp, blockers,
+    mesh: grp, blockers, roles,
+    /* 기체가 있는 자리의 쓰임새 */
+    zoneAt: (x, z, vx = 0, vz = 0) => { const I = islandAt(x, z); if (!I || !I.role) return null;
+      if (I.role === 'cloud') return Math.hypot(x - I.x, z - I.z) < I.cloudR ? 'cloud' : null;
+      if (I.role === 'wind') { const dx = x - I.x, dz = z - I.z, along = dx * I.wind.ux + dz * I.wind.uz, side = -dx * I.wind.uz + dz * I.wind.ux; if (Math.abs(along) > I.wind.L / 2 || Math.abs(side) > I.wind.w) return null;
+        return (vx * I.wind.ux + vz * I.wind.uz) > Math.hypot(vx, vz) * .5 ? 'wind' : null; }
+      return I.role; },
+    /* 거울 결정 첨탑: 탄이 맞으면 튕겨 나감 */
+    reflect: b => { for (const sp of spires) { const c = sp.mirror; if (!c) continue; const dx = b.x - c.x, dz = b.z - c.z, d = Math.hypot(dx, dz); if (d < c.r) { const nx = dx / d, nz = dz / d, dot = b.vx * nx + b.vz * nz; if (dot < 0) { b.vx -= 2 * dot * nx; b.vz -= 2 * dot * nz; } b.x = c.x + nx * c.r; b.z = c.z + nz * c.r; return true; } } return false; },
     topAt: (x, z) => { const I = islandAt(x, z); return I ? I.top : null; },
     blocked: (x, z) => { if (Math.abs(x) > AX - 6 || Math.abs(z) > AZ - 6) return true; for (const b of blockers) { const dx = x - b.x, dz = z - b.z; if (dx * dx + dz * dz < b.r * b.r) return true; } return false; },
     update(t, dt, cx, cz) {
@@ -209,6 +255,51 @@ export function makeSkyCanyon(uT, sun) {
       debM.instanceMatrix.needsUpdate = true;
       for (let i = 0; i < clouds.length; i++) { const c = clouds[i]; c.x += c.v * dt; if (c.x > AX * 1.15) c.x -= AX * 2.3;
         qq.identity(); m4.compose(vv.set(c.x, c.y, c.z), qq, ss.set(c.w, 1, c.d)); clouds.mesh.setMatrixAt(i, m4); }
-      clouds.mesh.instanceMatrix.needsUpdate = true; } };
+      clouds.mesh.instanceMatrix.needsUpdate = true;
+      for (const A of anim) { A.m.rotation.y += A.spin * dt; if (A.bob != null) A.m.position.y = A.bob + Math.sin(t * 1.4) * .35; } } };
 }
 const FLYH = .7, v0 = new THREE.Vector3();
+
+/* 거울 결정: 면마다 하늘·별빛을 비춘 듯 밝기가 다르고 모서리가 빛남 · 숨 쉬듯 */
+function mirrorMat(uT) { return new THREE.ShaderMaterial({ uniforms: { uT },
+  vertexShader: 'varying vec3 vW, vN; void main(){ vec4 w=modelMatrix*vec4(position,1.); vW=w.xyz; vN=normalize(mat3(modelMatrix)*normal); gl_Position=projectionMatrix*viewMatrix*w; }',
+  fragmentShader: `uniform float uT; varying vec3 vW, vN;
+    void main(){ vec3 n=normalize(vN), v=normalize(cameraPosition-vW), r=reflect(-v,n);
+      float face=fract(sin(dot(floor(n*5.+.5),vec3(12.9,78.2,37.7)))*43758.5);
+      vec3 sky=mix(vec3(.12,.1,.32),vec3(.55,.75,1.1),smoothstep(-.3,.8,r.y))+vec3(.9,.7,1.)*pow(max(r.y,0.),12.)*.6;   /* 비친 하늘 */
+      float f=pow(1.-abs(dot(n,v)),3.);
+      vec3 c=sky*(.55+.5*face)+vec3(.6,.9,1.2)*f*.8;
+      c+=vec3(.3,.6,1.)*smoothstep(.85,1.,fract(vW.y*.35-uT*.15))*.35;                                     /* 위로 흐르는 빛 띠 */
+      c=mix(c,vec3(.045,.035,.11),smoothstep(-11.,-75.,vW.y)*.9);
+      gl_FragColor=vec4(c,1.); }` }); }
+function glowMat(uT, col, pulse) { return new THREE.ShaderMaterial({ transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide, uniforms: { uT, uC: { value: new THREE.Vector3(...col) }, uP: { value: pulse } },
+  vertexShader: 'varying vec3 vN, vW; void main(){ vec4 w=modelMatrix*vec4(position,1.); vW=w.xyz; vN=normalize(mat3(modelMatrix)*normal); gl_Position=projectionMatrix*viewMatrix*w; }',
+  fragmentShader: 'uniform float uT, uP; uniform vec3 uC; varying vec3 vN, vW; void main(){ float f=.75+.25*sin(uT*2.+vW.x); vec3 c=uC*(1.2+uP*.6*abs(dot(normalize(vN),vec3(.3,.8,.5))))*f; gl_FragColor=vec4(c,1.); }' }); }
+/* 빛 샘: 맑은 청록 물에 가운데서 퍼지는 잔물결 고리 */
+function healMat(uT) { return new THREE.ShaderMaterial({ uniforms: { uT },
+  vertexShader: 'varying vec2 vP; void main(){ vP=position.xz; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.); }',
+  fragmentShader: `uniform float uT; varying vec2 vP; void main(){ float r=length(vP); float w=sin(r*2.2-uT*2.4)*.5+.5; w=pow(w,6.);
+    vec3 c=mix(vec3(.02,.25,.22),vec3(.1,.6,.5),.5+.5*sin(r*.7))+vec3(.5,1.2,.9)*w*.6; gl_FragColor=vec4(c,1.); }` }); }
+/* 떠오르는 빛 알갱이: 샘에서 기체 높이까지 천천히 올라가며 사라짐 */
+function moteMat(uT, col, H) { return new THREE.ShaderMaterial({ transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, uniforms: { uT, uC: { value: new THREE.Vector3(...col) }, uH: { value: H } },
+  vertexShader: `uniform float uT, uH; attribute float aS; varying float vA; void main(){ float t=fract(uT*.12+aS); vec3 p=position; p.y+=t*uH; p.x+=sin(uT+aS*20.)*.4*t; vA=sin(t*3.14);
+    vec4 mv=modelViewMatrix*vec4(p,1.); gl_Position=projectionMatrix*mv; gl_PointSize=(2.+aS*2.5)*90./max(10.,-mv.z); }`,
+  fragmentShader: 'uniform vec3 uC; varying float vA; void main(){ float d=length(gl_PointCoord-.5); if(d>.5) discard; gl_FragColor=vec4(uC*smoothstep(.5,.0,d)*vA,1.); }' }); }
+/* 낮은 구름 덩이 (카메라를 바라보는 판) */
+function puffMat(uT, uN) { return new THREE.ShaderMaterial({ transparent: true, depthWrite: false, uniforms: { uT, uN: { value: uN } },
+  vertexShader: `varying vec2 vUv; varying float vS; void main(){ vUv=uv; vS=fract(instanceMatrix[3].x*.37+instanceMatrix[3].z*.21);
+    vec3 right=vec3(viewMatrix[0][0],viewMatrix[1][0],viewMatrix[2][0]), up=vec3(viewMatrix[0][1],viewMatrix[1][1],viewMatrix[2][1]);
+    vec3 c=(modelMatrix*instanceMatrix*vec4(0.,0.,0.,1.)).xyz; float sx=length(instanceMatrix[0].xyz), sy=length(instanceMatrix[1].xyz);
+    vec3 w=c+right*position.x*sx+up*position.y*sy; gl_Position=projectionMatrix*viewMatrix*vec4(w,1.); }`,
+  fragmentShader: `uniform float uT; uniform sampler2D uN; varying vec2 vUv; varying float vS;
+    void main(){ vec2 q=vUv-.5; float d=length(q*vec2(1.,1.2)); float n=texture2D(uN,vUv*.6+vec2(vS,uT*.01)).r;
+      float a=smoothstep(.5,.15,d+(n-.5)*.35); vec3 c=mix(vec3(.55,.55,.75),vec3(.85,.85,.98),smoothstep(-.2,.3,-q.y+n*.2));
+      gl_FragColor=vec4(c,a*.55); }` }); }
+/* 바람길: 흐르는 결 (더해 그림) */
+function windMat(uT) { return new THREE.ShaderMaterial({ transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide, uniforms: { uT },
+  vertexShader: 'varying vec2 vUv; void main(){ vUv=uv; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.); }',
+  fragmentShader: `uniform float uT; varying vec2 vUv;
+    void main(){ float side=smoothstep(.0,.3,vUv.y)*smoothstep(1.,.7,vUv.y), ends=smoothstep(.0,.15,vUv.x)*smoothstep(1.,.85,vUv.x);
+      float k=0.; for(int i=0;i<4;i++){ float fi=float(i); float y=.2+fi*.2+sin(vUv.x*6.+fi*2.)*.03; float l=smoothstep(.025,.0,abs(vUv.y-y)); float seg=smoothstep(.0,.3,fract(vUv.x*3.-uT*1.2+fi*.37))*smoothstep(.6,.3,fract(vUv.x*3.-uT*1.2+fi*.37)); k+=l*seg; }
+      float chev=smoothstep(.04,.0,abs(fract(vUv.x*5.-uT*1.5)-.5-abs(vUv.y-.5)*.5))*.5;                       /* 흐르는 쪽을 가리키는 꺾쇠 */
+      gl_FragColor=vec4(vec3(.55,.95,1.1)*(k*1.6+chev*1.2+.08)*side*ends,1.); }` }); }

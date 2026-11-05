@@ -5,24 +5,24 @@
    무게: 바닥 판 하나 + 기체 둘 + 빛 알갱이 한 묶음 + 그림자 판 둘 */
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
-import { makeBloom } from '../core/hangar/bloom.js?v=11052126';
-import { makePerf } from './perf.js?v=11052126';
+import { makeBloom } from '../core/hangar/bloom.js?v=11052142';
+import { makePerf } from './perf.js?v=11052142';
 import { buildShip, engineSpots } from '../core/ships/build.js';
 import { makeGlow } from '../preview/glow.js';
-import { makeFlight, FLY } from './flight.js?v=11052126';
-import { makeFloorLab, LAB, JOIN, sdBlob, sdRoad, blobR } from './floorlab.js?v=11052126';
-import { makeMassWall, STYLES } from './wallmass.js?v=11052126';
-import { makeIceWall } from './icewall.js?v=11052126';
-import { SNOW_U } from './snowtone.js?v=11052126';
-import { iceWallMaterial, snowMaterial } from './icewall.js?v=11052126';
-import { makeRuinWall, ruinMaterial } from './ruins.js?v=11052126';
-import { makeCoralWall, coralMaterial, coral } from './coral.js?v=11052126';
-import { makeTrailMap } from './trailmap.js?v=11052126';
-import { makeThemedHide } from './hidetheme.js?v=11052126';
-import { makePlantBush } from './plantbush.js?v=11052126';
-import { makeCrystalWall, crystalMaterial } from './crystal.js?v=11052126';
-import { makeLavaWall, lavaWallMaterial } from './lavawall.js?v=11052126';
-import { makeSkyCanyon } from './skycanyon.js?v=11052126';
+import { makeFlight, FLY } from './flight.js?v=11052142';
+import { makeFloorLab, LAB, JOIN, sdBlob, sdRoad, blobR } from './floorlab.js?v=11052142';
+import { makeMassWall, STYLES } from './wallmass.js?v=11052142';
+import { makeIceWall } from './icewall.js?v=11052142';
+import { SNOW_U } from './snowtone.js?v=11052142';
+import { iceWallMaterial, snowMaterial } from './icewall.js?v=11052142';
+import { makeRuinWall, ruinMaterial } from './ruins.js?v=11052142';
+import { makeCoralWall, coralMaterial, coral } from './coral.js?v=11052142';
+import { makeTrailMap } from './trailmap.js?v=11052142';
+import { makeThemedHide } from './hidetheme.js?v=11052142';
+import { makePlantBush } from './plantbush.js?v=11052142';
+import { makeCrystalWall, crystalMaterial } from './crystal.js?v=11052142';
+import { makeLavaWall, lavaWallMaterial } from './lavawall.js?v=11052142';
+import { makeSkyCanyon } from './skycanyon.js?v=11052142';
 
 const $ = s => document.querySelector(s), clamp = THREE.MathUtils.clamp;
 const VIEWS = [{ id: 'game', name: '게임 시점', h: 42, tilt: .38 }, { id: 'near', name: '가까이', h: 18, tilt: .6 }, { id: 'far', name: '멀리', h: 90, tilt: .3 }];
@@ -218,12 +218,14 @@ export async function start(canvas, onProgress = () => {}) {
       if ((myCool -= dt) <= 0) { myCool = .22; fire(FS.x - Math.sin(FS.head) * 1.2, FS.z - Math.cos(FS.head) * 1.2, E.x, E.z, true); } }
     /* 탄 움직임 · 맞음 */
     for (let i = bolts.length - 1; i >= 0; i--) { const b = bolts[i]; b.x += b.vx * dt; b.z += b.vz * dt; b.life -= dt;
+      if (K === 13 && SKY.reflect(b)) flash(b.x, b.z, [.6, 1., 1.4]);   /* 거울 결정에 맞으면 튕겨 나감 */
       const [hx, hz] = b.mine ? [E.x, E.z] : [FS.x, FS.z];
       if (Math.hypot(b.x - hx, b.z - hz) < 1.1) { flash(b.x, b.z, b.mine ? [.6, 1.3, .7] : [1.4, .5, .5]); if (b.mine) { HF.hp = Math.max(.05, HF.hp - .018); HF.heat += .07; } else HM.hp = Math.max(.05, HM.hp - .03); bolts.splice(i, 1); continue; }
       if (b.life <= 0) bolts.splice(i, 1); }
     HM.hp = Math.min(1, HM.hp + dt * .03); HF.hp = Math.min(1, HF.hp + dt * .05);
     if (K === 13) SKY.update(t, dt, cam.x, cam.z);
-    UT.value = t; { let inH = false; for (const k in HIDE) { const h = HIDE[k]; h.mesh.visible = +k === K; if (+k === K) inH = h.update(t, dt, FS.x, FS.z); } if (K === 11) for (const b of plants) inH = b.update(t, dt, FS.x, FS.z) || inH; if (K === 12) for (const b of zonePlants) inH = b.update(t, dt, FS.x, FS.z) || inH; PL.visible = K === 11; if (!NOGH) fly.userData.setGhost?.(inH); }   /* 숨으면 내 기체 반투명 */
+    UT.value = t; { let inH = false; for (const k in HIDE) { const h = HIDE[k]; h.mesh.visible = +k === K; if (+k === K) inH = h.update(t, dt, FS.x, FS.z); } if (K === 11) for (const b of plants) inH = b.update(t, dt, FS.x, FS.z) || inH; if (K === 12) for (const b of zonePlants) inH = b.update(t, dt, FS.x, FS.z) || inH; if (K === 13) { const zn = SKY.zoneAt(FS.x, FS.z, FS.vx, FS.vz);   /* 하늘 협곡 섬 쓰임새 */
+      if (zn === 'cloud') inH = true; if (zn === 'heal') HM.hp = Math.min(1, HM.hp + dt * .12); if (zn === 'wind') FS.boost = Math.max(FS.boost || 0, .7); } PL.visible = K === 11; if (!NOGH) fly.userData.setGhost?.(inH); }   /* 숨으면 내 기체 반투명 */
     for (const g of galTags) { v3.copy(g.p).project(camera); const on = gal.visible && v3.z < 1 && Math.abs(v3.x) < 1.1 && Math.abs(v3.y) < 1.1; g.el.style.opacity = on ? 1 : 0; if (on) g.el.style.transform = `translate(${(v3.x * .5 + .5) * cw}px,${(-v3.y * .5 + .5) * ch}px) translate(-50%,-50%)`; }
     lab.ships[0].set(FS.x, 0, FS.z, 1); lab.ships[1].set(E.x, 0, E.z, 2); lab.update(t);
     /* 빛 길: 기체가 지난 토막을 빛 길 지도에 칠함 (기체 수와 상관없이 바닥은 한 번만 읽음) — 숨었는지와 상관없이 남김 */
