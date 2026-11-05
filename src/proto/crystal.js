@@ -5,7 +5,7 @@
    · 맞으면: 맞은 자리 근처(지름 3m 남짓) 결정 속으로 들어간 빛이 면마다 다르게 꺾여 면마다 다른 색으로 0.7초쯤 반짝인다(칠한 무지개가 아님).
      맞은 결정은 움찔 움츠러들었다가 다시 뻗는다. */
 import * as THREE from 'three';
-import { HITS } from './rocks.js?v=11051201';
+import { HITS } from './rocks.js?v=11051242';
 
 /* 결정 하나 (밑 0 ~ 기둥 끝 1 ~ 머리 꼭짓점 1.0+tip). 모든 삼각형을 바깥쪽으로 맞춘다 */
 export function prism(seed) {
@@ -29,7 +29,7 @@ export function prism(seed) {
 }
 
 export function crystalMaterial(uT) {
-  const m = new THREE.MeshPhysicalMaterial({ color: 0x14081f, roughness: .025, metalness: 0, clearcoat: 1, clearcoatRoughness: .01, envMapIntensity: 1.5, ior: 1.9, specularIntensity: 1, specularColor: 0xf3eaff, flatShading: true });
+  const m = new THREE.MeshPhysicalMaterial({ color: 0x14081f, roughness: .02, metalness: 0, clearcoat: 0, envMapIntensity: 1.7,   /* 겉 코팅 빛 끔 (가볍게) */ ior: 1.9, specularIntensity: 1, specularColor: 0xf3eaff, flatShading: true });
   m.onBeforeCompile = sh => { sh.uniforms.uT = uT; sh.uniforms.uHits = HITS;
     sh.vertexShader = `uniform float uT; uniform vec4 uHits[16]; varying vec3 vCw; varying vec3 vCo; varying float vSeed; varying vec3 vOrg;
       float chh(vec3 p){ return fract(sin(dot(p,vec3(127.1,311.7,74.7)))*43758.5453); }\n` + sh.vertexShader.replace('#include <begin_vertex>', `#include <begin_vertex>
@@ -110,5 +110,45 @@ export function makeCrystalRidge(path, opt = {}) {
   for (const c of cs) { if (c.tiny) { tg.push({ x: c.x, y: c.y + c.h * .4, z: c.z, r: .35 }); continue; } ax.set(0, 1, 0).applyQuaternion(c.q); const n = Math.max(1, Math.round(c.h / .6));
     for (let k = 0; k < n; k++) { const s = (k + .5) / n * c.h * 1.2; tg.push({ x: c.x + ax.x * s, y: c.y + ax.y * s, z: c.z + ax.z * s, r: c.w * .5 }); } }
   grp.userData = { targets: () => tg, uT, kind: 'crystal' };
+  return grp;
+}
+
+/* ── 자수정 꽃 무리 벽 (사용자 2026-11-05: 벽보다는 크고 작은 결정이 중심에서 꽃처럼 핀 결정 덩어리들이 벽을 만드는 느낌) ──
+   ① 꽃 한 송이: 가운데 뿌리에서 결정이 꽃잎처럼 사방으로 핌 — 한가운데는 가장 크고 곧게, 바깥 고리로 갈수록 짧고 많이 눕고 많아짐(꽃잎 겹)
+      · 고리마다 결정 사이를 엇갈려 놓아 빈틈 없음 · 결정마다 뿌리에 작은 결정 한두 개가 바짝 붙어 갈라져 나옴
+   ② 꽃 크기가 제각각(큰 송이 · 작은 송이) · 송이끼리 바짝 붙어 겹쳐 한 줄 벽이 됨 — 큰 송이 사이 틈은 작은 송이가 메움(건너편이 안 보이게)
+   ③ 문 양옆: 가장 큰 송이 · 문 없는 끝은 작은 송이로 잦아듦
+   같은 결정(prism)·같은 재질(crystalMaterial): 평소 빛 없음 · 뿌리 짙은 보라 → 끝 맑음 · 끝이 천천히 뻗었다 움츠러듦 · 맞으면 면마다 다른 색으로 꺾인 빛 */
+export function makeCrystalWall(path, opt = {}) {
+  const uT = opt.uT || { value: 0 }, mat = opt.mat || crystalMaterial(uT), geos = opt.geos || [1, 2, 3, 4, 5].map(prism), doors = opt.doors || [true, true];
+  const R = (() => { let s = (opt.seed || 9) * 7919; return () => (s = (s * 9301 + 49297) % 233280) / 233280; })();
+  const curve = new THREE.CatmullRomCurve3(path.map(p => new THREE.Vector3(p[0], 0, p[1])), false, 'centripetal'), len = curve.getLength();
+  const at = d => { const u = Math.min(1, Math.max(0, d / len)), p = curve.getPointAt(u), t = curve.getTangentAt(u); return { p, t, nx: -t.z, nz: t.x }; };
+  const cs = [], up = new THREE.Vector3(0, 1, 0), BLK = [], tg = [];
+  const put = (x, y, z, dir, h, w, tiny) => { const q = new THREE.Quaternion().setFromUnitVectors(up, dir).multiply(new THREE.Quaternion().setFromAxisAngle(up, R() * 6.28)); cs.push({ g: Math.floor(R() * geos.length), x, y, z, h, w, q, tiny }); return q; };
+  /* 꽃 한 송이 (가운데 x,z · 크기 S) */
+  const flower = (x, z, S) => {
+    const rings = S > 1.1 ? 3 : 2;
+    put(x, -.3, z, new THREE.Vector3((R() - .5) * .12, 1, (R() - .5) * .12).normalize(), 2.3 * S, .55 * S + .1);             /* 한가운데: 가장 크고 곧게 */
+    for (let r = 1; r <= rings; r++) { const k = r / rings, n = 4 + r * 3 + Math.floor(R() * 2), ph = R() * 6.28;
+      for (let i = 0; i < n; i++) { const a = ph + (i + (r % 2) * .5) / n * 6.28 + (R() - .5) * .3, ca = Math.cos(a), sa = Math.sin(a), rad = (.18 + .5 * k) * S;
+        const lean = .2 + k * k * 2.1 + (R() - .5) * .2;   /* 바깥 고리는 거의 옆으로 벌어짐 */                                                                          /* 바깥 고리일수록 많이 누움 (꽃잎이 벌어짐) */
+        const dir = new THREE.Vector3(ca * lean, 1, sa * lean).normalize(), h = (2.1 - k * 1.05) * S * (.8 + R() * .35), w = h * (.24 + R() * .1) + .06;
+        const q = put(x + ca * rad, -.3 + (1 - k) * .05, z + sa * rad, dir, h, w);
+        if (R() < .55) { const b = R() * 6.28, sd = new THREE.Vector3(Math.cos(b), 0, Math.sin(b)).applyQuaternion(q), d2 = dir.clone().multiplyScalar(.9).addScaledVector(sd, .6).normalize(), hh = h * (.25 + R() * .2);   /* 뿌리에 붙은 작은 결정 */
+          put(x + ca * rad + sd.x * w * .5, -.28, z + sa * rad + sd.z * w * .5, d2, hh, hh * .35 + .04, true); } } }
+    BLK.push({ x, z, r: .85 * S + .15, top: 2 * S }); tg.push({ x, y: S, z, r: S * .8 }); };
+  /* 송이 놓기: 큰 송이 · 작은 송이 번갈아 바짝 붙여 */
+  const endK = d => { const ds = doors[0] ? 9 : d, de = doors[1] ? 9 : len - d; return Math.min(1, .55 + Math.min(ds, de) / 4); };
+  for (let d = .2; d < len;) { const big = R() < .6, S = (big ? 1.15 + R() * .55 : .65 + R() * .3) * endK(d), a = at(d), off = (R() - .5) * .5;
+    flower(a.p.x + a.nx * off, a.p.z + a.nz * off, S); d += S * 1.55 + R() * .3; }   /* 송이가 하나하나 보이게 띄우되, 바깥 꽃잎끼리는 겹쳐 틈이 없음 */
+  for (let d = .9 + R() * .5; d < len - .4; d += 2.4 + R() * 1.6) { const a = at(d), side = R() < .5 ? -1 : 1, S = (.38 + R() * .2) * endK(d);   /* 틈 메우는 작은 송이 (앞뒤로 살짝 비켜) */
+    flower(a.p.x + a.nx * side * .75, a.p.z + a.nz * side * .75, S); }
+  for (const end of [0, 1]) if (doors[end]) { const a = at(end ? len - .7 : .7); flower(a.p.x, a.p.z, 1.65); }   /* 문 양옆 가장 큰 송이 */
+  const grp = new THREE.Group(), m4 = new THREE.Matrix4(), sc = new THREE.Vector3(), pos = new THREE.Vector3();
+  geos.forEach((g, gi) => { const mine = cs.filter(c => c.g === gi); if (!mine.length) return;
+    const im = new THREE.InstancedMesh(g, mat, mine.length); mine.forEach((c, j) => { m4.compose(pos.set(c.x, c.y, c.z), c.q, sc.set(c.w, c.h, c.w)); im.setMatrixAt(j, m4); });
+    im.computeBoundingSphere(); grp.add(im); });
+  grp.userData = { targets: () => tg, uT, kind: 'crystal', blockers: BLK };
   return grp;
 }

@@ -5,20 +5,21 @@
    무게: 바닥 판 하나 + 기체 둘 + 빛 알갱이 한 묶음 + 그림자 판 둘 */
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
-import { makeBloom } from '../core/hangar/bloom.js?v=11051201';
-import { makePerf } from './perf.js?v=11051201';
+import { makeBloom } from '../core/hangar/bloom.js?v=11051242';
+import { makePerf } from './perf.js?v=11051242';
 import { buildShip, engineSpots } from '../core/ships/build.js';
 import { makeGlow } from '../preview/glow.js';
-import { makeFlight, FLY } from './flight.js?v=11051201';
-import { makeFloorLab, LAB, JOIN, sdBlob, sdRoad, blobR } from './floorlab.js?v=11051201';
-import { makeMassWall, STYLES } from './wallmass.js?v=11051201';
-import { makeIceWall } from './icewall.js?v=11051201';
-import { SNOW_U } from './snowtone.js?v=11051201';
-import { iceWallMaterial, snowMaterial } from './icewall.js?v=11051201';
-import { makeRuinWall, ruinMaterial } from './ruins.js?v=11051201';
-import { makeCoralWall, coralMaterial, coral } from './coral.js?v=11051201';
-import { makeTrailMap } from './trailmap.js?v=11051201';
-import { makeLavaWall, lavaWallMaterial } from './lavawall.js?v=11051201';
+import { makeFlight, FLY } from './flight.js?v=11051242';
+import { makeFloorLab, LAB, JOIN, sdBlob, sdRoad, blobR } from './floorlab.js?v=11051242';
+import { makeMassWall, STYLES } from './wallmass.js?v=11051242';
+import { makeIceWall } from './icewall.js?v=11051242';
+import { SNOW_U } from './snowtone.js?v=11051242';
+import { iceWallMaterial, snowMaterial } from './icewall.js?v=11051242';
+import { makeRuinWall, ruinMaterial } from './ruins.js?v=11051242';
+import { makeCoralWall, coralMaterial, coral } from './coral.js?v=11051242';
+import { makeTrailMap } from './trailmap.js?v=11051242';
+import { makeCrystalWall, crystalMaterial } from './crystal.js?v=11051242';
+import { makeLavaWall, lavaWallMaterial } from './lavawall.js?v=11051242';
 
 const $ = s => document.querySelector(s), clamp = THREE.MathUtils.clamp;
 const VIEWS = [{ id: 'game', name: '게임 시점', h: 42, tilt: .38 }, { id: 'near', name: '가까이', h: 18, tilt: .6 }, { id: 'far', name: '멀리', h: 90, tilt: .3 }];
@@ -81,6 +82,10 @@ export async function start(canvas, onProgress = () => {}) {
   const cgal = new THREE.Group(); scene.add(cgal); cgal.visible = false; { const cm = coralMaterial(UT), big = [1, 2, 3, 4].map(q => coral(q, true, 3)), small = [5, 6, 7].map(q => coral(q, true, 2));
     cgal.add(makeCoralWall(L1, { uT: UT, mat: cm, big, small, seed: 41, doors: [false, true] }), makeCoralWall(L2, { uT: UT, mat: cm, big, small, seed: 42, doors: [true, false] })); }
   cgal.children.forEach(w => addBlk(9, w));
+  /* 자수정 꽃 무리 보기 */
+  const xgal = new THREE.Group(); scene.add(xgal); xgal.visible = false; { const xm = crystalMaterial(UT);
+    xgal.add(makeCrystalWall(L1, { uT: UT, mat: xm, seed: 51, doors: [false, true] }), makeCrystalWall(L2, { uT: UT, mat: xm, seed: 52, doors: [true, false] })); }
+  xgal.children.forEach(w => addBlk(10, w));
   /* 용암 폭포 자리를 바닥에 넘김 (0~11 벽 칸 · 12~23 이음 장면) → 바닥이 폭포 아래 웅덩이·흘러나가는 개울을 그림 */
   { const LF = lab.mat.uniforms.uLF.value, LW = lab.mat.uniforms.uLFw.value, fill = (ws, o) => { let k = 0; for (const w of ws) for (const F of w.userData.fallsW || []) if (k < 12) { LF[o + k].set(F.x, F.z, F.dx, F.dz); LW[o + k].set(F.w, F.reach); k++; } };
     fill(lgal.children, 0); fill(walls.children, 12); }
@@ -129,7 +134,7 @@ export async function start(canvas, onProgress = () => {}) {
   const tip = () => { $('#tip').hidden = false; $('#tip b').textContent = LAB[K].name; $('#tip span').textContent = LAB[K].tip; $('#head b').textContent = '바닥 시험장 · ' + LAB[K].name; };
   const tour = $('#tour');
   LAB.forEach((f, i) => { const b = document.createElement('button'); b.type = 'button'; b.textContent = f.name; b.className = 'fl';
-    b.addEventListener('pointerdown', e => { e.stopPropagation(); const was = K; K = i; lab.set(i); walls.visible = i === 5; gal.visible = i === 6; lgal.visible = i === 7; rgal.visible = i === 8; cgal.visible = i === 9; if (i === 5 && was !== 5) { fly.userData.moveTo(-40, 0, -Math.PI / 2); E.x = -30; E.z = 12; } else if (i >= 6 && was < 6) { fly.userData.moveTo(0, 4, 0); E.x = 10; E.z = 14; } else if (was >= 5 && i < 5) fly.userData.moveTo(0, 8, 0); tour.querySelectorAll('.fl').forEach(x => x.classList.toggle('on', x === b)); tip(); }); tour.appendChild(b); });
+    b.addEventListener('pointerdown', e => { e.stopPropagation(); const was = K; K = i; lab.set(i); walls.visible = i === 5; gal.visible = i === 6; lgal.visible = i === 7; rgal.visible = i === 8; cgal.visible = i === 9; xgal.visible = i === 10; if (i === 5 && was !== 5) { fly.userData.moveTo(-40, 0, -Math.PI / 2); E.x = -30; E.z = 12; } else if (i >= 6 && was < 6) { fly.userData.moveTo(0, 4, 0); E.x = 10; E.z = 14; } else if (was >= 5 && i < 5) fly.userData.moveTo(0, 8, 0); tour.querySelectorAll('.fl').forEach(x => x.classList.toggle('on', x === b)); tip(); }); tour.appendChild(b); });
   { const sep = document.createElement('i'); sep.style.cssText = 'width:1px;align-self:stretch;background:rgba(185,255,74,.25);margin:0 4px'; tour.appendChild(sep); }
   /* 비교 버튼(얼음 땅 눈 양 · 눈 결 · 입구 시안)은 모두 정해져서 없앰 (2026-11-05): 바닥 눈 없음 · 눈 결 물결 · 입구 결정 문기둥 */
   VIEWS.forEach(v => { const b = document.createElement('button'); b.type = 'button'; b.textContent = v.name; b.className = 'vw';
@@ -185,5 +190,5 @@ export async function start(canvas, onProgress = () => {}) {
     el.style.cssText = 'position:fixed;left:max(18px,env(safe-area-inset-left,0px));bottom:calc(env(safe-area-inset-bottom,0px) + 14px);font-size:11px;color:rgba(185,255,74,.7);pointer-events:none'; document.body.appendChild(el); }
   tour.querySelectorAll('.fl')[5].dispatchEvent(new PointerEvent('pointerdown'));   /* 처음엔 새 이음 시험부터 */
   onProgress(1);
-  window.__fl = { G: { cgal, rgal, lgal, gal, walls }, blk: (k, x, z) => hitBlk(k, x, z), cam, set: i => tour.querySelectorAll('.fl')[i].dispatchEvent(new PointerEvent('pointerdown')), FS, E };
+  window.__fl = { G: { xgal, cgal, rgal, lgal, gal, walls }, blk: (k, x, z) => hitBlk(k, x, z), cam, set: i => tour.querySelectorAll('.fl')[i].dispatchEvent(new PointerEvent('pointerdown')), FS, E };
 }

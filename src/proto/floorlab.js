@@ -4,8 +4,8 @@
    · 멀어질수록 깊은 색으로 가라앉힘 (가까운 싸움터가 또렷하게)
    0 금속 판 · 1 이끼 낀 암반 · 2 결정 섞인 모래 · 3 은은한 평지 · 4 보스존 별빛 우주(보이지 않는 유리 바닥 + 아래로 깊은 별 세 겹) */
 import * as THREE from 'three';
-import { LAVA_GLSL, vorTex } from './lavatone.js?v=11051201';
-import { SNOW_GLSL, SNOW_U } from './snowtone.js?v=11051201';
+import { LAVA_GLSL, vorTex } from './lavatone.js?v=11051242';
+import { SNOW_GLSL, SNOW_U } from './snowtone.js?v=11051242';
 
 function bakeNoise(N = 256) {
   const hash = (x, y, p) => { x = ((x % p) + p) % p; y = ((y % p) + p) % p; const s = Math.sin(x * 127.1 + y * 311.7) * 43758.5453; return s - Math.floor(s); };
@@ -29,7 +29,8 @@ export const LAB = [
   { id: 'walls', name: '빙하 얼음 벽', tip: '벽 한 줄이 처음부터 끝까지 한 덩어리 절벽이에요. 앞뒤 면은 수직 절벽에 세로 결이 깊게 패여 있고, 윗단은 구간마다 한 단씩 높이가 달라 계단처럼 층져요. 윗단엔 눈이 덮이고 고드름이 늘어져요. 문 양옆이 가장 높이 솟았다가 수직으로 끊겨요.' },
   { id: 'lavawalls', name: '용암 바위 벽', tip: '검은 현무암 절벽 한 덩어리예요. 바위 겉에 빛나는 금이 그물처럼 퍼져 있고, 윗단에서 넘친 용암이 앞면을 타고 흘러내려 발치에 고여요. 문 양옆엔 날카로운 바위 뿔이 솟아요.' },
   { id: 'ruinwalls', name: '고대 유적 벽', tip: '크기가 다른 돌을 엇갈려 쌓은 옛 벽이에요. 구간마다 온전하거나 반쯤 무너졌거나 돌무더기만 남았어요. 돌기둥엔 금빛 띠와 푸른 문양이 빛나고, 문 위엔 거대한 고리 조각이 떠 돌아요. 맞으면 가까운 문양부터 금빛으로 켜져요.' },
-  { id: 'coralwalls', name: '성운 산호 벽', tip: '낮고 울퉁불퉁한 산호초 바위 위에 산호가 세 줄로 얽혀 자란 벽이에요. 뿌리는 청록, 가지 끝은 보랏빛이고 물속처럼 천천히 흔들려요. 맞으면 가지 끝 방울이 반딧불처럼 깜빡여요.' }];
+  { id: 'coralwalls', name: '성운 산호 벽', tip: '낮고 울퉁불퉁한 산호초 바위 위에 산호가 세 줄로 얽혀 자란 벽이에요. 뿌리는 청록, 가지 끝은 보랏빛이고 물속처럼 천천히 흔들려요. 맞으면 가지 끝 방울이 반딧불처럼 깜빡여요.' },
+  { id: 'crystalwalls', name: '자수정 꽃 무리', tip: '크고 작은 자수정 결정이 한가운데서 꽃잎처럼 사방으로 핀 덩어리들이 바짝 붙어 벽을 이뤄요. 가운데 결정이 가장 크고 곧고, 바깥으로 갈수록 짧고 눕혀져요. 맞으면 결정 면마다 다른 색으로 빛이 꺾여요.' }];
 
 /* 이음 시험 자리 (그림과 JS가 같은 식): 얼음 땅 가운데 (-30,0) · 용암 땅 (30,0) · 큰길 = 두 가운데를 잇는 폭 8m 띠 */
 export const JOIN = { ice: [-30, 0], lava: [30, 0], R: 22, roadW: 4, roadX: 30 };
@@ -212,6 +213,24 @@ export function makeFloorLab() {
         float m1=smoothstep(.5,.85,N4(p*.012+vec2(uT*.002,uT*.001)).r), m2=smoothstep(.55,.9,N4(p*.018-vec2(uT*.0015,0.)).g);
         c+=vec3(.015,.07,.065)*m1*.35+vec3(.055,.025,.08)*m2*.3;                                               /* 크고 옅은 성운 안개 */
         return c; }
+      /* 자수정 바닥: 결정과 같은 세상 — 짙은 보랏빛 회색 바위판(깨진 판, 판마다 색·기울기 다름)
+         · 금 속에 자라난 작은 결정 결: 금을 따라 가는 보라 결정이 박혀, 보는 각도에 따라 반짝 (판 그림을 읽기만 해서 가벼움)
+         · 바위 겉에 박힌 결정 알갱이가 해 쪽에서 볼 때 반짝 · 결정 무리 가까이는 보랏빛 가루가 더 많음 */
+      vec3 crystalGround(vec2 p, vec3 rd){
+        vec2 wq=(N4(p*.04).rg-.5)*1.2; vec3 v=vorB(p*.45+wq), v2=vorB(p*1.4+5.+wq);
+        vec3 n=normalize(vec3((v.y-.5)*.22+(N4(p*.5).b-.5)*.08,1.,(v.z-.5)*.22+(N4(p*.5+.3).b-.5)*.08));
+        vec3 base=mix(vec3(.055,.045,.07),vec3(.085,.07,.1),v.y)*(.75+.5*N4(p*.25).a);
+        float crk=smoothstep(.035,0.,v.x), crk2=smoothstep(.02,0.,v2.x)*step(.5,v2.z);
+        base*=1.-max(crk,crk2*.7)*.75;
+        vec3 c=lit(base,n,rd,.15,30.)*.55;
+        vec3 hv=normalize(uSun-rd);
+        float vein=smoothstep(.06,.0,v.x)*smoothstep(.3,.7,N4(p*.08+.6).g);                                            /* 금 속 결정 결 */
+        float gl=pow(max(dot(normalize(vec3((N4(p*3.).r-.5)*1.6,1.,(N4(p*3.+.4).g-.5)*1.6)),hv),0.),24.);
+        c+=vec3(.5,.25,.9)*vein*(.05+.5*gl);
+        vec2 gq=p*4.; vec2 gid=floor(gq); float gh=h2(gid+21.); vec2 gf=fract(gq)-.5;
+        if(gh>.94){ vec3 gn=normalize(vec3(h2(gid+1.)-.5,.7,h2(gid+2.)-.5)); float sp=pow(max(dot(gn,hv),0.),60.)*exp(-dot(gf,gf)*50.);   /* 박힌 결정 알갱이 */
+          c+=mix(vec3(.7,.5,1.2),vec3(1.,.85,1.1),fract(gh*37.))*sp*1.6; }
+        return c; }
       void main(){
         vec3 ro=cameraPosition, rd=normalize(vW-ro); vec2 p=vW.xz; float dist=length(p-ro.xz); vec3 c;
         if(uK<.5){ /* 금속 판: 4m 판 · 이음매 · 모서리로 갈수록 살짝 둥글게 깎임(빛 받는 턱) · 볼트 · 긁힘 · 얼룩 */
@@ -249,6 +268,8 @@ export function makeFloorLab() {
           vec3 n=normalize(vec3((g-.5)*.06+(g2-.5)*.08, 1., (N4(p*.5+.4).a-.5)*.06));
           vec3 base=vec3(.17,.19,.22)*(.88+.22*a)+vec3(.012)*(g2-.5);
           c=lit(base,n,rd,.06,20.);
+        } else if(uK>9.5){ /* 자수정 꽃 무리 칸 */
+          c=crystalGround(p,rd);
         } else if(uK>8.5){ /* 성운 산호 벽 칸: 산호 바닥 */
           c=coralGround(p,rd);
         } else if(uK>7.5){ /* 고대 유적 벽 칸: 유적 바닥 (벽 줄 z=-12 가까이 더 부서짐) */

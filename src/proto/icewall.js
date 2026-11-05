@@ -11,8 +11,8 @@
    무게: 벽 한 줄 = 얼음 1번 + 눈 1번 그리기 */
 import * as THREE from 'three';
 import { mergeGeometries, mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js';
-import { iceMaterial, block } from './ice.js?v=11051201';
-import { SNOW_GLSL, SNOW_U } from './snowtone.js?v=11051201';
+import { iceMaterial, block } from './ice.js?v=11051242';
+import { SNOW_GLSL, SNOW_U } from './snowtone.js?v=11051242';
 
 const hs = (x, y, z) => { const s = Math.sin(x * 127.1 + y * 311.7 + z * 74.7) * 43758.5453; return s - Math.floor(s); };
 const vn = (x, y, z) => { const ix = Math.floor(x), iy = Math.floor(y), iz = Math.floor(z), fx = x - ix, fy = y - iy, fz = z - iz, u = fx * fx * (3 - 2 * fx), v = fy * fy * (3 - 2 * fy), w = fz * fz * (3 - 2 * fz);
@@ -28,7 +28,11 @@ const prepS = g => { const n = g.index ? g.toNonIndexed() : g; for (const k of O
 /* 얼음 재질: 승인된 얼음 + 더 맑은 청록 + 조각 틈(aG)과 속 금에서 새는 빛 + 모서리 빛 + 서리 반짝임 */
 export function iceWallMaterial(uT) {
   const m = iceMaterial(uT), prev = m.onBeforeCompile; m.color.set(0x0b3d5c);
+  /* 가볍게 (사용자 2026-11-05): 겉 코팅 빛(두 번째 반사 계산) 끔 → 그 대신 매끈함·주변 반사를 조금 올림 · 속 들여다보기 4겹 → 2겹(간격 넓혀 같은 깊이) */
+  m.clearcoat = 0; m.roughness = .03; m.envMapIntensity = 1.05;
   m.onBeforeCompile = sh => { prev(sh);
+    sh.fragmentShader = sh.fragmentShader.replace('for(int k=1;k<=4;k++){ float fade=1.-float(k)*.2; vec3 q=vIw-Vw*(.32*float(k));', 'for(int k=1;k<=2;k++){ float fade=1.-float(k)*.28; vec3 q=vIw-Vw*(.5*float(k));')
+      .replace('vec3 inside=vec3(.004,.03,.065)+vec3(.025,.11,.2)*lay*.6', 'lay*=1.45; bub*=1.6; vec3 inside=vec3(.004,.03,.065)+vec3(.025,.11,.2)*lay*.6');
     sh.vertexShader = 'attribute float aG; varying float vG;\n' + sh.vertexShader.replace('#include <project_vertex>', '#include <project_vertex>\n vG=aG;');
     sh.fragmentShader = 'varying float vG;\n' + sh.fragmentShader
       .replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>
