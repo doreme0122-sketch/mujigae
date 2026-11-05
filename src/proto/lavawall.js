@@ -12,8 +12,8 @@
    무게: 벽 한 줄 = 그리기 1번 (바위·용암·웅덩이가 한 재질, aF 값으로 용암 자리를 정함) */
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { block } from './ice.js?v=11051145';
-import { LAVA_GLSL } from './lavatone.js?v=11051145';
+import { block } from './ice.js?v=11051155';
+import { LAVA_GLSL, vorTex } from './lavatone.js?v=11051155';
 
 const hs = (x, y, z) => { const s = Math.sin(x * 127.1 + y * 311.7 + z * 74.7) * 43758.5453; return s - Math.floor(s); };
 const vn = (x, y, z) => { const ix = Math.floor(x), iy = Math.floor(y), iz = Math.floor(z), fx = x - ix, fy = y - iy, fz = z - iz, u = fx * fx * (3 - 2 * fx), v = fy * fy * (3 - 2 * fy), w = fz * fz * (3 - 2 * fz);
@@ -27,7 +27,7 @@ const prep = (g, glow = .15, lava = 0) => { const n = g.index ? g.toNonIndexed()
 /* 재질: 바위 + 용암이 한 재질. aG = 덩어리 사이 틈 빛, aF = 용암 자리(0 바위 ~ 1 녹은 용암) */
 export function lavaWallMaterial(uT) {
   const m = new THREE.MeshStandardMaterial({ color: 0x0a0605, roughness: .93, metalness: 0, flatShading: true, envMapIntensity: .05 });
-  m.onBeforeCompile = sh => { sh.uniforms.uT = uT;
+  m.onBeforeCompile = sh => { sh.uniforms.uT = uT; sh.uniforms.uVor = { value: vorTex() };
     sh.vertexShader = 'attribute float aG; attribute float aF; varying float vG; varying float vF; varying vec3 vIw; varying vec3 vNw;\n' + sh.vertexShader.replace('#include <project_vertex>', '#include <project_vertex>\n vG=aG; vF=aF; vIw=(modelMatrix*vec4(transformed,1.)).xyz; vNw=normalize(mat3(modelMatrix)*objectNormal);');
     sh.fragmentShader = 'uniform float uT; varying float vG; varying float vF; varying vec3 vIw; varying vec3 vNw;\n' + LAVA_GLSL + '\n' + sh.fragmentShader
       .replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>

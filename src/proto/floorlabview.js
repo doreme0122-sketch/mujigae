@@ -5,19 +5,20 @@
    무게: 바닥 판 하나 + 기체 둘 + 빛 알갱이 한 묶음 + 그림자 판 둘 */
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
-import { makeBloom } from '../core/hangar/bloom.js?v=11051145';
-import { makePerf } from './perf.js?v=11051145';
+import { makeBloom } from '../core/hangar/bloom.js?v=11051155';
+import { makePerf } from './perf.js?v=11051155';
 import { buildShip, engineSpots } from '../core/ships/build.js';
 import { makeGlow } from '../preview/glow.js';
-import { makeFlight, FLY } from './flight.js?v=11051145';
-import { makeFloorLab, LAB, JOIN, sdBlob, sdRoad, blobR } from './floorlab.js?v=11051145';
-import { makeMassWall, STYLES } from './wallmass.js?v=11051145';
-import { makeIceWall } from './icewall.js?v=11051145';
-import { SNOW_U } from './snowtone.js?v=11051145';
-import { iceWallMaterial, snowMaterial } from './icewall.js?v=11051145';
-import { makeRuinWall, ruinMaterial } from './ruins.js?v=11051145';
-import { makeCoralWall, coralMaterial, coral } from './coral.js?v=11051145';
-import { makeLavaWall, lavaWallMaterial } from './lavawall.js?v=11051145';
+import { makeFlight, FLY } from './flight.js?v=11051155';
+import { makeFloorLab, LAB, JOIN, sdBlob, sdRoad, blobR } from './floorlab.js?v=11051155';
+import { makeMassWall, STYLES } from './wallmass.js?v=11051155';
+import { makeIceWall } from './icewall.js?v=11051155';
+import { SNOW_U } from './snowtone.js?v=11051155';
+import { iceWallMaterial, snowMaterial } from './icewall.js?v=11051155';
+import { makeRuinWall, ruinMaterial } from './ruins.js?v=11051155';
+import { makeCoralWall, coralMaterial, coral } from './coral.js?v=11051155';
+import { makeTrailMap } from './trailmap.js?v=11051155';
+import { makeLavaWall, lavaWallMaterial } from './lavawall.js?v=11051155';
 
 const $ = s => document.querySelector(s), clamp = THREE.MathUtils.clamp;
 const VIEWS = [{ id: 'game', name: '게임 시점', h: 42, tilt: .38 }, { id: 'near', name: '가까이', h: 18, tilt: .6 }, { id: 'far', name: '멀리', h: 90, tilt: .3 }];
@@ -123,7 +124,7 @@ export async function start(canvas, onProgress = () => {}) {
     h.now.style.width = (h.hp * 100) + '%'; h.lag.style.width = (h.lagv * 100) + '%'; const k = Math.min(1, h.heat);
     h.ht.style.width = (k * 100) + '%'; h.ht.style.background = k > .98 ? `rgba(255,60,60,${.6 + .4 * Math.sin(t * 20)})` : `rgb(255,${200 - 150 * k | 0},${80 - 60 * k | 0})`; };
   /* 버튼 */
-  const trLast = [[1e9, 0, 0], [1e9, 0, 0]]; let trI = 0;
+  const trail = makeTrailMap(renderer); lab.mat.uniforms.uTrO.value.copy(trail.origin); lab.mat.uniforms.uTrail.value = trail.tex;
   const cam = { x: 0, z: 8, h: 42, H: 42, tilt: .38, T: .38 };
   const tip = () => { $('#tip').hidden = false; $('#tip b').textContent = LAB[K].name; $('#tip span').textContent = LAB[K].tip; $('#head b').textContent = '바닥 시험장 · ' + LAB[K].name; };
   const tour = $('#tour');
@@ -164,9 +165,8 @@ export async function start(canvas, onProgress = () => {}) {
     UT.value = t;
     for (const g of galTags) { v3.copy(g.p).project(camera); const on = gal.visible && v3.z < 1 && Math.abs(v3.x) < 1.1 && Math.abs(v3.y) < 1.1; g.el.style.opacity = on ? 1 : 0; if (on) g.el.style.transform = `translate(${(v3.x * .5 + .5) * cw}px,${(-v3.y * .5 + .5) * ch}px) translate(-50%,-50%)`; }
     lab.ships[0].set(FS.x, 0, FS.z, 1); lab.ships[1].set(E.x, 0, E.z, 2); lab.update(t);
-    /* 빛 길: 기체마다 1.5m(또는 0.45초)마다 지나간 토막과 시각을 남김 (최근 72토막 돌려 씀 → 5초 길) — 숨었는지와 상관없이 남김 */
-    { const TR = lab.mat.uniforms.uTr.value, TT = lab.mat.uniforms.uTt.value; for (const [k, x, z] of [[0, FS.x, FS.z], [1, E.x, E.z]]) { const L = trLast[k];
-        const dd = Math.hypot(x - L[0], z - L[1]); if (dd > 1.5 || t - L[2] > .45) { const far = dd > 6; TR[trI].set(x, z, far ? x : L[0], far ? z : L[1]); TT[trI] = t; trI = (trI + 1) % TR.length; L[0] = x; L[1] = z; L[2] = t; } } }   /* 토막(이전 자리→지금)으로 남김 · 순간 이동은 잇지 않음 */
+    /* 빛 길: 기체가 지난 토막을 빛 길 지도에 칠함 (기체 수와 상관없이 바닥은 한 번만 읽음) — 숨었는지와 상관없이 남김 */
+    if (K === 9) { trail.mark(0, FS.x, FS.z); trail.mark(1, E.x, E.z); trail.update(dt); lab.mat.uniforms.uTrail.value = trail.tex; }   /* 빛 길 지도에 칠함 (산호 칸에서만) */
     glow.begin();
     for (const b of bolts) glow.add(b.x, FLY.HOVER + .3, b.z, -b.vx * .05, 0, -b.vz * .05, .2, 0, b.mine ? [.45, 1.25, .6] : [1.35, .35, .45], 1, b.x);
     for (let i = fx.length - 1; i >= 0; i--) { const f = fx[i]; f.t += dt; if (f.t > .25) { fx.splice(i, 1); continue; } const k = 1 - f.t / .25; glow.add(f.x, FLY.HOVER + .3, f.z, 0, 0, 0, .5 + f.t * 3, 3, f.c, k); }

@@ -4,8 +4,8 @@
    · 멀어질수록 깊은 색으로 가라앉힘 (가까운 싸움터가 또렷하게)
    0 금속 판 · 1 이끼 낀 암반 · 2 결정 섞인 모래 · 3 은은한 평지 · 4 보스존 별빛 우주(보이지 않는 유리 바닥 + 아래로 깊은 별 세 겹) */
 import * as THREE from 'three';
-import { LAVA_GLSL } from './lavatone.js?v=11051145';
-import { SNOW_GLSL, SNOW_U } from './snowtone.js?v=11051145';
+import { LAVA_GLSL, vorTex } from './lavatone.js?v=11051155';
+import { SNOW_GLSL, SNOW_U } from './snowtone.js?v=11051155';
 
 function bakeNoise(N = 256) {
   const hash = (x, y, p) => { x = ((x % p) + p) % p; y = ((y % p) + p) % p; const s = Math.sin(x * 127.1 + y * 311.7) * 43758.5453; return s - Math.floor(s); };
@@ -41,9 +41,9 @@ export function makeFloorLab() {
   const noise = bakeNoise();
   const ships = Array.from({ length: 2 }, () => new THREE.Vector4(0, 0, 0, 0));
   const mat = new THREE.ShaderMaterial({ depthWrite: true,
-    uniforms: { uN: { value: noise }, uK: { value: 0 }, uT: { value: 0 }, uSun: { value: new THREE.Vector3(-.45, .78, -.42).normalize() }, uShips: { value: ships }, uIV: { value: 0 }, uSG: SNOW_U.uSG, uGate: { value: 0 }, uLF: { value: Array.from({ length: 24 }, () => new THREE.Vector4(0, 0, 0, 0)) }, uLFw: { value: Array.from({ length: 24 }, () => new THREE.Vector2(0, 0)) }, uTr: { value: Array.from({ length: 72 }, () => new THREE.Vector4(0, 0, 0, 0)) }, uTt: { value: new Float32Array(72).fill(-99) }, uDoor: { value: [new THREE.Vector4(), new THREE.Vector4()] } },
+    uniforms: { uVor: { value: vorTex() }, uN: { value: noise }, uK: { value: 0 }, uT: { value: 0 }, uSun: { value: new THREE.Vector3(-.45, .78, -.42).normalize() }, uShips: { value: ships }, uIV: { value: 0 }, uSG: SNOW_U.uSG, uGate: { value: 0 }, uLF: { value: Array.from({ length: 24 }, () => new THREE.Vector4(0, 0, 0, 0)) }, uLFw: { value: Array.from({ length: 24 }, () => new THREE.Vector2(0, 0)) }, uTrail: { value: null }, uTrO: { value: new THREE.Vector3(0, 0, 1) }, uDoor: { value: [new THREE.Vector4(), new THREE.Vector4()] } },
     vertexShader: 'varying vec3 vW; void main(){ vec4 w=modelMatrix*vec4(position,1.); vW=w.xyz; gl_Position=projectionMatrix*viewMatrix*w; }',
-    fragmentShader: `precision highp float; varying vec3 vW; uniform sampler2D uN; uniform float uK, uT; uniform vec3 uSun; uniform vec4 uShips[2]; uniform float uIV; uniform float uGate; uniform vec4 uLF[24]; uniform vec2 uLFw[24]; uniform vec4 uTr[72]; uniform float uTt[72]; uniform vec4 uDoor[2];
+    fragmentShader: `precision highp float; varying vec3 vW; uniform sampler2D uN; uniform float uK, uT; uniform vec3 uSun; uniform vec4 uShips[2]; uniform float uIV; uniform float uGate; uniform vec4 uLF[24]; uniform vec2 uLFw[24]; uniform sampler2D uTrail; uniform vec3 uTrO; uniform vec4 uDoor[2];
       float h2(vec2 p){ p=fract(p*vec2(123.34,456.21)); p+=dot(p,p+45.32); return fract(p.x*p.y); }
       vec4 N4(vec2 p){ return texture2D(uN,p); }
       const vec3 SUN=vec3(1.,.94,.86), SKY=vec3(.42,.48,.62), GND=vec3(.16,.12,.1);
@@ -70,11 +70,8 @@ export function makeFloorLab() {
       ${SNOW_GLSL}
       float gSnow;   /* iceGround가 남기는 '여기가 눈인지' (문턱 처리에 씀) */
       /* 얼음 판 나눔: 가장 가까운 판까지 거리(금까지 거리) + 판 번호 */
-      vec3 vor(vec2 x){ vec2 n=floor(x), f=fract(x), mg=vec2(0.), mr=vec2(0.); float md=8.;
-        for(int j=-1;j<=1;j++) for(int i=-1;i<=1;i++){ vec2 g=vec2(float(i),float(j)); vec2 o=vec2(h2(n+g),h2(n+g+17.3))*.85+.075; vec2 r=g+o-f; float d=dot(r,r); if(d<md){ md=d; mr=r; mg=g; } }
-        md=8.; for(int j=-1;j<=1;j++) for(int i=-1;i<=1;i++){ vec2 g=mg+vec2(float(i),float(j)); vec2 o=vec2(h2(n+g),h2(n+g+17.3))*.85+.075; vec2 r=g+o-f;
-          vec2 dd=r-mr; if(dot(dd,dd)>1e-5) md=min(md,dot(.5*(mr+r),normalize(dd))); }
-        return vec3(md,h2(n+mg+3.1),h2(n+mg+9.7)); }
+      ${LAVA_GLSL}
+      vec3 vor(vec2 x){ return vorB(x); }   /* 구워 둔 판 그림 (lavatone) */
       /* 얼음 땅 (벽과 같은 세상) — 바닥 눈은 없앰(사용자 2026-11-04): 바닥은 얼음판만, 눈은 벽 위·바위·벽 발치 눈밭에만
          · 색은 벽에서 가져옴: 밝은 하늘색 + 하얀 금 + 금 속 푸른 빛 · 모양도 벽처럼 각진 깨진 판 */
       vec3 iceGround(vec2 p, vec3 rd, float edge){
@@ -114,7 +111,6 @@ export function makeFloorLab() {
             vec3 gl=vec3(.12,.55,1.)*band*under*.9*br*endk;                              /* 밝은 얼음 위에서도 보이게: 색을 섞어 바꾸고(더하기만 하면 묻힘) 금은 빛 번짐이 날 만큼 밝게 */
             c=mix(c,c*vec3(.55,.8,1.1)+gl,min(1.,band*.75)); c+=vec3(.6,.9,1.3)*crk*band*1.6*br*endk; } }
         return c; }
-      ${LAVA_GLSL}
       /* 용암 땅 (용암 벽과 같은 세상 · 같은 계산 lavatone.js): 숯빛 현무암 껍질 판(판마다 조금씩 기울고 색이 다름) · 판 사이 금은 뜨거운 곳만 주황으로 빛남(벽 겉 금과 같은 색·박자)
          · 군데군데 녹은 용암 웅덩이: 식은 검은 껍질 판이 떠다니고 그 사이로 끓는 용암 (벽 발치 웅덩이와 같은 모습) · thin = 문턱 얇은 곳일수록 뜨거움
          · 벽 재질은 화면에 낼 때 밝기 변환을 거치므로 바닥 빛은 같은 변환(pow 1/2.2)을 직접 해서 색을 맞춤 */
@@ -198,10 +194,8 @@ export function makeFloorLab() {
         vec3 c=lit(mix(ground,moss,cover),n,rd,.14,16.)*.5;
         vec3 glowC=mix(vec3(.15,.9,.75),vec3(.6,.4,1.),N4(p*.04+.2).r*.8+.1*sin(uT*.3+p.x*.05));
         float idle=(.5+.5*sin(uT*.5+N4(p*.07).g*12.))*.03*hair*thick;                                           /* 평소: 결 끝이 아주 희미하게 숨 쉼 */
-        float wake=0.;
-        for(int i=0;i<72;i++){ float age=uT-uTt[i]; if(age<0.||age>5.) continue; vec4 T=uTr[i]; vec2 ab=T.zw-T.xy, ap=p-T.xy; float k=clamp(dot(ap,ab)/max(dot(ab,ab),1e-4),0.,1.); vec2 d=ap-ab*k; float r2=dot(d,d); if(r2>9.) continue;   /* 지나간 한 토막까지 거리 → 끊김 없는 길 */
-          float fade=pow(1.-age/5.,1.6)*smoothstep(0.,.25,age+.05);                                            /* 깨어났다가 5초에 걸쳐 천천히 꺼짐 */
-          wake=max(wake,exp(-r2/2.2)*fade); }
+        vec2 tu=(p-uTrO.xy)/uTrO.z; float wake=0.;                                                                /* 빛 길 지도(trailmap.js)에서 한 번 읽음 */
+        if(tu.x>0.&&tu.x<1.&&tu.y>0.&&tu.y<1.) wake=pow(texture2D(uTrail,tu).r,1.6);
         /* 빛 길: 결을 따라 번지는 띠 — 가운데 밝고, 가장자리는 털 결 사이로 스며들며 옅어짐 */
         float band=smoothstep(.0,.35,wake), edge=wake*(.35+.65*hair);
         c+=glowC*(idle+band*.06*cover+edge*.42*cover+wake*wake*.12);
