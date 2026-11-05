@@ -12,8 +12,8 @@
    무게: 벽 한 줄 = 그리기 1번 (바위·용암·웅덩이가 한 재질, aF 값으로 용암 자리를 정함) */
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { block } from './ice.js?v=11051020';
-import { LAVA_GLSL } from './lavatone.js?v=11051020';
+import { block } from './ice.js?v=11051029';
+import { LAVA_GLSL } from './lavatone.js?v=11051029';
 
 const hs = (x, y, z) => { const s = Math.sin(x * 127.1 + y * 311.7 + z * 74.7) * 43758.5453; return s - Math.floor(s); };
 const vn = (x, y, z) => { const ix = Math.floor(x), iy = Math.floor(y), iz = Math.floor(z), fx = x - ix, fy = y - iy, fz = z - iz, u = fx * fx * (3 - 2 * fx), v = fy * fy * (3 - 2 * fy), w = fz * fz * (3 - 2 * fz);
@@ -140,13 +140,14 @@ export function makeLavaWall(path, opt = {}) {
     const tris = THREE.ShapeUtils.triangulateShape(ring.map(q => new THREE.Vector2(q[0], q[1])), []);
     for (const [x, y, z] of tris) { const A = pt(i, x), B = pt(i, y), C = pt(i, z), ux = B[0] - A[0], uy = B[1] - A[1], uz = B[2] - A[2], vx = C[0] - A[0], vy = C[1] - A[1], vz = C[2] - A[2];
       const ok = (uy * vz - uz * vy) * tx + (ux * vy - uy * vx) * tz >= 0; ok ? P.push(...A, ...B, ...C) : P.push(...A, ...C, ...B); G.push(.3, .3, .3); F.push(0, 0, 0); } }
+  const BLK = []; for (let i = 0; i <= N; i += 2) { const f = fr[i]; BLK.push({ x: f.x, z: f.z, r: (faceV(f, -1, .3) + faceV(f, 1, .3)) * .5 + .1 }); }   /* 기체가 못 지나가는 자리 */
   const parts = []; { const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(P, 3)); g.setAttribute('aG', new THREE.Float32BufferAttribute(G, 1)); g.setAttribute('aF', new THREE.Float32BufferAttribute(F, 1)); parts.push(prep(g)); }
   const RG = (() => { let s = seed * 104729 + 13; return () => (s = (s * 9301 + 49297) % 233280) / 233280; })();
   /* 바위 뿔: 5모 뿔, 마디마다 크게 어긋나 날카롭게 깨진 바위 */
   const spike = (x, z, y0, hh, r, lx, lz, lean) => { const g = new THREE.CylinderGeometry(r * .05, r, hh, 5, 4).toNonIndexed(), P3 = g.attributes.position;
     for (let j = 0; j < P3.count; j++) { const yy = P3.getY(j) / hh + .5, k = 1 + (hs(Math.round(P3.getX(j) * 40), Math.round(yy * 4), seed) - .5) * .5; P3.setX(j, P3.getX(j) * k); P3.setZ(j, P3.getZ(j) * k * .85); }
     g.translate(0, hh / 2, 0); g.rotateY(RG() * 6); g.applyQuaternion(new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), new THREE.Vector3(lx * lean, 1, lz * lean).normalize()));
-    g.translate(x, y0, z); parts.push(prep(g, .25)); };
+    g.translate(x, y0, z); parts.push(prep(g, .25)); if (y0 < .5) BLK.push({ x, z, r: r * .95 }); };
   /* ② 봉우리 덩어리 위엔 날카로운 바위 뿔 1~2개 (그림의 뾰족한 산꼭대기) */
   for (const q of PK) { const i = Math.round(q.c / len * N), f = fr[Math.min(N, Math.max(0, i))]; if (f.c < .9) continue; const cnt = RG() < .5 ? 1 : 2;
     for (let k = 0; k < cnt; k++) spike(f.x + f.tx * (k - .5) * .7 * (cnt - 1), f.z + f.tz * (k - .5) * .7 * (cnt - 1), f.h + q.h * .6, Hm * (.45 + RG() * .45) / (k + 1), .45 + RG() * .2, f.nx * (RG() - .5), f.nz * (RG() - .5), .25); }
@@ -157,7 +158,7 @@ export function makeLavaWall(path, opt = {}) {
   /* ⑤ 발치: 무너져 내린 큰 바위 (앞쪽 많이 · 폭포 바로 앞은 비움) */
   const rock = (d, v, s) => { const i = Math.round(d / len * N), f = fr[Math.min(N, Math.max(0, i))]; if (v < 0 && fallV(d) > .2) return;
     const g = block(seed * 31 + Math.floor(d * 7)).clone(), sy = s * (.8 + R() * .5); g.scale(s * (1 + R() * .5), sy, s * (.8 + R() * .4)); g.rotateY(R() * 6);
-    g.translate(f.x + f.nx * v, sy * .25, f.z + f.nz * v); parts.push(prep(g, .2)); };
+    g.translate(f.x + f.nx * v, sy * .25, f.z + f.nz * v); parts.push(prep(g, .2)); if (s > .3) BLK.push({ x: f.x + f.nx * v, z: f.z + f.nz * v, r: s * .9 }); };
   for (let d = .6 + R(); d < len - .4; d += .8 + R() * 1.9) { const big = R() < .4; rock(d, -(W * 1.5 + .4 + R() * (big ? 1.2 : 2.4)), big ? .7 + R() * .8 : .2 + R() * .35); }
   for (let d = 1 + R() * 2; d < len - .5; d += 2.5 + R() * 4) rock(d, W * 1.5 + .5 + R(), .3 + R() * .5);
   /* ⑤ 발치 용암 웅덩이: 벽 밑동에서 앞으로 들쭉날쭉 · 폭포 앞이 가장 넓고 뜨거움 · 바깥 끝은 바닥 아래로 스며 들어감 */
@@ -170,6 +171,6 @@ export function makeLavaWall(path, opt = {}) {
       if (!FL) { Q.push(...a, ...b, ...c, ...b, ...d, ...c); Fq.push(la, lb, lc, lb, ld, lc); } else { Q.push(...a, ...c, ...b, ...b, ...c, ...d); Fq.push(la, lc, lb, lb, lc, ld); } Gq.push(0, 0, 0, 0, 0, 0); }
     const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(Q, 3)); g.setAttribute('aG', new THREE.Float32BufferAttribute(Gq, 1)); g.setAttribute('aF', new THREE.Float32BufferAttribute(Fq, 1)); parts.push(prep(g)); }
   const grp = new THREE.Group(); grp.add(new THREE.Mesh(mergeGeometries(parts), mat));
-  grp.userData = { mat, len, falls: FALLS };
+  grp.userData = { mat, len, falls: FALLS, blockers: BLK };
   return grp;
 }
