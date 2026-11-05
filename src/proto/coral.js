@@ -5,7 +5,7 @@
      가지에도 끝 쪽으로 빛이 살짝 번진다. */
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { HITS } from './rocks.js?v=11051047';
+import { HITS } from './rocks.js?v=11051101';
 
 const rng = seed => { let s = seed * 9301 + 49297; return () => (s = (s * 9301 + 49297) % 233280) / 233280; };
 
@@ -94,13 +94,13 @@ export function makeCoralRidge(path, opt = {}) {
    ② 산호 세 줄: 가운데 줄은 크게, 앞뒤 줄은 작게 비스듬히 겹쳐 자람 · 높낮이는 길게 오르내리는 물결(높게 솟은 무리 / 낮게 퍼진 곳)
    ③ 문 양옆: 가장 크게 자란 산호 둘 + 둘레에 작은 산호
    ④ 벽 주변: 떨어져 자란 작은 산호 무리 · 바닥에 굴러다니는 산호 조각(낮아서 기체가 넘어감) */
-import { block } from './ice.js?v=11051047';
+import { block } from './ice.js?v=11051101';
 export function makeCoralWall(path, opt = {}) {
   const uT = opt.uT || { value: 0 }, mat = opt.mat || coralMaterial(uT), geos = opt.geos || [1, 2, 3, 4, 5, 6].map(s => coral(s)), R = rng(opt.seed || 41), doors = opt.doors || [true, true];
   const curve = new THREE.CatmullRomCurve3(path.map(p => new THREE.Vector3(p[0], 0, p[1])), false, 'centripetal'), len = curve.getLength();
   const at = d => { const u = Math.min(1, Math.max(0, d / len)), p = curve.getPointAt(u), t = curve.getTangentAt(u); return { p, t, nx: -t.z, nz: t.x }; };
-  const ph = R() * 9, wave = d => .78 + .22 * Math.sin(d * .23 + ph) + .14 * Math.sin(d * .61 + ph * 1.7);
-  const endK = d => { const ds = doors[0] ? 9 : d, de = doors[1] ? 9 : len - d; return Math.min(1, .45 + Math.min(ds, de) / 3); };   /* 문 없는 끝은 낮게 잦아듦 */
+  const ph = R() * 9, wave = d => .9 + .16 * Math.sin(d * .23 + ph) + .08 * Math.sin(d * .61 + ph * 1.7);   /* 사용자: 산호가 비는 곳은 길로 착각 → 가장 낮은 곳도 빽빽 (키 차이만) */
+  const endK = d => { const ds = doors[0] ? 9 : d, de = doors[1] ? 9 : len - d; return Math.min(1, .7 + Math.min(ds, de) / 4); };   /* 문 없는 끝은 낮게 잦아듦 */
   const cs = [], tg = [], BLK = [];
   const add = (x, z, s, d) => { cs.push({ g: Math.floor(R() * geos.length), x, z, s, yaw: R() * 6.28, tilt: [(R() - .5) * .25, (R() - .5) * .25] }); tg.push({ x, y: s * 1.2, z, r: s * .5 }); BLK.push({ x, z, r: s * .42, top: s * 2.2 }); };
   /* ② 가운데 큰 줄 · 앞뒤 작은 줄 */

@@ -4,8 +4,8 @@
    · 멀어질수록 깊은 색으로 가라앉힘 (가까운 싸움터가 또렷하게)
    0 금속 판 · 1 이끼 낀 암반 · 2 결정 섞인 모래 · 3 은은한 평지 · 4 보스존 별빛 우주(보이지 않는 유리 바닥 + 아래로 깊은 별 세 겹) */
 import * as THREE from 'three';
-import { LAVA_GLSL } from './lavatone.js?v=11051047';
-import { SNOW_GLSL, SNOW_U } from './snowtone.js?v=11051047';
+import { LAVA_GLSL } from './lavatone.js?v=11051101';
+import { SNOW_GLSL, SNOW_U } from './snowtone.js?v=11051101';
 
 function bakeNoise(N = 256) {
   const hash = (x, y, p) => { x = ((x % p) + p) % p; y = ((y % p) + p) % p; const s = Math.sin(x * 127.1 + y * 311.7) * 43758.5453; return s - Math.floor(s); };
@@ -41,9 +41,9 @@ export function makeFloorLab() {
   const noise = bakeNoise();
   const ships = Array.from({ length: 2 }, () => new THREE.Vector4(0, 0, 0, 0));
   const mat = new THREE.ShaderMaterial({ depthWrite: true,
-    uniforms: { uN: { value: noise }, uK: { value: 0 }, uT: { value: 0 }, uSun: { value: new THREE.Vector3(-.45, .78, -.42).normalize() }, uShips: { value: ships }, uIV: { value: 0 }, uSG: SNOW_U.uSG, uGate: { value: 0 }, uDoor: { value: [new THREE.Vector4(), new THREE.Vector4()] } },
+    uniforms: { uN: { value: noise }, uK: { value: 0 }, uT: { value: 0 }, uSun: { value: new THREE.Vector3(-.45, .78, -.42).normalize() }, uShips: { value: ships }, uIV: { value: 0 }, uSG: SNOW_U.uSG, uGate: { value: 0 }, uTr: { value: Array.from({ length: 72 }, () => new THREE.Vector4(0, 0, 0, 0)) }, uTt: { value: new Float32Array(72).fill(-99) }, uDoor: { value: [new THREE.Vector4(), new THREE.Vector4()] } },
     vertexShader: 'varying vec3 vW; void main(){ vec4 w=modelMatrix*vec4(position,1.); vW=w.xyz; gl_Position=projectionMatrix*viewMatrix*w; }',
-    fragmentShader: `precision highp float; varying vec3 vW; uniform sampler2D uN; uniform float uK, uT; uniform vec3 uSun; uniform vec4 uShips[2]; uniform float uIV; uniform float uGate; uniform vec4 uDoor[2];
+    fragmentShader: `precision highp float; varying vec3 vW; uniform sampler2D uN; uniform float uK, uT; uniform vec3 uSun; uniform vec4 uShips[2]; uniform float uIV; uniform float uGate; uniform vec4 uTr[72]; uniform float uTt[72]; uniform vec4 uDoor[2];
       float h2(vec2 p){ p=fract(p*vec2(123.34,456.21)); p+=dot(p,p+45.32); return fract(p.x*p.y); }
       vec4 N4(vec2 p){ return texture2D(uN,p); }
       const vec3 SUN=vec3(1.,.94,.86), SKY=vec3(.42,.48,.62), GND=vec3(.16,.12,.1);
@@ -149,18 +149,28 @@ export function makeFloorLab() {
         if(miss>.5){ float gr=N4(p*2.3).a*.6+N4(p*.8).g*.4, gv=smoothstep(.6,.75,N4(p*4.1).b); base=mix(vec3(.035,.028,.022),vec3(.075,.064,.054),gr)*(.75+.5*gv); n=normalize(vec3((N4(p*2.).b-.5)*.4,1.,(N4(p*2.+.5).b-.5)*.4)); base*=smoothstep(.0,.15,e)*.5+.5; }
         else if(hid>.96){ vec2 c=vec2(fx-.5,fy-.5)*vec2(sl,rw); float r=length(c), g=smoothstep(.05,.02,abs(r-.32))+smoothstep(.04,.015,abs(r-.18)); base*=1.-g*.6; }   /* 새긴 문양 고리 */
         return lit(base,n,rd,.08,18.)*.45; }
-      /* 산호 바닥: 산호와 같은 색 세상 — 어두운 청록 바닥(물 밑 모래처럼 고운 물결) · 군데군데 산호 부스러기(뿌리 청록~끝 보라 점)
-         · 성운 안개 얼룩: 낮게 깔린 청록·보라 빛 안개가 아주 천천히 흘러감 (빛은 은은하게, 탄보다 훨씬 어둡게) */
+      /* 산호 바닥 = 우주 이끼 들판 (사용자 2026-11-05: 신비로운 느낌 · 우주 식물 · 지나가면 은은히 빛났다 사라짐)
+         · 작은 우주 이끼가 촘촘히 덮임: 포기마다 끝이 아주 희미하게 숨 쉬듯 빛남(포기마다 박자 다름)
+         · 기체가 지나간 자리(uTr: x,z,지난 시각)의 이끼가 깨어나 청록·보라로 빛나고 5초에 걸쳐 천천히 꺼짐 → 빛나는 길이 남음
+           모두 같은 색 · 숨은 기체도 길은 남김(기체는 안 보여도 지나간 길은 보임 → 쫓아가는 재미)
+         · 그 위로 아주 크고 옅은 성운 안개가 천천히 흐름 */
       vec3 coralGround(vec2 p, vec3 rd){
-        vec2 wd=normalize(vec2(.6,.8)); float rip=sin(dot(p,wd)*2.1+N4(p*.06).r*7.)*.5+.5;
-        vec3 n=normalize(vec3(-wd.x*(rip-.5)*.08+(N4(p*.5).b-.5)*.06,1.,-wd.y*(rip-.5)*.08+(N4(p*.5+.3).b-.5)*.06));
-        vec3 base=mix(vec3(.018,.05,.055),vec3(.035,.03,.06),N4(p*.04).g)*(.75+.5*N4(p*.25).a);
-        vec2 q=p*2.2; vec2 id=floor(q); float h=h2(id);
-        if(h>.9){ vec2 f=fract(q)-.5-vec2(h2(id+1.)-.5,h2(id+2.)-.5)*.5; float r=length(f*vec2(1.,1.6)); float k=smoothstep(.16,.08,r);
-          base=mix(base,mix(vec3(.02,.09,.09),vec3(.08,.045,.12),h2(id+3.)),k); }                         /* 산호 부스러기 */
-        vec3 c=lit(base,n,rd,.12,24.)*.55;
-        float m1=smoothstep(.62,.85,N4(p*.03+vec2(uT*.004,uT*.002)).r), m2=smoothstep(.6,.85,N4(p*.05-vec2(uT*.003,0.)).g);
-        c+=vec3(.02,.09,.08)*m1*.22+vec3(.07,.03,.1)*m2*.18;                                                   /* 성운 안개 */
+        vec3 base=mix(vec3(.012,.035,.04),vec3(.028,.02,.045),N4(p*.04).g)*(.7+.6*N4(p*.25).a);
+        vec2 q=p*3.4; vec2 id=floor(q); vec2 f=fract(q)-.5-vec2(h2(id)-.5,h2(id+1.)-.5)*.5; float h=h2(id+2.);
+        float tuft=smoothstep(.34,.1,length(f))*(.55+.45*h);                                                  /* 이끼 포기 */
+        float tip=smoothstep(.12,.0,length(f))*step(.35,h);                                                     /* 포기 끝 빛 점 */
+        vec3 n=normalize(vec3(f.x*tuft*.9+(N4(p*.6).b-.5)*.08,1.,f.y*tuft*.9+(N4(p*.6+.3).b-.5)*.08));
+        vec3 moss=mix(vec3(.02,.075,.07),vec3(.06,.035,.09),h2(id+5.));
+        vec3 c=lit(mix(base,moss,tuft*.8),n,rd,.1,20.)*.5;
+        vec3 glowC=mix(vec3(.15,.9,.75),vec3(.6,.4,1.),h2(id+7.)*.8+.1*sin(uT*.3+p.x*.05));
+        float idle=(.5+.5*sin(uT*(.6+h*.9)+h*40.))*.05;                                                         /* 평소: 아주 희미하게 숨 쉼 */
+        float wake=0.;
+        for(int i=0;i<72;i++){ float age=uT-uTt[i]; if(age<0.||age>5.) continue; vec4 T=uTr[i]; vec2 ab=T.zw-T.xy, ap=p-T.xy; float k=clamp(dot(ap,ab)/max(dot(ab,ab),1e-4),0.,1.); vec2 d=ap-ab*k; float r2=dot(d,d); if(r2>9.) continue;   /* 지나간 한 토막(이전 자리 → 이 자리)까지 거리 → 끊김 없는 길 */
+          float fade=pow(1.-age/5.,1.6)*smoothstep(0.,.25,age+.05);                                            /* 깨어났다가 5초에 걸쳐 천천히 꺼짐 */
+          wake=max(wake,exp(-r2/2.2)*fade); }
+        c+=glowC*(tip*(idle+wake*1.6)+tuft*wake*.55+wake*.09);
+        float m1=smoothstep(.5,.85,N4(p*.012+vec2(uT*.002,uT*.001)).r), m2=smoothstep(.55,.9,N4(p*.018-vec2(uT*.0015,0.)).g);
+        c+=vec3(.015,.07,.065)*m1*.35+vec3(.055,.025,.08)*m2*.3;                                               /* 크고 옅은 성운 안개 */
         return c; }
       void main(){
         vec3 ro=cameraPosition, rd=normalize(vW-ro); vec2 p=vW.xz; float dist=length(p-ro.xz); vec3 c;
