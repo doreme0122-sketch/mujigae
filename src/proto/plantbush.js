@@ -35,7 +35,7 @@ export function makePlantBush(rect, kind, uT, R) {
     e.set(0, yaw, 0, 'YXZ'); q.setFromEuler(e); const q2 = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), lean); q.multiply(q2);
     m4.compose(p3.set(bx, -.05, bz), q, s3.set(w, h, w)); L.setMatrixAt(i, m4);
     const tip = new THREE.Vector3(0, h * .92, 0).applyQuaternion(q).add(p3); if (sp.leaf === 'broad') tips.push(tip); }
-  const leafMat = new THREE.ShaderMaterial({ side: THREE.DoubleSide, transparent: true, depthWrite: true,
+  const leafMat = new THREE.ShaderMaterial({ side: THREE.DoubleSide, transparent: false, depthWrite: true,   /* 불투명으로 그림: 겹친 잎을 다 섞어 그리면 탭에서 40프레임까지 떨어짐(사용자 2026-11-05) → 반투명은 점무늬로 구멍을 뚫어 흉내 */
     uniforms: { uT, uIn, uShip, uA: { value: new THREE.Vector3(...sp.col[0]) }, uB: { value: new THREE.Vector3(...sp.col[1]) }, uF: { value: sp.leaf === 'feather' ? 1 : 0 }, uSun: { value: new THREE.Vector3(-.45, .78, -.42).normalize() } },
     vertexShader: `uniform float uT; uniform vec3 uShip; varying vec2 vUv; varying vec3 vN, vW; varying float vS;
       void main(){ vUv=uv; vec3 p=position; float t=uv.y; vS=fract(instanceMatrix[3].x*1.37+instanceMatrix[3].z*.91);
@@ -55,7 +55,8 @@ export function makePlantBush(rect, kind, uT, R) {
         float dif=abs(dot(normalize(vN),uSun));
         vec3 c=base*(.35+.4*dif)+base*smoothstep(.4,1.,t)*.5+mix(uB,vec3(.6,.95,1.),.5)*(mid*1.4+side*1.)+uB*net*.12*(.55+.45*sin(uT*1.1+t*4.-vS*9.));   /* 잎맥이 또렷이 빛남 */   /* 잎맥에 빛이 흐름 */
         c+=mix(uA,uB,.5)*pow(1.-abs(dot(normalize(vN),normalize(cameraPosition-vW))),2.)*.25;                                 /* 반투명한 가장자리 */
-        gl_FragColor=vec4(c,(.92-.25*smoothstep(.3,.5,abs(u)))*(1.-uIn*.6)); }` });
+        float al=(.92-.25*smoothstep(.3,.5,abs(u)))*(1.-uIn*.6); if(fract(dot(floor(gl_FragCoord.xy),vec2(.5,.75)))*1.02>al) discard;   /* 점무늬 반투명 (화면 칸마다 뚫음) */
+        gl_FragColor=vec4(c,1.); }` });
   L.material = leafMat; mats.push(leafMat); grp.add(L); }
   /* ── 봉오리 · 버섯 ── */
   const bulbs = [];
@@ -65,7 +66,7 @@ export function makePlantBush(rect, kind, uT, R) {
     const cap = new THREE.SphereGeometry(1, 12, 6, 0, 6.29, 0, Math.PI * .5); cap.scale(1, .5, 1); const stem = new THREE.CylinderGeometry(.12, .16, 1, 6, 1, true); stem.translate(0, .5, 0); cap.translate(0, 1, 0);
     const mk = (geo, list, tp) => { if (!list.length) return; const im = new THREE.InstancedMesh(geo, null, list.length); list.forEach((b, j) => { const h = tp ? (1.6 + R()) * cfg.tall : 1;
         m4.compose(p3.set(b.x, -.05, b.z), q.setFromEuler(e.set((R() - .5) * .3, R() * 6.28, (R() - .5) * .3)), s3.set(b.s, b.s * h, b.s)); im.setMatrixAt(j, m4); }); return im; };
-    const bMat = (tp) => new THREE.ShaderMaterial({ transparent: true, side: THREE.DoubleSide, uniforms: { uT, uIn, uTp: { value: tp } },
+    const bMat = (tp) => new THREE.ShaderMaterial({ transparent: false, side: THREE.DoubleSide, uniforms: { uT, uIn, uTp: { value: tp } },
       vertexShader: `uniform float uT, uTp; varying vec3 vP, vN, vW; varying float vS;
         void main(){ vS=fract(instanceMatrix[3].x*2.1+instanceMatrix[3].z*1.3); vec3 p=position;
           if(uTp>1.5){ float k=.92+.08*sin(uT*1.3+vS*20.); p.xz*=k; p.y=1.+(p.y-1.)*(2.-k); }                       /* 갓이 숨 쉬듯 오므렸다 폄 */
@@ -81,7 +82,7 @@ export function makePlantBush(rect, kind, uT, R) {
             vec3 d=normalize(vP-vec3(0.,1.,0.)); float spot=smoothstep(.16,.08,length(fract(vec2(atan(d.z,d.x)*1.6,d.y*3.)+vS)-.5))*(1.-under);   /* 갓 위 빛 점 */
             float rim=smoothstep(.3,.0,abs(vP.y-1.03))*.8;                                                              /* 갓 가장자리 빛 테 */
             c=mix(vec3(.08,.12,.32),vec3(.25,.08,.4),vS)*(.4+.7*pow(1.-ndv,1.5))+vec3(.3,1.,.9)*(gill*1.3+under*.35+rim)*(.7+.3*sin(uT*1.3+vS*20.))+vec3(.6,.9,1.)*spot*.6; a=.86; }
-          gl_FragColor=vec4(c,a*(1.-uIn*.6)); }` });
+          float al=a*(1.-uIn*.6); if(fract(dot(floor(gl_FragCoord.xy),vec2(.5,.75)))*1.02>al) discard; gl_FragColor=vec4(c,1.); }` });
     const P = mk(pod, bulbs.filter(b => !b.type), 0); if (P) { P.material = bMat(0); mats.push(P.material); grp.add(P); }
     const sh = bulbs.filter(b => b.type); const St = mk(stem, sh, 1), Cp = mk(cap, sh, 1); if (St) { St.material = bMat(1); Cp.material = bMat(2); mats.push(St.material, Cp.material); grp.add(St, Cp); } }
   /* ── 잎 끝 빛 방울 줄기 (A) ── 가는 세로 띠, 빛 방울이 천천히 흘러내림 */
