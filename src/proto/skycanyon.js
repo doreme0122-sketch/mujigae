@@ -264,8 +264,21 @@ export function makeSkyCanyon(uT, sun) {
     highM.material.fragmentShader = 'uniform float uA;\n' + highM.material.fragmentShader; highM.frustumCulled = false; highM.renderOrder = 6; grp.add(highM);
     for (let i = 0; i < N; i++) HIGH.push({ x: (R() - .5) * AX * 2.3, z: (R() - .5) * AZ * 2.3, y: 4 + R() * 3, w: 12 + R() * 14, d: 7 + R() * 8, v: 1.2 + R() * .8 }); }
 
+  /* ── 숨는 구름 (사용자 2026-11-05: 기체 위의 진한 구름을 숨을 곳으로 · 따로 덤불 없이 불규칙하게 많이 · 매번 바뀌게)
+     기체 바로 위(1.5~3m)에 진한 구름 덩이 · 판마다 자리·모양이 새로 정해지고, 바람 따라 천천히 흘러감(숨으려면 같이 움직여야 함)
+     들어가면 내 화면에선 그 구름이 옅어져 내 기체가 보임 · 밖에선 안 보임 */
+  const HC = [], HR = Math.random, wind = HR() * 6.28, wx = Math.cos(wind), wz = Math.sin(wind);
+  for (let i = 0; i < 16; i++) { const cx0 = (HR() - .5) * (AX * 2 - 20), cz0 = (HR() - .5) * (AZ * 2 - 14), np = 5 + Math.floor(HR() * 6), puffs = [], sz = 3.5 + HR() * 3.5, ang = HR() * 3.14, el = 1 + HR() * 1.2;
+    for (let k = 0; k < np; k++) { const t = (k / (np - 1) - .5) * 2, ox = Math.cos(ang) * t * sz * el + (HR() - .5) * sz * .7, oz = Math.sin(ang) * t * sz * el + (HR() - .5) * sz * .7; puffs.push({ ox, oz, oy: FLYH + 1.6 + HR() * 1.4, r: sz * (.55 + HR() * .45) * (1 - Math.abs(t) * .3) }); }
+    const mat = puffMat(uT, uN); mat.uniforms.uIn = { value: 0 }; mat.uniforms.uDen = { value: 1 };
+    mat.fragmentShader = mat.fragmentShader.replace('uniform float uT;', 'uniform float uT, uIn, uDen;').replace('gl_FragColor=vec4(c,a*.55); }', 'c=mix(c,vec3(.92,.92,1.),.25); gl_FragColor=vec4(c,a*mix(.93,.1,uIn)*uDen); }');   /* 진하게 · 안에 있으면 옅게 */
+    const im = new THREE.InstancedMesh(new THREE.PlaneGeometry(1, 1), mat, np); im.frustumCulled = false; im.renderOrder = 7; grp.add(im);
+    HC.push({ x: cx0, z: cz0, puffs, im, mat, v: .45 + HR() * .4, k: 0 }); }
+  const hideAt = (x, z) => { for (let i = 0; i < HC.length; i++) { const c = HC[i]; for (const p of c.puffs) { const dx = x - (c.x + p.ox), dz = z - (c.z + p.oz); if (dx * dx + dz * dz < (p.r * .62) ** 2) return i; } } return -1; };
+  let insideH = -1;
+
   return {
-    mesh: grp, blockers, roles,
+    mesh: grp, blockers, roles, hideAt, setInside: i => { insideH = i; },
     /* 기체가 있는 자리의 쓰임새 */
     zoneAt: (x, z, vx = 0, vz = 0) => { const I = islandAt(x, z); if (!I || !I.role) return null;
       if (I.role === 'cloud') return Math.hypot(x - I.x, z - I.z) < I.cloudR ? 'cloud' : null;
@@ -289,6 +302,10 @@ export function makeSkyCanyon(uT, sun) {
       nearM.instanceMatrix.needsUpdate = true;
       for (let i = 0; i < HIGH.length; i++) { const c = HIGH[i]; c.x += c.v * dt; if (c.x > AX * 1.15) c.x -= AX * 2.3; qq.identity(); m4.compose(vv.set(c.x, c.y, c.z), qq, ss.set(c.w, 1, c.d)); highM.setMatrixAt(i, m4); }
       highM.instanceMatrix.needsUpdate = true;
+      for (let i = 0; i < HC.length; i++) { const c = HC[i]; c.x += wx * c.v * dt; c.z += wz * c.v * dt;
+        if (c.x > AX) c.x -= AX * 2; if (c.x < -AX) c.x += AX * 2; if (c.z > AZ) c.z -= AZ * 2; if (c.z < -AZ) c.z += AZ * 2;   /* 맵 끝을 넘으면 반대편에서 다시 들어옴 */
+        c.k += ((insideH === i ? 1 : 0) - c.k) * Math.min(1, dt * 4); c.mat.uniforms.uIn.value = c.k;
+        c.puffs.forEach((p, k) => { const br = 1 + .04 * Math.sin(t * .7 + k * 1.3 + i); m4.compose(vv.set(c.x + p.ox, p.oy, c.z + p.oz), qq.identity(), ss.set(p.r * 2 * br, p.r * 1.5 * br, 1)); c.im.setMatrixAt(k, m4); }); c.im.instanceMatrix.needsUpdate = true; }
       for (const A of anim) { A.m.rotation.y += A.spin * dt; if (A.bob != null) A.m.position.y = A.bob + Math.sin(t * 1.4) * .35; } } };
 }
 const FLYH = .7, v0 = new THREE.Vector3();
