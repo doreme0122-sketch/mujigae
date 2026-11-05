@@ -10,9 +10,9 @@
    무게: 기체 한 대 + 불꽃 띠 몇 장 + 꼬리 띠 하나 + 불티 점 묶음 하나 + 그림자 판 하나 */
 import * as THREE from 'three';
 import { buildShip, engineSpots } from '../core/ships/build.js';
-import { flameMesh } from './sortie.js?v=11051709';
-import { MAP } from './mapfloor.js?v=11051709';
-import { applyShipHeat, heatVis } from './shipheat.js?v=11051709';
+import { flameMesh } from './sortie.js?v=11051730';
+import { MAP } from './mapfloor.js?v=11051730';
+import { applyShipHeat, heatVis } from './shipheat.js?v=11051730';
 
 export const FLY = { LEN: 2, HOVER: .7, R: .8, SPEEDS: [9, 12, 15, 18], TURN: 7, ACC: .22, TURNMAX: 9,
   BASE: 9, SHIELD: 3, BOOST: 5, BOOSTK: 1.5 };   /* 기지 고리(반지름 9m)를 벗어나는 순간: 보호막 3초 · 가속 5초(1.5배) — 기지 출구 앞 매복에 바로 당하지 않게 */
@@ -98,9 +98,20 @@ export async function makeFlight(renderer, B, start, face) {
   const heatFx = applyShipHeat(ship, { value: 0 });                                                   /* 과열: 기체 금속이 총구부터 달아오름 (시안 B) */
   const mats = []; ship.traverse(o => { if (o.isMesh) (Array.isArray(o.material) ? o.material : [o.material]).forEach(m => { if (!mats.includes(m)) mats.push(m); }); });
   let ghost = 0, ghostT = 0;
+  /* 숨은 내 기체: 화면 점을 고른 점무늬로 비워 비쳐 보이게 (사용자 2026-11-05: 무지개 결 재질을 통째로 반투명으로 바꾸면 탭에서 40프레임 → 불투명 그대로 두고 점만 비움)
+     · 4×4 고른 점무늬라 서서히 옅어지고 짙어짐 · 최대 약 55%를 비워 기체 모양은 또렷이 남음 */
+  const uGhost = { value: 0 };
+  for (const m of mats) { const ob = m.onBeforeCompile, ok = m.customProgramCacheKey;
+    m.onBeforeCompile = (sh, r) => { if (ob) ob.call(m, sh, r); sh.uniforms.uGhost = uGhost;
+      sh.fragmentShader = sh.fragmentShader.replace('void main() {', `uniform float uGhost;
+float gB2(vec2 a){ a=floor(a); return fract(dot(a,vec2(.5,a.y*.75))); }
+float gB4(vec2 a){ return gB2(.5*a)*.25+gB2(a); }
+void main() {
+  if(uGhost>.002 && gB4(gl_FragCoord.xy)+.03<uGhost*.55) discard;`); };
+    m.customProgramCacheKey = () => (ok ? ok.call(m) : '') + '|ghost'; m.needsUpdate = true; }
   G.userData.setGhost = on => { ghostT = on ? 1 : 0; };
   const applyGhost = dt => { const g0 = ghost; ghost += (ghostT - ghost) * Math.min(1, dt * 6); if (Math.abs(ghost - g0) < 1e-4 && (ghost < .001 || ghost > .999)) return;
-    const op = 1 - ghost * .62; for (const m of mats) { m.transparent = op < .999; m.opacity = op; m.depthWrite = op > .999; } flames.forEach(f => f.visible = op > .6); };
+    uGhost.value = ghost; flames.forEach(f => f.visible = ghost < .65); };
   G.userData.S = S;
   G.userData.reset = () => { S.x = start[0]; S.z = start[1]; S.vx = S.vz = 0; S.head = S.mh = face; hist.length = 0; S.armed = true; S.shield = S.boost = S.pop = 0; };
   G.userData.moveTo = (x, z, h) => { S.x = x; S.z = z; S.vx = S.vz = 0; if (h != null) S.head = S.mh = h; hist.length = 0; S.armed = false; };   /* 시험장: 다른 자리로 옮김 (꼬리 자국은 지움) */
