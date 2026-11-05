@@ -14,8 +14,8 @@ const TH = {
   coral: { core: [.01, .03, .035], lit: [.05, .16, .16], under: [0, 0, 0], dens: .35, hgt: .7, bits: 'moss' } };
 
 /* 숨는 자리 = 곧은 변의 네모 (사용자 2026-11-05: 곡선 테두리는 경계가 애매) — [가운데 x, z, 반 길이, 반 폭, 각도] */
-const inRect = ([cx, cz, hl, hw, a], x, z, m = 0) => { const dx = x - cx, dz = z - cz, u = dx * Math.cos(a) + dz * Math.sin(a), v = -dx * Math.sin(a) + dz * Math.cos(a); return Math.abs(u) < hl - m && Math.abs(v) < hw - m; };
-const sampleRect = ([cx, cz, hl, hw, a], R, m) => { const u = (R() * 2 - 1) * Math.max(.1, hl - m), v = (R() * 2 - 1) * Math.max(.1, hw - m); return [cx + u * Math.cos(a) - v * Math.sin(a), cz + u * Math.sin(a) + v * Math.cos(a)]; };
+export const inRect = ([cx, cz, hl, hw, a], x, z, m = 0) => { const dx = x - cx, dz = z - cz, u = dx * Math.cos(a) + dz * Math.sin(a), v = -dx * Math.sin(a) + dz * Math.cos(a); return Math.abs(u) < hl - m && Math.abs(v) < hw - m; };
+export const sampleRect = ([cx, cz, hl, hw, a], R, m) => { const u = (R() * 2 - 1) * Math.max(.1, hl - m), v = (R() * 2 - 1) * Math.max(.1, hw - m); return [cx + u * Math.cos(a) - v * Math.sin(a), cz + u * Math.sin(a) + v * Math.cos(a)]; };
 /* 가스(안개·연기·먼지): 바라보는 쪽을 향한 판을 겹겹이 */
 function gas(lobes, th, noise, R) {
   const D = [];
@@ -111,8 +111,8 @@ function bits(lobes, th, R) {
 
 /* 발밑 경계 표시: 숨는 자리 테두리를 땅에 옅게 (그 땅의 흔적 색) · 내 기체가 안에 있으면 밝아짐 */
 /* 경계 테두리: 들어가 있을 때만 보임 (사용자 2026-11-05: 안 들어갔는데 테두리가 있으면 안 됨) */
-const RING = { ice: [.75, .9, 1.], lava: [.9, .35, .1], ruin: [.7, .6, .42], coral: [.3, 1., .85] };
-function ring(rc, theme) { const [cx, cz, hl, hw, an] = rc, pad = 1;
+const RING = { plant: [.55, .7, 1.], ice: [.75, .9, 1.], lava: [.9, .35, .1], ruin: [.7, .6, .42], coral: [.3, 1., .85] };
+export function ring(rc, theme) { const [cx, cz, hl, hw, an] = rc, pad = 1;
   const g = new THREE.PlaneGeometry((hl + pad) * 2, (hw + pad) * 2); g.rotateX(-Math.PI / 2); g.rotateY(-an); g.translate(cx, .04, cz);
   const mat = new THREE.ShaderMaterial({ transparent: true, depthWrite: false, depthTest: false, uniforms: { uR: { value: new THREE.Vector4(cx, cz, hl, hw) }, uA: { value: an }, uC: { value: new THREE.Vector3(...RING[theme]) }, uIn: { value: 0 }, uT: { value: 0 } },
     vertexShader: 'varying vec2 vP; void main(){ vec4 w=modelMatrix*vec4(position,1.); vP=w.xz; gl_Position=projectionMatrix*viewMatrix*w; }',
