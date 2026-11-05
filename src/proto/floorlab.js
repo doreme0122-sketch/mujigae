@@ -4,8 +4,8 @@
    · 멀어질수록 깊은 색으로 가라앉힘 (가까운 싸움터가 또렷하게)
    0 금속 판 · 1 이끼 낀 암반 · 2 결정 섞인 모래 · 3 은은한 평지 · 4 보스존 별빛 우주(보이지 않는 유리 바닥 + 아래로 깊은 별 세 겹) */
 import * as THREE from 'three';
-import { LAVA_GLSL, vorTex } from './lavatone.js?v=11051438';
-import { SNOW_GLSL, SNOW_U } from './snowtone.js?v=11051438';
+import { LAVA_GLSL, vorTex } from './lavatone.js?v=11051443';
+import { SNOW_GLSL, SNOW_U } from './snowtone.js?v=11051443';
 
 function bakeNoise(N = 256) {
   const hash = (x, y, p) => { x = ((x % p) + p) % p; y = ((y % p) + p) % p; const s = Math.sin(x * 127.1 + y * 311.7) * 43758.5453; return s - Math.floor(s); };
@@ -51,12 +51,19 @@ export function makeFloorLab() {
       vec3 lit(vec3 base, vec3 n, vec3 rd, float spec, float sh){ float d=max(dot(n,uSun),0.); vec3 amb=mix(GND,SKY,n.y*.5+.5)*.55;
         vec3 hv=normalize(uSun-rd); float s=pow(max(dot(n,hv),0.),sh)*spec; return base*(amb+SUN*d*1.05)+SUN*s; }
       /* 별 한 겹: 시선이 깊이 D 판에 닿는 자리의 칸마다 별 하나 (있을 수도 없을 수도) */
+      /* 별 한 겹 (사용자 2026-11-05: 별이 선명하지 않고 네모로 번짐 · 너무 누렇다)
+         · 네모 번짐 원인: 별 둘레 빛 번짐이 칸 경계에서 잘림 → 번짐은 칸 안에서 0이 되게 (칸 가장자리까지 남은 거리로 줄임)
+         · 선명하게: 별 심은 작고 또렷하게, 너무 작아 화면 점보다 작아지면 화면 점 크기로 맞추고 밝기는 그만큼 나눔(반짝이며 깨지지 않게)
+         · 색: 흰색 · 분홍빛 흰색 · 파란빛 흰색 · 아주 드물게 옅은 금빛 (모두 흰색에 가까운 맑은 빛) */
       vec3 starLayer(vec3 ro, vec3 rd, float D, float cs, float th, float br, float seed){
         vec2 q=ro.xz+rd.xz*((ro.y+D)/max(-rd.y,.05)); vec2 g=floor(q/cs), f=q/cs-g; float h=h2(g+seed);
-        if(h<th) return vec3(0.); vec2 o=vec2(h2(g*1.7+seed),h2(g*2.3-seed))*.7+.15; float d=length(f-o)*cs;
-        float tw=.65+.35*sin(uT*(1.+h*3.)+h*40.); float r=.05+.09*fract(h*13.);
-        vec3 col=mix(vec3(.7,.8,1.15),vec3(1.1,.95,.8),fract(h*7.));
-        return col*(exp(-d*d/(r*r))*1.4+exp(-d/(r*5.))*.12)*br*tw; }
+        if(h<th) return vec3(0.); vec2 o=vec2(h2(g*1.7+seed),h2(g*2.3-seed))*.6+.2; float d=length(f-o)*cs;
+        float pw=length(fwidth(q))*.7; float r0=.035+.06*fract(h*13.), r=max(r0,pw); float k=(r0*r0)/(r*r);
+        float edge=min(min(f.x,1.-f.x),min(f.y,1.-f.y))*cs, R=min(r0*7.,edge);                                 /* 번짐은 칸 안에서 끝남 */
+        float halo=pow(max(0.,1.-d/max(R,1e-3)),3.);
+        float tw=.7+.3*sin(uT*(1.+h*3.)+h*40.);
+        float hc=fract(h*7.3); vec3 col=hc<.34?vec3(1.,1.,1.):hc<.6?vec3(1.,.76,.88):hc<.9?vec3(.74,.86,1.15):vec3(1.,.92,.78);
+        return col*(exp(-d*d/(r*r))*k*1.15+halo*.07)*br*tw; }
       /* 깊은 우주: 성운 + 별 세 겹 */
       vec3 deep(vec3 ro, vec3 rd){ vec2 dq=ro.xz+rd.xz*((ro.y+320.)/max(-rd.y,.05)); vec4 nb=N4(dq*.0016+vec2(uT*.0008,0.)); vec4 nb2=N4(dq*.0045-vec2(0.,uT*.001));
         float cloud=smoothstep(.38,.85,nb.r)*(.6+.6*nb2.g);
