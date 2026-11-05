@@ -11,8 +11,8 @@
    무게: 벽 한 줄 = 얼음 1번 + 눈 1번 그리기 */
 import * as THREE from 'three';
 import { mergeGeometries, mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js';
-import { iceMaterial, block } from './ice.js?v=11051029';
-import { SNOW_GLSL, SNOW_U } from './snowtone.js?v=11051029';
+import { iceMaterial, block } from './ice.js?v=11051034';
+import { SNOW_GLSL, SNOW_U } from './snowtone.js?v=11051034';
 
 const hs = (x, y, z) => { const s = Math.sin(x * 127.1 + y * 311.7 + z * 74.7) * 43758.5453; return s - Math.floor(s); };
 const vn = (x, y, z) => { const ix = Math.floor(x), iy = Math.floor(y), iz = Math.floor(z), fx = x - ix, fy = y - iy, fz = z - iz, u = fx * fx * (3 - 2 * fx), v = fy * fy * (3 - 2 * fy), w = fz * fz * (3 - 2 * fz);
@@ -177,7 +177,7 @@ export function makeIceWall(path, opt = {}) {
   for (const i of [0, N]) { const L = []; capPoly(i, S[i].map(q => [q[0], q[1]]), .3, L); for (const q of L) P.push(...q); }
   const ice = []; { const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(P, 3)); g.setAttribute('aG', new THREE.Float32BufferAttribute(G, 1)); g.setAttribute('aF', new THREE.Float32BufferAttribute(F, 1)); g.computeVertexNormals(); ice.push(g); }
   const snow = [], BLK = [];   /* BLK = 기체가 못 지나가는 자리 (동그라미 x,z,r) — 벽 몸통 · 바위 · 결정 */
-  for (let i = 0; i <= N; i += 2) { const f = fr[i]; BLK.push({ x: f.x, z: f.z, r: (W + .3) * f.sv + .05 }); }
+  for (let i = 0; i <= N; i += 2) { const f = fr[i]; BLK.push({ x: f.x, z: f.z, r: (W + .3) * f.sv + .05, top: f.h }); }
   /* ④ 눈: 윗단 전체 + 앞 모서리로 둥글게 넘쳐 흘러내림 */
   /* 눈이 얹히는 모서리 자리는 앞뒤 단면 몇 개를 고르게 평균 → 얼음 조각의 잔 들쭉날쭉이 눈에 세로 줄무늬로 옮지 않게 */
   const avgS = (i, k) => { let v = 0, y = 0, n = 0; for (let j = Math.max(0, i - 4); j <= Math.min(N, i + 4); j++) { const w = 5 - Math.abs(j - i); v += S[j][k][0] * w; y += S[j][k][1] * w; n += w; } return [v / n, y / n]; };
@@ -207,7 +207,7 @@ export function makeIceWall(path, opt = {}) {
     body.translate(0, hh * .38, 0); tip.translate(0, hh * .76 + hh * .12, 0); g = mergeGeometries([body.toNonIndexed(), tip.toNonIndexed()]); }
     const P2 = g.attributes.position; for (let j = 0; j < P2.count; j++) { const yy = P2.getY(j); P2.setX(j, P2.getX(j) * (1 + (hs(j % 7, seed, 1) - .5) * .15)); P2.setZ(j, P2.getZ(j) * (.8 + hs(j % 5, seed, 2) * .25)); }
     g.rotateY(RG() * 6); const q = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), new THREE.Vector3(lx * lean, 1, lz * lean).normalize()); g.applyQuaternion(q);
-    g.translate(x, y0, z); g.computeVertexNormals(); ice.push(prep(g, LV ? glow * .5 : glow)); BLK.push({ x, z, r: r * .95 }); };
+    g.translate(x, y0, z); g.computeVertexNormals(); ice.push(prep(g, LV ? glow * .5 : glow)); BLK.push({ x, z, r: r * .95, top: y0 + hh }); };
   /* 결정 하나를 아무 방향(dv)으로 · cut = 끝을 비스듬히 부러뜨린 단면(뾰족한 끝 대신, 단면 속빛 세게) */
   const crystalDir = (x, y, z, dv, hh, r, glow, cut) => { const body = new THREE.CylinderGeometry(r * .9, r, hh * (cut ? 1 : .76), 6, 2); body.translate(0, hh * (cut ? .5 : .38), 0);
     let g; if (cut) { g = body.toNonIndexed(); const P2 = g.attributes.position, tilt = new THREE.Vector3(RG() - .5, 1.4, RG() - .5).normalize();
@@ -245,7 +245,7 @@ export function makeIceWall(path, opt = {}) {
   /* ⑦ 발치: 눈 덮인 큰 얼음 바위 + 작은 조각 (앞쪽 많이, 뒤쪽 조금) */
   const rock = (d, v, s) => { const i = Math.round(d / len * N), f = fr[Math.min(N, Math.max(0, i))]; rockAt(f.x + f.nx * v, f.z + f.nz * v, s, Math.floor(d * 7), R); };
   function rockAt(x, z, s, bk = Math.floor(RG() * 999), Rr = RG) { const g = prep(block(seed * 31 + bk).clone(), .2), sy = s * (.75 + Rr() * .45); const R = Rr;
-    g.scale(s * (.9 + R() * .4), sy, s * (.8 + R() * .3)); g.rotateY(R() * 6); g.translate(x, sy * .25, z); ice.push(g); if (s > .3) BLK.push({ x, z, r: s * .85 });
+    g.scale(s * (.9 + R() * .4), sy, s * (.8 + R() * .3)); g.rotateY(R() * 6); g.translate(x, sy * .25, z); ice.push(g); BLK.push({ x, z, r: s * .85, top: sy * 1.03 });
     /* 바위 위 눈: 바위 윗면 모양 그대로 따라 쌓임 (각진 면엔 각지게) · 바람 쪽으로 쏠림 · 바위마다 양이 다름(안 덮인 것도) */
     const amt = R(); if (amt > .2 && !LV) { const th = (amt > .75 ? .2 : amt > .45 ? .11 : .05) * Math.min(1.4, s + .3), wind = new THREE.Vector3(R() - .5, 0, R() - .5).normalize(), lim = .42 - amt * .15;
       g.computeVertexNormals(); const A = g.attributes.position, Nn = g.attributes.normal, Q = [], a = new THREE.Vector3(), nn = new THREE.Vector3();

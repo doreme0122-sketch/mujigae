@@ -5,18 +5,18 @@
    무게: 바닥 판 하나 + 기체 둘 + 빛 알갱이 한 묶음 + 그림자 판 둘 */
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
-import { makeBloom } from '../core/hangar/bloom.js?v=11051029';
-import { makePerf } from './perf.js?v=11051029';
+import { makeBloom } from '../core/hangar/bloom.js?v=11051034';
+import { makePerf } from './perf.js?v=11051034';
 import { buildShip, engineSpots } from '../core/ships/build.js';
 import { makeGlow } from '../preview/glow.js';
-import { makeFlight, FLY } from './flight.js?v=11051029';
-import { makeFloorLab, LAB, JOIN, sdBlob, sdRoad, blobR } from './floorlab.js?v=11051029';
-import { makeMassWall, STYLES } from './wallmass.js?v=11051029';
-import { makeIceWall } from './icewall.js?v=11051029';
-import { SNOW_U } from './snowtone.js?v=11051029';
-import { iceWallMaterial, snowMaterial } from './icewall.js?v=11051029';
-import { makeRuinWall, ruinMaterial } from './ruins.js?v=11051029';
-import { makeLavaWall, lavaWallMaterial } from './lavawall.js?v=11051029';
+import { makeFlight, FLY } from './flight.js?v=11051034';
+import { makeFloorLab, LAB, JOIN, sdBlob, sdRoad, blobR } from './floorlab.js?v=11051034';
+import { makeMassWall, STYLES } from './wallmass.js?v=11051034';
+import { makeIceWall } from './icewall.js?v=11051034';
+import { SNOW_U } from './snowtone.js?v=11051034';
+import { iceWallMaterial, snowMaterial } from './icewall.js?v=11051034';
+import { makeRuinWall, ruinMaterial } from './ruins.js?v=11051034';
+import { makeLavaWall, lavaWallMaterial } from './lavawall.js?v=11051034';
 
 const $ = s => document.querySelector(s), clamp = THREE.MathUtils.clamp;
 const VIEWS = [{ id: 'game', name: '게임 시점', h: 42, tilt: .38 }, { id: 'near', name: '가까이', h: 18, tilt: .6 }, { id: 'far', name: '멀리', h: 90, tilt: .3 }];
@@ -36,7 +36,7 @@ export async function start(canvas, onProgress = () => {}) {
   const sdI = (x, z) => sdBlob(x, z, JOIN.ice, 0), sdL = (x, z) => sdBlob(x, z, JOIN.lava, 2.1);
   const onRoad = (x, z) => sdRoad(x, z) < 0, inLand = (x, z) => Math.min(sdI(x, z), sdL(x, z)) < 0;
   /* 못 지나가는 자리: 벽마다 넘겨준 동그라미(벽 몸통 · 바위 · 결정 · 기둥 · 쓰러진 토막)를 2m 칸에 나눠 둠 → 보이는 벽 모양 그대로 막힘 (사용자 2026-11-05: 벽 근처 빈 곳에서 막히고, 돌·얼음은 그냥 뚫고 지나감) */
-  const BLK = {}, addBlk = (k, grp) => { const G = BLK[k] || (BLK[k] = new Map()); for (const c of grp.userData.blockers || []) { const x0 = Math.floor((c.x - c.r) / 2), x1 = Math.floor((c.x + c.r) / 2), z0 = Math.floor((c.z - c.r) / 2), z1 = Math.floor((c.z + c.r) / 2);
+  const BLK = {}, addBlk = (k, grp) => { const G = BLK[k] || (BLK[k] = new Map()); for (const c of grp.userData.blockers || []) { if (c.top != null && c.top < FLY.HOVER - .2) continue;   /* 기체(0.7m 높이로 뜸) 배 밑보다 낮은 건 위로 넘어감 — 보이는 그대로 */ const x0 = Math.floor((c.x - c.r) / 2), x1 = Math.floor((c.x + c.r) / 2), z0 = Math.floor((c.z - c.r) / 2), z1 = Math.floor((c.z + c.r) / 2);
       for (let a = x0; a <= x1; a++) for (let b = z0; b <= z1; b++) { const key = a * 4096 + b; let L = G.get(key); if (!L) G.set(key, L = []); L.push(c); } } };
   const hitBlk = (k, x, z) => { const G = BLK[k]; if (!G) return false; const L = G.get(Math.floor(x / 2) * 4096 + Math.floor(z / 2)); if (!L) return false; for (const c of L) { const dx = x - c.x, dz = z - c.z; if (dx * dx + dz * dz < c.r * c.r) return true; } return false; };
   const B = { blocked: (x, z) => { if (K === 6 || K === 7 || K === 8) { if (Math.abs(x) > 90 || z > 30 || z < -30) return true; return hitBlk(K, x, z); }
