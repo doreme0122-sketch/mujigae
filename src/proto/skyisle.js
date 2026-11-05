@@ -20,14 +20,14 @@ function bakeFbm(N = 256, P = 8) {
   const t = new THREE.DataTexture(d, N, N); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.magFilter = THREE.LinearFilter; t.minFilter = THREE.LinearMipmapLinearFilter; t.generateMipmaps = true; t.needsUpdate = true; return t;
 }
 
-export const SEA = -34;
+export const SEA = -62;   /* 구름 바다: 섬 아래 뿌리를 길게 늘어뜨리며 더 깊이 내림 (사용자 2026-11-05) */
 const SKY = `
 uniform sampler2D uN; uniform vec3 uSun; uniform float uT;
 float nz(vec2 p){ return texture2D(uN,p).r; }
 float hh(vec2 p){ return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453); }
 const vec3 SUNC=vec3(1.,.93,.80), SKYC=vec3(.46,.58,.86), CLOUD=vec3(.80,.84,.95);
 /* 아래로 갈수록 구름 바다의 흰 안개에 묻힘 */
-vec3 sink(vec3 c, float y){ float k=smoothstep(-14.,${SEA.toFixed(1)}+1.,y); return mix(c,CLOUD*.92,k*k); }
+vec3 sink(vec3 c, float y){ float k=smoothstep(-16.,${SEA.toFixed(1)}+2.,y); return mix(c,CLOUD*.92,k*k*.95); }
 /* 감싸는 빛: 해 반대쪽도 완전히 까맣지 않게 (그림 같은 부드러운 그늘) */
 float wrapL(vec3 n, float w){ return max((dot(n,uSun)+w)/(1.+w),0.); }
 `;

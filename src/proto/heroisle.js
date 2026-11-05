@@ -13,7 +13,7 @@
    · 가장자리 회색 바위 몇 개 · 작은 풀 포기 */
 import * as THREE from 'three';
 import { mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js';
-import { SKY, bakeFbm } from './skyisle.js?v=11051951';
+import { SKY, bakeFbm } from './skyisle.js?v=11052005';
 
 const rng = s => () => (s = (s * 16807) % 2147483647) / 2147483647;
 const v0 = new THREE.Vector3(), v1 = new THREE.Vector3();
@@ -108,10 +108,10 @@ function leafMat(uT, uN, sun) {
 /* 잎 달린 덩굴: 세로 띠에 하트 잎이 좌우로 번갈아 */
 function vineMat(uT, uN, sun) {
   return new THREE.ShaderMaterial({ side: THREE.DoubleSide, uniforms: { uT, uN: { value: uN }, uSun: { value: sun } },
-    vertexShader: `uniform float uT; varying vec2 vUv; varying vec3 vW; varying float vS; void main(){ vUv=uv; vS=fract(instanceMatrix[3].x*3.7+instanceMatrix[3].z*1.3);
+    vertexShader: `uniform float uT; varying vec2 vUv; varying vec3 vW; varying float vS, vLen; void main(){ vUv=uv; vLen=length(instanceMatrix[1].xyz); vS=fract(instanceMatrix[3].x*3.7+instanceMatrix[3].z*1.3);
         vec4 w=modelMatrix*instanceMatrix*vec4(position,1.); float t=1.-uv.y; w.xz+=vec2(sin(uT*.8+vS*9.),cos(uT*.7+vS*7.))*.07*t*t; vW=w.xyz; gl_Position=projectionMatrix*viewMatrix*w; }`,
-    fragmentShader: SKY + `varying vec2 vUv; varying vec3 vW; varying float vS;
-      void main(){ float u=vUv.x-.5, t=1.-vUv.y; float L=7.;
+    fragmentShader: SKY + `varying vec2 vUv; varying vec3 vW; varying float vS, vLen;
+      void main(){ float u=vUv.x-.5, t=1.-vUv.y; float L=max(3.,vLen*2.6);   /* 길이에 맞춰 잎 수를 늘림 (잎이 늘어나지 않게) */
         float i=floor(t*L+vS*3.), f=fract(t*L+vS*3.), sd=mod(i,2.)*2.-1.;
         vec2 q=vec2((u-sd*.17)/.25,(f-.45)/.5); q.y-=abs(q.x)*.35; float leaf=step(length(q),1.)*step(t,.96-vS*.25);   /* 하트 모양 잎 */
         float stem=step(abs(u+sin(t*9.)*.03),.03)*step(t,.99);
@@ -175,7 +175,20 @@ export function makeHeroIsle(uT, sun, opt = {}) {
   /* 3층 · 4층 · 끝: 점점 작고 안쪽으로 → 뾰족 */
   for (let i = 0; i < 11; i++) { const th = (i + R() * .5) / 11 * Math.PI * 2, r = rad(th) * .55, h = 3 + R() * 1.8; rock(CX + Math.cos(th) * r, T - 8.4 - h * .5 - R(), CZ + Math.sin(th) * r, 1.9, h * .5, 1.6, -th + Math.PI / 2, (R() - .5) * .3, gray(.86), false); }
   for (let i = 0; i < 6; i++) { const th = (i + R() * .5) / 6 * Math.PI * 2, r = rad(th) * .3, h = 2.6 + R() * 1.5; rock(CX + Math.cos(th) * r, T - 11.5 - h * .5 - R(), CZ + Math.sin(th) * r, 1.5, h * .5, 1.3, R() * 6, (R() - .5) * .3, gray(.8), false); }
-  rock(CX + .4, T - 14.5, CZ, 1.6, 2.4, 1.4, 1, .15, gray(.76), false); rock(CX - .8, T - 16.2, CZ + .5, .9, 1.6, .9, 2, -.2, gray(.74), false);
+  /* ── 길게 늘어진 뿌리 (사용자 2026-11-05: 망원이라 높이가 눌려 보임 → 아랫부분을 일부러 길게 늘어뜨려 깊이감)
+     몸통 아래에서 두세 갈래로 갈라져, 아래로 갈수록 가늘어지며 살짝 휘어 내려감 · 끝엔 작은 바위가 사이를 두고 줄줄이 매달림 */
+  const ROOTS = [], NRT = 3;
+  for (let b = 0; b < NRT; b++) { const a0 = b / NRT * Math.PI * 2 + .7 + (R() - .5) * .5, out = .18 + R() * .1, len = 7 + Math.floor(R() * 3) + (b === 0 ? 2 : 0);
+    let x = CX + Math.cos(a0) * S * .3, z = CZ + Math.sin(a0) * S * .3, y = T - 12.5 - R() * 1.5, rr = 2.6 - b * .2; const pts = [];
+    for (let k = 0; k < len; k++) { const q = k / len, bend = Math.sin(q * 3.1) * out;   /* 처음엔 바깥으로 벌어졌다 끝에서 안으로 */
+      x += Math.cos(a0) * bend + (R() - .5) * .35; z += Math.sin(a0) * bend + (R() - .5) * .35; const h = 2.6 + R() * 1.3;
+      rock(x, y, z, rr * (1.1 + R() * .3), h * .55, rr * (1 + R() * .25), R() * 6, (R() - .5) * .25, gray(.86 - q * .14), false);
+      if (R() < .55) rock(x + (R() - .5) * rr, y + (R() - .5) * 1.2, z + (R() - .5) * rr, rr * .7, h * .4, rr * .6, R() * 6, (R() - .5) * .5, gray(.84 - q * .14), false);   /* 곁 덩이 */
+      pts.push([x, y, z, rr]); y -= h * .78; rr = Math.max(.4, rr * .8); }
+    for (let k = 0; k < 3; k++) { y -= 1.4 + k * .5 + R() * .6; const s2 = rr * (.7 - k * .17); rock(x + (R() - .5) * .5, y, z + (R() - .5) * .5, s2, s2 * 1.1, s2, R() * 6, R(), gray(.78), false); pts.push([x, y, z, s2]); }   /* 매달린 작은 바위 */
+    ROOTS.push(pts); }
+  /* 몸통과 뿌리를 잇는 덩이 */
+  for (let i = 0; i < 5; i++) { const th = R() * 6.28, r = S * .2 * R(); rock(CX + Math.cos(th) * r, T - 13 - R() * 3, CZ + Math.sin(th) * r, 2.4, 1.8, 2.2, R() * 6, (R() - .5) * .3, gray(.82), false); }
   /* 속 채움 */
   for (let i = 0; i < 6; i++) rock(CX + (R() - .5) * S * .9, T - 2.4 - R() * 2.2, CZ + (R() - .5) * S * .8, S * .5, 2.2, S * .45, R() * 3, 0, gray(.9));
   /* 가장자리 회색 바위 (풀 위로 솟음) */
@@ -227,14 +240,18 @@ export function makeHeroIsle(uT, sun, opt = {}) {
     const im = new THREE.InstancedMesh(g, grassMat(uT, uN, sun, true), L.length);
     L.forEach(([x, y, z, s], i) => { m4.compose(v.set(x, y, z), q.identity(), s3.set(s * 1.3, s, s * 1.3)); im.setMatrixAt(i, m4); }); grp.add(im); }
   /* 늘어진 덩굴 */
-  { const L = []; for (let i = 0; i < 64; i++) { const th = R() * 6.28, r = rad(th) * 1.06, len = 1 + Math.pow(R(), 1.4) * 4.2; L.push([CX + Math.cos(th) * r, T - .35, CZ + Math.sin(th) * r, len, th]); }
+  { const L = []; for (let i = 0; i < 76; i++) { const th = R() * 6.28, r = rad(th) * 1.06, len = i < 12 ? 7 + R() * 7 : 1 + Math.pow(R(), 1.4) * 4.2;   /* 열둘은 아주 길게 (깊이감) */ L.push([CX + Math.cos(th) * r, T - .35, CZ + Math.sin(th) * r, len, th]); }
     const g = new THREE.PlaneGeometry(.75, 1); g.translate(0, -.5, 0); const im = new THREE.InstancedMesh(g, vineMat(uT, uN, sun), L.length);
     L.forEach(([x, y, z, len, th], i) => { e.set(0, -th + Math.PI / 2, 0); q.setFromEuler(e); m4.compose(v.set(x, y, z), q, s3.set(1, len, 1)); im.setMatrixAt(i, m4); }); grp.add(im); }
   /* ───── 결정 ───── 오른쪽 아치 뒤 키 큰 무리 · 섬 바닥 아래로 삐져나온 큰 결정들 */
   { const cm = crystalMat(uT), G2 = [crystalCluster(R, 6, 3.6), crystalCluster(R, 4, 2.2), crystalCluster(R, 5, 2.6)], L = [[], [], []];
     L[0].push([PX + 6.1, T + .1, PZ - 3.9, 1, 0, -.15]);
-    const under = [[-.2, -6.6, 2.5], [.25, -8.6, 2.2], [-.45, -9.8, 4.6], [.5, -5.2, 3.8], [-.1, -11.5, 1.6], [.35, -12.2, -1.5]];
+    const under = [[-.2, -6.6, 2.5], [.25, -8.6, 2.2], [-.45, -9.8, 4.6], [.5, -5.2, 3.8]];
     under.forEach(([fx, dy, z], i) => L[1 + i % 2].push([CX + fx * S, T + dy, CZ + z, .9 + R() * .5, Math.PI, (R() - .5) * .8]));
+    /* 뿌리 옆구리에 비스듬히 아래로 삐져나온 결정 · 뿌리 끝에 거꾸로 매달린 결정 (바위에 가리지 않게 바깥으로) */
+    ROOTS.forEach(pts => { for (let k = 2; k < pts.length - 3; k += 2) { const [x, y, z, rr] = pts[k], a = Math.atan2(z - CZ, x - CX) + (R() - .5) * .8;
+        L[1 + k % 2].push([x + Math.cos(a) * rr * .7, y - .3, z + Math.sin(a) * rr * .7, .7 + R() * .5, Math.PI - .6, (R() - .5) * .6]); }
+      const tp = pts[pts.length - 4]; L[2].push([tp[0], tp[1] - 1, tp[2], 1 + R() * .4, Math.PI, (R() - .5) * .3]); });
     L.forEach((list, k) => { if (!list.length) return; const im = new THREE.InstancedMesh(G2[k], cm, list.length);
       list.forEach(([x, y, z, s, flip, tl], i) => { e.set(flip + tl, R() * 6, tl * .7); q.setFromEuler(e); m4.compose(v.set(x, y, z), q, s3.set(s, s, s)); im.setMatrixAt(i, m4); }); grp.add(im); }); }
   /* ───── 식물 ───── */
