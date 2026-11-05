@@ -4,8 +4,8 @@
    · 멀어질수록 깊은 색으로 가라앉힘 (가까운 싸움터가 또렷하게)
    0 금속 판 · 1 이끼 낀 암반 · 2 결정 섞인 모래 · 3 은은한 평지 · 4 보스존 별빛 우주(보이지 않는 유리 바닥 + 아래로 깊은 별 세 겹) */
 import * as THREE from 'three';
-import { LAVA_GLSL } from './lavatone.js?v=11051106';
-import { SNOW_GLSL, SNOW_U } from './snowtone.js?v=11051106';
+import { LAVA_GLSL } from './lavatone.js?v=11051112';
+import { SNOW_GLSL, SNOW_U } from './snowtone.js?v=11051112';
 
 function bakeNoise(N = 256) {
   const hash = (x, y, p) => { x = ((x % p) + p) % p; y = ((y % p) + p) % p; const s = Math.sin(x * 127.1 + y * 311.7) * 43758.5453; return s - Math.floor(s); };
@@ -155,20 +155,28 @@ export function makeFloorLab() {
            모두 같은 색 · 숨은 기체도 길은 남김(기체는 안 보여도 지나간 길은 보임 → 쫓아가는 재미)
          · 그 위로 아주 크고 옅은 성운 안개가 천천히 흐름 */
       vec3 coralGround(vec2 p, vec3 rd){
-        vec3 base=mix(vec3(.012,.035,.04),vec3(.028,.02,.045),N4(p*.04).g)*(.7+.6*N4(p*.25).a);
-        vec2 q=p*3.4; vec2 id=floor(q); vec2 f=fract(q)-.5-vec2(h2(id)-.5,h2(id+1.)-.5)*.5; float h=h2(id+2.);
-        float tuft=smoothstep(.34,.1,length(f))*(.55+.45*h);                                                  /* 이끼 포기 */
-        float tip=smoothstep(.12,.0,length(f))*step(.35,h);                                                     /* 포기 끝 빛 점 */
-        vec3 n=normalize(vec3(f.x*tuft*.9+(N4(p*.6).b-.5)*.08,1.,f.y*tuft*.9+(N4(p*.6+.3).b-.5)*.08));
-        vec3 moss=mix(vec3(.02,.075,.07),vec3(.06,.035,.09),h2(id+5.));
-        vec3 c=lit(mix(base,moss,tuft*.8),n,rd,.1,20.)*.5;
-        vec3 glowC=mix(vec3(.15,.9,.75),vec3(.6,.4,1.),h2(id+7.)*.8+.1*sin(uT*.3+p.x*.05));
-        float idle=(.5+.5*sin(uT*(.6+h*.9)+h*40.))*.05;                                                         /* 평소: 아주 희미하게 숨 쉼 */
+        /* 이끼 결 (사용자 2026-11-05: 점 X): 가는 털 이끼가 한 방향으로 누운 결 — 결 방향은 큰 물결처럼 휘어 흐름 · 곳마다 길고 짧고 촘촘·성김 */
+        float fa=N4(p*.018).r*4.2+N4(p*.06).g*1.2; vec2 fd=vec2(cos(fa),sin(fa)), fn=vec2(-fd.y,fd.x);
+        float u=dot(p,fd), v=dot(p,fn);
+        float dens=.55+.45*N4(p*.09+.3).b;                                                                    /* 촘촘한 곳 / 성긴 곳 */
+        float lane=floor(v*9.), off=h2(vec2(lane,3.)), fl=.35+.9*h2(vec2(lane,7.))*dens;                        /* 털 한 가닥: 줄마다 길이·엇갈림 다름 */
+        float along=fract(u/fl+off), across=fract(v*9.)-.5;
+        float hair=smoothstep(.42,.05,abs(across))*smoothstep(0.,.25,along)*smoothstep(1.,.55,along)*step(.25,h2(vec2(lane,floor(u/fl+off))));
+        float thick=smoothstep(.3,.75,N4(p*.035+.7).g);                                                         /* 이끼가 두껍게 뭉친 곳 / 얇아 바닥이 비치는 곳 */
+        float cover=mix(.25,1.,thick)*(.6+.4*hair);
+        vec3 ground=mix(vec3(.01,.022,.026),vec3(.022,.015,.03),N4(p*.05).g);
+        vec3 moss=mix(vec3(.018,.07,.065),vec3(.055,.032,.085),N4(p*.025+.4).r)*(.75+.5*hair);
+        vec3 n=normalize(vec3(fd.x*(along-.5)*.5*hair+(N4(p*.6).b-.5)*.06,1.,fd.y*(along-.5)*.5*hair+(N4(p*.6+.3).b-.5)*.06));   /* 누운 털이 빛을 받는 결 */
+        vec3 c=lit(mix(ground,moss,cover),n,rd,.14,16.)*.5;
+        vec3 glowC=mix(vec3(.15,.9,.75),vec3(.6,.4,1.),N4(p*.04+.2).r*.8+.1*sin(uT*.3+p.x*.05));
+        float idle=(.5+.5*sin(uT*.5+N4(p*.07).g*12.))*.03*hair*thick;                                           /* 평소: 결 끝이 아주 희미하게 숨 쉼 */
         float wake=0.;
-        for(int i=0;i<72;i++){ float age=uT-uTt[i]; if(age<0.||age>5.) continue; vec4 T=uTr[i]; vec2 ab=T.zw-T.xy, ap=p-T.xy; float k=clamp(dot(ap,ab)/max(dot(ab,ab),1e-4),0.,1.); vec2 d=ap-ab*k; float r2=dot(d,d); if(r2>9.) continue;   /* 지나간 한 토막(이전 자리 → 이 자리)까지 거리 → 끊김 없는 길 */
+        for(int i=0;i<72;i++){ float age=uT-uTt[i]; if(age<0.||age>5.) continue; vec4 T=uTr[i]; vec2 ab=T.zw-T.xy, ap=p-T.xy; float k=clamp(dot(ap,ab)/max(dot(ab,ab),1e-4),0.,1.); vec2 d=ap-ab*k; float r2=dot(d,d); if(r2>9.) continue;   /* 지나간 한 토막까지 거리 → 끊김 없는 길 */
           float fade=pow(1.-age/5.,1.6)*smoothstep(0.,.25,age+.05);                                            /* 깨어났다가 5초에 걸쳐 천천히 꺼짐 */
           wake=max(wake,exp(-r2/2.2)*fade); }
-        c+=glowC*(tip*(idle+wake*1.6)+tuft*wake*.55+wake*.09);
+        /* 빛 길: 결을 따라 번지는 띠 — 가운데 밝고, 가장자리는 털 결 사이로 스며들며 옅어짐 */
+        float band=smoothstep(.0,.35,wake), edge=wake*(.35+.65*hair);
+        c+=glowC*(idle+band*.06*cover+edge*.42*cover+wake*wake*.12);
         float m1=smoothstep(.5,.85,N4(p*.012+vec2(uT*.002,uT*.001)).r), m2=smoothstep(.55,.9,N4(p*.018-vec2(uT*.0015,0.)).g);
         c+=vec3(.015,.07,.065)*m1*.35+vec3(.055,.025,.08)*m2*.3;                                               /* 크고 옅은 성운 안개 */
         return c; }
