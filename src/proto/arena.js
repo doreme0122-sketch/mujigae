@@ -7,8 +7,8 @@
    단위는 자기장 판과 같음. */
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { sweep, posNor } from './floatring.js?v=11052031';
-import { GUARD_ANG, GUARD, guardScale } from './guardian.js?v=11052031';
+import { sweep, posNor } from './floatring.js?v=11052035';
+import { GUARD_ANG, GUARD, guardScale } from './guardian.js?v=11052035';
 
 
 /* 건담처럼 장갑판을 조립한 느낌의 검은 판 선 — 면 위치로 바로 그림(텍스처 없음, 가벼움)

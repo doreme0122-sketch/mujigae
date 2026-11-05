@@ -5,26 +5,26 @@
    무게: 바닥 판 하나 + 기체 둘 + 빛 알갱이 한 묶음 + 그림자 판 둘 */
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
-import { makeBloom } from '../core/hangar/bloom.js?v=11052031';
-import { makePerf } from './perf.js?v=11052031';
+import { makeBloom } from '../core/hangar/bloom.js?v=11052035';
+import { makePerf } from './perf.js?v=11052035';
 import { buildShip, engineSpots } from '../core/ships/build.js';
 import { makeGlow } from '../preview/glow.js';
-import { makeFlight, FLY } from './flight.js?v=11052031';
-import { makeFloorLab, LAB, JOIN, sdBlob, sdRoad, blobR } from './floorlab.js?v=11052031';
-import { makeMassWall, STYLES } from './wallmass.js?v=11052031';
-import { makeIceWall } from './icewall.js?v=11052031';
-import { SNOW_U } from './snowtone.js?v=11052031';
-import { iceWallMaterial, snowMaterial } from './icewall.js?v=11052031';
-import { makeRuinWall, ruinMaterial } from './ruins.js?v=11052031';
-import { makeCoralWall, coralMaterial, coral } from './coral.js?v=11052031';
-import { makeTrailMap } from './trailmap.js?v=11052031';
-import { makeThemedHide } from './hidetheme.js?v=11052031';
-import { makePlantBush } from './plantbush.js?v=11052031';
-import { makeCrystalWall, crystalMaterial } from './crystal.js?v=11052031';
-import { makeLavaWall, lavaWallMaterial } from './lavawall.js?v=11052031';
-import { makeSkyCanyon } from './skycanyon.js?v=11052031';
-import { makeSkyIsle, makeCloudSea } from './skyisle.js?v=11052031';
-import { makeHeroIsle } from './heroisle.js?v=11052031';
+import { makeFlight, FLY } from './flight.js?v=11052035';
+import { makeFloorLab, LAB, JOIN, sdBlob, sdRoad, blobR } from './floorlab.js?v=11052035';
+import { makeMassWall, STYLES } from './wallmass.js?v=11052035';
+import { makeIceWall } from './icewall.js?v=11052035';
+import { SNOW_U } from './snowtone.js?v=11052035';
+import { iceWallMaterial, snowMaterial } from './icewall.js?v=11052035';
+import { makeRuinWall, ruinMaterial } from './ruins.js?v=11052035';
+import { makeCoralWall, coralMaterial, coral } from './coral.js?v=11052035';
+import { makeTrailMap } from './trailmap.js?v=11052035';
+import { makeThemedHide } from './hidetheme.js?v=11052035';
+import { makePlantBush } from './plantbush.js?v=11052035';
+import { makeCrystalWall, crystalMaterial } from './crystal.js?v=11052035';
+import { makeLavaWall, lavaWallMaterial } from './lavawall.js?v=11052035';
+import { makeSkyCanyon } from './skycanyon.js?v=11052035';
+import { makeSkyIsle, makeCloudSea } from './skyisle.js?v=11052035';
+import { makeHeroIsle } from './heroisle.js?v=11052035';
 
 const $ = s => document.querySelector(s), clamp = THREE.MathUtils.clamp;
 /* 망원 카메라 (사용자 2026-11-05: 조금만 멀어져도 기체가 작아지는 게 확 느껴짐 · 롤은 맵 끝과 끝이어도 크기가 같음)
