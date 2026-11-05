@@ -4,8 +4,8 @@
    · 멀어질수록 깊은 색으로 가라앉힘 (가까운 싸움터가 또렷하게)
    0 금속 판 · 1 이끼 낀 암반 · 2 결정 섞인 모래 · 3 은은한 평지 · 4 보스존 별빛 우주(보이지 않는 유리 바닥 + 아래로 깊은 별 세 겹) */
 import * as THREE from 'three';
-import { LAVA_GLSL, vorTex } from './lavatone.js?v=11051443';
-import { SNOW_GLSL, SNOW_U } from './snowtone.js?v=11051443';
+import { LAVA_GLSL, vorTex } from './lavatone.js?v=11051452';
+import { SNOW_GLSL, SNOW_U } from './snowtone.js?v=11051452';
 
 function bakeNoise(N = 256) {
   const hash = (x, y, p) => { x = ((x % p) + p) % p; y = ((y % p) + p) % p; const s = Math.sin(x * 127.1 + y * 311.7) * 43758.5453; return s - Math.floor(s); };
@@ -55,10 +55,11 @@ export function makeFloorLab() {
          · 네모 번짐 원인: 별 둘레 빛 번짐이 칸 경계에서 잘림 → 번짐은 칸 안에서 0이 되게 (칸 가장자리까지 남은 거리로 줄임)
          · 선명하게: 별 심은 작고 또렷하게, 너무 작아 화면 점보다 작아지면 화면 점 크기로 맞추고 밝기는 그만큼 나눔(반짝이며 깨지지 않게)
          · 색: 흰색 · 분홍빛 흰색 · 파란빛 흰색 · 아주 드물게 옅은 금빛 (모두 흰색에 가까운 맑은 빛) */
+      float gRdW;   /* 화면 점 하나만큼 시선이 바뀌는 정도 — main 맨 앞(갈림길 전)에서 구함: 갈림길 안에서 구하면 갈림 경계를 따라 값이 깨져 줄이 생김 */
       vec3 starLayer(vec3 ro, vec3 rd, float D, float cs, float th, float br, float seed){
-        vec2 q=ro.xz+rd.xz*((ro.y+D)/max(-rd.y,.05)); vec2 g=floor(q/cs), f=q/cs-g; float h=h2(g+seed);
+        float tq=(ro.y+D)/max(-rd.y,.05); vec2 q=ro.xz+rd.xz*tq; vec2 g=floor(q/cs), f=q/cs-g; float h=h2(g+seed);
         if(h<th) return vec3(0.); vec2 o=vec2(h2(g*1.7+seed),h2(g*2.3-seed))*.6+.2; float d=length(f-o)*cs;
-        float pw=length(fwidth(q))*.7; float r0=.035+.06*fract(h*13.), r=max(r0,pw); float k=(r0*r0)/(r*r);
+        float pw=gRdW*tq*.7; float r0=.035+.06*fract(h*13.), r=max(r0,pw); float k=(r0*r0)/(r*r);
         float edge=min(min(f.x,1.-f.x),min(f.y,1.-f.y))*cs, R=min(r0*7.,edge);                                 /* 번짐은 칸 안에서 끝남 */
         float halo=pow(max(0.,1.-d/max(R,1e-3)),3.);
         float tw=.7+.3*sin(uT*(1.+h*3.)+h*40.);
@@ -239,7 +240,7 @@ export function makeFloorLab() {
           c+=mix(vec3(.7,.5,1.2),vec3(1.,.85,1.1),fract(gh*37.))*sp*1.6; }
         return c; }
       void main(){
-        vec3 ro=cameraPosition, rd=normalize(vW-ro); vec2 p=vW.xz; float dist=length(p-ro.xz); vec3 c;
+        vec3 ro=cameraPosition, rd=normalize(vW-ro); gRdW=length(fwidth(rd.xz)); vec2 p=vW.xz; float dist=length(p-ro.xz); vec3 c;
         if(uK<.5){ /* 금속 판: 4m 판 · 이음매 · 모서리로 갈수록 살짝 둥글게 깎임(빛 받는 턱) · 볼트 · 긁힘 · 얼룩 */
           float S=4.; vec2 cl=floor(p/S), f=p-cl*S; vec2 e2=min(f,S-f); float e=min(e2.x,e2.y);
           vec2 sg=vec2(f.x<S*.5?-1.:1., f.y<S*.5?-1.:1.); float bx=1.-smoothstep(.03,.16,e2.x), bz=1.-smoothstep(.03,.16,e2.y);

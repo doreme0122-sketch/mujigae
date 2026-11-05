@@ -4,8 +4,8 @@
    · 맞은 해파리 위에 피해 숫자가 떠오름 (튕겨서 맞으면 ×1.5 표시 · 쓰러뜨린 한 방은 크게)
    · 아래: 사냥터 / 수정 기둥 / 숨을 곳으로 바로 옮기기 · 해파리 다시 채우기 */
 import * as THREE from 'three';
-import { SHOT, SHOT_IDS } from './shots.js?v=11051443';
-import { makeDuel } from './duel.js?v=11051443';
+import { SHOT, SHOT_IDS } from './shots.js?v=11051452';
+import { makeDuel } from './duel.js?v=11051452';
 
 const css = `
 #rgSel{position:fixed;top:calc(env(safe-area-inset-top,0px) + 10px);left:50%;transform:translateX(-50%);display:flex;flex-direction:column;align-items:flex-start;gap:4px;z-index:7;touch-action:none}
