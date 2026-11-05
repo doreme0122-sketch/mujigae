@@ -5,44 +5,38 @@
    무게: 바닥 판 하나 + 기체 둘 + 빛 알갱이 한 묶음 + 그림자 판 둘 */
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
-import { makeBloom } from '../core/hangar/bloom.js?v=11052120';
-import { makePerf } from './perf.js?v=11052120';
+import { makeBloom } from '../core/hangar/bloom.js?v=11052126';
+import { makePerf } from './perf.js?v=11052126';
 import { buildShip, engineSpots } from '../core/ships/build.js';
 import { makeGlow } from '../preview/glow.js';
-import { makeFlight, FLY } from './flight.js?v=11052120';
-import { makeFloorLab, LAB, JOIN, sdBlob, sdRoad, blobR } from './floorlab.js?v=11052120';
-import { makeMassWall, STYLES } from './wallmass.js?v=11052120';
-import { makeIceWall } from './icewall.js?v=11052120';
-import { SNOW_U } from './snowtone.js?v=11052120';
-import { iceWallMaterial, snowMaterial } from './icewall.js?v=11052120';
-import { makeRuinWall, ruinMaterial } from './ruins.js?v=11052120';
-import { makeCoralWall, coralMaterial, coral } from './coral.js?v=11052120';
-import { makeTrailMap } from './trailmap.js?v=11052120';
-import { makeThemedHide } from './hidetheme.js?v=11052120';
-import { makePlantBush } from './plantbush.js?v=11052120';
-import { makeCrystalWall, crystalMaterial } from './crystal.js?v=11052120';
-import { makeLavaWall, lavaWallMaterial } from './lavawall.js?v=11052120';
-import { makeSkyCanyon } from './skycanyon.js?v=11052120';
-import { makeSkyIsle, makeCloudSea } from './skyisle.js?v=11052120';
-import { makeHeroIsle } from './heroisle.js?v=11052120';
+import { makeFlight, FLY } from './flight.js?v=11052126';
+import { makeFloorLab, LAB, JOIN, sdBlob, sdRoad, blobR } from './floorlab.js?v=11052126';
+import { makeMassWall, STYLES } from './wallmass.js?v=11052126';
+import { makeIceWall } from './icewall.js?v=11052126';
+import { SNOW_U } from './snowtone.js?v=11052126';
+import { iceWallMaterial, snowMaterial } from './icewall.js?v=11052126';
+import { makeRuinWall, ruinMaterial } from './ruins.js?v=11052126';
+import { makeCoralWall, coralMaterial, coral } from './coral.js?v=11052126';
+import { makeTrailMap } from './trailmap.js?v=11052126';
+import { makeThemedHide } from './hidetheme.js?v=11052126';
+import { makePlantBush } from './plantbush.js?v=11052126';
+import { makeCrystalWall, crystalMaterial } from './crystal.js?v=11052126';
+import { makeLavaWall, lavaWallMaterial } from './lavawall.js?v=11052126';
+import { makeSkyCanyon } from './skycanyon.js?v=11052126';
 
 const $ = s => document.querySelector(s), clamp = THREE.MathUtils.clamp;
-/* 원근 없는 카메라 (사용자 2026-11-05: 롤처럼 맵 끝과 끝이어도 크기가 같게 · 망원으로 줄이기만 하니 섬 윗면과 꼬리가 다른 빠르기로 움직여 따로 놂)
-   멀고 가까움에 상관없이 같은 크기 · 같은 빠르기 → 섬이 통째로 한 덩어리로 움직임 · 보이는 넓이는 전(40° 렌즈)과 같게 · TELE = 카메라 거리(가려짐 순서용) */
-const PAR = { isle: 42 / (42 + 8), sea: 42 / (42 + 62), ox: 0, oz: 0 };   /* 깊이별로 카메라를 따라오는 정도 */
-const TELE = Math.tan(20 * Math.PI / 180) / Math.tan(6.5 * Math.PI / 180);
-const VIEWS = [{ id: 'game', name: '게임 시점', h: 42, tilt: .59 }, { id: 'near', name: '가까이', h: 18, tilt: .6 }, { id: 'far', name: '멀리', h: 90, tilt: .3 }];
+const VIEWS = [{ id: 'game', name: '게임 시점', h: 42, tilt: .38 }, { id: 'near', name: '가까이', h: 18, tilt: .6 }, { id: 'far', name: '멀리', h: 90, tilt: .3 }];
 const AREA = 70;
 
 export async function start(canvas, onProgress = () => {}) {
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: false, powerPreference: 'high-performance' });
   renderer.toneMapping = THREE.NoToneMapping; renderer.autoClear = false; renderer.setClearColor(0, 1);
-  const scene = new THREE.Scene(), camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 1, 2600), pcam = new THREE.PerspectiveCamera(40, 1, .5, 1200), bloom = makeBloom(renderer, { samples: 0 });
+  const scene = new THREE.Scene(), camera = new THREE.PerspectiveCamera(40, 1, .5, 900), bloom = makeBloom(renderer, { samples: 0 });
   { const pm = new THREE.PMREMGenerator(renderer); scene.environment = pm.fromScene(new RoomEnvironment(), .04).texture; scene.environmentIntensity = .6; pm.dispose(); }
   const sunDir = new THREE.Vector3(-.45, .78, -.42).normalize(), sun = new THREE.DirectionalLight(0xfff0dc, 3); sun.position.copy(sunDir).multiplyScalar(20); scene.add(sun);
-  { const hl = new THREE.HemisphereLight(0x7080a8, 0x2a1810, .5); scene.add(hl); hl.layers.enableAll(); sun.layers.enableAll(); }   /* 빛은 배경·캐릭터 두 번 그리기 모두에 */
+  scene.add(new THREE.HemisphereLight(0x7080a8, 0x2a1810, .5));
   const lab = makeFloorLab(); scene.add(lab.mesh); let K = 0;
-  const glow = makeGlow(); scene.add(glow.mesh); glow.mesh.layers.set(1);   /* 탄 빛 = 캐릭터 쪽 */
+  const glow = makeGlow(); scene.add(glow.mesh);
   onProgress(.3);
   /* 내 기체: 맵과 같은 비행 (둘레 AREA m 밖은 막힘) */
   const sdI = (x, z) => sdBlob(x, z, JOIN.ice, 0), sdL = (x, z) => sdBlob(x, z, JOIN.lava, 2.1);
@@ -51,15 +45,15 @@ export async function start(canvas, onProgress = () => {}) {
   const BLK = {}, addBlk = (k, grp) => { const G = BLK[k] || (BLK[k] = new Map()); for (const c of grp.userData.blockers || []) { if (c.top != null && c.top < FLY.HOVER - .2) continue;   /* 기체(0.7m 높이로 뜸) 배 밑보다 낮은 건 위로 넘어감 — 보이는 그대로 */ const x0 = Math.floor((c.x - c.r) / 2), x1 = Math.floor((c.x + c.r) / 2), z0 = Math.floor((c.z - c.r) / 2), z1 = Math.floor((c.z + c.r) / 2);
       for (let a = x0; a <= x1; a++) for (let b = z0; b <= z1; b++) { const key = a * 4096 + b; let L = G.get(key); if (!L) G.set(key, L = []); L.push(c); } } };
   const hitBlk = (k, x, z) => { const G = BLK[k]; if (!G) return false; const L = G.get(Math.floor(x / 2) * 4096 + Math.floor(z / 2)); if (!L) return false; for (const c of L) { const dx = x - c.x, dz = z - c.z; if (dx * dx + dz * dz < c.r * c.r) return true; } return false; };
-  const B = { blocked: (x, z) => { if (K === 14) return Math.abs(x) > 50 || Math.abs(z) > 34; if (K === 13) return SKY ? SKY.blocked(x, z) : false; if (K === 12) { if (!zoneReg) return false; const r = zoneReg(x, z); return r === 17 || hitBlk(12, x, z); } if (K >= 6) { if (Math.abs(x) > 90 || z > 30 || z < -30) return true; return hitBlk(K, x, z); }
+  const B = { blocked: (x, z) => { if (K === 13) return SKY ? SKY.blocked(x, z) : false; if (K === 12) { if (!zoneReg) return false; const r = zoneReg(x, z); return r === 17 || hitBlk(12, x, z); } if (K >= 6) { if (Math.abs(x) > 90 || z > 30 || z < -30) return true; return hitBlk(K, x, z); }
       if (K !== 5) return Math.hypot(x, z) > AREA;
       if (hitBlk(5, x, z)) return true; if (onRoad(x, z)) return false; const sd = Math.min(sdI(x, z), sdL(x, z)); return sd > -1.4; },   /* 이음 시험: 땅 밖(우주)·벽 띠는 막힘, 큰길은 벽 틈(문)으로 지나감 */
     region: () => 0 };
-  const fly = await makeFlight(renderer, B, [0, 8], 0); scene.add(fly); fly.traverse(o => o.layers.set(1)); const FS = fly.userData.S;
+  const fly = await makeFlight(renderer, B, [0, 8], 0); scene.add(fly); const FS = fly.userData.S;
   fly.traverse(o => { if (o.isMesh && o.renderOrder === 1 && o.geometry.type === 'PlaneGeometry') o.userData.oldShadow = true; });
   onProgress(.6);
   /* 상대 기체 */
-  const fb = await buildShip(4, 2, 'neon-black', { renderer, size: FLY.LEN }); const foe = fb.root; scene.add(foe); foe.traverse(o => o.layers.set(1));
+  const fb = await buildShip(4, 2, 'neon-black', { renderer, size: FLY.LEN }); const foe = fb.root; scene.add(foe);
   const fsm = foe.children[0], FENG = engineSpots(fb.ship, fsm, new THREE.Box3().setFromObject(fsm).getSize(new THREE.Vector3()));
   /* 벽: 얼음 땅 둘레 = 빙하 얼음 · 용암 땅 둘레 = 흑요석. 큰길이 지나는 자리만 비움(벽 틈 = 문) */
   const UT = { value: 0 }, walls = new THREE.Group(); scene.add(walls); walls.visible = false;
@@ -112,9 +106,6 @@ export async function start(canvas, onProgress = () => {}) {
   const NOGH = /[?&]gh=0/.test(location.search);   /* 시험: 숨을 때 내 기체 반투명 끄기 (프레임 원인 찾기) */
   /* 하늘 협곡 (나는 느낌 시험, 2026-11-05) */
   const SKY = makeSkyCanyon(UT, sunDir); scene.add(SKY.mesh); SKY.mesh.visible = false;
-  /* 하늘 섬 하나 (섬 부품 1단계, 2026-11-05) — 처음 열 때 만듦 */
-  let ISLE = null, ISEA = null; const isleGrp = new THREE.Group(); scene.add(isleGrp); isleGrp.visible = false;
-  const mkIsle = () => { if (ISLE) return; ISLE = makeHeroIsle(UT, sunDir, { seed: 2026, size: 9, top: -8 }); ISEA = makeCloudSea(UT, sunDir, ISLE.uN, ISLE.discs);   /* 참고 제작 시트대로 (2026-11-05) */ isleGrp.add(ISLE.mesh, ISEA); };
   const ZONE = new THREE.Group(); scene.add(ZONE); ZONE.visible = false; let zoneReady = null, zoneReg = null, zonePlants = [];
   const buildZone = async () => {
     const J = await (await fetch('./assets/map/v7.json')).json(), tex = await new THREE.TextureLoader().loadAsync('./assets/map/v7.png');
@@ -165,7 +156,7 @@ export async function start(canvas, onProgress = () => {}) {
     m.position.set(x + ox, .03, z + oz); m.rotation.set(-Math.PI / 2, 0, head);
     const u = m.material.uniforms; u.uS.value = .55 + y * .35; u.uA.value = clamp(.95 - y * .3, .35, .9) * ground(x + ox, z + oz); m.visible = u.uA.value > .01; };
   /* 하늘 협곡 그림자: 저 아래 섬 윗면에 작고 흐릿하게(해 반대쪽으로 비켜) · 틈 위에선 떨어질 곳이 없어 사라짐 → 아래가 비었다는 게 느껴짐 */
-  const skyShadow = (m, x, z, y, head, SRC0 = SKY) => { const SRC = { topAt: (a, b) => SRC0.topAt(a - PAR.ox, b - PAR.oz) };   /* 섬이 밀린 만큼 빼서 찾음 */ let ox = 0, oz = 0, tp = null; for (let it = 0; it < 2; it++) { const hgt = y - (tp ?? -14); ox = -sunDir.x / sunDir.y * hgt * .35; oz = -sunDir.z / sunDir.y * hgt * .35; tp = SRC.topAt(x + ox, z + oz); if (tp == null) break; }
+  const skyShadow = (m, x, z, y, head) => { let ox = 0, oz = 0, tp = null; for (let it = 0; it < 2; it++) { const hgt = y - (tp ?? -14); ox = -sunDir.x / sunDir.y * hgt * .35; oz = -sunDir.z / sunDir.y * hgt * .35; tp = SKY.topAt(x + ox, z + oz); if (tp == null) break; }
     if (tp == null) { m.visible = false; return; } const hgt = y - tp; m.position.set(x + ox, tp + .06, z + oz); m.rotation.set(-Math.PI / 2, 0, head);
     const u = m.material.uniforms; u.uS.value = 1.1 + hgt * .06; u.uA.value = clamp(.5 - hgt * .012, .22, .45); m.visible = true; };
   /* 탄: 빛 알갱이 */
@@ -194,11 +185,11 @@ export async function start(canvas, onProgress = () => {}) {
     h.ht.style.width = (k * 100) + '%'; h.ht.style.background = k > .98 ? `rgba(255,60,60,${.6 + .4 * Math.sin(t * 20)})` : `rgb(255,${200 - 150 * k | 0},${80 - 60 * k | 0})`; };
   /* 버튼 */
   const trail = makeTrailMap(renderer), trail2 = makeTrailMap(renderer, { cx: 0, cz: -62, span: 104 }); lab.mat.uniforms.uTrO.value.copy(trail.origin); lab.mat.uniforms.uTrail.value = trail.tex;
-  const cam = { x: 0, z: 8, h: 42, H: 42, tilt: .59, T: .59 };   /* 게임 시점 기울기: 수직에서 약 34도 (사용자 2026-11-05: 롤처럼 비스듬히 · 전엔 22도) */
+  const cam = { x: 0, z: 8, h: 42, H: 42, tilt: .38, T: .38 };
   const tip = () => { $('#tip').hidden = false; $('#tip b').textContent = LAB[K].name; $('#tip span').textContent = LAB[K].tip; $('#head b').textContent = '바닥 시험장 · ' + LAB[K].name; };
   const tour = $('#tour');
   LAB.forEach((f, i) => { const b = document.createElement('button'); b.type = 'button'; b.textContent = f.name; b.className = 'fl';
-    b.addEventListener('pointerdown', e => { e.stopPropagation(); const was = K; K = i; lab.set(i); walls.visible = i === 5; gal.visible = i === 6; lgal.visible = i === 7; rgal.visible = i === 8; cgal.visible = i === 9; xgal.visible = i === 10; ZONE.visible = i === 12; SKY.mesh.visible = i === 13; if (i === 14) mkIsle(); isleGrp.visible = i === 14; lab.mesh.visible = i !== 13 && i !== 14; if (i === 12) { (zoneReady ||= buildZone()).then(() => { fly.userData.moveTo(0, -166.5, 0); E.x = 0; E.z = -150; lab.mat.uniforms.uTrO.value.copy(trail2.origin); }); } else lab.mat.uniforms.uTrO.value.copy(trail.origin); if (i === 5 && was !== 5) { fly.userData.moveTo(-40, 0, -Math.PI / 2); E.x = -30; E.z = 12; } else if (i >= 6 && was < 6) { fly.userData.moveTo(0, 4, 0); E.x = 10; E.z = 14; } else if (was >= 5 && i < 5) fly.userData.moveTo(0, 8, 0); tour.querySelectorAll('.fl').forEach(x => x.classList.toggle('on', x === b)); tip(); }); tour.appendChild(b); });
+    b.addEventListener('pointerdown', e => { e.stopPropagation(); const was = K; K = i; lab.set(i); walls.visible = i === 5; gal.visible = i === 6; lgal.visible = i === 7; rgal.visible = i === 8; cgal.visible = i === 9; xgal.visible = i === 10; ZONE.visible = i === 12; SKY.mesh.visible = i === 13; lab.mesh.visible = i !== 13; if (i === 12) { (zoneReady ||= buildZone()).then(() => { fly.userData.moveTo(0, -166.5, 0); E.x = 0; E.z = -150; lab.mat.uniforms.uTrO.value.copy(trail2.origin); }); } else lab.mat.uniforms.uTrO.value.copy(trail.origin); if (i === 5 && was !== 5) { fly.userData.moveTo(-40, 0, -Math.PI / 2); E.x = -30; E.z = 12; } else if (i >= 6 && was < 6) { fly.userData.moveTo(0, 4, 0); E.x = 10; E.z = 14; } else if (was >= 5 && i < 5) fly.userData.moveTo(0, 8, 0); tour.querySelectorAll('.fl').forEach(x => x.classList.toggle('on', x === b)); tip(); }); tour.appendChild(b); });
   { const sep = document.createElement('i'); sep.style.cssText = 'width:1px;align-self:stretch;background:rgba(185,255,74,.25);margin:0 4px'; tour.appendChild(sep); }
   /* 비교 버튼(얼음 땅 눈 양 · 눈 결 · 입구 시안)은 모두 정해져서 없앰 (2026-11-05): 바닥 눈 없음 · 눈 결 물결 · 입구 결정 문기둥 */
   VIEWS.forEach(v => { const b = document.createElement('button'); b.type = 'button'; b.textContent = v.name; b.className = 'vw';
@@ -208,7 +199,7 @@ export async function start(canvas, onProgress = () => {}) {
   let Wd = 2, Hd = 2, cw = 1, ch = 1;
   const perf = makePerf(st => { bloom.setSamples(st.aa ? 4 : 0); size(); });
   function size() { const r = canvas.getBoundingClientRect(); cw = r.width; ch = r.height; [Wd, Hd] = perf.size(r.width, r.height); renderer.setSize(Wd, Hd, false); bloom.size(Wd, Hd);
-    glow.uRes.value.set(Wd, Hd); }
+    camera.aspect = Wd / Hd; camera.updateProjectionMatrix(); glow.uRes.value.set(Wd, Hd); fly.userData.setPx?.(Hd / (2 * Math.tan(camera.fov * Math.PI / 360))); }
   addEventListener('resize', size); size(); bloom.setSamples(perf.st.aa ? 4 : 0);
   var E = { a: 0, x: 0, z: -12, head: 0, cool: 0, bank: 0 }; let myCool = 0, t = 0, last = performance.now(); const v3 = new THREE.Vector3();
   renderer.setAnimationLoop(now => { try {
@@ -221,9 +212,9 @@ export async function start(canvas, onProgress = () => {}) {
       const want = Math.atan2(-(FS.x - E.x), -(FS.z - E.z)), turn = THREE.MathUtils.euclideanModulo(want - E.head + Math.PI, Math.PI * 2) - Math.PI; E.head += turn * Math.min(1, dt * 4);
       E.bank += (clamp(-(vx * Math.cos(E.head) - vz * Math.sin(E.head)) * .04, -.5, .5) - E.bank) * Math.min(1, dt * 3);
       const bob = Math.sin(t * 2.1) * .12; foe.position.set(E.x, FLY.HOVER + .25 + bob, E.z); foe.rotation.set(0, E.head, 0); foe.rotateZ(E.bank); foe.updateMatrixWorld(true);
-      placeShadow(shFoe, E.x, E.z, FLY.HOVER + .25 + bob, E.head); if (K === 13) skyShadow(shFoe, E.x, E.z, FLY.HOVER + .25 + bob, E.head); if (K === 14) skyShadow(shFoe, E.x, E.z, FLY.HOVER + .25 + bob, E.head, ISLE);
+      placeShadow(shFoe, E.x, E.z, FLY.HOVER + .25 + bob, E.head); if (K === 13) skyShadow(shFoe, E.x, E.z, FLY.HOVER + .25 + bob, E.head);
       if ((E.cool -= dt) <= 0) { E.cool = .55; fire(E.x - Math.sin(E.head) * 1.2, E.z - Math.cos(E.head) * 1.2, FS.x, FS.z, false); } }
-    { const hy = fly.children[0]?.position.y ?? FLY.HOVER; placeShadow(shMe, FS.x, FS.z, Math.max(.4, hy), FS.head); if (K === 13) skyShadow(shMe, FS.x, FS.z, hy, FS.head); if (K === 14) skyShadow(shMe, FS.x, FS.z, hy, FS.head, ISLE);
+    { const hy = fly.children[0]?.position.y ?? FLY.HOVER; placeShadow(shMe, FS.x, FS.z, Math.max(.4, hy), FS.head); if (K === 13) skyShadow(shMe, FS.x, FS.z, hy, FS.head);
       if ((myCool -= dt) <= 0) { myCool = .22; fire(FS.x - Math.sin(FS.head) * 1.2, FS.z - Math.cos(FS.head) * 1.2, E.x, E.z, true); } }
     /* 탄 움직임 · 맞음 */
     for (let i = bolts.length - 1; i >= 0; i--) { const b = bolts[i]; b.x += b.vx * dt; b.z += b.vz * dt; b.life -= dt;
@@ -231,12 +222,7 @@ export async function start(canvas, onProgress = () => {}) {
       if (Math.hypot(b.x - hx, b.z - hz) < 1.1) { flash(b.x, b.z, b.mine ? [.6, 1.3, .7] : [1.4, .5, .5]); if (b.mine) { HF.hp = Math.max(.05, HF.hp - .018); HF.heat += .07; } else HM.hp = Math.max(.05, HM.hp - .03); bolts.splice(i, 1); continue; }
       if (b.life <= 0) bolts.splice(i, 1); }
     HM.hp = Math.min(1, HM.hp + dt * .03); HF.hp = Math.min(1, HF.hp + dt * .05);
-    /* 깊이 = 섬끼리만 (사용자 2026-11-05: 원근이면 섬 윗면과 꼬리가 엇갈려 잘린 것처럼 움직임) — 화면은 원근 없이 그려 섬은 통째로 한 덩어리,
-       대신 깊은 것일수록 통째로 카메라를 덜 따라와 천천히 흘러감 (섬 윗면 약 0.84배 · 구름 바다 약 0.4배) */
-    { const kI = PAR.isle, kS = PAR.sea; PAR.ox = cam.x * (1 - kI); PAR.oz = cam.z * (1 - kI);
-      if (K === 13) { SKY.mesh.position.set(PAR.ox, 0, PAR.oz); SKY.update(t, dt, cam.x - PAR.ox, cam.z - PAR.oz); }
-      if (K === 14 && ISEA) { isleGrp.position.set(0, 0, 0); ISLE.mesh.position.set(PAR.ox, 0, PAR.oz); ISEA.position.x = cam.x; ISEA.position.z = cam.z;
-        ISEA.material.uniforms.uSea.value.set(cam.x * (1 - kS), cam.z * (1 - kS)); ISEA.material.uniforms.uIsl.value.set(PAR.ox, PAR.oz); } }
+    if (K === 13) SKY.update(t, dt, cam.x, cam.z);
     UT.value = t; { let inH = false; for (const k in HIDE) { const h = HIDE[k]; h.mesh.visible = +k === K; if (+k === K) inH = h.update(t, dt, FS.x, FS.z); } if (K === 11) for (const b of plants) inH = b.update(t, dt, FS.x, FS.z) || inH; if (K === 12) for (const b of zonePlants) inH = b.update(t, dt, FS.x, FS.z) || inH; PL.visible = K === 11; if (!NOGH) fly.userData.setGhost?.(inH); }   /* 숨으면 내 기체 반투명 */
     for (const g of galTags) { v3.copy(g.p).project(camera); const on = gal.visible && v3.z < 1 && Math.abs(v3.x) < 1.1 && Math.abs(v3.y) < 1.1; g.el.style.opacity = on ? 1 : 0; if (on) g.el.style.transform = `translate(${(v3.x * .5 + .5) * cw}px,${(-v3.y * .5 + .5) * ch}px) translate(-50%,-50%)`; }
     lab.ships[0].set(FS.x, 0, FS.z, 1); lab.ships[1].set(E.x, 0, E.z, 2); lab.update(t);
@@ -251,21 +237,15 @@ export async function start(canvas, onProgress = () => {}) {
     /* 카메라: 내 기체를 따라감 */
     { const lx = FS.x + FS.vx * .35, lz = FS.z + FS.vz * .35, k = Math.min(1, dt * 5); cam.x += (lx - cam.x) * k; cam.z += (lz - cam.z) * k; }
     cam.h += (cam.H - cam.h) * Math.min(1, dt * 3); cam.tilt += (cam.T - cam.tilt) * Math.min(1, dt * 3);
-    { const vh = 2 * cam.h * Math.tan(20 * Math.PI / 180), asp = Wd / Hd; camera.top = vh / 2; camera.bottom = -vh / 2; camera.left = -vh / 2 * asp; camera.right = vh / 2 * asp; camera.updateProjectionMatrix();   /* 보이는 넓이는 전과 같게 */
-      fly.userData.setPx?.(Hd / vh * cam.h * TELE); }   /* 불꽃 알갱이 크기: 원근 없는 화면에 맞춤 */
-    camera.position.set(cam.x, cam.h * TELE * Math.cos(cam.tilt), cam.z + cam.h * TELE * Math.sin(cam.tilt)); camera.lookAt(cam.x, 0, cam.z); const ov = window.__camOv; if (ov) { camera.position.set(ov[0], ov[1], ov[2]); camera.lookAt(ov[3], ov[4], ov[5]); }   /* 시험용: 원하는 자리에서 보기 */ camera.updateMatrixWorld();
-    /* 배경 원근 카메라 (사용자 2026-11-05: 배경은 원근감 있게, 캐릭터만 직교로): 같은 방향 · 기체가 나는 높이에서 직교 화면과 딱 맞게(거리 cam.h, 40° 렌즈 → 그 높이에서 보이는 넓이가 같음) */
-    pcam.aspect = Wd / Hd; pcam.updateProjectionMatrix(); pcam.quaternion.copy(camera.quaternion);
-    { const d = cam.h, fx = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion); pcam.position.set(cam.x, FLY.HOVER, cam.z).addScaledVector(fx, -d); if (ov) pcam.position.copy(camera.position); } pcam.updateMatrixWorld();
+    camera.position.set(cam.x, cam.h * Math.cos(cam.tilt), cam.z + cam.h * Math.sin(cam.tilt)); camera.lookAt(cam.x, 0, cam.z); const ov = window.__camOv; if (ov) { camera.position.set(ov[0], ov[1], ov[2]); camera.lookAt(ov[3], ov[4], ov[5]); }   /* 시험용: 원하는 자리에서 보기 */ camera.updateMatrixWorld();
     lab.mesh.position.set(Math.round(cam.x / 4) * 4, 0, Math.round(cam.z / 4) * 4);
     drawHud(HM, FS.x, FLY.HOVER, FS.z, dt); drawHud(HF, E.x, FLY.HOVER, E.z, dt);
-    renderer.setRenderTarget(bloom.scene); renderer.clear();
-    camera.layers.enableAll(); renderer.render(scene, camera);   /* 모두 원근 없이 (배경 원근 + 캐릭터 직교 두 번 그리기는 섬 안이 엇갈려 그만둠) */
+    renderer.setRenderTarget(bloom.scene); renderer.clear(); renderer.render(scene, camera);
     bloom.render(Wd, Hd, !perf.st.bloom); perf.tick(dt);
   } catch (e) { console.error('[바닥 시험장]', e); } });
   { const v = (import.meta.url.match(/v=(\d+)/) || [])[1] || '개발'; const el = document.createElement('div'); el.textContent = '판 번호 ' + v;
     el.style.cssText = 'position:fixed;left:max(18px,env(safe-area-inset-left,0px));bottom:calc(env(safe-area-inset-bottom,0px) + 14px);font-size:11px;color:rgba(185,255,74,.7);pointer-events:none'; document.body.appendChild(el); }
   tour.querySelectorAll('.fl')[5].dispatchEvent(new PointerEvent('pointerdown'));   /* 처음엔 새 이음 시험부터 */
   onProgress(1);
-  window.__fl = { renderer, SKY, get ISLE() { return ISLE; }, G: { ZONE, xgal, cgal, rgal, lgal, gal, walls }, blk: (k, x, z) => hitBlk(k, x, z), cam, set: i => tour.querySelectorAll('.fl')[i].dispatchEvent(new PointerEvent('pointerdown')), FS, E };
+  window.__fl = { renderer, SKY, G: { ZONE, xgal, cgal, rgal, lgal, gal, walls }, blk: (k, x, z) => hitBlk(k, x, z), cam, set: i => tour.querySelectorAll('.fl')[i].dispatchEvent(new PointerEvent('pointerdown')), FS, E };
 }
