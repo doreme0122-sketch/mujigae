@@ -12,8 +12,8 @@
    무게: 벽 한 줄 = 그리기 1번 (바위·용암·웅덩이가 한 재질, aF 값으로 용암 자리를 정함) */
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { block } from './ice.js?v=11051121';
-import { LAVA_GLSL } from './lavatone.js?v=11051121';
+import { block } from './ice.js?v=11051133';
+import { LAVA_GLSL } from './lavatone.js?v=11051133';
 
 const hs = (x, y, z) => { const s = Math.sin(x * 127.1 + y * 311.7 + z * 74.7) * 43758.5453; return s - Math.floor(s); };
 const vn = (x, y, z) => { const ix = Math.floor(x), iy = Math.floor(y), iz = Math.floor(z), fx = x - ix, fy = y - iy, fz = z - iz, u = fx * fx * (3 - 2 * fx), v = fy * fy * (3 - 2 * fy), w = fz * fz * (3 - 2 * fz);
@@ -162,7 +162,8 @@ export function makeLavaWall(path, opt = {}) {
   /* 벽 주변 구조물: 없앰 (사용자 2026-11-05: 가끔 걸리면 짜증) — opt.props 로만 켬 */
   if (opt.props) for (let d = .6 + R(); d < len - .4; d += .8 + R() * 1.9) { const big = R() < .4; rock(d, -(W * 1.5 + .4 + R() * (big ? 1.2 : 2.4)), big ? .7 + R() * .8 : .2 + R() * .35); }
   if (opt.props) for (let d = 1 + R() * 2; d < len - .5; d += 2.5 + R() * 4) rock(d, W * 1.5 + .5 + R(), .3 + R() * .5);
-  /* ⑤ 발치 용암 웅덩이: 벽 밑동에서 앞으로 들쭉날쭉 · 폭포 앞이 가장 넓고 뜨거움 · 바깥 끝은 바닥 아래로 스며 들어감 */
+  /* ⑤ 발치 용암 웅덩이 띠: 없앰 (사용자 2026-11-05: 벽 둘레 테두리처럼 오려 붙인 듯 보임) → 고이고 흘러나가는 용암은 바닥이 그림(floorlab lavaGround) */
+  if (opt.pool) /* ⑤ 발치 용암 웅덩이: 벽 밑동에서 앞으로 들쭉날쭉 · 폭포 앞이 가장 넓고 뜨거움 · 바깥 끝은 바닥 아래로 스며 들어감 */
   { const Q = [], Gq = [], Fq = [], sk = (i, k) => { const f = fr[i], fv = poolK(f.d);
       const reach = (1.2 + vn(f.d * .35, 4, o) * 2. + fv * 2.6) * f.c, base = faceV(f, -1, 0) - .15;
       const v = -(base + [0, .5, reach * .6, reach][k]), y = [.06, .03, .012, -.02][k];   /* 바닥에 거의 붙어 바닥 껍질 판으로 이어짐 */
@@ -172,6 +173,8 @@ export function makeLavaWall(path, opt = {}) {
       if (!FL) { Q.push(...a, ...b, ...c, ...b, ...d, ...c); Fq.push(la, lb, lc, lb, ld, lc); } else { Q.push(...a, ...c, ...b, ...b, ...c, ...d); Fq.push(la, lc, lb, lb, lc, ld); } Gq.push(0, 0, 0, 0, 0, 0); }
     const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(Q, 3)); g.setAttribute('aG', new THREE.Float32BufferAttribute(Gq, 1)); g.setAttribute('aF', new THREE.Float32BufferAttribute(Fq, 1)); parts.push(prep(g)); }
   const grp = new THREE.Group(); grp.add(new THREE.Mesh(mergeGeometries(parts), mat));
-  grp.userData = { mat, len, falls: FALLS, blockers: BLK };
+  /* 바닥에 넘겨줄 폭포 자리: 벽 앞 밑동(x,z) · 흘러나가는 쪽(앞) · 굵기 · 바닥까지 오는지 */
+  const fallsW = FALLS.map(F => { const i = Math.min(N, Math.max(0, Math.round(F.c / len * N))), f = fr[i], v = faceV(f, -1, 0); return { x: f.x - f.nx * v, z: f.z - f.nz * v, dx: -f.nx, dz: -f.nz, w: F.w, reach: F.ystop ? .35 : 1, hot: F.hot }; });
+  grp.userData = { mat, len, falls: FALLS, fallsW, blockers: BLK };
   return grp;
 }

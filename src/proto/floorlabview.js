@@ -5,19 +5,19 @@
    무게: 바닥 판 하나 + 기체 둘 + 빛 알갱이 한 묶음 + 그림자 판 둘 */
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
-import { makeBloom } from '../core/hangar/bloom.js?v=11051121';
-import { makePerf } from './perf.js?v=11051121';
+import { makeBloom } from '../core/hangar/bloom.js?v=11051133';
+import { makePerf } from './perf.js?v=11051133';
 import { buildShip, engineSpots } from '../core/ships/build.js';
 import { makeGlow } from '../preview/glow.js';
-import { makeFlight, FLY } from './flight.js?v=11051121';
-import { makeFloorLab, LAB, JOIN, sdBlob, sdRoad, blobR } from './floorlab.js?v=11051121';
-import { makeMassWall, STYLES } from './wallmass.js?v=11051121';
-import { makeIceWall } from './icewall.js?v=11051121';
-import { SNOW_U } from './snowtone.js?v=11051121';
-import { iceWallMaterial, snowMaterial } from './icewall.js?v=11051121';
-import { makeRuinWall, ruinMaterial } from './ruins.js?v=11051121';
-import { makeCoralWall, coralMaterial } from './coral.js?v=11051121';
-import { makeLavaWall, lavaWallMaterial } from './lavawall.js?v=11051121';
+import { makeFlight, FLY } from './flight.js?v=11051133';
+import { makeFloorLab, LAB, JOIN, sdBlob, sdRoad, blobR } from './floorlab.js?v=11051133';
+import { makeMassWall, STYLES } from './wallmass.js?v=11051133';
+import { makeIceWall } from './icewall.js?v=11051133';
+import { SNOW_U } from './snowtone.js?v=11051133';
+import { iceWallMaterial, snowMaterial } from './icewall.js?v=11051133';
+import { makeRuinWall, ruinMaterial } from './ruins.js?v=11051133';
+import { makeCoralWall, coralMaterial } from './coral.js?v=11051133';
+import { makeLavaWall, lavaWallMaterial } from './lavawall.js?v=11051133';
 
 const $ = s => document.querySelector(s), clamp = THREE.MathUtils.clamp;
 const VIEWS = [{ id: 'game', name: '게임 시점', h: 42, tilt: .38 }, { id: 'near', name: '가까이', h: 18, tilt: .6 }, { id: 'far', name: '멀리', h: 90, tilt: .3 }];
@@ -80,6 +80,9 @@ export async function start(canvas, onProgress = () => {}) {
   const cgal = new THREE.Group(); scene.add(cgal); cgal.visible = false; { const cm = coralMaterial(UT);
     cgal.add(makeCoralWall(L1, { uT: UT, mat: cm, seed: 41, doors: [false, true] }), makeCoralWall(L2, { uT: UT, mat: cm, seed: 42, doors: [true, false] })); }
   cgal.children.forEach(w => addBlk(9, w));
+  /* 용암 폭포 자리를 바닥에 넘김 (0~11 벽 칸 · 12~23 이음 장면) → 바닥이 폭포 아래 웅덩이·흘러나가는 개울을 그림 */
+  { const LF = lab.mat.uniforms.uLF.value, LW = lab.mat.uniforms.uLFw.value, fill = (ws, o) => { let k = 0; for (const w of ws) for (const F of w.userData.fallsW || []) if (k < 12) { LF[o + k].set(F.x, F.z, F.dx, F.dz); LW[o + k].set(F.w, F.reach); k++; } };
+    fill(lgal.children, 0); fill(walls.children, 12); }
   walls.children.forEach(w => addBlk(5, w)); galW.forEach(w => addBlk(6, w)); lgal.children.forEach(w => addBlk(7, w)); rgal.children.forEach(w => addBlk(8, w));
   const tagAt = (txt, x, y, z) => { const el = document.createElement('div'); el.className = 'tag'; el.innerHTML = `<b>${txt}</b>`; el.style.opacity = 0; $('#tags').appendChild(el); galTags.push({ el, p: new THREE.Vector3(x, y, z) }); };
   tagAt('빙하 얼음 벽 · 한 덩어리 절벽', -19, 10, GAL.z); tagAt('문', 0, 4, GAL.z);
