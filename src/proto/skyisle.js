@@ -228,4 +228,4 @@ export function makeCloudSea(uT, sun, uN, discs = []) {
         gl_FragColor=vec4(c*.9,1.); }` }));
   m.position.y = SEA; m.renderOrder = -1; return m;
 }
-export { bakeFbm };
+export { bakeFbm, SKY, grassCap, grassMat, rockChunk, rockMat };

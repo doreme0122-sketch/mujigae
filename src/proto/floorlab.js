@@ -4,9 +4,9 @@
    · 멀어질수록 깊은 색으로 가라앉힘 (가까운 싸움터가 또렷하게)
    0 금속 판 · 1 이끼 낀 암반 · 2 결정 섞인 모래 · 3 은은한 평지 · 4 보스존 별빛 우주(보이지 않는 유리 바닥 + 아래로 깊은 별 세 겹) */
 import * as THREE from 'three';
-import { LAVA_GLSL, vorTex } from './lavatone.js?v=11051918';
-import { SNOW_GLSL, SNOW_U } from './snowtone.js?v=11051918';
-import { RUIN_TONE } from './ruintone.js?v=11051918';
+import { LAVA_GLSL, vorTex } from './lavatone.js?v=11051927';
+import { SNOW_GLSL, SNOW_U } from './snowtone.js?v=11051927';
+import { RUIN_TONE } from './ruintone.js?v=11051927';
 const RTv = a => `vec3(${a.map(x => x.toFixed(4)).join(',')})`;
 
 function bakeNoise(N = 256) {
@@ -36,7 +36,7 @@ export const LAB = [
   { id: 'plants', name: '숨을 곳 · 우주 식물', tip: '미지의 우주 식물 덤불 시안 셋이에요. 왼쪽부터 A 빛잎 덤불 · B 깃털 덤불 · C 빛버섯 무리(키 낮춤) · 맨 오른쪽 셋을 섞은 덤불. 들어가면 반투명해지고 곧은 테두리가 보여요.' },
   { id: 'zone1', name: '맵 1구역', tip: '맵 7안 방 1 둘레를 실제로 깔았어요. 방 1(바깥 벽 뒤) · 얼음 사냥터 · 양옆 보물 땅(유적) · 앞 산호 정글 · 가운데 자수정 보스존 둘레. 숨을 곳은 우주 식물 덤불.' },
   { id: 'sky', name: '하늘 협곡', tip: '나는 느낌 시험이에요. 부서진 행성 조각(섬)들이 저 아래 떠 있고, 섬 사이 틈 아래는 끝없는 별바다예요. 땅이라면 못 건널 틈과 끊긴 다리를 그냥 넘어가요. 막는 건 하늘까지 솟은 바위 첨탑뿐이에요.' },
-  { id: 'isle', name: '하늘 섬 하나', tip: '섬 부품 1단계예요. 층층이 쌓인 바위 덩이 위마다 풀이 덮이고 가장자리로 넘쳐 늘어져요. 나무(초록·분홍 꽃나무)와 덤불, 아래는 밝은 낮의 몽글몽글한 흰 구름 바다예요.' }];
+  { id: 'isle', name: '하늘 섬 하나', tip: '참고 제작 시트대로 만든 섬이에요. 깎인 바위 벼랑, 넘친 이끼와 늘어진 덩굴, 가운데 빛 고리 돌 판, 부서진 돌 아치, 빛나는 결정, 열대 잎과 야자, 분홍 별꽃.' }];
 
 /* 이음 시험 자리 (그림과 JS가 같은 식): 얼음 땅 가운데 (-30,0) · 용암 땅 (30,0) · 큰길 = 두 가운데를 잇는 폭 8m 띠 */
 export const JOIN = { ice: [-30, 0], lava: [30, 0], R: 22, roadW: 4, roadX: 30 };

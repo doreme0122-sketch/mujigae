@@ -5,28 +5,29 @@
    무게: 바닥 판 하나 + 기체 둘 + 빛 알갱이 한 묶음 + 그림자 판 둘 */
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
-import { makeBloom } from '../core/hangar/bloom.js?v=11051918';
-import { makePerf } from './perf.js?v=11051918';
+import { makeBloom } from '../core/hangar/bloom.js?v=11051927';
+import { makePerf } from './perf.js?v=11051927';
 import { buildShip, engineSpots } from '../core/ships/build.js';
 import { makeGlow } from '../preview/glow.js';
-import { makeFlight, FLY } from './flight.js?v=11051918';
-import { makeFloorLab, LAB, JOIN, sdBlob, sdRoad, blobR } from './floorlab.js?v=11051918';
-import { makeMassWall, STYLES } from './wallmass.js?v=11051918';
-import { makeIceWall } from './icewall.js?v=11051918';
-import { SNOW_U } from './snowtone.js?v=11051918';
-import { iceWallMaterial, snowMaterial } from './icewall.js?v=11051918';
-import { makeRuinWall, ruinMaterial } from './ruins.js?v=11051918';
-import { makeCoralWall, coralMaterial, coral } from './coral.js?v=11051918';
-import { makeTrailMap } from './trailmap.js?v=11051918';
-import { makeThemedHide } from './hidetheme.js?v=11051918';
-import { makePlantBush } from './plantbush.js?v=11051918';
-import { makeCrystalWall, crystalMaterial } from './crystal.js?v=11051918';
-import { makeLavaWall, lavaWallMaterial } from './lavawall.js?v=11051918';
-import { makeSkyCanyon } from './skycanyon.js?v=11051918';
-import { makeSkyIsle, makeCloudSea } from './skyisle.js?v=11051918';
+import { makeFlight, FLY } from './flight.js?v=11051927';
+import { makeFloorLab, LAB, JOIN, sdBlob, sdRoad, blobR } from './floorlab.js?v=11051927';
+import { makeMassWall, STYLES } from './wallmass.js?v=11051927';
+import { makeIceWall } from './icewall.js?v=11051927';
+import { SNOW_U } from './snowtone.js?v=11051927';
+import { iceWallMaterial, snowMaterial } from './icewall.js?v=11051927';
+import { makeRuinWall, ruinMaterial } from './ruins.js?v=11051927';
+import { makeCoralWall, coralMaterial, coral } from './coral.js?v=11051927';
+import { makeTrailMap } from './trailmap.js?v=11051927';
+import { makeThemedHide } from './hidetheme.js?v=11051927';
+import { makePlantBush } from './plantbush.js?v=11051927';
+import { makeCrystalWall, crystalMaterial } from './crystal.js?v=11051927';
+import { makeLavaWall, lavaWallMaterial } from './lavawall.js?v=11051927';
+import { makeSkyCanyon } from './skycanyon.js?v=11051927';
+import { makeSkyIsle, makeCloudSea } from './skyisle.js?v=11051927';
+import { makeHeroIsle } from './heroisle.js?v=11051927';
 
 const $ = s => document.querySelector(s), clamp = THREE.MathUtils.clamp;
-const VIEWS = [{ id: 'game', name: '게임 시점', h: 42, tilt: .38 }, { id: 'near', name: '가까이', h: 18, tilt: .6 }, { id: 'far', name: '멀리', h: 90, tilt: .3 }];
+const VIEWS = [{ id: 'game', name: '게임 시점', h: 42, tilt: .59 }, { id: 'near', name: '가까이', h: 18, tilt: .6 }, { id: 'far', name: '멀리', h: 90, tilt: .3 }];
 const AREA = 70;
 
 export async function start(canvas, onProgress = () => {}) {
@@ -109,7 +110,7 @@ export async function start(canvas, onProgress = () => {}) {
   const SKY = makeSkyCanyon(UT, sunDir); scene.add(SKY.mesh); SKY.mesh.visible = false;
   /* 하늘 섬 하나 (섬 부품 1단계, 2026-11-05) — 처음 열 때 만듦 */
   let ISLE = null, ISEA = null; const isleGrp = new THREE.Group(); scene.add(isleGrp); isleGrp.visible = false;
-  const mkIsle = () => { if (ISLE) return; ISLE = makeSkyIsle(UT, sunDir, { seed: 777, size: 11, top: -9 }); ISEA = makeCloudSea(UT, sunDir, ISLE.uN, [...ISLE.spots].sort((a, b) => b.r - a.r).slice(0, 16)); isleGrp.add(ISLE.mesh, ISEA); };
+  const mkIsle = () => { if (ISLE) return; ISLE = makeHeroIsle(UT, sunDir, { seed: 2026, size: 9, top: -8 }); ISEA = makeCloudSea(UT, sunDir, ISLE.uN, ISLE.discs);   /* 참고 제작 시트대로 (2026-11-05) */ isleGrp.add(ISLE.mesh, ISEA); };
   const ZONE = new THREE.Group(); scene.add(ZONE); ZONE.visible = false; let zoneReady = null, zoneReg = null, zonePlants = [];
   const buildZone = async () => {
     const J = await (await fetch('./assets/map/v7.json')).json(), tex = await new THREE.TextureLoader().loadAsync('./assets/map/v7.png');
@@ -189,7 +190,7 @@ export async function start(canvas, onProgress = () => {}) {
     h.ht.style.width = (k * 100) + '%'; h.ht.style.background = k > .98 ? `rgba(255,60,60,${.6 + .4 * Math.sin(t * 20)})` : `rgb(255,${200 - 150 * k | 0},${80 - 60 * k | 0})`; };
   /* 버튼 */
   const trail = makeTrailMap(renderer), trail2 = makeTrailMap(renderer, { cx: 0, cz: -62, span: 104 }); lab.mat.uniforms.uTrO.value.copy(trail.origin); lab.mat.uniforms.uTrail.value = trail.tex;
-  const cam = { x: 0, z: 8, h: 42, H: 42, tilt: .38, T: .38 };
+  const cam = { x: 0, z: 8, h: 42, H: 42, tilt: .59, T: .59 };   /* 게임 시점 기울기: 수직에서 약 34도 (사용자 2026-11-05: 롤처럼 비스듬히 · 전엔 22도) */
   const tip = () => { $('#tip').hidden = false; $('#tip b').textContent = LAB[K].name; $('#tip span').textContent = LAB[K].tip; $('#head b').textContent = '바닥 시험장 · ' + LAB[K].name; };
   const tour = $('#tour');
   LAB.forEach((f, i) => { const b = document.createElement('button'); b.type = 'button'; b.textContent = f.name; b.className = 'fl';
