@@ -6,8 +6,8 @@
    · 예전 게임은 바닥 XY · 위 Z → 이 게임(위 Y)에 맞게 통째로 눕힘
    · 그리는 횟수는 크로나크와 같은 공용 방법(slim.js)으로 줄임 */
 import * as THREE from 'three';
-import { buildB03, buildB03FX } from './hivecode.js?v=11051010';
-import { slim, countDraws } from './slim.js?v=11051010';
+import { buildB03, buildB03FX } from './hivecode.js?v=11051020';
+import { slim, countDraws } from './slim.js?v=11051020';
 
 export function makeHive(opt = {}) {
   const ally = false, SIZE = opt.size || 12;                                  /* SIZE: 이 게임에서의 지름(m) */

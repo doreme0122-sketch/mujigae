@@ -3,12 +3,12 @@
    맵에 넣기 전에 생김새·움직임·맞음·쓰러짐·경험치를 한자리에서 봄 */
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
-import { makeBloom } from '../core/hangar/bloom.js?v=11051010';
+import { makeBloom } from '../core/hangar/bloom.js?v=11051020';
 import { buildShip } from '../core/ships/build.js';
-import { makeJellies, JELLY, JCOL } from './jelly.js?v=11051010';
-import { pointPool } from './skilldemo.js?v=11051010';
-import { makeMobFx } from './mobfx.js?v=11051010';
-import { makePerf } from './perf.js?v=11051010';
+import { makeJellies, JELLY, JCOL } from './jelly.js?v=11051020';
+import { pointPool } from './skilldemo.js?v=11051020';
+import { makeMobFx } from './mobfx.js?v=11051020';
+import { makePerf } from './perf.js?v=11051020';
 import * as A from '../core/audio.js';
 
 const $ = s => document.querySelector(s), clamp = THREE.MathUtils.clamp;

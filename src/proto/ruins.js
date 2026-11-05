@@ -4,7 +4,7 @@
    · 평소: 빛나지 않는다. 문양은 어두운 홈으로만 보인다.
    · 맞으면: 맞은 자리에서 가까운 문양부터 하나씩 차례로 금빛으로 켜졌다가(지름 3m 남짓) 0.8초쯤에 꺼진다. */
 import * as THREE from 'three';
-import { HITS } from './rocks.js?v=11051010';
+import { HITS } from './rocks.js?v=11051020';
 
 const rng = seed => { let s = seed * 9301 + 49297; return () => (s = (s * 9301 + 49297) % 233280) / 233280; };
 
@@ -149,7 +149,7 @@ export function makeRuinWall(path, opt = {}) {
   /* 무너짐 물결 (0 = 바닥까지 무너짐 · 1 = 온전) · 문 가까이 온전 · 문 없는 끝은 무너짐 */
   const ph = R() * 9, keep = d => { let k = .78 + .28 * Math.sin(d * .19 + ph) + .18 * Math.sin(d * .47 + ph * 2.3);
     const ds = doors[0] ? d : 1e9, de = doors[1] ? len - d : 1e9; k = Math.max(k, 1.1 - Math.min(ds, de) / 4);
-    if (!doors[0]) k *= Math.min(1, .25 + d / 3); if (!doors[1]) k *= Math.min(1, .25 + (len - d) / 3); return Math.min(1.05, Math.max(.12, k)); };
+    if (!doors[0]) k *= Math.min(1, .55 + d / 4); if (!doors[1]) k *= Math.min(1, .55 + (len - d) / 4); return Math.min(1.05, Math.max(.5, k)); };   /* 가장 무너진 곳도 절반은 남음 (사용자: 낮은 벽이 너무 낮음) */
   /* ① 단마다 엇갈려 쌓기 */
   const COURSES = [[.62, 1.55, 1.3], [.55, 1.42, 1.15], [.5, 1.3, 1.0], [.46, 1.2, .9], [.42, 1.1, .85]];   /* [단 높이, 두께, 돌 길이 기준] */
   let y0 = -.18;
@@ -173,6 +173,17 @@ export function makeRuinWall(path, opt = {}) {
     for (let j = 0; j < 4; j++) tg.push({ x: a.p.x, y: h * (j + .5) / 4, z: a.p.z, r: w * .6 }); };
   if (doors[0]) { col(.5, true); col(2.1, false); } if (doors[1]) { col(len - .5, true); col(len - 2.1, false); }
   for (let d = 5 + R() * 2; d < len - 4; d += 6 + R() * 3) col(d, false);
+  /* ⑥ 벽 주변 부서진 기둥 (사용자 2026-11-05): 벽 앞뒤 1.5~4m에 옛 기둥이 남은 자리
+     · 부러진 밑동: 받침돌 위에 깨진 윗면의 짧은 기둥(0.5~1.6m)
+     · 쓰러진 토막: 부러져 나간 윗부분이 옆으로 누움(반쯤 바닥에 묻힌 듯), 머리돌이 떨어져 굴러 있기도 */
+  for (let d = 2 + R() * 3; d < len - 2; d += 4 + R() * 5) { const a = at(d), side = R() < .65 ? -1 : 1, off = side * (1.6 + R() * 2.4), x = a.p.x + a.nx * off, z = a.p.z + a.nz * off, w = .85 + R() * .3;
+    const stump = .5 + R() * 1.1; put(x, -.25, z, w + .3, .35, w + .3, R() * 6.28, 0, 0, 1);
+    put(x, -.2, z, w, stump, w * .92, R() * 6.28, (R() - .5) * .06, (R() - .5) * .06, 0);
+    tg.push({ x, y: stump * .5, z, r: w * .6 });
+    if (R() < .7) { const fa = R() * 6.28, fl = 1.2 + R() * 1.6, fx = x + Math.cos(fa) * (fl * .5 + .5), fz = z + Math.sin(fa) * (fl * .5 + .5);   /* 쓰러진 토막 */
+      st.push({ g: Math.floor(R() * 4), x: fx - Math.cos(fa) * fl * .5, y: w * .3 - .15, z: fz - Math.sin(fa) * fl * .5, s: [w * .95, fl, w * .9],
+        q: new THREE.Quaternion().setFromEuler(new THREE.Euler(0, -fa, -Math.PI / 2 + (R() - .5) * .15, 'YXZ')) });
+      if (R() < .5) put(fx + Math.cos(fa) * .6, -.2, fz + Math.sin(fa) * .6, w + .25, .3, w + .25, R() * 6.28, (R() - .5) * .5, (R() - .5) * .5, 1); } }
   /* ④ 떨어진 돌: 무너진 만큼 많이 · 바닥에 구르거나 벽에 기댐 */
   for (let d = .3; d < len; d += .6 + R() * .9) { const k = keep(d), lost = 1 - k; if (R() > .15 + lost * 1.1) continue; const a = at(d), side = R() < .7 ? -1 : 1;
     const lean = R() < .25, s = .4 + R() * .45, off = side * (lean ? .95 + R() * .2 : 1.3 + R() * 2.4);
