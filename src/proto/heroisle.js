@@ -7,7 +7,7 @@
    · 빛나는 결정: 아치 옆 무리 + 섬 아래에 거꾸로 매달린 무리
    · 식물: 넓은 잎 열대 풀(잎맥·갈라진 잎) · 야자 한 그루 · 분홍 별꽃 · 작은 바위 */
 import * as THREE from 'three';
-import { SKY, grassCap, grassMat, bakeFbm } from './skyisle.js';
+import { SKY, grassCap, grassMat, bakeFbm } from './skyisle.js?v=11051928';
 
 const rng = s => () => (s = (s * 16807) % 2147483647) / 2147483647;
 const v0 = new THREE.Vector3();
