@@ -5,35 +5,38 @@
    무게: 바닥 판 하나 + 기체 둘 + 빛 알갱이 한 묶음 + 그림자 판 둘 */
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
-import { makeBloom } from '../core/hangar/bloom.js?v=11051928';
-import { makePerf } from './perf.js?v=11051928';
+import { makeBloom } from '../core/hangar/bloom.js?v=11051943';
+import { makePerf } from './perf.js?v=11051943';
 import { buildShip, engineSpots } from '../core/ships/build.js';
 import { makeGlow } from '../preview/glow.js';
-import { makeFlight, FLY } from './flight.js?v=11051928';
-import { makeFloorLab, LAB, JOIN, sdBlob, sdRoad, blobR } from './floorlab.js?v=11051928';
-import { makeMassWall, STYLES } from './wallmass.js?v=11051928';
-import { makeIceWall } from './icewall.js?v=11051928';
-import { SNOW_U } from './snowtone.js?v=11051928';
-import { iceWallMaterial, snowMaterial } from './icewall.js?v=11051928';
-import { makeRuinWall, ruinMaterial } from './ruins.js?v=11051928';
-import { makeCoralWall, coralMaterial, coral } from './coral.js?v=11051928';
-import { makeTrailMap } from './trailmap.js?v=11051928';
-import { makeThemedHide } from './hidetheme.js?v=11051928';
-import { makePlantBush } from './plantbush.js?v=11051928';
-import { makeCrystalWall, crystalMaterial } from './crystal.js?v=11051928';
-import { makeLavaWall, lavaWallMaterial } from './lavawall.js?v=11051928';
-import { makeSkyCanyon } from './skycanyon.js?v=11051928';
-import { makeSkyIsle, makeCloudSea } from './skyisle.js?v=11051928';
-import { makeHeroIsle } from './heroisle.js?v=11051928';
+import { makeFlight, FLY } from './flight.js?v=11051943';
+import { makeFloorLab, LAB, JOIN, sdBlob, sdRoad, blobR } from './floorlab.js?v=11051943';
+import { makeMassWall, STYLES } from './wallmass.js?v=11051943';
+import { makeIceWall } from './icewall.js?v=11051943';
+import { SNOW_U } from './snowtone.js?v=11051943';
+import { iceWallMaterial, snowMaterial } from './icewall.js?v=11051943';
+import { makeRuinWall, ruinMaterial } from './ruins.js?v=11051943';
+import { makeCoralWall, coralMaterial, coral } from './coral.js?v=11051943';
+import { makeTrailMap } from './trailmap.js?v=11051943';
+import { makeThemedHide } from './hidetheme.js?v=11051943';
+import { makePlantBush } from './plantbush.js?v=11051943';
+import { makeCrystalWall, crystalMaterial } from './crystal.js?v=11051943';
+import { makeLavaWall, lavaWallMaterial } from './lavawall.js?v=11051943';
+import { makeSkyCanyon } from './skycanyon.js?v=11051943';
+import { makeSkyIsle, makeCloudSea } from './skyisle.js?v=11051943';
+import { makeHeroIsle } from './heroisle.js?v=11051943';
 
 const $ = s => document.querySelector(s), clamp = THREE.MathUtils.clamp;
+/* 망원 카메라 (사용자 2026-11-05: 조금만 멀어져도 기체가 작아지는 게 확 느껴짐 · 롤은 맵 끝과 끝이어도 크기가 같음)
+   카메라를 3.2배 멀리 빼고 렌즈를 40° → 13°로 좁혀, 화면에 보이는 넓이는 그대로 · 위아래 끝의 크기 차이는 거의 없음 */
+const TELE = Math.tan(20 * Math.PI / 180) / Math.tan(6.5 * Math.PI / 180);
 const VIEWS = [{ id: 'game', name: '게임 시점', h: 42, tilt: .59 }, { id: 'near', name: '가까이', h: 18, tilt: .6 }, { id: 'far', name: '멀리', h: 90, tilt: .3 }];
 const AREA = 70;
 
 export async function start(canvas, onProgress = () => {}) {
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: false, powerPreference: 'high-performance' });
   renderer.toneMapping = THREE.NoToneMapping; renderer.autoClear = false; renderer.setClearColor(0, 1);
-  const scene = new THREE.Scene(), camera = new THREE.PerspectiveCamera(40, 1, .5, 900), bloom = makeBloom(renderer, { samples: 0 });
+  const scene = new THREE.Scene(), camera = new THREE.PerspectiveCamera(13, 1, 4, 1800), bloom = makeBloom(renderer, { samples: 0 });
   { const pm = new THREE.PMREMGenerator(renderer); scene.environment = pm.fromScene(new RoomEnvironment(), .04).texture; scene.environmentIntensity = .6; pm.dispose(); }
   const sunDir = new THREE.Vector3(-.45, .78, -.42).normalize(), sun = new THREE.DirectionalLight(0xfff0dc, 3); sun.position.copy(sunDir).multiplyScalar(20); scene.add(sun);
   scene.add(new THREE.HemisphereLight(0x7080a8, 0x2a1810, .5));
@@ -242,7 +245,7 @@ export async function start(canvas, onProgress = () => {}) {
     /* 카메라: 내 기체를 따라감 */
     { const lx = FS.x + FS.vx * .35, lz = FS.z + FS.vz * .35, k = Math.min(1, dt * 5); cam.x += (lx - cam.x) * k; cam.z += (lz - cam.z) * k; }
     cam.h += (cam.H - cam.h) * Math.min(1, dt * 3); cam.tilt += (cam.T - cam.tilt) * Math.min(1, dt * 3);
-    camera.position.set(cam.x, cam.h * Math.cos(cam.tilt), cam.z + cam.h * Math.sin(cam.tilt)); camera.lookAt(cam.x, 0, cam.z); const ov = window.__camOv; if (ov) { camera.position.set(ov[0], ov[1], ov[2]); camera.lookAt(ov[3], ov[4], ov[5]); }   /* 시험용: 원하는 자리에서 보기 */ camera.updateMatrixWorld();
+    camera.position.set(cam.x, cam.h * TELE * Math.cos(cam.tilt), cam.z + cam.h * TELE * Math.sin(cam.tilt)); camera.lookAt(cam.x, 0, cam.z); const ov = window.__camOv; if (ov) { camera.position.set(ov[0], ov[1], ov[2]); camera.lookAt(ov[3], ov[4], ov[5]); }   /* 시험용: 원하는 자리에서 보기 */ camera.updateMatrixWorld();
     lab.mesh.position.set(Math.round(cam.x / 4) * 4, 0, Math.round(cam.z / 4) * 4);
     drawHud(HM, FS.x, FLY.HOVER, FS.z, dt); drawHud(HF, E.x, FLY.HOVER, E.z, dt);
     renderer.setRenderTarget(bloom.scene); renderer.clear(); renderer.render(scene, camera);
