@@ -13,7 +13,7 @@
    · 가장자리 회색 바위 몇 개 · 작은 풀 포기 */
 import * as THREE from 'three';
 import { mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js';
-import { SKY, bakeFbm } from './skyisle.js?v=11052035';
+import { SKY, bakeFbm } from './skyisle.js?v=11052039';
 
 const rng = s => () => (s = (s * 16807) % 2147483647) / 2147483647;
 const v0 = new THREE.Vector3(), v1 = new THREE.Vector3();
@@ -183,14 +183,18 @@ export function makeHeroIsle(uT, sun, opt = {}) {
      · 끝은 한쪽으로 치우쳐 뜯긴 듯 울퉁불퉁 · 겉에 큰 바위 덩이 몇 개만 박힘 */
   const DEPTH = S * 2 * 1.6, tipX = S * .28, tipZ = -S * .12, LEDGE = [];
   const prof = q => Math.pow(Math.max(0, 1 - q), .72) * (1 + .18 * Math.sin(q * Math.PI)) * .95;
-  { const NC = 30, NRW = 16, LED = new Set([3, 6, 9, 12]), P = [], ring = [];
-    const colJ = Array.from({ length: NC }, () => (R() - .5) * .5), grv = Array.from({ length: NC }, (_, c) => c % 3 === 0 ? .55 + R() * .4 : 0);
+  { const NC = 30, NRW = 16, P = [], ring = [];
+    /* 턱은 둘레 전체 고리가 아니라 군데군데 짧게 (사용자 2026-11-05: 여러 층으로 나눈 것처럼 보임) — 2~4줄 폭, 높이 제각각 */
+    const LM = Array.from({ length: NRW + 1 }, () => new Float32Array(NC)), LS = [];
+    for (let k = 0; k < 11; k++) { const r = 2 + Math.floor(R() * 10), c0 = Math.floor(R() * NC), n = 2 + Math.floor(R() * 3), a = .7 + R() * .6;
+      for (let j = 0; j < n; j++) { const c = (c0 + j) % NC, w = j === 0 || j === n - 1 ? .55 : 1; LM[r][c] = Math.max(LM[r][c], a * w); if (r + 1 <= NRW) LM[r + 1][c] = Math.min(LM[r + 1][c], -.3 * w); }
+      LS.push([r, (c0 + (n >> 1)) % NC]); }
+    const colJ = Array.from({ length: NC }, () => (R() - .5) * .5), grv = Array.from({ length: NC }, (_, c) => c % 3 === 0 ? .55 + R() * .4 : R() < .12 ? 1 + R() * .4 : 0);   /* 세로 홈 + 위에서 아래까지 이어진 깊은 틈 몇 줄 */
     for (let r = 0; r <= NRW; r++) { const q = r / NRW, y = T - .55 - Math.pow(q, 1.05) * DEPTH + (r > 0 && r < NRW ? (R() - .5) * 1.1 : 0), f = prof(q), ox = CX + tipX * q * q, oz = CZ + tipZ * q * q, row = [];
-      const ledge = LED.has(r) ? .75 + R() * .5 : LED.has(r - 1) ? -.35 : 0;
       for (let c = 0; c < NC; c++) { const th = (c + colJ[c] * (r > 0 ? 1 : .3)) / NC * Math.PI * 2;
-        let rr = r === 0 ? rad(th) * .97 : rad(th) * f - grv[c] * (1 - q * .4) + ledge * (1 - q * .5) + (R() - .5) * .7 * (1 - q * .3);
+        let rr = r === 0 ? rad(th) * .97 : rad(th) * f - grv[c] * (1 - q * .4) + LM[r][c] * (1 - q * .5) + (R() - .5) * .7 * (1 - q * .3);
         rr = Math.max(.25, rr); row.push([ox + Math.cos(th) * rr, y, oz + Math.sin(th) * rr]);
-        if (LED.has(r) && q < .8 && R() < .3) LEDGE.push([ox + Math.cos(th) * (rr + .25), y + .25, oz + Math.sin(th) * (rr + .25), th, 1 - q]); }
+        if (LM[r][c] > .5 && q < .8 && LS.some(([lr, lc]) => lr === r && lc === c) && R() < .7) LEDGE.push([ox + Math.cos(th) * (rr + .25), y + .25, oz + Math.sin(th) * (rr + .25), th, 1 - q]); }   /* 짧은 턱 몇 곳에만 식물 */
       ring.push(row); }
     const tip = [CX + tipX + (R() - .5), T - .55 - DEPTH - 2.5, CZ + tipZ + (R() - .5)];
     const tri = (a, b, c) => P.push(...a, ...b, ...c);
