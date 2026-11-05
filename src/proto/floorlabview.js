@@ -5,17 +5,18 @@
    무게: 바닥 판 하나 + 기체 둘 + 빛 알갱이 한 묶음 + 그림자 판 둘 */
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
-import { makeBloom } from '../core/hangar/bloom.js?v=11050937';
-import { makePerf } from './perf.js?v=11050937';
+import { makeBloom } from '../core/hangar/bloom.js?v=11050950';
+import { makePerf } from './perf.js?v=11050950';
 import { buildShip, engineSpots } from '../core/ships/build.js';
 import { makeGlow } from '../preview/glow.js';
-import { makeFlight, FLY } from './flight.js?v=11050937';
-import { makeFloorLab, LAB, JOIN, sdBlob, sdRoad, blobR } from './floorlab.js?v=11050937';
-import { makeMassWall, STYLES } from './wallmass.js?v=11050937';
-import { makeIceWall } from './icewall.js?v=11050937';
-import { SNOW_U } from './snowtone.js?v=11050937';
-import { iceWallMaterial, snowMaterial } from './icewall.js?v=11050937';
-import { makeLavaWall, lavaWallMaterial } from './lavawall.js?v=11050937';
+import { makeFlight, FLY } from './flight.js?v=11050950';
+import { makeFloorLab, LAB, JOIN, sdBlob, sdRoad, blobR } from './floorlab.js?v=11050950';
+import { makeMassWall, STYLES } from './wallmass.js?v=11050950';
+import { makeIceWall } from './icewall.js?v=11050950';
+import { SNOW_U } from './snowtone.js?v=11050950';
+import { iceWallMaterial, snowMaterial } from './icewall.js?v=11050950';
+import { makeRuinWall, ruinWallMaterial } from './ruinwall.js?v=11050950';
+import { makeLavaWall, lavaWallMaterial } from './lavawall.js?v=11050950';
 
 const $ = s => document.querySelector(s), clamp = THREE.MathUtils.clamp;
 const VIEWS = [{ id: 'game', name: '게임 시점', h: 42, tilt: .38 }, { id: 'near', name: '가까이', h: 18, tilt: .6 }, { id: 'far', name: '멀리', h: 90, tilt: .3 }];
@@ -34,7 +35,7 @@ export async function start(canvas, onProgress = () => {}) {
   /* 내 기체: 맵과 같은 비행 (둘레 AREA m 밖은 막힘) */
   const sdI = (x, z) => sdBlob(x, z, JOIN.ice, 0), sdL = (x, z) => sdBlob(x, z, JOIN.lava, 2.1);
   const onRoad = (x, z) => sdRoad(x, z) < 0, inLand = (x, z) => Math.min(sdI(x, z), sdL(x, z)) < 0;
-  const B = { blocked: (x, z) => { if (K === 6 || K === 7) { if (Math.abs(x) > 90 || z > 30 || z < -30) return true; const ok = (x > -34 && x < -4) || (x > 4 && x < 34); return ok && Math.abs(z - GAL.z) < 3.2; }
+  const B = { blocked: (x, z) => { if (K === 6 || K === 7 || K === 8) { if (Math.abs(x) > 90 || z > 30 || z < -30) return true; const ok = (x > -34 && x < -4) || (x > 4 && x < 34); return ok && Math.abs(z - GAL.z) < 3.2; }
       if (K !== 5) return Math.hypot(x, z) > AREA;
       if (onRoad(x, z)) return false; const sd = Math.min(sdI(x, z), sdL(x, z)); return sd > -1.4; },   /* 이음 시험: 땅 밖(우주)·벽 띠는 막힘, 큰길은 벽 틈(문)으로 지나감 */
     region: () => 0 };
@@ -67,6 +68,9 @@ export async function start(canvas, onProgress = () => {}) {
   /* 용암 바위 벽 보기: 얼음 벽 칸과 같은 자리·같은 모양 줄 (가운데 문) */
   const lgal = new THREE.Group(); scene.add(lgal); lgal.visible = false; { const lm = lavaWallMaterial(UT);
     lgal.add(makeLavaWall(L1, { uT: UT, mat: lm, seed: 21, out: north, doors: [false, true] }), makeLavaWall(L2, { uT: UT, mat: lm, seed: 22, out: north, doors: [true, false] })); }
+  /* 고대 유적 벽 보기: 같은 자리·같은 모양 줄 (가운데 문) */
+  const rgal = new THREE.Group(); scene.add(rgal); rgal.visible = false; { const rm = ruinWallMaterial(UT);
+    rgal.add(makeRuinWall(L1, { uT: UT, mat: rm, seed: 31, out: north, doors: [false, true] }), makeRuinWall(L2, { uT: UT, mat: rm, seed: 32, out: north, doors: [true, false] })); }
   const tagAt = (txt, x, y, z) => { const el = document.createElement('div'); el.className = 'tag'; el.innerHTML = `<b>${txt}</b>`; el.style.opacity = 0; $('#tags').appendChild(el); galTags.push({ el, p: new THREE.Vector3(x, y, z) }); };
   tagAt('빙하 얼음 벽 · 한 덩어리 절벽', -19, 10, GAL.z); tagAt('문', 0, 4, GAL.z);
 
@@ -110,7 +114,7 @@ export async function start(canvas, onProgress = () => {}) {
   const tip = () => { $('#tip').hidden = false; $('#tip b').textContent = LAB[K].name; $('#tip span').textContent = LAB[K].tip; $('#head b').textContent = '바닥 시험장 · ' + LAB[K].name; };
   const tour = $('#tour');
   LAB.forEach((f, i) => { const b = document.createElement('button'); b.type = 'button'; b.textContent = f.name; b.className = 'fl';
-    b.addEventListener('pointerdown', e => { e.stopPropagation(); const was = K; K = i; lab.set(i); walls.visible = i === 5; gal.visible = i === 6; lgal.visible = i === 7; if (i === 5 && was !== 5) { fly.userData.moveTo(-40, 0, -Math.PI / 2); E.x = -30; E.z = 12; } else if ((i === 6 || i === 7) && was !== 6 && was !== 7) { fly.userData.moveTo(0, 4, 0); E.x = 10; E.z = 14; } else if ((was === 5 || was === 6 || was === 7) && i < 5) fly.userData.moveTo(0, 8, 0); tour.querySelectorAll('.fl').forEach(x => x.classList.toggle('on', x === b)); tip(); }); tour.appendChild(b); });
+    b.addEventListener('pointerdown', e => { e.stopPropagation(); const was = K; K = i; lab.set(i); walls.visible = i === 5; gal.visible = i === 6; lgal.visible = i === 7; rgal.visible = i === 8; if (i === 5 && was !== 5) { fly.userData.moveTo(-40, 0, -Math.PI / 2); E.x = -30; E.z = 12; } else if ((i === 6 || i === 7 || i === 8) && was !== 6 && was !== 7 && was !== 8) { fly.userData.moveTo(0, 4, 0); E.x = 10; E.z = 14; } else if ((was === 5 || was === 6 || was === 7 || was === 8) && i < 5) fly.userData.moveTo(0, 8, 0); tour.querySelectorAll('.fl').forEach(x => x.classList.toggle('on', x === b)); tip(); }); tour.appendChild(b); });
   { const sep = document.createElement('i'); sep.style.cssText = 'width:1px;align-self:stretch;background:rgba(185,255,74,.25);margin:0 4px'; tour.appendChild(sep); }
   /* 비교 버튼(얼음 땅 눈 양 · 눈 결 · 입구 시안)은 모두 정해져서 없앰 (2026-11-05): 바닥 눈 없음 · 눈 결 물결 · 입구 결정 문기둥 */
   VIEWS.forEach(v => { const b = document.createElement('button'); b.type = 'button'; b.textContent = v.name; b.className = 'vw';
@@ -143,7 +147,7 @@ export async function start(canvas, onProgress = () => {}) {
       if (Math.hypot(b.x - hx, b.z - hz) < 1.1) { flash(b.x, b.z, b.mine ? [.6, 1.3, .7] : [1.4, .5, .5]); if (b.mine) { HF.hp = Math.max(.05, HF.hp - .018); HF.heat += .07; } else HM.hp = Math.max(.05, HM.hp - .03); bolts.splice(i, 1); continue; }
       if (b.life <= 0) bolts.splice(i, 1); }
     HM.hp = Math.min(1, HM.hp + dt * .03); HF.hp = Math.min(1, HF.hp + dt * .05);
-    UT.value = t;
+    UT.value = t; if (rgal.visible) rgal.children.forEach(w => w.userData.update?.(t));
     for (const g of galTags) { v3.copy(g.p).project(camera); const on = gal.visible && v3.z < 1 && Math.abs(v3.x) < 1.1 && Math.abs(v3.y) < 1.1; g.el.style.opacity = on ? 1 : 0; if (on) g.el.style.transform = `translate(${(v3.x * .5 + .5) * cw}px,${(-v3.y * .5 + .5) * ch}px) translate(-50%,-50%)`; }
     lab.ships[0].set(FS.x, 0, FS.z, 1); lab.ships[1].set(E.x, 0, E.z, 2); lab.update(t);
     glow.begin();

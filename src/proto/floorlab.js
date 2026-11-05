@@ -4,8 +4,8 @@
    · 멀어질수록 깊은 색으로 가라앉힘 (가까운 싸움터가 또렷하게)
    0 금속 판 · 1 이끼 낀 암반 · 2 결정 섞인 모래 · 3 은은한 평지 · 4 보스존 별빛 우주(보이지 않는 유리 바닥 + 아래로 깊은 별 세 겹) */
 import * as THREE from 'three';
-import { LAVA_GLSL } from './lavatone.js?v=11050937';
-import { SNOW_GLSL, SNOW_U } from './snowtone.js?v=11050937';
+import { LAVA_GLSL } from './lavatone.js?v=11050950';
+import { SNOW_GLSL, SNOW_U } from './snowtone.js?v=11050950';
 
 function bakeNoise(N = 256) {
   const hash = (x, y, p) => { x = ((x % p) + p) % p; y = ((y % p) + p) % p; const s = Math.sin(x * 127.1 + y * 311.7) * 43758.5453; return s - Math.floor(s); };
@@ -27,7 +27,8 @@ export const LAB = [
   { id: 'void', name: '보스존 별빛 우주', tip: '바닥도 그림자도 없는 진짜 우주예요(블랙홀이 돌아다니는 곳). 아래로 별이 세 겹으로 깊어서, 가까운 별은 빨리, 먼 별은 느리게 흘러요.' },
   { id: 'join', name: '얼음·용암 + 유리 길', tip: '맨 밑은 별빛 유리 한 장, 지역 땅은 그 위에 덮인 껍질이에요. 지역 안은 끝까지 땅이고, 문(벽 틈) 안쪽만 땅이 조각으로 부서져 아래 유리가 드러나요. 문을 나서면 유리 다리가 우주를 건너요. 유리엔 테두리가 없어요.' },
   { id: 'walls', name: '빙하 얼음 벽', tip: '벽 한 줄이 처음부터 끝까지 한 덩어리 절벽이에요. 앞뒤 면은 수직 절벽에 세로 결이 깊게 패여 있고, 윗단은 구간마다 한 단씩 높이가 달라 계단처럼 층져요. 윗단엔 눈이 덮이고 고드름이 늘어져요. 문 양옆이 가장 높이 솟았다가 수직으로 끊겨요.' },
-  { id: 'lavawalls', name: '용암 바위 벽', tip: '검은 현무암 절벽 한 덩어리예요. 바위 겉에 빛나는 금이 그물처럼 퍼져 있고, 윗단에서 넘친 용암이 앞면을 타고 흘러내려 발치에 고여요. 문 양옆엔 날카로운 바위 뿔이 솟아요.' }];
+  { id: 'lavawalls', name: '용암 바위 벽', tip: '검은 현무암 절벽 한 덩어리예요. 바위 겉에 빛나는 금이 그물처럼 퍼져 있고, 윗단에서 넘친 용암이 앞면을 타고 흘러내려 발치에 고여요. 문 양옆엔 날카로운 바위 뿔이 솟아요.' },
+  { id: 'ruinwalls', name: '고대 유적 벽', tip: '크기가 다른 돌을 엇갈려 쌓은 옛 벽이에요. 구간마다 온전하거나 반쯤 무너졌거나 돌무더기만 남았어요. 돌기둥엔 금빛 띠와 푸른 문양이 빛나고, 문 위엔 거대한 고리 조각이 떠 돌아요. 맞으면 가까운 문양부터 금빛으로 켜져요.' }];
 
 /* 이음 시험 자리 (그림과 JS가 같은 식): 얼음 땅 가운데 (-30,0) · 용암 땅 (30,0) · 큰길 = 두 가운데를 잇는 폭 8m 띠 */
 export const JOIN = { ice: [-30, 0], lava: [30, 0], R: 22, roadW: 4, roadX: 30 };
@@ -129,6 +130,24 @@ export function makeFloorLab() {
         if(amt>.01){ vec2 cr=lavaCrust(p,amt,uT); vec3 crust=vec3(.03,.024,.022)*(.7+.6*cr.y);
           col=mix(col,crust,smoothstep(0.,.35,amt)); em=mix(em,lavaHot(.3+.5*cr.x*amt)*cr.x*pulse*.8+lavaHot(.2)*smoothstep(.2,0.,abs(cr.x-.5))*.25,smoothstep(0.,.35,amt)); }
         return col+pow(max(em*.85,0.),vec3(.4545)); }
+      /* 유적 바닥: 유적 벽과 같은 돌 — 크기가 제각각인 네모 판석을 줄마다 엇갈려 깖 · 판마다 색·기울기가 조금씩 다름 · 줄눈은 어둡게
+         · 판 안에 금 · 군데군데 판이 빠져 흙과 돌 부스러기가 드러남(벽 가까이일수록 많이) · 드물게 판에 새긴 문양 고리 */
+      vec3 ruinGround(vec2 p, vec3 rd, float near){
+        vec2 wq=vec2(N4(p*.05).r,N4(p*.05+.4).g)-.5; vec2 q=p+wq*.4;
+        float rw=1.1+.7*h2(vec2(floor(q.y/1.4),3.)); float row=floor(q.y/rw), fy=q.y/rw-row;                       /* 줄 (줄마다 폭이 다름) */
+        float sl=.8+1.1*h2(vec2(row,5.)); float qx=q.x+h2(vec2(row,9.))*sl, col=floor(qx/sl), fx=qx/sl-col;          /* 판 (줄마다 길이·엇갈림이 다름) */
+        vec2 id=vec2(col,row); float hid=h2(id);
+        float ex=min(fx,1.-fx)*sl, ey=min(fy,1.-fy)*rw, e=min(ex,ey);
+        float mort=1.-smoothstep(.02,.05,e), chip=1.-smoothstep(.04,.12,e);
+        vec3 n=normalize(vec3((h2(id+.3)-.5)*.08+(N4(p*.5).b-.5)*.06,1.,(h2(id+.7)-.5)*.08+(N4(p*.5+.3).b-.5)*.06));
+        float wear=N4(p*.18).r*.5+N4(p*.7).g*.3;
+        vec3 base=vec3(.085,.077,.068)*(.8+.4*hid)*(.6+wear*.8);
+        vec2 v=lvor(p*.9+id); float crk=smoothstep(.04,.0,v.x)*step(.62,h2(id+2.));                                  /* 판 안의 금 (판마다 있거나 없음) */
+        base*=1.-crk*.6; base*=1.-mort*.78; base*=1.+chip*.15*(h2(id+5.)-.4);
+        float miss=step(h2(id+11.),.06+near*.3);                                                                     /* 빠진 판: 흙 + 부스러기 */
+        if(miss>.5){ float gr=N4(p*2.3).a*.6+N4(p*.8).g*.4, gv=smoothstep(.6,.75,N4(p*4.1).b); base=mix(vec3(.035,.028,.022),vec3(.075,.064,.054),gr)*(.75+.5*gv); n=normalize(vec3((N4(p*2.).b-.5)*.4,1.,(N4(p*2.+.5).b-.5)*.4)); base*=smoothstep(.0,.15,e)*.5+.5; }
+        else if(hid>.96){ vec2 c=vec2(fx-.5,fy-.5)*vec2(sl,rw); float r=length(c), g=smoothstep(.05,.02,abs(r-.32))+smoothstep(.04,.015,abs(r-.18)); base*=1.-g*.6; }   /* 새긴 문양 고리 */
+        return lit(base,n,rd,.08,18.)*.62; }
       void main(){
         vec3 ro=cameraPosition, rd=normalize(vW-ro); vec2 p=vW.xz; float dist=length(p-ro.xz); vec3 c;
         if(uK<.5){ /* 금속 판: 4m 판 · 이음매 · 모서리로 갈수록 살짝 둥글게 깎임(빛 받는 턱) · 볼트 · 긁힘 · 얼룩 */
@@ -166,6 +185,8 @@ export function makeFloorLab() {
           vec3 n=normalize(vec3((g-.5)*.06+(g2-.5)*.08, 1., (N4(p*.5+.4).a-.5)*.06));
           vec3 base=vec3(.17,.19,.22)*(.88+.22*a)+vec3(.012)*(g2-.5);
           c=lit(base,n,rd,.06,20.);
+        } else if(uK>7.5){ /* 고대 유적 벽 칸: 유적 바닥 (벽 줄 z=-12 가까이 더 부서짐) */
+          c=ruinGround(p,rd,smoothstep(5.,1.5,abs(p.y+12.)));
         } else if(uK>6.5){ /* 용암 바위 벽 칸: 용암 땅 */
           c=lavaGround(p,rd,0.);
         } else if(uK>5.5){ /* 얼음 벽 칸: 얼음 땅 (벽 줄 z=-12 가까이 눈 두껍게) */
