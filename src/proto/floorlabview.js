@@ -5,22 +5,22 @@
    무게: 바닥 판 하나 + 기체 둘 + 빛 알갱이 한 묶음 + 그림자 판 둘 */
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
-import { makeBloom } from '../core/hangar/bloom.js?v=11051525';
-import { makePerf } from './perf.js?v=11051525';
+import { makeBloom } from '../core/hangar/bloom.js?v=11051535';
+import { makePerf } from './perf.js?v=11051535';
 import { buildShip, engineSpots } from '../core/ships/build.js';
 import { makeGlow } from '../preview/glow.js';
-import { makeFlight, FLY } from './flight.js?v=11051525';
-import { makeFloorLab, LAB, JOIN, sdBlob, sdRoad, blobR } from './floorlab.js?v=11051525';
-import { makeMassWall, STYLES } from './wallmass.js?v=11051525';
-import { makeIceWall } from './icewall.js?v=11051525';
-import { SNOW_U } from './snowtone.js?v=11051525';
-import { iceWallMaterial, snowMaterial } from './icewall.js?v=11051525';
-import { makeRuinWall, ruinMaterial } from './ruins.js?v=11051525';
-import { makeCoralWall, coralMaterial, coral } from './coral.js?v=11051525';
-import { makeTrailMap } from './trailmap.js?v=11051525';
-import { makeThemedHide } from './hidetheme.js?v=11051525';
-import { makeCrystalWall, crystalMaterial } from './crystal.js?v=11051525';
-import { makeLavaWall, lavaWallMaterial } from './lavawall.js?v=11051525';
+import { makeFlight, FLY } from './flight.js?v=11051535';
+import { makeFloorLab, LAB, JOIN, sdBlob, sdRoad, blobR } from './floorlab.js?v=11051535';
+import { makeMassWall, STYLES } from './wallmass.js?v=11051535';
+import { makeIceWall } from './icewall.js?v=11051535';
+import { SNOW_U } from './snowtone.js?v=11051535';
+import { iceWallMaterial, snowMaterial } from './icewall.js?v=11051535';
+import { makeRuinWall, ruinMaterial } from './ruins.js?v=11051535';
+import { makeCoralWall, coralMaterial, coral } from './coral.js?v=11051535';
+import { makeTrailMap } from './trailmap.js?v=11051535';
+import { makeThemedHide } from './hidetheme.js?v=11051535';
+import { makeCrystalWall, crystalMaterial } from './crystal.js?v=11051535';
+import { makeLavaWall, lavaWallMaterial } from './lavawall.js?v=11051535';
 
 const $ = s => document.querySelector(s), clamp = THREE.MathUtils.clamp;
 const VIEWS = [{ id: 'game', name: '게임 시점', h: 42, tilt: .38 }, { id: 'near', name: '가까이', h: 18, tilt: .6 }, { id: 'far', name: '멀리', h: 90, tilt: .3 }];
@@ -91,9 +91,9 @@ export async function start(canvas, onProgress = () => {}) {
   { const LF = lab.mat.uniforms.uLF.value, LW = lab.mat.uniforms.uLFw.value, fill = (ws, o) => { let k = 0; for (const w of ws) for (const F of w.userData.fallsW || []) if (k < 12) { LF[o + k].set(F.x, F.z, F.dx, F.dz); LW[o + k].set(F.w, F.reach); k++; } };
     fill(lgal.children, 0); fill(walls.children, 12); }
   /* 숨을 곳 보기 (사용자 2026-11-05: 땅마다 다른 생김새) — 벽 칸마다 벽 앞에 셋: 벽 따라 길쭉 · 문 옆 · 둥근 덩이 */
-  const HIDE = {}; { const wz = x => -12 + Math.sin(x * .12) * 1.2 + 3.3, along = (x0, x1, r) => { const L = []; for (let x = x0; x <= x1; x += r * 1.1) L.push([x, wz(x) + Math.sin(x) * .4, r * (.85 + .3 * Math.abs(Math.sin(x * 1.7)))]); return L; };
-    const spots = [along(-24, -15, 2.6), along(7, 11, 2.4), [[22, -3, 3], [24.5, -1.5, 2.4], [20, -.8, 2.2]]];
-    for (const [k, th] of [[6, 'ice'], [7, 'lava'], [8, 'ruin'], [9, 'coral']]) { const h = makeThemedHide(spots.map(lobes => ({ lobes, theme: th })), lab.mat.uniforms.uN.value); h.mesh.visible = false; scene.add(h.mesh); HIDE[k] = h; } }
+  const HIDE = {}; { const wz = x => -12 + Math.sin(x * .12) * 1.2, ang = x => Math.atan2(Math.cos(x * .12) * .144, 1);   /* 벽 줄을 따라 기울인 네모 */
+    const spots = [[-19.5, wz(-19.5) + 3.4, 5, 2, ang(-19.5)], [9.5, wz(9.5) + 3.1, 3, 1.8, ang(9.5)], [22, -2, 3, 2.4, .35]];
+    for (const [k, th] of [[6, 'ice'], [7, 'lava'], [8, 'ruin'], [9, 'coral']]) { const h = makeThemedHide(spots.map(rect => ({ rect, theme: th })), lab.mat.uniforms.uN.value); h.mesh.visible = false; scene.add(h.mesh); HIDE[k] = h; } }
   walls.children.forEach(w => addBlk(5, w)); galW.forEach(w => addBlk(6, w)); lgal.children.forEach(w => addBlk(7, w)); rgal.children.forEach(w => addBlk(8, w));
   const tagAt = (txt, x, y, z) => { const el = document.createElement('div'); el.className = 'tag'; el.innerHTML = `<b>${txt}</b>`; el.style.opacity = 0; $('#tags').appendChild(el); galTags.push({ el, p: new THREE.Vector3(x, y, z) }); };
   tagAt('빙하 얼음 벽 · 한 덩어리 절벽', -19, 10, GAL.z); tagAt('문', 0, 4, GAL.z);
