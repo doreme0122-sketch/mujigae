@@ -4,8 +4,8 @@
    · 멀어질수록 깊은 색으로 가라앉힘 (가까운 싸움터가 또렷하게)
    0 금속 판 · 1 이끼 낀 암반 · 2 결정 섞인 모래 · 3 은은한 평지 · 4 보스존 별빛 우주(보이지 않는 유리 바닥 + 아래로 깊은 별 세 겹) */
 import * as THREE from 'three';
-import { LAVA_GLSL } from './lavatone.js?v=11051112';
-import { SNOW_GLSL, SNOW_U } from './snowtone.js?v=11051112';
+import { LAVA_GLSL } from './lavatone.js?v=11051121';
+import { SNOW_GLSL, SNOW_U } from './snowtone.js?v=11051121';
 
 function bakeNoise(N = 256) {
   const hash = (x, y, p) => { x = ((x % p) + p) % p; y = ((y % p) + p) % p; const s = Math.sin(x * 127.1 + y * 311.7) * 43758.5453; return s - Math.floor(s); };
@@ -119,18 +119,21 @@ export function makeFloorLab() {
          · 군데군데 녹은 용암 웅덩이: 식은 검은 껍질 판이 떠다니고 그 사이로 끓는 용암 (벽 발치 웅덩이와 같은 모습) · thin = 문턱 얇은 곳일수록 뜨거움
          · 벽 재질은 화면에 낼 때 밝기 변환을 거치므로 바닥 빛은 같은 변환(pow 1/2.2)을 직접 해서 색을 맞춤 */
       vec3 lavaGround(vec2 p, vec3 rd, float thin){
+        /* 사용자 2026-11-05: 벽과 바닥이 다른 세상 → 벽과 같은 바위 밝기 · 같은 굵기 섞인 금 · 뜨거운 금은 군데군데만
+           벽 재질은 화면에 낼 때 밝기 변환(pow 1/2.2)을 거치므로 바닥도 바위·빛 모두 같은 변환을 해서 맞춤 */
         vec2 wq=vec2(N4(p*.03).r,N4(p*.03+.5).g)*1.4; vec2 v1=lvor(p*.75+wq), v2=lvor(p*2.1+9.+wq);
-        vec3 n=normalize(vec3((lh(vec3(v1.y,1.,0.))-.5)*.12+(N4(p*.4).b-.5)*.12,1.,(lh(vec3(v1.y,2.,0.))-.5)*.12+(N4(p*.4+.3).b-.5)*.12));
-        vec3 base=mix(vec3(.06,.05,.046),vec3(.08,.068,.062),v1.y)*(.75+.5*N4(p*.3).a);
+        vec3 n=normalize(vec3((lh(vec3(v1.y,1.,0.))-.5)*.25+(N4(p*.4).b-.5)*.12,1.,(lh(vec3(v1.y,2.,0.))-.5)*.25+(N4(p*.4+.3).b-.5)*.12));
+        float fh=lh(vec3(v1.y,4.,1.)); vec3 base=vec3(.0392,.0235,.0196)*(.6+.7*fh)*.55*(.8+.4*N4(p*.3).a);       /* 벽 바위와 같은 색 (0x0a0605 · 판마다 다름) */
         float pulse=lavaPulse(vec3(p.x,0.,p.y),uT);
-        float hotz=smoothstep(.5,.78,lnz(vec3(p*.35,.5))*.65+lnz(vec3(p*.07,1.5))*.35+thin*.45);   /* 금마다 뜨겁기가 다름 (한 덩어리 구역 X) */
-        float crack=smoothstep(.03+.05*thin,0.,v1.x)*hotz*(.6+.4*hotz), crack2=smoothstep(.02,0.,v2.x)*.45*step(.6,v2.y)*hotz, cold=smoothstep(.025,0.,v1.x)*(1.-hotz);
-        vec3 col=lit(base,n,rd,.18,30.)*.13*(1.-min(1.,crack+crack2+cold*.7)*.9);
-        vec3 em=lavaHot(crack*.9)*(crack+crack2*.6)*pulse*.85+lavaHot(.15)*smoothstep(.15,0.,v1.x)*hotz*.06;
-        float amt=smoothstep(.7,.9,lnz(vec3(p*.055,3.5))+thin*.15)*.85;                                   /* 녹은 웅덩이 */
-        if(amt>.01){ vec2 cr=lavaCrust(p,amt,uT); vec3 crust=vec3(.03,.024,.022)*(.7+.6*cr.y);
-          col=mix(col,crust,smoothstep(0.,.35,amt)); em=mix(em,lavaHot(.3+.5*cr.x*amt)*cr.x*pulse*.8+lavaHot(.2)*smoothstep(.2,0.,abs(cr.x-.5))*.25,smoothstep(0.,.35,amt)); }
-        return col+pow(max(em*.85,0.),vec3(.4545)); }
+        float hotz=smoothstep(.55,.8,lnz(vec3(p*.12,.5))*.6+lnz(vec3(p*.05,1.5))*.4+thin*.45);                       /* 뜨거운 곳은 군데군데 */
+        float wv=.03+.05*N4(p*.06+.2).g;                                                                              /* 금 굵기 섞임 (벽과 같은 식) */
+        float crack=smoothstep(wv,0.,v1.x)*hotz, crack2=smoothstep(.035,0.,v2.x)*.5*step(.55,v2.y)*hotz, cold=smoothstep(.03,0.,v1.x)*(1.-hotz);
+        vec3 lin=lit(base*(.8+.4*v1.y),n,rd,.05,12.)*.13*(1.-min(1.,crack+crack2+cold*.6)*.9);                       /* 해 세기(벽 조명 3 · 하늘빛)에 맞춘 바위 밝기 */
+        vec3 em=lavaHot(crack*.9)*(crack+crack2*.6)*pulse*.95+lavaHot(.25)*smoothstep(.12,0.,v1.x)*hotz*.05;
+        float amt=smoothstep(.72,.9,lnz(vec3(p*.055,3.5))+thin*.15)*.85;                                           /* 녹은 웅덩이 */
+        if(amt>.01){ vec2 cr=lavaCrust(p,amt,uT); vec3 crust=vec3(.03,.02,.018)*(.7+.6*cr.y)*.13;
+          lin=mix(lin,crust*max(dot(n,uSun),.2),smoothstep(0.,.35,amt)); em=mix(em,lavaHot(.3+.5*cr.x*amt)*cr.x*pulse*.9+lavaHot(.2)*smoothstep(.2,0.,abs(cr.x-.5))*.3,smoothstep(0.,.35,amt)); }
+        return pow(max(lin+em,0.),vec3(.4545)); }
       /* 유적 바닥: 유적 벽과 같은 돌 — 크기가 제각각인 네모 판석을 줄마다 엇갈려 깖 · 판마다 색·기울기가 조금씩 다름 · 줄눈은 어둡게
          · 판 안에 금 · 군데군데 판이 빠져 흙과 돌 부스러기가 드러남(벽 가까이일수록 많이) · 드물게 판에 새긴 문양 고리 */
       vec3 ruinGround(vec2 p, vec3 rd, float near){

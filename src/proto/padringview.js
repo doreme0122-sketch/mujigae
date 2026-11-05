@@ -1,17 +1,17 @@
 /* 시작 기지 부품 보기 ① — 자기장 판(격납고 그대로) + 금테 네 갈래 별 */
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
-import { makeBloom } from '../core/hangar/bloom.js?v=11051112';
-import { makePad } from '../core/hangar/pad.js?v=11051112';
-import { makeMag } from '../core/hangar/mag.js?v=11051112';
+import { makeBloom } from '../core/hangar/bloom.js?v=11051121';
+import { makePad } from '../core/hangar/pad.js?v=11051121';
+import { makeMag } from '../core/hangar/mag.js?v=11051121';
 import { buildShip, engineSpots } from '../core/ships/build.js';
-import { makeGoldStar } from './goldstar.js?v=11051112';
-import { makeArena, SPEED, WAVE_R0 } from './arena.js?v=11051112';
-import { makeGuardians, GUARD } from './guardian.js?v=11051112';
-import { makeFloor, FLOORS } from './floor.js?v=11051112';
-import { makePerf } from './perf.js?v=11051112';
-import { makeBirth, BIRTH } from './birth.js?v=11051112';
-import { makeSortie, SORTIE } from './sortie.js?v=11051112';
+import { makeGoldStar } from './goldstar.js?v=11051121';
+import { makeArena, SPEED, WAVE_R0 } from './arena.js?v=11051121';
+import { makeGuardians, GUARD } from './guardian.js?v=11051121';
+import { makeFloor, FLOORS } from './floor.js?v=11051121';
+import { makePerf } from './perf.js?v=11051121';
+import { makeBirth, BIRTH } from './birth.js?v=11051121';
+import { makeSortie, SORTIE } from './sortie.js?v=11051121';
 
 const $ = s => document.querySelector(s), clamp = THREE.MathUtils.clamp;
 const SHIPL = 2.9;     /* 기체 길이: 자기장 판(지름 3.2)보다 약간 작게 */

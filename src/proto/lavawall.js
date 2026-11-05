@@ -12,8 +12,8 @@
    무게: 벽 한 줄 = 그리기 1번 (바위·용암·웅덩이가 한 재질, aF 값으로 용암 자리를 정함) */
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { block } from './ice.js?v=11051112';
-import { LAVA_GLSL } from './lavatone.js?v=11051112';
+import { block } from './ice.js?v=11051121';
+import { LAVA_GLSL } from './lavatone.js?v=11051121';
 
 const hs = (x, y, z) => { const s = Math.sin(x * 127.1 + y * 311.7 + z * 74.7) * 43758.5453; return s - Math.floor(s); };
 const vn = (x, y, z) => { const ix = Math.floor(x), iy = Math.floor(y), iz = Math.floor(z), fx = x - ix, fy = y - iy, fz = z - iz, u = fx * fx * (3 - 2 * fx), v = fy * fy * (3 - 2 * fy), w = fz * fz * (3 - 2 * fz);
@@ -165,7 +165,7 @@ export function makeLavaWall(path, opt = {}) {
   /* ⑤ 발치 용암 웅덩이: 벽 밑동에서 앞으로 들쭉날쭉 · 폭포 앞이 가장 넓고 뜨거움 · 바깥 끝은 바닥 아래로 스며 들어감 */
   { const Q = [], Gq = [], Fq = [], sk = (i, k) => { const f = fr[i], fv = poolK(f.d);
       const reach = (1.2 + vn(f.d * .35, 4, o) * 2. + fv * 2.6) * f.c, base = faceV(f, -1, 0) - .15;
-      const v = -(base + [0, .5, reach * .6, reach][k]), y = [.12, .07, .04, -.05][k];
+      const v = -(base + [0, .5, reach * .6, reach][k]), y = [.06, .03, .012, -.02][k];   /* 바닥에 거의 붙어 바닥 껍질 판으로 이어짐 */
       const lav = [Math.min(1, .5 + fv * .6), .45 + fv * .5, .35 + fv * .45, .2][k];
       return [[f.x + f.nx * v, y, f.z + f.nz * v], lav]; };
     for (let i = 0; i < N; i++) for (let k = 0; k < 3; k++) { const [a, la] = sk(i, k), [b, lb] = sk(i + 1, k), [c, lc] = sk(i, k + 1), [d, ld] = sk(i + 1, k + 1);
