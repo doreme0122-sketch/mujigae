@@ -4,8 +4,8 @@
    · 멀어질수록 깊은 색으로 가라앉힘 (가까운 싸움터가 또렷하게)
    0 금속 판 · 1 이끼 낀 암반 · 2 결정 섞인 모래 · 3 은은한 평지 · 4 보스존 별빛 우주(보이지 않는 유리 바닥 + 아래로 깊은 별 세 겹) */
 import * as THREE from 'three';
-import { LAVA_GLSL, vorTex } from './lavatone.js?v=11051417';
-import { SNOW_GLSL, SNOW_U } from './snowtone.js?v=11051417';
+import { LAVA_GLSL, vorTex } from './lavatone.js?v=11051438';
+import { SNOW_GLSL, SNOW_U } from './snowtone.js?v=11051438';
 
 function bakeNoise(N = 256) {
   const hash = (x, y, p) => { x = ((x % p) + p) % p; y = ((y % p) + p) % p; const s = Math.sin(x * 127.1 + y * 311.7) * 43758.5453; return s - Math.floor(s); };
@@ -268,8 +268,10 @@ export function makeFloorLab() {
           vec3 n=normalize(vec3((g-.5)*.06+(g2-.5)*.08, 1., (N4(p*.5+.4).a-.5)*.06));
           vec3 base=vec3(.17,.19,.22)*(.88+.22*a)+vec3(.012)*(g2-.5);
           c=lit(base,n,rd,.06,20.);
-        } else if(uK>9.5){ /* 자수정 꽃 무리 칸 */
-          c=crystalGround(p,rd);
+        } else if(uK>9.5){ /* 자수정 꽃 무리 칸: 자수정은 보스존을 두르는 벽 (사용자 2026-11-05) → 벽 안쪽(먼 쪽)은 바닥 없는 보스존 별빛 우주 · 바깥쪽만 자수정 바닥
+             땅 가장자리는 결정 무리 밑에서 들쭉날쭉 끝남(결정에 가려 보이지 않는 자리) */
+          float wl=-12.+sin(p.x*.12+(p.x>0.?1.:0.))*1.2, edgeN=(N4(p*.15).r-.5)*1.4;
+          c=p.y<wl+edgeN&&abs(p.x)>3.?deep(ro,rd):(p.y<wl-1.5+edgeN?deep(ro,rd):crystalGround(p,rd));
         } else if(uK>8.5){ /* 성운 산호 벽 칸: 산호 바닥 */
           c=coralGround(p,rd);
         } else if(uK>7.5){ /* 고대 유적 벽 칸: 유적 바닥 (벽 줄 z=-12 가까이 더 부서짐) */

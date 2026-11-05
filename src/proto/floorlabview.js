@@ -5,21 +5,21 @@
    무게: 바닥 판 하나 + 기체 둘 + 빛 알갱이 한 묶음 + 그림자 판 둘 */
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
-import { makeBloom } from '../core/hangar/bloom.js?v=11051417';
-import { makePerf } from './perf.js?v=11051417';
+import { makeBloom } from '../core/hangar/bloom.js?v=11051438';
+import { makePerf } from './perf.js?v=11051438';
 import { buildShip, engineSpots } from '../core/ships/build.js';
 import { makeGlow } from '../preview/glow.js';
-import { makeFlight, FLY } from './flight.js?v=11051417';
-import { makeFloorLab, LAB, JOIN, sdBlob, sdRoad, blobR } from './floorlab.js?v=11051417';
-import { makeMassWall, STYLES } from './wallmass.js?v=11051417';
-import { makeIceWall } from './icewall.js?v=11051417';
-import { SNOW_U } from './snowtone.js?v=11051417';
-import { iceWallMaterial, snowMaterial } from './icewall.js?v=11051417';
-import { makeRuinWall, ruinMaterial } from './ruins.js?v=11051417';
-import { makeCoralWall, coralMaterial, coral } from './coral.js?v=11051417';
-import { makeTrailMap } from './trailmap.js?v=11051417';
-import { makeCrystalWall, crystalMaterial } from './crystal.js?v=11051417';
-import { makeLavaWall, lavaWallMaterial } from './lavawall.js?v=11051417';
+import { makeFlight, FLY } from './flight.js?v=11051438';
+import { makeFloorLab, LAB, JOIN, sdBlob, sdRoad, blobR } from './floorlab.js?v=11051438';
+import { makeMassWall, STYLES } from './wallmass.js?v=11051438';
+import { makeIceWall } from './icewall.js?v=11051438';
+import { SNOW_U } from './snowtone.js?v=11051438';
+import { iceWallMaterial, snowMaterial } from './icewall.js?v=11051438';
+import { makeRuinWall, ruinMaterial } from './ruins.js?v=11051438';
+import { makeCoralWall, coralMaterial, coral } from './coral.js?v=11051438';
+import { makeTrailMap } from './trailmap.js?v=11051438';
+import { makeCrystalWall, crystalMaterial } from './crystal.js?v=11051438';
+import { makeLavaWall, lavaWallMaterial } from './lavawall.js?v=11051438';
 
 const $ = s => document.querySelector(s), clamp = THREE.MathUtils.clamp;
 const VIEWS = [{ id: 'game', name: '게임 시점', h: 42, tilt: .38 }, { id: 'near', name: '가까이', h: 18, tilt: .6 }, { id: 'far', name: '멀리', h: 90, tilt: .3 }];
@@ -100,7 +100,7 @@ export async function start(canvas, onProgress = () => {}) {
     fragmentShader: 'uniform float uA, uS; varying vec2 vP; void main(){ vec2 q=vP*vec2(1.,1.7)/uS; float r=dot(q,q); float core=exp(-r*4.), soft=exp(-r*1.3); gl_FragColor=vec4(0.,0.,0.,min(1.,(core*.85+soft*.35)*uA)); }' });
   const mkSh = () => { const m = new THREE.Mesh(new THREE.PlaneGeometry(FLY.LEN * 2.2, FLY.LEN * 2.2), shM()); m.renderOrder = 1; scene.add(m); return m; };
   const shMe = mkSh(), shFoe = mkSh();
-  const ground = (x, z) => K === 4 ? 0 : K !== 5 ? 1 : onRoad(x, z) ? clamp(.12 + (sdRoad(x, z) + 1) * .2, .12, .3) : inLand(x, z) ? clamp(sdRoad(x, z) / 2.5, .3, 1) : 0;   /* 우주엔 그림자 없음 · 유리 위는 옅게 */
+  const ground = (x, z) => K === 4 || (K === 10 && z < -12 + Math.sin(x * .12 + (x > 0 ? 1 : 0)) * 1.2 - (Math.abs(x) > 3 ? 0 : 1.5)) ? 0 :   /* 우주(보스존)엔 그림자 없음 */ K !== 5 ? 1 : onRoad(x, z) ? clamp(.12 + (sdRoad(x, z) + 1) * .2, .12, .3) : inLand(x, z) ? clamp(sdRoad(x, z) / 2.5, .3, 1) : 0;   /* 우주엔 그림자 없음 · 유리 위는 옅게 */
   const placeShadow = (m, x, z, y, head) => { const hh = y * 2.4, ox = -sunDir.x / sunDir.y * hh * .55, oz = -sunDir.z / sunDir.y * hh * .55;
     m.position.set(x + ox, .03, z + oz); m.rotation.set(-Math.PI / 2, 0, head);
     const u = m.material.uniforms; u.uS.value = .55 + y * .35; u.uA.value = clamp(.95 - y * .3, .35, .9) * ground(x + ox, z + oz); m.visible = u.uA.value > .01; };
