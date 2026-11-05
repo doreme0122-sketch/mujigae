@@ -13,7 +13,7 @@
    · 가장자리 회색 바위 몇 개 · 작은 풀 포기 */
 import * as THREE from 'three';
 import { mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js';
-import { SKY, bakeFbm } from './skyisle.js?v=11051943';
+import { SKY, bakeFbm } from './skyisle.js?v=11051951';
 
 const rng = s => () => (s = (s * 16807) % 2147483647) / 2147483647;
 const v0 = new THREE.Vector3(), v1 = new THREE.Vector3();
@@ -91,8 +91,8 @@ function leafMat(uT, uN, sun) {
     fragmentShader: SKY + `varying vec2 vUv; varying vec3 vW, vN; varying vec4 vK;
       void main(){ float u=vUv.x-.5, t=vUv.y, k=vK.x;
         float w;
-        if(k<1.5) w=pow(sin(3.1416*min(t*1.02,1.)),.62)*.5*(1.-.25*t);                                             /* 넓은 잎: 밑이 둥글고 끝이 뾰족 */
-        else if(k<3.5) w=pow(sin(3.1416*t),.9)*.5*(1.-t*.55);                                                       /* 꽃잎: 가늘고 끝이 뾰족 */
+        if(k<1.5) w=pow(max(sin(3.1416*min(t*1.02,1.)),0.),.62)*.5*(1.-.25*t);   /* 끝에서 sin이 0보다 살짝 작아지면 계산이 깨져 끝에 가로 띠가 남던 것 막음 (사용자 2026-11-05) */                                             /* 넓은 잎: 밑이 둥글고 끝이 뾰족 */
+        else if(k<3.5) w=pow(max(sin(3.1416*t),0.),.9)*.5*(1.-t*.55);                                                       /* 꽃잎: 가늘고 끝이 뾰족 */
         else w=(1.-t)*.5;                                                                                           /* 풀잎 */
         if(abs(u)>w) discard;
         if(k>.5&&k<1.5){ float sl=abs(fract(t*4.5+abs(u)*1.9)-.5); if(sl<.05&&abs(u)>w*.3&&t>.12) discard; }          /* 갈라진 잎 틈 */
