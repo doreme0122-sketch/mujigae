@@ -5,23 +5,23 @@
    무게: 바닥 판 하나 + 기체 둘 + 빛 알갱이 한 묶음 + 그림자 판 둘 */
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
-import { makeBloom } from '../core/hangar/bloom.js?v=11051549';
-import { makePerf } from './perf.js?v=11051549';
+import { makeBloom } from '../core/hangar/bloom.js?v=11051558';
+import { makePerf } from './perf.js?v=11051558';
 import { buildShip, engineSpots } from '../core/ships/build.js';
 import { makeGlow } from '../preview/glow.js';
-import { makeFlight, FLY } from './flight.js?v=11051549';
-import { makeFloorLab, LAB, JOIN, sdBlob, sdRoad, blobR } from './floorlab.js?v=11051549';
-import { makeMassWall, STYLES } from './wallmass.js?v=11051549';
-import { makeIceWall } from './icewall.js?v=11051549';
-import { SNOW_U } from './snowtone.js?v=11051549';
-import { iceWallMaterial, snowMaterial } from './icewall.js?v=11051549';
-import { makeRuinWall, ruinMaterial } from './ruins.js?v=11051549';
-import { makeCoralWall, coralMaterial, coral } from './coral.js?v=11051549';
-import { makeTrailMap } from './trailmap.js?v=11051549';
-import { makeThemedHide } from './hidetheme.js?v=11051549';
-import { makePlantBush } from './plantbush.js?v=11051549';
-import { makeCrystalWall, crystalMaterial } from './crystal.js?v=11051549';
-import { makeLavaWall, lavaWallMaterial } from './lavawall.js?v=11051549';
+import { makeFlight, FLY } from './flight.js?v=11051558';
+import { makeFloorLab, LAB, JOIN, sdBlob, sdRoad, blobR } from './floorlab.js?v=11051558';
+import { makeMassWall, STYLES } from './wallmass.js?v=11051558';
+import { makeIceWall } from './icewall.js?v=11051558';
+import { SNOW_U } from './snowtone.js?v=11051558';
+import { iceWallMaterial, snowMaterial } from './icewall.js?v=11051558';
+import { makeRuinWall, ruinMaterial } from './ruins.js?v=11051558';
+import { makeCoralWall, coralMaterial, coral } from './coral.js?v=11051558';
+import { makeTrailMap } from './trailmap.js?v=11051558';
+import { makeThemedHide } from './hidetheme.js?v=11051558';
+import { makePlantBush } from './plantbush.js?v=11051558';
+import { makeCrystalWall, crystalMaterial } from './crystal.js?v=11051558';
+import { makeLavaWall, lavaWallMaterial } from './lavawall.js?v=11051558';
 
 const $ = s => document.querySelector(s), clamp = THREE.MathUtils.clamp;
 const VIEWS = [{ id: 'game', name: '게임 시점', h: 42, tilt: .38 }, { id: 'near', name: '가까이', h: 18, tilt: .6 }, { id: 'far', name: '멀리', h: 90, tilt: .3 }];
@@ -97,7 +97,7 @@ export async function start(canvas, onProgress = () => {}) {
     for (const [k, th] of [[6, 'ice'], [7, 'lava'], [8, 'ruin'], [9, 'coral']]) { const h = makeThemedHide(spots.map(rect => ({ rect, theme: th })), lab.mat.uniforms.uN.value); h.mesh.visible = false; scene.add(h.mesh); HIDE[k] = h; } }
   /* 숨을 곳 시안: 미지의 우주 식물 셋 (A 빛잎 · B 깃털 · C 빛버섯) */
   const PL = new THREE.Group(); scene.add(PL); PL.visible = false; const plants = []; { const Rp = (() => { let s = 31337; return () => (s = (s * 9301 + 49297) % 233280) / 233280; })();
-    [['A', -14], ['B', 0], ['C', 14]].forEach(([kd, x]) => { const b = makePlantBush([x, -9, 3.6, 2.2, 0], kd, UT, Rp); PL.add(b.mesh); plants.push(b); }); }
+    [['A', -22], ['B', -7.5], ['C', 7.5], ['M', 22]].forEach(([kd, x]) => { const b = makePlantBush([x, -9, 3.4, 2.2, 0], kd, UT, Rp); PL.add(b.mesh); plants.push(b); }); }   /* 맨 오른쪽 = 셋을 섞은 것 */
   walls.children.forEach(w => addBlk(5, w)); galW.forEach(w => addBlk(6, w)); lgal.children.forEach(w => addBlk(7, w)); rgal.children.forEach(w => addBlk(8, w));
   const tagAt = (txt, x, y, z) => { const el = document.createElement('div'); el.className = 'tag'; el.innerHTML = `<b>${txt}</b>`; el.style.opacity = 0; $('#tags').appendChild(el); galTags.push({ el, p: new THREE.Vector3(x, y, z) }); };
   tagAt('빙하 얼음 벽 · 한 덩어리 절벽', -19, 10, GAL.z); tagAt('문', 0, 4, GAL.z);

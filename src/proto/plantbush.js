@@ -7,9 +7,12 @@
 import * as THREE from 'three';
 import { inRect, sampleRect, ring } from './hidetheme.js';
 
-const V = { A: { leaf: 'broad', n: 48, h: [1.6, 2.8], col: [[.42, .06, .75], [.12, .35, 1.]], drip: 1, pods: 4, shrooms: 3 },
-            B: { leaf: 'feather', n: 70, h: [1.3, 2.5], col: [[.75, .12, .35], [.6, .25, .95]], drip: 0, pods: 2, shrooms: 7 },
-            C: { leaf: 'broad', n: 12, h: [.7, 1.2], col: [[.2, .25, .75], [.2, .75, .9]], drip: 0, pods: 2, shrooms: 34 } };
+const LA = { leaf: 'broad', col: [[.42, .06, .75], [.12, .35, 1.]] }, LB = { leaf: 'feather', col: [[.75, .12, .35], [.6, .25, .95]] }, LC = { leaf: 'broad', col: [[.2, .25, .75], [.2, .75, .9]] };
+const V = { A: { leaves: [{ ...LA, n: 48, h: [1.6, 2.8] }], drip: 1, pods: 4, shrooms: 3, sh: [.22, .22], tall: 1 },
+            B: { leaves: [{ ...LB, n: 70, h: [1.3, 2.5] }], drip: 0, pods: 2, shrooms: 7, sh: [.22, .22], tall: 1 },
+            C: { leaves: [{ ...LC, n: 12, h: [.7, 1.2] }], drip: 0, pods: 2, shrooms: 34, sh: [.4, .8], tall: .55 },   /* 키 낮춤 (사용자 2026-11-05) */
+            /* M 섞음 (사용자 2026-11-05: 빛버섯 키 낮추고 셋을 섞자) — 가운데 큰 빛잎(위를 덮어 가림) · 그 둘레 깃털 잎 · 발치에 낮은 빛버섯 · 알 봉오리 · 빛 방울 줄기 */
+            M: { leaves: [{ ...LA, n: 22, h: [1.5, 2.5], inner: 1 }, { ...LB, n: 30, h: [1., 1.8] }], drip: 1, pods: 3, shrooms: 16, sh: [.32, .5], tall: .55 } };
 
 /* 잎 한 장: 길이 방향으로 휘고 끝이 아래로 늘어짐 (밑동 0 ~ 끝 1) */
 function leafGeo() { const g = new THREE.PlaneGeometry(1, 1, 4, 10), P = g.attributes.position, uv = g.attributes.uv;
@@ -23,15 +26,17 @@ export function makePlantBush(rect, kind, uT, R) {
   const [cx, cz, hl, hw] = rect;
   /* ── 잎 ── 밑동은 네모 안 몇 군데 포기에 모이고, 잎은 포기에서 바깥·위로 펼침 (끝이 네모 밖으로 나가지 않게 기울기를 줄임) */
   const clumps = []; { const nc = Math.max(3, Math.round(hl * hw * .9)); for (let i = 0; i < nc; i++) clumps.push(sampleRect(rect, R, .7)); }   /* 포기를 네모 전체에 고르게 → 덤불이 네모를 꽉 채움 */
-  const L = new THREE.InstancedMesh(leafGeo(), null, cfg.n), m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), e = new THREE.Euler(), s3 = new THREE.Vector3(), p3 = new THREE.Vector3();
-  const tips = [];
-  for (let i = 0; i < cfg.n; i++) { const [bx, bz] = clumps[i % clumps.length], yaw = R() * 6.28, lean = .55 + R() * .75, h = cfg.h[0] + R() * (cfg.h[1] - cfg.h[0]);
-    const w = cfg.leaf === 'feather' ? .7 + R() * .35 : 1.3 + R() * .9;
+  const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), e = new THREE.Euler(), s3 = new THREE.Vector3(), p3 = new THREE.Vector3(), tips = [];
+  for (const sp of cfg.leaves) {
+  const L = new THREE.InstancedMesh(leafGeo(), null, sp.n);
+  const cl = sp.inner ? clumps.map(([x, z]) => [cx + (x - cx) * .5, cz + (z - cz) * .5]) : clumps;   /* 큰 잎은 가운데 쪽 포기에 */
+  for (let i = 0; i < sp.n; i++) { const [bx, bz] = cl[i % cl.length], yaw = R() * 6.28, lean = .55 + R() * .75, h = sp.h[0] + R() * (sp.h[1] - sp.h[0]);
+    const w = sp.leaf === 'feather' ? .7 + R() * .35 : 1.3 + R() * .9;
     e.set(0, yaw, 0, 'YXZ'); q.setFromEuler(e); const q2 = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), lean); q.multiply(q2);
     m4.compose(p3.set(bx, -.05, bz), q, s3.set(w, h, w)); L.setMatrixAt(i, m4);
-    const tip = new THREE.Vector3(0, h * .92, 0).applyQuaternion(q).add(p3); tips.push(tip); }
+    const tip = new THREE.Vector3(0, h * .92, 0).applyQuaternion(q).add(p3); if (sp.leaf === 'broad') tips.push(tip); }
   const leafMat = new THREE.ShaderMaterial({ side: THREE.DoubleSide, transparent: true, depthWrite: true,
-    uniforms: { uT, uIn, uShip, uA: { value: new THREE.Vector3(...cfg.col[0]) }, uB: { value: new THREE.Vector3(...cfg.col[1]) }, uF: { value: cfg.leaf === 'feather' ? 1 : 0 }, uSun: { value: new THREE.Vector3(-.45, .78, -.42).normalize() } },
+    uniforms: { uT, uIn, uShip, uA: { value: new THREE.Vector3(...sp.col[0]) }, uB: { value: new THREE.Vector3(...sp.col[1]) }, uF: { value: sp.leaf === 'feather' ? 1 : 0 }, uSun: { value: new THREE.Vector3(-.45, .78, -.42).normalize() } },
     vertexShader: `uniform float uT; uniform vec3 uShip; varying vec2 vUv; varying vec3 vN, vW; varying float vS;
       void main(){ vUv=uv; vec3 p=position; float t=uv.y; vS=fract(instanceMatrix[3].x*1.37+instanceMatrix[3].z*.91);
         p.z+= -t*t*.45;                                                                                     /* 끝이 바깥으로 휘어 늘어짐 */
@@ -51,14 +56,14 @@ export function makePlantBush(rect, kind, uT, R) {
         vec3 c=base*(.35+.4*dif)+base*smoothstep(.4,1.,t)*.5+mix(uB,vec3(.6,.95,1.),.5)*(mid*1.4+side*1.)+uB*net*.12*(.55+.45*sin(uT*1.1+t*4.-vS*9.));   /* 잎맥이 또렷이 빛남 */   /* 잎맥에 빛이 흐름 */
         c+=mix(uA,uB,.5)*pow(1.-abs(dot(normalize(vN),normalize(cameraPosition-vW))),2.)*.25;                                 /* 반투명한 가장자리 */
         gl_FragColor=vec4(c,(.92-.25*smoothstep(.3,.5,abs(u)))*(1.-uIn*.6)); }` });
-  L.material = leafMat; mats.push(leafMat); grp.add(L);
+  L.material = leafMat; mats.push(leafMat); grp.add(L); }
   /* ── 봉오리 · 버섯 ── */
   const bulbs = [];
   for (let i = 0; i < cfg.pods; i++) { const [x, z] = sampleRect(rect, R, .5); bulbs.push({ type: 0, x, z, s: .32 + R() * .25 }); }
-  for (let i = 0; i < cfg.shrooms; i++) { const [x, z] = sampleRect(rect, R, .35); bulbs.push({ type: 1, x, z, s: kind === 'C' ? .45 + Math.pow(R(), 1.3) * 1.2 : .22 + R() * .22 }); }
+  for (let i = 0; i < cfg.shrooms; i++) { const [x, z] = sampleRect(rect, R, .35); bulbs.push({ type: 1, x, z, s: cfg.sh[0] + Math.pow(R(), 1.3) * cfg.sh[1] }); }
   { const pod = new THREE.IcosahedronGeometry(1, 2); pod.scale(.85, 1.1, .85); pod.translate(0, .9, 0);
     const cap = new THREE.SphereGeometry(1, 12, 6, 0, 6.29, 0, Math.PI * .5); cap.scale(1, .5, 1); const stem = new THREE.CylinderGeometry(.12, .16, 1, 6, 1, true); stem.translate(0, .5, 0); cap.translate(0, 1, 0);
-    const mk = (geo, list, tp) => { if (!list.length) return; const im = new THREE.InstancedMesh(geo, null, list.length); list.forEach((b, j) => { const h = tp ? (b.s * (1.6 + R())) : 1;
+    const mk = (geo, list, tp) => { if (!list.length) return; const im = new THREE.InstancedMesh(geo, null, list.length); list.forEach((b, j) => { const h = tp ? (1.6 + R()) * cfg.tall : 1;
         m4.compose(p3.set(b.x, -.05, b.z), q.setFromEuler(e.set((R() - .5) * .3, R() * 6.28, (R() - .5) * .3)), s3.set(b.s, b.s * h, b.s)); im.setMatrixAt(j, m4); }); return im; };
     const bMat = (tp) => new THREE.ShaderMaterial({ transparent: true, side: THREE.DoubleSide, uniforms: { uT, uIn, uTp: { value: tp } },
       vertexShader: `uniform float uT, uTp; varying vec3 vP, vN, vW; varying float vS;

@@ -4,8 +4,8 @@
    · 멀어질수록 깊은 색으로 가라앉힘 (가까운 싸움터가 또렷하게)
    0 금속 판 · 1 이끼 낀 암반 · 2 결정 섞인 모래 · 3 은은한 평지 · 4 보스존 별빛 우주(보이지 않는 유리 바닥 + 아래로 깊은 별 세 겹) */
 import * as THREE from 'three';
-import { LAVA_GLSL, vorTex } from './lavatone.js?v=11051549';
-import { SNOW_GLSL, SNOW_U } from './snowtone.js?v=11051549';
+import { LAVA_GLSL, vorTex } from './lavatone.js?v=11051558';
+import { SNOW_GLSL, SNOW_U } from './snowtone.js?v=11051558';
 
 function bakeNoise(N = 256) {
   const hash = (x, y, p) => { x = ((x % p) + p) % p; y = ((y % p) + p) % p; const s = Math.sin(x * 127.1 + y * 311.7) * 43758.5453; return s - Math.floor(s); };
@@ -31,7 +31,7 @@ export const LAB = [
   { id: 'ruinwalls', name: '고대 유적 벽', tip: '크기가 다른 돌을 엇갈려 쌓은 옛 벽이에요. 구간마다 온전하거나 반쯤 무너졌거나 돌무더기만 남았어요. 돌기둥엔 금빛 띠와 푸른 문양이 빛나고, 문 위엔 거대한 고리 조각이 떠 돌아요. 맞으면 가까운 문양부터 금빛으로 켜져요.' },
   { id: 'coralwalls', name: '성운 산호 벽', tip: '낮고 울퉁불퉁한 산호초 바위 위에 산호가 세 줄로 얽혀 자란 벽이에요. 뿌리는 청록, 가지 끝은 보랏빛이고 물속처럼 천천히 흔들려요. 맞으면 가지 끝 방울이 반딧불처럼 깜빡여요.' },
   { id: 'crystalwalls', name: '자수정 꽃 무리', tip: '크고 작은 자수정 결정이 한가운데서 꽃잎처럼 사방으로 핀 덩어리들이 바짝 붙어 벽을 이뤄요. 가운데 결정이 가장 크고 곧고, 바깥으로 갈수록 짧고 눕혀져요. 맞으면 결정 면마다 다른 색으로 빛이 꺾여요.' },
-  { id: 'plants', name: '숨을 곳 · 우주 식물', tip: '미지의 우주 식물 덤불 시안 셋이에요. 왼쪽 A 빛잎 덤불 · 가운데 B 깃털 덤불 · 오른쪽 C 빛버섯 무리. 들어가면 반투명해지고 곧은 테두리가 보여요.' }];
+  { id: 'plants', name: '숨을 곳 · 우주 식물', tip: '미지의 우주 식물 덤불 시안 셋이에요. 왼쪽부터 A 빛잎 덤불 · B 깃털 덤불 · C 빛버섯 무리(키 낮춤) · 맨 오른쪽 셋을 섞은 덤불. 들어가면 반투명해지고 곧은 테두리가 보여요.' }];
 
 /* 이음 시험 자리 (그림과 JS가 같은 식): 얼음 땅 가운데 (-30,0) · 용암 땅 (30,0) · 큰길 = 두 가운데를 잇는 폭 8m 띠 */
 export const JOIN = { ice: [-30, 0], lava: [30, 0], R: 22, roadW: 4, roadX: 30 };
