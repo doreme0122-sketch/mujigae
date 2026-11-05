@@ -4,7 +4,8 @@
    · 멀어질수록 깊은 색으로 가라앉힘 (가까운 싸움터가 또렷하게)
    0 금속 판 · 1 이끼 낀 암반 · 2 결정 섞인 모래 · 3 은은한 평지 · 4 보스존 별빛 우주(보이지 않는 유리 바닥 + 아래로 깊은 별 세 겹) */
 import * as THREE from 'three';
-import { SNOW_GLSL, SNOW_U } from './snowtone.js?v=11050856';
+import { LAVA_GLSL } from './lavatone.js?v=11050920';
+import { SNOW_GLSL, SNOW_U } from './snowtone.js?v=11050920';
 
 function bakeNoise(N = 256) {
   const hash = (x, y, p) => { x = ((x % p) + p) % p; y = ((y % p) + p) % p; const s = Math.sin(x * 127.1 + y * 311.7) * 43758.5453; return s - Math.floor(s); };
@@ -111,14 +112,23 @@ export function makeFloorLab() {
             vec3 gl=vec3(.12,.55,1.)*band*under*.9*br*endk;                              /* 밝은 얼음 위에서도 보이게: 색을 섞어 바꾸고(더하기만 하면 묻힘) 금은 빛 번짐이 날 만큼 밝게 */
             c=mix(c,c*vec3(.55,.8,1.1)+gl,min(1.,band*.75)); c+=vec3(.6,.9,1.3)*crk*band*1.6*br*endk; } }
         return c; }
-      /* 용암 땅: 검은 현무암 껍질 · 숨 쉬듯 빛나는 붉은 결 (thin = 문턱 얇은 곳일수록 결이 굵고 밝음) */
+      ${LAVA_GLSL}
+      /* 용암 땅 (용암 벽과 같은 세상 · 같은 계산 lavatone.js): 숯빛 현무암 껍질 판(판마다 조금씩 기울고 색이 다름) · 판 사이 금은 뜨거운 곳만 주황으로 빛남(벽 겉 금과 같은 색·박자)
+         · 군데군데 녹은 용암 웅덩이: 식은 검은 껍질 판이 떠다니고 그 사이로 끓는 용암 (벽 발치 웅덩이와 같은 모습) · thin = 문턱 얇은 곳일수록 뜨거움
+         · 벽 재질은 화면에 낼 때 밝기 변환을 거치므로 바닥 빛은 같은 변환(pow 1/2.2)을 직접 해서 색을 맞춤 */
       vec3 lavaGround(vec2 p, vec3 rd, float thin){
-        float e=.35; float h=N4(p*.035+.4).r*.6+N4(p*.14).b*.4, hx=N4((p+vec2(e,0.))*.035+.4).r*.6+N4((p+vec2(e,0.))*.14).b*.4, hz=N4((p+vec2(0.,e))*.035+.4).r*.6+N4((p+vec2(0.,e))*.14).b*.4;
-        vec3 n=normalize(vec3(-(hx-h)/e*2.,1.,-(hz-h)/e*2.));
-        float v=abs(N4(p*.04+.9).g-.5), w=.01+.03*thin, vein=1.-smoothstep(w*.3,w,v);
-        float pulse=.7+.3*sin(uT*1.6+N4(p*.02).r*12.);
-        vec3 base=mix(vec3(.05,.045,.045),vec3(.1,.085,.08),h);
-        return lit(base,n,rd,.25,40.)*.13*(1.-vein)+vec3(1.1,.28,.04)*vein*pulse*(.45+.55*thin); }
+        vec2 wq=vec2(N4(p*.03).r,N4(p*.03+.5).g)*1.4; vec2 v1=lvor(p*.75+wq), v2=lvor(p*2.1+9.+wq);
+        vec3 n=normalize(vec3((lh(vec3(v1.y,1.,0.))-.5)*.12+(N4(p*.4).b-.5)*.12,1.,(lh(vec3(v1.y,2.,0.))-.5)*.12+(N4(p*.4+.3).b-.5)*.12));
+        vec3 base=mix(vec3(.06,.05,.046),vec3(.08,.068,.062),v1.y)*(.75+.5*N4(p*.3).a);
+        float pulse=lavaPulse(vec3(p.x,0.,p.y),uT);
+        float hotz=smoothstep(.5,.78,lnz(vec3(p*.35,.5))*.65+lnz(vec3(p*.07,1.5))*.35+thin*.45);   /* 금마다 뜨겁기가 다름 (한 덩어리 구역 X) */
+        float crack=smoothstep(.03+.05*thin,0.,v1.x)*hotz*(.6+.4*hotz), crack2=smoothstep(.02,0.,v2.x)*.45*step(.6,v2.y)*hotz, cold=smoothstep(.025,0.,v1.x)*(1.-hotz);
+        vec3 col=lit(base,n,rd,.18,30.)*.13*(1.-min(1.,crack+crack2+cold*.7)*.9);
+        vec3 em=lavaHot(crack*.9)*(crack+crack2*.6)*pulse*.85+lavaHot(.15)*smoothstep(.15,0.,v1.x)*hotz*.06;
+        float amt=smoothstep(.7,.9,lnz(vec3(p*.055,3.5))+thin*.15)*.85;                                   /* 녹은 웅덩이 */
+        if(amt>.01){ vec2 cr=lavaCrust(p,amt,uT); vec3 crust=vec3(.03,.024,.022)*(.7+.6*cr.y);
+          col=mix(col,crust,smoothstep(0.,.35,amt)); em=mix(em,lavaHot(.3+.5*cr.x*amt)*cr.x*pulse*.8+lavaHot(.2)*smoothstep(.2,0.,abs(cr.x-.5))*.25,smoothstep(0.,.35,amt)); }
+        return col+pow(max(em*.85,0.),vec3(.4545)); }
       void main(){
         vec3 ro=cameraPosition, rd=normalize(vW-ro); vec2 p=vW.xz; float dist=length(p-ro.xz); vec3 c;
         if(uK<.5){ /* 금속 판: 4m 판 · 이음매 · 모서리로 갈수록 살짝 둥글게 깎임(빛 받는 턱) · 볼트 · 긁힘 · 얼룩 */
