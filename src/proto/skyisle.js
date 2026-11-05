@@ -209,12 +209,12 @@ function bakePuffs(N = 512, n = 260) { const R = rng(4242), h = new Float32Array
   const t = new THREE.DataTexture(d, N, N); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.magFilter = THREE.LinearFilter; t.minFilter = THREE.LinearMipmapLinearFilter; t.generateMipmaps = true; t.needsUpdate = true; return t; }
 export function makeCloudSea(uT, sun, uN, discs = []) {
   const uP = { value: bakePuffs() }, D = []; for (let i = 0; i < 16; i++) { const d = discs[i]; D.push(d ? new THREE.Vector4(d.x - sun.x / sun.y * (d.y - SEA), d.z - sun.z / sun.y * (d.y - SEA), d.r, 1) : new THREE.Vector4(0, 0, 0, 0)); }
-  const m = new THREE.Mesh(new THREE.PlaneGeometry(900, 900).rotateX(-Math.PI / 2), new THREE.ShaderMaterial({ uniforms: { uT, uN: { value: uN }, uSun: { value: sun }, uP, uD: { value: D } },
+  const m = new THREE.Mesh(new THREE.PlaneGeometry(900, 900).rotateX(-Math.PI / 2), new THREE.ShaderMaterial({ uniforms: { uT, uN: { value: uN }, uSun: { value: sun }, uP, uD: { value: D }, uSea: { value: new THREE.Vector2() }, uIsl: { value: new THREE.Vector2() } },
     vertexShader: 'varying vec3 vW; void main(){ vec4 w=modelMatrix*vec4(position,1.); vW=w.xyz; gl_Position=projectionMatrix*viewMatrix*w; }',
-    fragmentShader: SKY + `uniform sampler2D uP; uniform vec4 uD[16]; varying vec3 vW;
+    fragmentShader: SKY + `uniform sampler2D uP; uniform vec4 uD[16]; uniform vec2 uSea, uIsl; varying vec3 vW;   /* uSea: 구름이 카메라를 덜 따라가게 밀어 주는 값(깊이) · uIsl: 섬이 밀린 만큼 */
       float H(vec2 p){ vec2 a=p*.0045+vec2(uT*.0005,0.), b=p*.016+vec2(uT*.0011,.3);
         return texture2D(uP,a).r*.75+texture2D(uP,b).r*.35; }
-      void main(){ vec2 p=vW.xz; float e=.9; float h=H(p), hx=H(p+vec2(e,0.)), hz=H(p+vec2(0.,e));
+      void main(){ vec2 p=vW.xz-uSea; float e=.9; float h=H(p), hx=H(p+vec2(e,0.)), hz=H(p+vec2(0.,e));
         vec3 n=normalize(vec3((h-hx)*9.,1.,(h-hz)*9.));
         float l=wrapL(n,.35);
         float ao=smoothstep(.05,.65,h);                                                                             /* 덩이 사이 골은 짙게 */
@@ -223,7 +223,7 @@ export function makeCloudSea(uT, sun, uN, discs = []) {
         c*=.72+.28*ao;
         c+=vec3(1.,.95,.9)*pow(1.-n.y,2.)*.25*l;                                                                    /* 덩이 가장자리 햇빛 테 */
         /* 섬 그림자: 해 반대쪽 구름 위로 크고 부드럽게 (섬이 높이 떠 있다는 게 한눈에 보임) */
-        float sh=0.; for(int i=0;i<16;i++){ vec4 d=uD[i]; if(d.w<.5) continue; float q=length(p-d.xy)/(d.z*1.08); sh=max(sh,smoothstep(1.,.45,q)); }
+        float sh=0.; for(int i=0;i<16;i++){ vec4 d=uD[i]; if(d.w<.5) continue; float q=length(vW.xz-uIsl-d.xy)/(d.z*1.08); sh=max(sh,smoothstep(1.,.45,q)); }
         c=mix(c,c*vec3(.62,.68,.86),sh*.75);
         gl_FragColor=vec4(c*.9,1.); }` }));
   m.position.y = SEA; m.renderOrder = -1; return m;
