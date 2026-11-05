@@ -4,8 +4,10 @@
    · 멀어질수록 깊은 색으로 가라앉힘 (가까운 싸움터가 또렷하게)
    0 금속 판 · 1 이끼 낀 암반 · 2 결정 섞인 모래 · 3 은은한 평지 · 4 보스존 별빛 우주(보이지 않는 유리 바닥 + 아래로 깊은 별 세 겹) */
 import * as THREE from 'three';
-import { LAVA_GLSL, vorTex } from './lavatone.js?v=11051730';
-import { SNOW_GLSL, SNOW_U } from './snowtone.js?v=11051730';
+import { LAVA_GLSL, vorTex } from './lavatone.js?v=11051755';
+import { SNOW_GLSL, SNOW_U } from './snowtone.js?v=11051755';
+import { RUIN_TONE } from './ruintone.js?v=11051755';
+const RTv = a => `vec3(${a.map(x => x.toFixed(4)).join(',')})`;
 
 function bakeNoise(N = 256) {
   const hash = (x, y, p) => { x = ((x % p) + p) % p; y = ((y % p) + p) % p; const s = Math.sin(x * 127.1 + y * 311.7) * 43758.5453; return s - Math.floor(s); };
@@ -178,13 +180,13 @@ export function makeFloorLab() {
         float mort=1.-smoothstep(.02,.05,e), chip=1.-smoothstep(.04,.12,e);
         vec3 n=normalize(vec3((h2(id+.3)-.5)*.08+(N4(p*.5).b-.5)*.06,1.,(h2(id+.7)-.5)*.08+(N4(p*.5+.3).b-.5)*.06));
         float wear=N4(p*.18).r*.5+N4(p*.7).g*.3;
-        vec3 base=vec3(.07,.06,.05)*(.8+.4*hid)*(.6+wear*.8);   /* 벽 돌보다 조금 어둡고 따뜻하게 → 벽이 바닥에서 떠 보임 */
+        vec3 base=${RTv(RUIN_TONE.floor)}*(.8+.4*hid)*(.6+wear*.8);   /* 벽 돌보다 조금 어둡고 따뜻하게 → 벽이 바닥에서 떠 보임 */
         vec2 v=lvor(p*.9+id); float crk=smoothstep(.04,.0,v.x)*step(.62,h2(id+2.));                                  /* 판 안의 금 (판마다 있거나 없음) */
         base*=1.-crk*.6; base*=1.-mort*.78; base*=1.+chip*.15*(h2(id+5.)-.4);
         float miss=step(h2(id+11.),.06+near*.3);                                                                     /* 빠진 판: 흙 + 부스러기 */
-        if(miss>.5){ float gr=N4(p*2.3).a*.6+N4(p*.8).g*.4, gv=smoothstep(.6,.75,N4(p*4.1).b); base=mix(vec3(.035,.028,.022),vec3(.075,.064,.054),gr)*(.75+.5*gv); n=normalize(vec3((N4(p*2.).b-.5)*.4,1.,(N4(p*2.+.5).b-.5)*.4)); base*=smoothstep(.0,.15,e)*.5+.5; }
+        if(miss>.5){ float gr=N4(p*2.3).a*.6+N4(p*.8).g*.4, gv=smoothstep(.6,.75,N4(p*4.1).b); base=mix(${RTv(RUIN_TONE.dirt)},${RTv(RUIN_TONE.dirt)}*2.15,gr)*(.75+.5*gv); n=normalize(vec3((N4(p*2.).b-.5)*.4,1.,(N4(p*2.+.5).b-.5)*.4)); base*=smoothstep(.0,.15,e)*.5+.5; }
         else if(hid>.96){ vec2 c=vec2(fx-.5,fy-.5)*vec2(sl,rw); float r=length(c), g=smoothstep(.05,.02,abs(r-.32))+smoothstep(.04,.015,abs(r-.18)); base*=1.-g*.6; }   /* 새긴 문양 고리 */
-        return lit(base,n,rd,.08,18.)*.45; }
+        return lit(base,n,rd,.08,18.)*${RUIN_TONE.glow.toFixed(3)}; }
       /* 산호 바닥 = 우주 이끼 들판 (사용자 2026-11-05: 신비로운 느낌 · 우주 식물 · 지나가면 은은히 빛났다 사라짐)
          · 작은 우주 이끼가 촘촘히 덮임: 포기마다 끝이 아주 희미하게 숨 쉬듯 빛남(포기마다 박자 다름)
          · 기체가 지나간 자리(uTr: x,z,지난 시각)의 이끼가 깨어나 청록·보라로 빛나고 5초에 걸쳐 천천히 꺼짐 → 빛나는 길이 남음
