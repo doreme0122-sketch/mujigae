@@ -5,23 +5,23 @@
    무게: 바닥 판 하나 + 기체 둘 + 빛 알갱이 한 묶음 + 그림자 판 둘 */
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
-import { makeBloom } from '../core/hangar/bloom.js?v=11051659';
-import { makePerf } from './perf.js?v=11051659';
+import { makeBloom } from '../core/hangar/bloom.js?v=11051709';
+import { makePerf } from './perf.js?v=11051709';
 import { buildShip, engineSpots } from '../core/ships/build.js';
 import { makeGlow } from '../preview/glow.js';
-import { makeFlight, FLY } from './flight.js?v=11051659';
-import { makeFloorLab, LAB, JOIN, sdBlob, sdRoad, blobR } from './floorlab.js?v=11051659';
-import { makeMassWall, STYLES } from './wallmass.js?v=11051659';
-import { makeIceWall } from './icewall.js?v=11051659';
-import { SNOW_U } from './snowtone.js?v=11051659';
-import { iceWallMaterial, snowMaterial } from './icewall.js?v=11051659';
-import { makeRuinWall, ruinMaterial } from './ruins.js?v=11051659';
-import { makeCoralWall, coralMaterial, coral } from './coral.js?v=11051659';
-import { makeTrailMap } from './trailmap.js?v=11051659';
-import { makeThemedHide } from './hidetheme.js?v=11051659';
-import { makePlantBush } from './plantbush.js?v=11051659';
-import { makeCrystalWall, crystalMaterial } from './crystal.js?v=11051659';
-import { makeLavaWall, lavaWallMaterial } from './lavawall.js?v=11051659';
+import { makeFlight, FLY } from './flight.js?v=11051709';
+import { makeFloorLab, LAB, JOIN, sdBlob, sdRoad, blobR } from './floorlab.js?v=11051709';
+import { makeMassWall, STYLES } from './wallmass.js?v=11051709';
+import { makeIceWall } from './icewall.js?v=11051709';
+import { SNOW_U } from './snowtone.js?v=11051709';
+import { iceWallMaterial, snowMaterial } from './icewall.js?v=11051709';
+import { makeRuinWall, ruinMaterial } from './ruins.js?v=11051709';
+import { makeCoralWall, coralMaterial, coral } from './coral.js?v=11051709';
+import { makeTrailMap } from './trailmap.js?v=11051709';
+import { makeThemedHide } from './hidetheme.js?v=11051709';
+import { makePlantBush } from './plantbush.js?v=11051709';
+import { makeCrystalWall, crystalMaterial } from './crystal.js?v=11051709';
+import { makeLavaWall, lavaWallMaterial } from './lavawall.js?v=11051709';
 
 const $ = s => document.querySelector(s), clamp = THREE.MathUtils.clamp;
 const VIEWS = [{ id: 'game', name: '게임 시점', h: 42, tilt: .38 }, { id: 'near', name: '가까이', h: 18, tilt: .6 }, { id: 'far', name: '멀리', h: 90, tilt: .3 }];
@@ -102,6 +102,7 @@ export async function start(canvas, onProgress = () => {}) {
      벽 줄기(v7.json ridges)를 각도 창(방 1 쪽 ±42°) 안 토막으로 잘라 벽 종류대로 세움:
      유적 = 보물 땅 둘레 · 맵 테두리(158m 근처) · 방 둘레 / 산호 = 정글 / 나머지(사냥터 벽) = 방 1 사냥터는 얼음 · 이웃 사냥터는 방 번호 짝에 따라 얼음·용암
      보스존 둘레 = 자수정 꽃 무리(반지름 31m, 문 10곳) · 숨을 곳 = 우주 식물 덤불 · 막힘 = 벽이 넘겨준 자리 + 맵 밖 */
+  const NOGH = /[?&]gh=0/.test(location.search);   /* 시험: 숨을 때 내 기체 반투명 끄기 (프레임 원인 찾기) */
   const ZONE = new THREE.Group(); scene.add(ZONE); ZONE.visible = false; let zoneReady = null, zoneReg = null, zonePlants = [];
   const buildZone = async () => {
     const J = await (await fetch('./assets/map/v7.json')).json(), tex = await new THREE.TextureLoader().loadAsync('./assets/map/v7.png');
@@ -214,7 +215,7 @@ export async function start(canvas, onProgress = () => {}) {
       if (Math.hypot(b.x - hx, b.z - hz) < 1.1) { flash(b.x, b.z, b.mine ? [.6, 1.3, .7] : [1.4, .5, .5]); if (b.mine) { HF.hp = Math.max(.05, HF.hp - .018); HF.heat += .07; } else HM.hp = Math.max(.05, HM.hp - .03); bolts.splice(i, 1); continue; }
       if (b.life <= 0) bolts.splice(i, 1); }
     HM.hp = Math.min(1, HM.hp + dt * .03); HF.hp = Math.min(1, HF.hp + dt * .05);
-    UT.value = t; { let inH = false; for (const k in HIDE) { const h = HIDE[k]; h.mesh.visible = +k === K; if (+k === K) inH = h.update(t, dt, FS.x, FS.z); } if (K === 11) for (const b of plants) inH = b.update(t, dt, FS.x, FS.z) || inH; if (K === 12) for (const b of zonePlants) inH = b.update(t, dt, FS.x, FS.z) || inH; PL.visible = K === 11; fly.userData.setGhost?.(inH); }   /* 숨으면 내 기체 반투명 */
+    UT.value = t; { let inH = false; for (const k in HIDE) { const h = HIDE[k]; h.mesh.visible = +k === K; if (+k === K) inH = h.update(t, dt, FS.x, FS.z); } if (K === 11) for (const b of plants) inH = b.update(t, dt, FS.x, FS.z) || inH; if (K === 12) for (const b of zonePlants) inH = b.update(t, dt, FS.x, FS.z) || inH; PL.visible = K === 11; if (!NOGH) fly.userData.setGhost?.(inH); }   /* 숨으면 내 기체 반투명 */
     for (const g of galTags) { v3.copy(g.p).project(camera); const on = gal.visible && v3.z < 1 && Math.abs(v3.x) < 1.1 && Math.abs(v3.y) < 1.1; g.el.style.opacity = on ? 1 : 0; if (on) g.el.style.transform = `translate(${(v3.x * .5 + .5) * cw}px,${(-v3.y * .5 + .5) * ch}px) translate(-50%,-50%)`; }
     lab.ships[0].set(FS.x, 0, FS.z, 1); lab.ships[1].set(E.x, 0, E.z, 2); lab.update(t);
     /* 빛 길: 기체가 지난 토막을 빛 길 지도에 칠함 (기체 수와 상관없이 바닥은 한 번만 읽음) — 숨었는지와 상관없이 남김 */
