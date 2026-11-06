@@ -7,18 +7,18 @@
    · 태어나 출구로 튀어 나가면 바로 조이스틱 · 기지 고리(9m)를 벗어나는 순간 보호막 3초 + 가속 5초 */
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
-import { makeBloom } from '../core/hangar/bloom.js?v=11061724';
-import { makePad } from '../core/hangar/pad.js?v=11061724';
-import { makeMag } from '../core/hangar/mag.js?v=11061724';
+import { makeBloom } from '../core/hangar/bloom.js?v=11061737';
+import { makePad } from '../core/hangar/pad.js?v=11061737';
+import { makeMag } from '../core/hangar/mag.js?v=11061737';
 import { buildShip } from '../core/ships/build.js';
-import { makeGoldStar } from './goldstar.js?v=11061724';
-import { makeArena, SPEED, WAVE_R0 } from './arena.js?v=11061724';
-import { makeGuardians, GUARD } from './guardian.js?v=11061724';
-import { makeBirth, BIRTH } from './birth.js?v=11061724';
-import { makePerf } from './perf.js?v=11061724';
+import { makeGoldStar } from './goldstar.js?v=11061737';
+import { makeArena, SPEED, WAVE_R0 } from './arena.js?v=11061737';
+import { makeGuardians, GUARD } from './guardian.js?v=11061737';
+import { makeBirth, BIRTH } from './birth.js?v=11061737';
+import { makePerf } from './perf.js?v=11061737';
 import { makeGlow } from '../preview/glow.js';
-import { makeFlight, FLY } from './flight.js?v=11061724';
-import { pedestal } from './gates.js?v=11061724';
+import { makeFlight, FLY } from './flight.js?v=11061737';
+import { pedestal } from './gates.js?v=11061737';
 
 const $ = s => document.querySelector(s), clamp = THREE.MathUtils.clamp, HOVER = FLY.HOVER;
 const R = 240, NB = 10, GAPH = 6, BASE_D = 15;      /* 맵 반지름 · 기지 수 · 벽 틈 반 폭(12m) · 벽에서 기지 가운데까지 */
@@ -55,22 +55,22 @@ export async function start(canvas, onProgress = () => {}) {
   /* ── 무지개 홀로그램 벽 ── */
   const HITS = Array.from({ length: 10 }, () => new THREE.Vector4(0, -999, 0, -99)); let hitI = 0;
   const wallM = new THREE.ShaderMaterial({ transparent: true, depthWrite: false, side: THREE.DoubleSide,
-    uniforms: { uT: { value: 0 }, uR: { value: R }, uGap: { value: GAPH }, uHit: { value: HITS } },
+    uniforms: { uT: { value: 0 }, uR: { value: R }, uGap: { value: GAPH }, uHit: { value: HITS }, uGapOn: { value: 1 } },
     vertexShader: 'varying vec3 vW; varying vec3 vN; void main(){ vec4 w=modelMatrix*vec4(position,1.); vW=w.xyz; vN=normalize(mat3(modelMatrix)*normal); gl_Position=projectionMatrix*viewMatrix*w; }',
-    fragmentShader: `uniform float uT, uR, uGap; uniform vec4 uHit[10]; varying vec3 vW; varying vec3 vN;
+    fragmentShader: `uniform float uT, uR, uGap, uGapOn; uniform vec4 uHit[10]; varying vec3 vW; varying vec3 vN;
       vec3 rb(float h){ return .5+.5*cos(6.2832*(h+vec3(0.,.33,.67))); }
       void main(){ float a=atan(vW.z,vW.x), st=6.2831853/10., k=a-st*floor(a/st+.5), arc=abs(k)*uR;
-        float open=smoothstep(uGap-.2,uGap+.7,arc);                                   /* 출구 틈 */
+        float open=uGapOn>.5 ? smoothstep(uGap-.2,uGap+.7,arc) : 1.;                  /* 출구 틈 (통로 벽에는 틈 없음) */
         float u=a*uR, y=vW.y;
         vec3 V=normalize(cameraPosition-vW); float fr=1.-abs(dot(normalize(vN),V)); fr=fr*fr;
         /* 홀로그램 결: 엇갈린 마름모 격자 · 위로 흐르는 가는 주사선 · 천천히 흐르는 무지개 */
         vec2 q=vec2(u*.5+y*.5, u*.5-y*.5)*.45; vec2 f=abs(fract(q)-.5); float grid=smoothstep(.46,.5,max(f.x,f.y));
         float scan=pow(.5+.5*sin(y*5.-uT*2.4),18.);
         float hue=fract(u/70.+y*.012+uT*.025);
-        float vf=smoothstep(-46.,-26.,y)*smoothstep(38.,20.,y);
+        float vf=uGapOn>.5 ? smoothstep(-46.,-26.,y)*smoothstep(38.,20.,y) : smoothstep(-12.,-6.,y)*smoothstep(9.,5.,y);
         vec3 col=rb(hue); float al=(.11+.14*fr+.1*grid+.05*scan);
         /* 틈 가장자리: 또렷한 무지개 선 */
-        float edge=exp(-pow((arc-uGap)/.22,2.)); col+=rb(hue+.3)*edge*1.2; al+=edge*.5;
+        float edge=exp(-pow((arc-uGap)/.22,2.))*uGapOn; col+=rb(hue+.3)*edge*1.2; al+=edge*.5;
         /* 맞은 자리: 무지개빛 고리가 표면을 따라 번져 나감 */
         for(int i=0;i<10;i++){ vec4 hh=uHit[i]; float age=uT-hh.w; if(age<0.||age>1.8) continue; float d=distance(vW,hh.xyz), rr=age*10.;
           float ring=exp(-pow((d-rr)/(.6+age*.6),2.))*(1.-age/1.8), core=exp(-d*d*.35)*max(0.,1.-age*3.);
@@ -90,6 +90,15 @@ export async function start(canvas, onProgress = () => {}) {
       const seam = new THREE.Mesh(new THREE.PlaneGeometry(.35, 12).translate(0, 1.5, 0), seamM); seam.position.z = -s * .62; seam.rotation.y = s * Math.PI / 2; g.add(seam);   /* 틈을 바라보는 면 */
       const bot = new THREE.Mesh(new THREE.ConeGeometry(.75, 6, 6).rotateX(Math.PI).translate(0, -7.8, 0), postM); g.add(bot); }
     BASES.push({ ang, x: Math.cos(ang) * (R + BASE_D), z: Math.sin(ang) * (R + BASE_D) }); }
+  /* 기지 → 문 통로 양옆 + 기지 둘레: 같은 무지개 홀로그램 벽 (막히는 곳마다 벽이 보이게 · 사용자 2026-11-06: 투명한데 막혀 있으면 납득이 안 됨) */
+  const RB = 10.5, CL = Math.sqrt(RB * RB - GAPH * GAPH);   /* 기지 둘레 반지름 · 통로 벽이 기지 둘레와 만나는 곳 */
+  const encM = wallM.clone(); encM.uniforms = { ...wallM.uniforms, uGapOn: { value: 0 } };
+  const strip = pts => { const pos = [], idx = []; pts.forEach(([x, z], i) => { pos.push(x, -12, z, x, 9, z);   /* 기지·통로 벽은 낮게 (카메라가 벽 안에 들어가 화면이 흐려지지 않게) */ if (i) { const k = (i - 1) * 2; idx.push(k, k + 1, k + 2, k + 1, k + 3, k + 2); } });
+    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setIndex(idx); g.computeVertexNormals(); const m = new THREE.Mesh(g, encM); m.renderOrder = 20; m.frustumCulled = false; scene.add(m); };
+  for (const b of BASES) { const ax = Math.cos(b.ang), az = Math.sin(b.ang), px = -az, pz = ax, D = R + BASE_D;
+    for (const sd of [-1, 1]) { const p = []; for (let r = R; r <= D - CL + .01; r += (D - CL - R) / 8) p.push([ax * r + px * sd * GAPH, az * r + pz * sd * GAPH]); strip(p); }   /* 통로 양옆 */
+    const dl = Math.atan2(GAPH, CL), arc = []; for (let k = 0; k <= 56; k++) { const q = Math.PI + dl + k / 56 * (Math.PI * 2 - 2 * dl); arc.push([b.x + (ax * Math.cos(q) + px * Math.sin(q)) * RB, b.z + (az * Math.cos(q) + pz * Math.sin(q)) * RB]); }
+    strip(arc); }   /* 기지 둘레 (통로 쪽만 열림) */
   onProgress(.25);
 
   /* ── 태어나는 곳 10곳: 받침 섬 + 하늘빛 '빛의 닻' (출구가 한가운데를 바라봄) ── */
@@ -110,10 +119,11 @@ export async function start(canvas, onProgress = () => {}) {
   const birth = makeBirth(bship); B0.w.add(birth);
   onProgress(.75);
   /* ── 조이스틱으로 모는 기체 ── */
-  const inBase = (x, z) => BASES.find(b => Math.hypot(x - b.x, z - b.z) < 10.5);
+  const inBase = (x, z) => BASES.find(b => Math.hypot(x - b.x, z - b.z) < RB - .9);
   const B = { blocked: (x, z) => { const r = Math.hypot(x, z); if (r < R - .9) return false; const a = Math.atan2(z, x), st = Math.PI * 2 / NB, k = a - st * Math.round(a / st), arc = Math.abs(k) * R;
-      if (r <= R + .9) return arc > GAPH - .9;                                 /* 벽: 틈으로만 지나감 */
-      if (inBase(x, z)) return false; return !(arc < GAPH - .9 && r < R + BASE_D); }, region: () => 0 };   /* 벽 바깥: 기지 둘레와 기지→틈 길만 */
+      if (r <= R + .9) return arc > GAPH - .9;                                 /* 바깥 벽: 틈으로만 지나감 */
+      if (inBase(x, z)) return false; const b = BASES[((Math.round(a / st) % NB) + NB) % NB], ax = Math.cos(b.ang), az = Math.sin(b.ang), along = x * ax + z * az, lat = Math.abs(-x * az + z * ax);
+      return !(lat < GAPH - .9 && along < R + BASE_D); }, region: () => 0 };   /* 벽 바깥: 기지 둘레 벽 안과 통로 벽 사이만 (보이는 벽 그대로) */   /* 벽 바깥: 기지 둘레와 기지→틈 길만 */
   const fly = await makeFlight(renderer, B, [B0.x, B0.z], 0); scene.add(fly); const FS = fly.userData.S; fly.visible = false;
   const oldSh = []; fly.traverse(o => { if (o.isMesh && o.renderOrder === 1 && o.geometry.type === 'PlaneGeometry') oldSh.push(o); });
   onProgress(.9);
@@ -149,7 +159,7 @@ export async function start(canvas, onProgress = () => {}) {
   addEventListener('resize', size); size(); bloom.setSamples(perf.st.aa ? 4 : 0);
 
   const v3 = new THREE.Vector3(), say = $('#where');
-  let t = 0, last = performance.now();
+  let t = 0, last = performance.now(); const WARP = { r: 0, s: 0 };
   wake(.6);
   renderer.setAnimationLoop(now => { try {
     const dt = clamp((now - last) / 1000, 0, .05); last = now; t += dt;
@@ -158,7 +168,7 @@ export async function start(canvas, onProgress = () => {}) {
     for (const b of BASES) { b.pad.userData.update(t); b.star.userData.update(t); b.ring.userData.update(t); b.guards.userData.update(t, b === B0 && on && !flying); }
     B0.mag.userData.update(t, on && !flying ? bship : null, shipHalf);
     { const LU = B0.pad.userData.lampU, q = (t - holdAt) / FILL; if (filling && q < 1.1) { LU.uIn.value = Math.max(0, 1.62 * (1 - Math.min(1, q))); LU.uInHead.value = q < 1 ? 1.4 : 0; } else { LU.uIn.value = -1; LU.uInHead.value = 0; } }
-    birth.userData.update(t, dt); { const S = birth.userData.S; for (const o of [B0.pad, B0.mag, B0.star, stand]) o.position.y = S.punch; B0.star.userData.burst(S.burst); B0.ring.userData.impact(S.impR, S.impK); }
+    birth.userData.update(t, dt); { const S = birth.userData.S; WARP.r = S.warpR; WARP.s = S.warpS; for (const o of [B0.pad, B0.mag, B0.star, stand]) o.position.y = S.punch; B0.star.userData.burst(S.burst); B0.ring.userData.impact(S.impR, S.impK); }
     if (!flying && t >= launchAt) launch(t);
     if (!flying && born && t > launchAt - .55) { bship.rotation.z = -.05 * Math.min(1, (t - launchAt + .55) / .3); }   /* 웅크림: 머리를 숙임 */
     /* 기체 */
@@ -167,7 +177,7 @@ export async function start(canvas, onProgress = () => {}) {
     /* 쏘기 · 벽에 맞으면 무지개빛이 번짐 */
     cool -= dt; if (flying && fireOn && cool <= 0) { cool = .16; const h = FS.head, x = FS.x - Math.sin(h) * 1.2, z = FS.z - Math.cos(h) * 1.2; bolts.push({ x, z, vx: -Math.sin(h) * 40 + FS.vx * .5, vz: -Math.cos(h) * 40 + FS.vz * .5, life: 1.6 }); }
     for (let i = bolts.length - 1; i >= 0; i--) { const b = bolts[i], r0 = Math.hypot(b.x, b.z); b.x += b.vx * dt; b.z += b.vz * dt; b.life -= dt; const r1 = Math.hypot(b.x, b.z);
-      if ((r0 - R) * (r1 - R) <= 0) { const a = Math.atan2(b.z, b.x), st = Math.PI * 2 / NB, k = a - st * Math.round(a / st); if (Math.abs(k) * R > GAPH) { const ka = R / r1; HITS[hitI++ % HITS.length].set(b.x * ka, HOVER + .3, b.z * ka, t); fx.push({ x: b.x * ka, z: b.z * ka, t: 0 }); bolts.splice(i, 1); continue; } }
+      if (r1 > R - 1.2 && B.blocked(b.x, b.z)) { const ka = Math.abs(r1 - R) < 1.2 ? R / r1 : 1; HITS[hitI++ % HITS.length].set(b.x * ka, HOVER + .3, b.z * ka, t); fx.push({ x: b.x * ka, z: b.z * ka, t: 0 }); bolts.splice(i, 1); continue; }   /* 무지개 벽(바깥 벽 · 통로 벽 · 기지 둘레)에 맞으면 무지개빛이 번짐 */
       if (b.life <= 0) bolts.splice(i, 1); }
     wallM.uniforms.uT.value = t; seamM.uniforms.uT.value = t;
     glow.begin();
@@ -180,6 +190,8 @@ export async function start(canvas, onProgress = () => {}) {
     const a = cfg.ang * Math.PI / 180, D = cfg.dist * (flying ? 1 : .7); camera.position.set(cam.x, cam.y + D * Math.sin(a), cam.z + D * Math.cos(a)); camera.lookAt(cam.x, cam.y, cam.z); camera.updateMatrixWorld();
     sea.position.x = cam.x; sea.position.z = cam.z; sea.material.uniforms.uT.value = t;
     { const r = Math.hypot(FS.x, FS.z); say.textContent = !flying ? '태어나는 중' : r > R ? '태어나는 곳 · 출구로 나가면 맵 안' : r > R - 25 ? '무지개 벽 가까이 · 쏘면 무지개빛이 번져요' : '맵 안 · 한가운데까지 ' + Math.round(r) + 'm'; }
+    /* 별똥별이 꽂힐 때 공간 일그러짐 충격파 (시작 기지와 같은 효과) */
+    if (WARP.s > 0) { B0.w.localToWorld(v3.set(0, .2, 0)); v3.project(camera); bloom.warp(v3.x * .5 + .5, v3.y * .5 + .5, WARP.r, WARP.s, Wd / Hd); } else bloom.warp(.5, .5, 0, 0, Wd / Hd);
     renderer.setRenderTarget(bloom.scene); renderer.clear(); renderer.render(scene, camera);
     bloom.render(Wd, Hd, !perf.st.bloom); perf.tick(dt);
   } catch (e) { console.error('[전체 맵]', e); } });

@@ -10,7 +10,7 @@
    · 빛이 가장 밝을 때 기체가 나오고, 빛이 걷히면 기체가 서 있음
    무게: 태어날 때 2초 남짓만 그림. 꼬리·빛 가닥은 각각 한 덩어리, 부스러기·조각은 점 묶음 한 번씩 */
 import * as THREE from 'three';
-import { makeMeteor, METEOR } from './meteor.js?v=11061724';
+import { makeMeteor, METEOR } from './meteor.js?v=11061737';
 
 export const BIRTH = { PRE: METEOR.FALL, END: 2.0 };   /* 떨어지는 빛 = 유성 (meteor.js) */
 const TOP = 16;
@@ -63,7 +63,7 @@ export function makeBirth(ship) {
       void main(){ vU=aU; vS=aS; vSeed=aP.w;
         float sp=aP.y, L=aP.x*(1.-exp(-max(uE,0.)*sp));                                      /* 빠르게 뻗었다 멈춤 */
         float fade=exp(-max(uE-aP.z,0.)*3.2)*step(0.,uE); vA=fade;
-        vec3 a=(viewMatrix*vec4(uC,1.)).xyz, b=(viewMatrix*vec4(uC+aDir*L,1.)).xyz;
+        vec3 a=(viewMatrix*(modelMatrix*vec4(uC,1.))).xyz, b=(viewMatrix*(modelMatrix*vec4(uC+aDir*L,1.))).xyz;   /* 부모가 옮겨지거나 줄어도 제자리 */
         vec3 d=normalize(b-a+vec3(1e-4)), n=cross(d, normalize(-a)); n = dot(n,n) > 1e-8 ? normalize(n) : vec3(1.,0.,0.);
         float w=.05*(1.-aU*.85)*(.6+aP.w*.8);
         gl_Position=projectionMatrix*vec4(mix(a,b,aU)+n*aS*w,1.); }`,

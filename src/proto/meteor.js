@@ -38,7 +38,7 @@ export function makeMeteor(S0, C, opt = {}) {
         float A = ang + (w-.5)*age*4.;
         vec3 off = (cos(A)*P1 + sin(A)*P2)*spread + (P1*.8+P2*.6)*tb + P1*(w-.5)*age*.9*uK;
         vec3 p = mix(uS0, uC, u) + off, q = mix(uS0, uC, max(u-.004,0.)) + off;
-        vec3 a=(viewMatrix*vec4(p,1.)).xyz, b=(viewMatrix*vec4(q,1.)).xyz;
+        vec3 a=(viewMatrix*(modelMatrix*vec4(p,1.))).xyz, b=(viewMatrix*(modelMatrix*vec4(q,1.))).xyz;   /* 부모가 옮겨지거나 줄어도 제자리 (하늘 맵의 기지는 0.69배·돌려 놓임) */
         vec3 n=cross(normalize(b-a+vec3(1e-4)), normalize(-a+vec3(1e-4))); n = dot(n,n) > 1e-8 ? normalize(n) : vec3(1.,0.,0.);
         a += n*sd*.01*wid*(1.+age*2.)*uK;
         float life = .12 + seed*.18;                                          /* 꼬리가 빠르게 잘리고 빠르게 사라짐 */
