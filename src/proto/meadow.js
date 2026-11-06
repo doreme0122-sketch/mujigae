@@ -4,10 +4,10 @@
    · 공평하게: 기지 10곳마다 같은 몫 — 기지 앞을 가운데로 한 조각(36°)마다 몬스터 둥지 1 · 큰 섬 4 · 작은·중간 섬 26 · 층을 뚫는 기둥 2 · 발아래 바위 16 · 위층 섬 5 · 아래층 섬 7 (가벼운 섬 모델 kit_meadow_lo: 겉모습은 그대로 · 면은 원래의 15%) (섬은 받은 모델의 3분의 1 크기)
    · 보물 던전 섬 5 = 기지 사이 다섯 곳 (위층 3 · 아래층 2, 번갈아) — 가운데층엔 보물 없음
    · 막힘: 가운데층 섬 중 기체 높이를 지나는 바위·땅만 막음(위에서 단면을 1m 칸으로 찍음). 풀·나무·물은 안 막음. 위·아래층 섬은 다른 층이라 안 막음
-   · 그리기: 조각마다 · 층마다 · 재질마다 한 덩어리로 합침 → 화면 밖 조각은 통째로 안 그림 */
+   · 그리기 (사용자 2026-11-06: 단순화 말고 진짜 최적화로): 원래 섬 모델 그대로 · 같은 섬은 한 번에(인스턴싱) · 섬 하나 단위로 화면 밖은 빼고 · 가까운 것부터 · 가벼운 칠 방식 */
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
-import { mergeGeometries, deinterleaveGeometry } from 'three/addons/utils/BufferGeometryUtils.js';
+import { deinterleaveGeometry } from 'three/addons/utils/BufferGeometryUtils.js';
 
 export const MEADOW = { R0: 187, R1: 240, UP: 20, DN: -30, TOP: -1.0, SC: 1 / 2 };   /* SC: 받은 섬 모델 크기의 2분의 1 (사용자 2026-11-06: 원래는 너무 크고 3분의 1은 너무 작음) */   /* 가운데층 섬 윗면 = 기체(높이 .7)보다 1.7m 아래 */
 const SECT = 10, CELL = 1;
@@ -73,28 +73,63 @@ export async function makeMeadow(scene, url, onProgress = () => {}) {
     tryPut(UPS, 'up', 5, rf(.06), rf(.9));
     tryPut(DNS, 'dn', 7, rf(.04), rf(.94)); }
 
-  /* ── 층마다 다른 빛: 위층 = 밝게 + 점무늬로 옅게(기체·카메라 가까이선 더 옅게) · 아래층 = 어둡고 아래로 갈수록 구름빛으로 흐려짐 ── */
+  /* ── 칠하는 방식: 이 그림체는 면마다 평평한 색 → 빛 반사를 점마다 정밀 계산하는 무거운 방식 대신,
+        꼭짓점에서 해·하늘·땅빛만 한 번 계산하고 화면 점마다는 그 색을 그대로 씀 (모양·색은 같고 계산은 훨씬 적음)
+        층마다: 위층 = 밝게 + 점무늬로 옅게(기체 가까이선 더 옅게) · 아래층 = 어둡고 아래로 갈수록 구름빛 · 기둥 = 기체보다 높은 부분이 가까이 오면 점무늬로 비켜 줌 ── */
   const uCam = { value: new THREE.Vector3() };
-  const tone = (src, layer) => { const m = src.clone(); m.vertexColors = true;
-    m.onBeforeCompile = sh => { sh.uniforms.uCam = uCam;
-      sh.vertexShader = 'varying vec3 vWp;\n' + sh.vertexShader.replace('#include <worldpos_vertex>', '#include <worldpos_vertex>\n vWp = (modelMatrix * vec4(transformed, 1.)).xyz;');
-      let f = 'uniform vec3 uCam; varying vec3 vWp;\n' + sh.fragmentShader;
-      const BAY = 'float bay(vec2 p){ vec2 q=mod(floor(p),4.); int i=int(q.x)+int(q.y)*4; float m[16]=float[16](0.,8.,2.,10.,12.,4.,14.,6.,3.,11.,1.,9.,15.,7.,13.,5.); return (m[i]+.5)/16.; }\n';
-      if (layer === 'pillar') f = f.replace('void main() {', BAY + 'void main() {\n { float near = smoothstep(10., 34., distance(vWp.xz, uCam.xz)), hi = smoothstep(2.5, 6., vWp.y); if (bay(gl_FragCoord.xy) > mix(1., mix(.25, 1., near), hi)) discard; }');   /* 기둥: 기체보다 높은 부분은 가까이 오면 점무늬로 비켜 줌 (화면을 가리지 않게) */
-      if (layer === 'up') f = f.replace('void main() {', BAY + 'void main() {\n float near = smoothstep(14., 40., distance(vWp.xz, uCam.xz)); if (bay(gl_FragCoord.xy) > mix(.22, .55, near)) discard;')
-        .replace('#include <dithering_fragment>', '#include <dithering_fragment>\n gl_FragColor.rgb = mix(gl_FragColor.rgb, vec3(1.,.99,.96), .22);');
-      if (layer === 'dn') f = f.replace('#include <dithering_fragment>', '#include <dithering_fragment>\n { float k = clamp((-vWp.y - 15.) / 50., 0., 1.); gl_FragColor.rgb = mix(gl_FragColor.rgb * .72, vec3(.5,.6,.78), .35 + k * .45); }');
-      sh.fragmentShader = f; };
-    m.customProgramCacheKey = () => 'meadow-' + layer; return m; };
-  const MAT = {}; const matFor = (name, layer) => { const key = name + '|' + layer; return MAT[key] || (MAT[key] = tone(MATS[name], layer === 'rock' ? 'mid' : layer)); };
+  const LIT = { uSun: { value: new THREE.Vector3(-9, 14, -8).normalize() }, uSunC: { value: new THREE.Color(0xfff0dc).multiplyScalar(2.8 / Math.PI) },
+    uSky: { value: new THREE.Color(0xb7c8e8).multiplyScalar(.85 / Math.PI + .38) }, uGnd: { value: new THREE.Color(0x3a3020).multiplyScalar(.85 / Math.PI + .38) } };
+  const BAY = 'float bay(vec2 p){ vec2 q=mod(floor(p),4.); int i=int(q.x)+int(q.y)*4; float m[16]=float[16](0.,8.,2.,10.,12.,4.,14.,6.,3.,11.,1.,9.,15.,7.,13.,5.); return (m[i]+.5)/16.; }\n';
+  const tone = (src, layer) => {
+    const em = src.emissive ? src.emissive.clone() : new THREE.Color(0);
+    const m = new THREE.ShaderMaterial({ vertexColors: true, transparent: src.transparent, depthWrite: src.depthWrite, side: src.side,
+      uniforms: { ...LIT, uCam, uEm: { value: em } },
+      vertexShader: `uniform vec3 uSun, uSunC, uSky, uGnd, uEm; varying vec3 vC; varying float vA; varying vec3 vWp;
+        void main(){ mat4 M = modelMatrix * instanceMatrix; vec4 w = M * vec4(position, 1.); vWp = w.xyz;
+          vec3 n = normalize(mat3(M) * normal);
+          #ifdef USE_COLOR_ALPHA
+            vec3 c = color.rgb; vA = color.a;
+          #else
+            vec3 c = color; vA = 1.;
+          #endif
+          vC = c * (uSunC * max(dot(n, uSun), 0.) + mix(uGnd, uSky, n.y * .5 + .5)) + uEm;
+          gl_Position = projectionMatrix * viewMatrix * w; }`,
+      fragmentShader: `uniform vec3 uCam; varying vec3 vC; varying float vA; varying vec3 vWp;
+        ${layer === 'up' || layer === 'pillar' ? BAY : ''}
+        void main(){ vec3 col = vC;
+          ${layer === 'pillar' ? '{ float near = smoothstep(10., 34., distance(vWp.xz, uCam.xz)), hi = smoothstep(2.5, 6., vWp.y); if (bay(gl_FragCoord.xy) > mix(1., mix(.25, 1., near), hi)) discard; }' : ''}
+          ${layer === 'up' ? '{ float near = smoothstep(14., 40., distance(vWp.xz, uCam.xz)); if (bay(gl_FragCoord.xy) > mix(.22, .55, near)) discard; col = mix(col, vec3(1., .99, .96), .22); }' : ''}
+          ${layer === 'dn' ? '{ float k = clamp((-vWp.y - 15.) / 50., 0., 1.); col = mix(col * .72, vec3(.5, .6, .78), .35 + k * .45); }' : ''}
+          gl_FragColor = linearToOutputTexel(vec4(col, vA)); }` });
+    return m; };
+  const MAT = {}; const matFor = (name, layer) => { const key = name + '|' + layer; return MAT[key] || (MAT[key] = tone(MATS[name], layer)); };
 
-  /* ── 조각 · 층 · 재질마다 한 덩어리로 ── */
-  const groups = new Map(), m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), up = new THREE.Vector3(0, 1, 0);
-  for (const p of place) { const th = Math.atan2(p.z, p.x), sec = ((Math.round(th / SA) % SECT) + SECT) % SECT, L = p.layer === 'rock' ? 'mid' : p.layer;
-    m4.compose(new THREE.Vector3(p.x, p.y, p.z), q.setFromAxisAngle(up, p.yaw), new THREE.Vector3(p.s, p.sy, p.s)); p.m = m4.clone();
-    for (const pr of KIT[p.k].prims) { const key = sec + '|' + L + '|' + pr.mat; if (!groups.has(key)) groups.set(key, { list: [], mat: matFor(pr.mat, L) }); groups.get(key).list.push(pr.geo.clone().applyMatrix4(p.m)); } }
+  /* ── 같은 섬은 한 번에 그리기: 섬 종류 × 층마다 모양은 한 벌만 두고 '여기·여기·여기'(자리 목록)만 넘김 ──
+        그리고 매 장면: 섬 하나하나를 화면 안에 드는지 보고 든 것만 · 가까운 것부터 차례로 넘김(뒤에 가려지는 부분은 칠하지 않게) */
+  const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), up = new THREE.Vector3(0, 1, 0), sph = new THREE.Sphere(), bs = new THREE.Box3();
+  for (const k in KIT) { const K = KIT[k]; bs.makeEmpty(); for (const p of K.prims) { p.geo.computeBoundingBox(); bs.union(p.geo.boundingBox); } K.sph = bs.getBoundingSphere(new THREE.Sphere()); }
   const root = new THREE.Group(); root.name = 'meadow'; scene.add(root);
-  for (const [, g] of groups) { const geo = mergeGeometries(g.list, false); g.list.forEach(x => x.dispose()); geo.computeBoundingSphere(); root.add(new THREE.Mesh(geo, g.mat)); }
+  const SETS = new Map();
+  for (const p of place) { const L = p.layer === 'rock' ? 'mid' : p.layer;
+    m4.compose(new THREE.Vector3(p.x, p.y, p.z), q.setFromAxisAngle(up, p.yaw), new THREE.Vector3(p.s, p.sy, p.s)); p.m = m4.clone();
+    const c = KIT[p.k].sph.center.clone().applyMatrix4(p.m); p.c = c; p.r = KIT[p.k].sph.radius * Math.max(p.s, p.sy);
+    const key = p.k + '|' + L; if (!SETS.has(key)) SETS.set(key, { k: p.k, L, list: [] }); SETS.get(key).list.push(p); }
+  let tris = 0, calls = 0, shown = 0;
+  for (const S of SETS.values()) { const n = S.list.length; S.attr = new THREE.InstancedBufferAttribute(new Float32Array(n * 16), 16); S.attr.setUsage(THREE.DynamicDrawUsage); S.meshes = [];
+    for (const pr of KIT[S.k].prims) { const im = new THREE.InstancedMesh(pr.geo, matFor(pr.mat, S.L), n); im.instanceMatrix = S.attr; im.frustumCulled = false; im.count = 0;
+      root.add(im); S.meshes.push(im); }
+    S.tri = KIT[S.k].prims.reduce((a, pr) => a + (pr.geo.index ? pr.geo.index.count : pr.geo.attributes.position.count) / 3, 0); }
+  const fr = new THREE.Frustum(), pv = new THREE.Matrix4(), tmp = [];
+  const cull = camera => { pv.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse); fr.setFromProjectionMatrix(pv); const cp = camera.position; tris = 0; calls = 0; shown = 0;
+    for (const S of SETS.values()) { tmp.length = 0;
+      for (const p of S.list) { sph.center.copy(p.c); sph.radius = p.r; if (fr.intersectsSphere(sph)) { p.d = p.c.distanceToSquared(cp); tmp.push(p); } }
+      tmp.sort((a, b) => a.d - b.d); const A = S.attr.array; for (let i = 0; i < tmp.length; i++) tmp[i].m.toArray(A, i * 16);
+      if (tmp.length) { S.attr.clearUpdateRanges(); S.attr.addUpdateRange(0, tmp.length * 16); S.attr.needsUpdate = true; }
+      for (const im of S.meshes) { im.count = tmp.length; im.visible = tmp.length > 0; } if (tmp.length) { calls += S.meshes.length; shown += tmp.length; tris += S.tri * tmp.length; }
+      S.near = tmp.length ? tmp[0].d : 1e12; }
+    /* 섬 종류끼리도 가까운 것부터 */
+    const order = [...SETS.values()].sort((a, b) => a.near - b.near); order.forEach((S, i) => { for (const im of S.meshes) im.renderOrder = im.material.transparent ? 1000 + i : 1 + i * .001; });
+  };
   onProgress(.8);
 
   /* ── 막힘: 가운데층 섬 · 기둥의 바위·땅이 기체 높이(.1~1.6m)를 지나는 곳을 1m 칸으로 찍음 ── */
@@ -110,6 +145,7 @@ export async function makeMeadow(scene, url, onProgress = () => {}) {
           if (w.y < Y0 || w.y > Y1) continue; const gx = cellOf(w.x), gz = cellOf(w.z); if (gx >= 0 && gz >= 0 && gx < N && gz < N) grid[gz * N + gx] = 1; } } } }
   onProgress(1);
   const blocked = (x, z) => { const gx = cellOf(x), gz = cellOf(z); return gx >= 0 && gz >= 0 && gx < N && gz < N && grid[gz * N + gx] === 1; };
-  const update = (cam) => { uCam.value.copy(cam); };
-  return { root, blocked, update, place, TREASURE, KIT };
+  const update = (ship, camera) => { uCam.value.copy(ship); if (camera) cull(camera); };
+  const info = () => ({ shown, calls, tris: Math.round(tris), total: place.length });
+  return { root, blocked, update, info, place, TREASURE, KIT };
 }

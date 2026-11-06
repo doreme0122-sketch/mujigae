@@ -7,19 +7,19 @@
    · 태어나 출구로 튀어 나가면 바로 조이스틱 · 기지 고리(9m)를 벗어나는 순간 보호막 3초 + 가속 5초 */
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
-import { makeBloom } from '../core/hangar/bloom.js?v=11062006';
-import { makePad } from '../core/hangar/pad.js?v=11062006';
-import { makeMag } from '../core/hangar/mag.js?v=11062006';
+import { makeBloom } from '../core/hangar/bloom.js?v=11062016';
+import { makePad } from '../core/hangar/pad.js?v=11062016';
+import { makeMag } from '../core/hangar/mag.js?v=11062016';
 import { buildShip } from '../core/ships/build.js';
-import { makeGoldStar } from './goldstar.js?v=11062006';
-import { makeArena, SPEED, WAVE_R0 } from './arena.js?v=11062006';
-import { makeGuardians, GUARD } from './guardian.js?v=11062006';
-import { makeBirth, BIRTH } from './birth.js?v=11062006';
-import { makePerf } from './perf.js?v=11062006';
+import { makeGoldStar } from './goldstar.js?v=11062016';
+import { makeArena, SPEED, WAVE_R0 } from './arena.js?v=11062016';
+import { makeGuardians, GUARD } from './guardian.js?v=11062016';
+import { makeBirth, BIRTH } from './birth.js?v=11062016';
+import { makePerf } from './perf.js?v=11062016';
 import { makeGlow } from '../preview/glow.js';
-import { makeFlight, FLY } from './flight.js?v=11062006';
-import { pedestal } from './gates.js?v=11062006';
-import { makeMeadow, MEADOW } from './meadow.js?v=11062006';
+import { makeFlight, FLY } from './flight.js?v=11062016';
+import { pedestal } from './gates.js?v=11062016';
+import { makeMeadow, MEADOW } from './meadow.js?v=11062016';
 
 const $ = s => document.querySelector(s), clamp = THREE.MathUtils.clamp, HOVER = FLY.HOVER;
 const R = 240, NB = 10, GAPH = 5.6, BASE_D = 0;     /* 맵 반지름 · 기지 수 · 벽 틈 반 폭(= 기지 반지름) · 기지 가운데는 벽 선 위 (앞 절반은 맵 안, 뒤 절반은 맵 밖 · 사용자 2026-11-06) */
@@ -131,7 +131,7 @@ export async function start(canvas, onProgress = () => {}) {
   const stand = new THREE.Group(); B0.w.add(stand);
   onProgress(.4);
   /* ── 초원 고리 ── */
-  const meadow = await makeMeadow(scene, new URL('./assets/kit_meadow_lo.glb?v=11062006', import.meta.url).href, p => onProgress(.4 + p * .4));
+  const meadow = await makeMeadow(scene, new URL('./assets/kit_meadow.glb?v=11062016', import.meta.url).href, p => onProgress(.4 + p * .4));
   onProgress(.82);
   /* ── 조이스틱으로 모는 기체 ── */
   /* 막힘: 맵 안은 자유 · 기지 안에선 판(계단 단 안쪽)과 출구 길만 · 무지개 벽과 그 바깥(우주)은 막힘 */
@@ -208,7 +208,7 @@ export async function start(canvas, onProgress = () => {}) {
     const k = Math.min(1, dt * (flying ? 4 : 2)); cam.x += (tx - cam.x) * k; cam.z += (tz - cam.z) * k;
     camD += (cfg.dist * (flying ? 1 : .7) - camD) * Math.min(1, dt * 1.2);   /* 태어나는 동안 가까이 → 몰기 시작하면 천천히 물러남 */
     const a = cfg.ang * Math.PI / 180, D = camD; camera.position.set(cam.x, cam.y + D * Math.sin(a), cam.z + D * Math.cos(a)); camera.lookAt(cam.x, cam.y, cam.z); camera.updateMatrixWorld();
-    sea.position.x = cam.x; sea.position.z = cam.z; sea.material.uniforms.uT.value = t; meadow.update(v3.set(cam.x, HOVER, cam.z));
+    sea.position.x = cam.x; sea.position.z = cam.z; sea.material.uniforms.uT.value = t; meadow.update(v3.set(cam.x, HOVER, cam.z), camera);
     { const r = Math.hypot(FS.x, FS.z); say.textContent = !flying ? '태어나는 중' : baseAt(FS.x, FS.z) ? '태어나는 곳 · 출구로 나가면 맵 안' : r > R - 25 ? '초원 · 무지개 벽 가까이 · 쏘면 무지개빛이 번져요' : (r > MEADOW.R0 ? '초원' : '맵 안') + ' · 한가운데까지 ' + Math.round(r) + 'm'; }
     /* 별똥별이 꽂힐 때 공간 일그러짐 충격파 (시작 기지와 같은 효과) */
     if (WARP.s > 0) { B0.w.localToWorld(v3.set(0, .2, 0)); v3.project(camera); bloom.warp(v3.x * .5 + .5, v3.y * .5 + .5, WARP.r, WARP.s, Wd / Hd); } else bloom.warp(.5, .5, 0, 0, Wd / Hd);
@@ -216,5 +216,5 @@ export async function start(canvas, onProgress = () => {}) {
     bloom.render(Wd, Hd, !perf.st.bloom); perf.tick(dt);
   } catch (e) { console.error('[전체 맵]', e); } });
   onProgress(1);
-  window.__sm = { meadow, FS, fly, BASES, cam, cfg, HITS, get t() { return t; }, get flying() { return flying; }, wake };
+  window.__sm = { meadow, info: () => ({ ...meadow.info(), drawCalls: renderer.info.render.calls, gpuTris: renderer.info.render.triangles }), FS, fly, BASES, cam, cfg, HITS, get t() { return t; }, get flying() { return flying; }, wake };
 }
