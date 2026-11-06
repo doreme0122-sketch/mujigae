@@ -104,3 +104,45 @@ export function makeChunk(seed, pal, cap) {
   g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3)); g.deleteAttribute('uv'); g.computeVertexNormals();
   const ix = new Uint32Array(P.count); for (let i = 0; i < ix.length; i++) ix[i] = i; g.setIndex(new THREE.BufferAttribute(ix, 1)); return g;
 }
+
+/* 오래된 돌 유적 (사용자 2026-11-06: 넓은 땅 위 돌기둥·무너진 돌담) — 받은 섬의 바위색을 밝게 한 돌 · 이끼 · 금 간 자리 */
+const stoneOf = (pal, R) => { const c = pal.rock[Math.floor(R() * Math.min(3, pal.rock.length))].clone(); const L = c.r * .3 + c.g * .55 + c.b * .15; return c.lerp(new THREE.Color(.86, .82, .74), .72 - L * .25); };   /* 볕에 바랜 밝은 돌 */
+/* 면 하나: 안쪽 기준점에서 바깥을 보게 감음 */
+function facet(pos, col, p, q, s, c, ref) { const ux = q[0] - p[0], uy = q[1] - p[1], uz = q[2] - p[2], vx = s[0] - p[0], vy = s[1] - p[1], vz = s[2] - p[2];
+  const nx = uy * vz - uz * vy, ny = uz * vx - ux * vz, nz = ux * vy - uy * vx, mx = (p[0] + q[0] + s[0]) / 3 - ref[0], my = (p[1] + q[1] + s[1]) / 3 - ref[1], mz = (p[2] + q[2] + s[2]) / 3 - ref[2];
+  if (nx * mx + ny * my + nz * mz < 0) pos.push(...p, ...s, ...q); else pos.push(...p, ...q, ...s); for (let i = 0; i < 3; i++) col.push(c.r, c.g, c.b); }
+function prism(pos, col, cx, cz, r0, r1, y0, y1, n, rot, c, mossC, R, tilt = [0, 0], jag = 0) {
+  const ring = (r, y, j) => Array.from({ length: n }, (_, k) => { const a = rot + k / n * Math.PI * 2, rr = r * (1 + (R() - .5) * jag * j);
+    return [cx + Math.cos(a) * rr + tilt[0] * (y - y0), y + (j ? (R() - .5) * jag * .6 : 0), cz + Math.sin(a) * rr + tilt[1] * (y - y0)]; });
+  const A = ring(r0, y0, 0), B = ring(r1, y1, 1), ax = (y) => [cx + tilt[0] * (y - y0), y, cz + tilt[1] * (y - y0)];
+  for (let k = 0; k < n; k++) { const k2 = (k + 1) % n, cc = c.clone().multiplyScalar(.9 + R() * .14), m = ax((y0 + y1) / 2); facet(pos, col, A[k], B[k], A[k2], cc, m); facet(pos, col, A[k2], B[k], B[k2], cc.clone().multiplyScalar(.96), m); }
+  const top = [cx + tilt[0] * (y1 - y0), y1 + jag * .25, cz + tilt[1] * (y1 - y0)], mc = mossC && R() < .6 ? mossC : c.clone().multiplyScalar(1.06);
+  for (let k = 0; k < n; k++) facet(pos, col, B[k], top, B[(k + 1) % n], mc, [top[0], top[1] - 1, top[2]]);
+}
+const finish = (pos, col) => { /* 면 방향: 바깥·위로 */
+  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3)); g.computeVertexNormals();
+  const ix = new Uint32Array(pos.length / 3); for (let i = 0; i < ix.length; i++) ix[i] = i; g.setIndex(new THREE.BufferAttribute(ix, 1)); return g; };
+/* 돌기둥: 받침돌 → 북 모양 돌을 층층이(조금씩 어긋나고 기울어짐) → 위는 부서져 들쭉날쭉 · 맨 위엔 이끼 */
+export function makePillar(seed, pal, h = 3.5) {
+  const R = rnd(seed), pos = [], col = [], st = stoneOf(pal, R), moss = pal.grass[0].clone().multiplyScalar(.85), n = 8, rot = R() * 6.28, tl = [(R() - .5) * .08, (R() - .5) * .08];
+  prism(pos, col, 0, 0, .78, .72, -.3, .22, n, rot, st.clone().multiplyScalar(.86), moss, R);                         /* 받침돌 */
+  let y = .22, ox = 0, oz = 0; const drums = 3 + Math.floor(R() * 3), dh = (h - .22) / drums;
+  for (let d = 0; d < drums; d++) { const last = d === drums - 1, y1 = y + dh * (last ? .55 + R() * .4 : .96); ox += (R() - .5) * .05; oz += (R() - .5) * .05;
+    prism(pos, col, ox, oz, .5 - d * .015, .48 - d * .015, y, y1, n, rot + d * .2, st, last ? moss : null, R, tl, last ? .35 : .03); y = y1 + .02; }
+  if (R() < .5) prism(pos, col, .9 + R() * .3, (R() - .5) * .6, .3, .26, -.25, .1, 6, R() * 6, st.clone().multiplyScalar(.9), moss, R, [0, 0], .2);   /* 떨어진 돌 조각 */
+  return finish(pos, col);
+}
+/* 무너진 돌담: 네모 돌을 엇갈려 쌓고, 군데군데 무너져 낮아짐 · 무너진 돌은 발치에 */
+export function makeWall(seed, pal, len = 6) {
+  const R = rnd(seed), pos = [], col = [], st = stoneOf(pal, R), moss = pal.grass[1 % pal.grass.length].clone().multiplyScalar(.85), B = .62, H = .42, rows = 4;
+  const box = (x, y, z, w, h, d, c, yaw = 0) => { const cy = Math.cos(yaw), sy = Math.sin(yaw), P = (a, b, e) => [x + a * cy - e * sy, y + b, z + a * sy + e * cy];
+    const v = [P(-w, 0, -d), P(w, 0, -d), P(w, 0, d), P(-w, 0, d), P(-w, h, -d), P(w, h, -d), P(w, h, d), P(-w, h, d)];
+    const F = [[0, 1, 5, 4], [1, 2, 6, 5], [2, 3, 7, 6], [3, 0, 4, 7], [4, 5, 6, 7]];
+    const ctr = [x, y + h / 2, z];
+    F.forEach((f, fi) => { const cc = fi === 4 && R() < .35 ? moss : c.clone().multiplyScalar(.9 + R() * .14); for (const t of [[0, 1, 2], [0, 2, 3]]) facet(pos, col, v[f[t[0]]], v[f[t[1]]], v[f[t[2]]], cc, ctr); }); };
+  const nB = Math.round(len / B), ruin = Array.from({ length: nB }, (_, i) => rows - Math.floor(Math.max(0, Math.sin(i * .9 + seed) * 2.2 + R() * 1.6)));
+  for (let i = 0; i < nB; i++) for (let r = 0; r < Math.max(0, ruin[i]); r++) { const x = -len / 2 + (i + (r % 2) * .5) * B; if (x > len / 2 - B * .4) continue;
+    box(x + (R() - .5) * .04, r * H - .1, (R() - .5) * .05, B * .47, H * .96, .28, st, (R() - .5) * .05); }
+  for (let i = 0; i < 4; i++) box((R() - .5) * len, -.12, (R() < .5 ? -1 : 1) * (.6 + R() * .5), B * .4, H * .8, .26, st.clone().multiplyScalar(.92), R() * 3);   /* 무너진 돌 */
+  return finish(pos, col);
+}
