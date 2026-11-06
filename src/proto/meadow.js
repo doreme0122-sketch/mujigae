@@ -8,9 +8,9 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { deinterleaveGeometry } from 'three/addons/utils/BufferGeometryUtils.js';
-import { makeLand, makeChunk, paletteFrom } from './land.js?v=11062147';
+import { makeLand, makeChunk, paletteFrom } from './land.js?v=11062253';
 
-export const MEADOW = { R0: 187, R1: 240, UP: 20, DN: -30, TOP: -1.0, SC: 1 / 2 };   /* SC: 받은 섬 모델 크기의 2분의 1 (사용자 2026-11-06: 원래는 너무 크고 3분의 1은 너무 작음) */   /* 가운데층 섬 윗면 = 기체(높이 .7)보다 1.7m 아래 */
+export const MEADOW = { R0: 187, R1: 240, UP: 20, DN: -30, TOP: -3.0, SC: 1 / 2 };   /* TOP: 가운데층 땅 높이 — 기체(.7)보다 3.7m 아래 → 나무 꼭대기 위로 날게 (사용자 2026-11-06: 나무에 걸림) */   /* SC: 받은 섬 모델 크기의 2분의 1 (사용자 2026-11-06: 원래는 너무 크고 3분의 1은 너무 작음) */   /* 가운데층 섬 윗면 = 기체(높이 .7)보다 1.7m 아래 */
 const SECT = 10, CELL = 1;
 
 const rnd = seed => { let s = seed >>> 0; return () => ((s = (s * 1664525 + 1013904223) >>> 0) / 4294967296); };
@@ -71,7 +71,8 @@ export async function makeMeadow(scene, url, onProgress = () => {}, decorUrl = n
         if ((kind === 'tree' || kind === 'bush') && R() > grove(lx, lz) + .25) continue;   /* 나무는 숲처럼 몰려 자람 */
         const h = hAt(lx, lz); if (h === null) continue; const [wx, wz] = toW(lx, lz), list = DECO[kind]; if (!list.length) return;
         if (opt.lane != null && kind !== 'tiny' && Math.abs(-Math.sin(opt.lane) * wx + Math.cos(opt.lane) * wz) < 5) continue;   /* 기지 출구 앞 길은 비워 둠 (풀꽃만) */
-        put(list[Math.floor(R() * list.length)], wx, wz, 'deco', R() * 6.28, { s: sc * (.85 + R() * .4), y: BY + h - .04, deco: kind, rl }); got++; } };
+        const pk = list[Math.floor(R() * list.length)]; let ss = sc * (.85 + R() * .4); if (kind === 'tree' || kind === 'bush') ss = Math.min(ss, 2.6 / Math.max(.1, KIT[pk].hi * SC));   /* 나무 꼭대기가 기체 높이에 닿지 않게 */
+        put(pk, wx, wz, 'deco', R() * 6.28, { s: ss, y: BY + h - .04, deco: kind, rl }); got++; } };
     deco('tree', Math.round(area / 30 * dens), 1); deco('bush', Math.round(area / 18 * dens), 1); deco('rock', Math.round(area / 55 * dens), 1); deco('tiny', Math.round(area / 7 * dens), 1, .6);   /* 풀포기·꽃은 촘촘히 */
     /* 테두리에 늘어진 뿌리·덩굴: 둘레를 따라 듬성듬성 */
     if (DECO.hang.length) for (let i = 0; i < L.lip.length; i += 2) { if (R() < .35) continue; const [lx, ly, lz] = L.lip[i], k2 = .97, [wx, wz] = toW(lx * k2, lz * k2);
@@ -120,14 +121,16 @@ export async function makeMeadow(scene, url, onProgress = () => {}, decorUrl = n
     tryPut(BIG, 'mid', 2, rf(.15), rf(.85));
     tryPut(MID, 'mid', 26, rf(.04), rf(.94));
     tryPut([PIL[i % PIL.length], PIL[(i + 2) % PIL.length]], 'pillar', 2, rf(.12), rf(.8));
-    tryPut(ROCK, 'rock', 16, rf(.04), rf(.96), { y: () => -4 - R() * 9, s: () => 1 + R() * .8 });   /* 기체 발아래 떠 있는 바위 */
+    tryPut(ROCK, 'rock', 16, rf(.04), rf(.96), { y: () => -6 - R() * 9, s: () => 1 + R() * .8 });   /* 기체 발아래 떠 있는 바위 */
     tryPut(UPS, 'up', 2, rf(.06), rf(.9), { s: () => .55 + R() * .3 });   /* 위층: 지금 시점에선 잘 안 보임 → 작게 몇 개만 (보물 던전 섬은 그대로) */
     tryPut(DNS, 'dn', 22, rf(.0), rf(.98));   /* 아래층을 꽉 차 보이게 (실제로 내려가는 곳은 보물 던전 몇 곳뿐) */
     for (let n = 0, t = 0; n < 2 && t < 60; t++) { const th = th0 + (R() - .5) * SA * .9, rr = 9 + R() * 5, r = rf(.1) + R() * (rf(.9) - rf(.1)), [x, z] = at(th, r);
       if (!fits(x, z, rr * 1.12, 'dn')) continue; addLand(x, z, rr, 2000 + i * 29 + t, { layer: 'dn', dens: .55 }); n++; }   /* 아래층 넓은 땅 */
-    for (let n = 0; n < 45; n++) { const th = th0 + (R() - .5) * SA, r = R0 - 6 + R() * (R1 - R0 + 2), [x, z] = at(th, r), sc = .7 + Math.pow(R(), 2.4) * 3.3, y = -6 - R() * 20;
+    for (let n = 0; n < 45; n++) { const th = th0 + (R() - .5) * SA, r = R0 - 6 + R() * (R1 - R0 + 2), [x, z] = at(th, r), sc = .7 + Math.pow(R(), 2.4) * 3.3, y = -9 - R() * 17;
       put(CHUNK[Math.floor(R() * CHUNK.length)], x, z, 'gap', R() * 6.28, { abs: true, s: 1, y, gs: sc }); }
-    /* 가운데층~위층 사이: 큰 섬은 두지 않음 (사용자 2026-11-06: 크게 할 필요 없음 · 거부감) → 작은 바위 조각만 듬성듬성 */
+    /* 가운데층~위층 사이: 큰 섬은 두지 않음 (사용자 2026-11-06: 크게 할 필요 없음 · 거부감) → 작은 섬 몇 개 + 바위 조각 (조금은 보이게) */
+    for (let n = 0, t = 0; n < 3 && t < 120; t++) { const k = ['Island_Small', 'Island_Chunk_Round', 'Island_Medium'][Math.floor(R() * 3)], th = th0 + (R() - .5) * SA, r = rf(.05) + R() * (rf(.92) - rf(.05)), [x, z] = at(th, r), s0 = .45 + R() * .3, rr = KIT[k].rad * s0 * SC * .78;
+      if (!fits(x, z, rr, 'upgap')) continue; put(k, x, z, 'upgap', R() * 6.28, { s: s0, y: Math.max(7 + R() * 7, 2.6 - KIT[k].bot * s0 * SC) - KIT[k].top * s0 * SC, rl: 'upgap' }); n++; }
     for (let n = 0; n < 6; n++) { const th = th0 + (R() - .5) * SA, r = R0 - 4 + R() * (R1 - R0), [x, z] = at(th, r), sc = .5 + Math.pow(R(), 2) * 1.1;
       put(CHUNK[Math.floor(R() * CHUNK.length)], x, z, 'gap', R() * 6.28, { abs: true, s: 1, y: 4.5 + R() * 11, gs: sc, rl: 'upgap' }); } }
 

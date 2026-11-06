@@ -7,19 +7,19 @@
    · 태어나 출구로 튀어 나가면 바로 조이스틱 · 기지 고리(9m)를 벗어나는 순간 보호막 3초 + 가속 5초 */
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
-import { makeBloom } from '../core/hangar/bloom.js?v=11062147';
-import { makePad } from '../core/hangar/pad.js?v=11062147';
-import { makeMag } from '../core/hangar/mag.js?v=11062147';
+import { makeBloom } from '../core/hangar/bloom.js?v=11062253';
+import { makePad } from '../core/hangar/pad.js?v=11062253';
+import { makeMag } from '../core/hangar/mag.js?v=11062253';
 import { buildShip } from '../core/ships/build.js';
-import { makeGoldStar } from './goldstar.js?v=11062147';
-import { makeArena, SPEED, WAVE_R0 } from './arena.js?v=11062147';
-import { makeGuardians, GUARD } from './guardian.js?v=11062147';
-import { makeBirth, BIRTH } from './birth.js?v=11062147';
-import { makePerf } from './perf.js?v=11062147';
+import { makeGoldStar } from './goldstar.js?v=11062253';
+import { makeArena, SPEED, WAVE_R0 } from './arena.js?v=11062253';
+import { makeGuardians, GUARD } from './guardian.js?v=11062253';
+import { makeBirth, BIRTH } from './birth.js?v=11062253';
+import { makePerf } from './perf.js?v=11062253';
 import { makeGlow } from '../preview/glow.js';
-import { makeFlight, FLY } from './flight.js?v=11062147';
-import { pedestal } from './gates.js?v=11062147';
-import { makeMeadow, MEADOW } from './meadow.js?v=11062147';
+import { makeFlight, FLY } from './flight.js?v=11062253';
+import { pedestal } from './gates.js?v=11062253';
+import { makeMeadow, MEADOW } from './meadow.js?v=11062253';
 
 const $ = s => document.querySelector(s), clamp = THREE.MathUtils.clamp, HOVER = FLY.HOVER;
 const R = 240, NB = 10, GAPH = 5.6, BASE_D = 0;     /* 맵 반지름 · 기지 수 · 벽 틈 반 폭(= 기지 반지름) · 기지 가운데는 벽 선 위 (앞 절반은 맵 안, 뒤 절반은 맵 밖 · 사용자 2026-11-06) */
@@ -48,10 +48,19 @@ export async function start(canvas, onProgress = () => {}) {
   const sea = new THREE.Mesh(new THREE.PlaneGeometry(2400, 2400).rotateX(-Math.PI / 2), new THREE.ShaderMaterial({ uniforms: { uT: { value: 0 } },
     vertexShader: 'varying vec3 vW; void main(){ vec4 w=modelMatrix*vec4(position,1.); vW=w.xyz; gl_Position=projectionMatrix*viewMatrix*w; }',
     fragmentShader: `uniform float uT; varying vec3 vW; float h(vec2 p){ return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453); }
-      float n(vec2 p){ vec2 i=floor(p),f=fract(p); f=f*f*(3.-2.*f); return mix(mix(h(i),h(i+vec2(1,0)),f.x),mix(h(i+vec2(0,1)),h(i+vec2(1,1)),f.x),f.y); }
+      /* 구름 무늬 (사용자 2026-11-06: 네모 칸처럼 보임 → 격자가 드러나지 않는 부드러운 잡음 · 겹마다 돌려서 쌓고 서로 휘게 함) */
+      vec3 pm(vec3 x){ return mod(((x*34.)+1.)*x, 289.); }
+      float sn(vec2 v){ const vec4 C=vec4(.211324865,.366025404,-.577350269,.024390244); vec2 i=floor(v+dot(v,C.yy)); vec2 x0=v-i+dot(i,C.xx);
+        vec2 i1=(x0.x>x0.y)?vec2(1.,0.):vec2(0.,1.); vec4 x12=x0.xyxy+C.xxzz; x12.xy-=i1; i=mod(i,289.);
+        vec3 p=pm(pm(i.y+vec3(0.,i1.y,1.))+i.x+vec3(0.,i1.x,1.)); vec3 m=max(.5-vec3(dot(x0,x0),dot(x12.xy,x12.xy),dot(x12.zw,x12.zw)),0.); m=m*m; m=m*m;
+        vec3 x=2.*fract(p*C.www)-1.; vec3 hh=abs(x)-.5; vec3 ox=floor(x+.5); vec3 a0=x-ox; m*=1.79284291-.85373472*(a0*a0+hh*hh);
+        vec3 g; g.x=a0.x*x0.x+hh.x*x0.y; g.yz=a0.yz*x12.xz+hh.yz*x12.yw; return 130.*dot(m,g); }
+      float n(vec2 p){ return sn(p)*.5+.5; }
+      float fbm(vec2 p){ float a=.5, s=0.; mat2 m=mat2(1.6,1.2,-1.2,1.6); for(int i=0;i<5;i++){ s+=a*n(p); p=m*p+vec2(3.1,1.7); a*=.5; } return s/.97; }
       void main(){ float rr=length(vW.xz);
         /* 하늘 → 우주: 구름 모양대로 울퉁불퉁하게 옅어지며 하늘빛이 어두워지고 별이 하나둘 · 경계를 따라 푸른 대기 빛 (사용자 2026-11-06) */
-        vec2 p=vW.xz*.015+vec2(uT*.004,0.); float c=n(p)*.5+n(p*2.1)*.3+n(p*4.3)*.2;
+        vec2 q=vW.xz*.011; vec2 wv=vec2(fbm(q+vec2(uT*.006,0.)), fbm(q+vec2(5.2,1.3)-vec2(0.,uT*.004)));
+        float c=fbm(q*1.3+wv*1.7+vec2(uT*.01,0.))*.72+fbm(q*3.3-vec2(uT*.022,uT*.012))*.28;   /* 큰 구름 덩어리는 천천히 · 잔 구름은 조금 빠르게 */
         float edge=rr-${R}.-8.-(n(vW.xz*.02)*.6+n(vW.xz*.05)*.4)*38.;                    /* 구름 가닥이 우주 쪽으로 들쭉날쭉 */
         float k=smoothstep(-6.,34.,edge);                                                  /* 0 = 하늘 · 1 = 우주 */
         float cl=smoothstep(.3+k*.4,.8+k*.15,c)*(1.-k);                                     /* 구름이 점점 옅어져 흩어짐 */
@@ -131,7 +140,7 @@ export async function start(canvas, onProgress = () => {}) {
   const stand = new THREE.Group(); B0.w.add(stand);
   onProgress(.4);
   /* ── 초원 고리 ── */
-  const meadow = await makeMeadow(scene, new URL('./assets/kit_meadow.glb?v=11062147', import.meta.url).href, p => onProgress(.4 + p * .4), new URL('./assets/kit_meadow_decor.glb?v=11062147', import.meta.url).href, new URL('./assets/kit_meadow_lo.glb?v=11062147', import.meta.url).href);
+  const meadow = await makeMeadow(scene, new URL('./assets/kit_meadow.glb?v=11062253', import.meta.url).href, p => onProgress(.4 + p * .4), new URL('./assets/kit_meadow_decor.glb?v=11062253', import.meta.url).href, new URL('./assets/kit_meadow_lo.glb?v=11062253', import.meta.url).href);
   onProgress(.82);
   /* ── 조이스틱으로 모는 기체 ── */
   /* 막힘: 맵 안은 자유 · 기지 안에선 판(계단 단 안쪽)과 출구 길만 · 무지개 벽과 그 바깥(우주)은 막힘 */
