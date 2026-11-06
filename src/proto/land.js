@@ -41,7 +41,7 @@ export function makeLand(seed, radius, pal, opt = {}) {
       const x = Math.cos(a) * rr, z = Math.sin(a) * rr, dc = Math.hypot(x, z), flat = clear ? smooth(Math.min(1, Math.max(0, (dc - clear) / 3))) : 1;
       const y = ((bump(x, z) - .5) * .7 + (R() - .5) * .12) * flat * (1 - smooth(Math.max(0, f - .85) / .15) * .6) - (f >= 1 ? .12 : 0);
       return { a: ri === 0 ? 0 : a, p: [x, y, z] }; }).sort((p, q) => p.a - q.a); });
-  const grassCol = (x, z) => { const t = tint(x, z), d = patch(x, z); if (!opt.noDirt && d > .8) return C.copy(pick(pal.dirt, (t * 1.7) % 1)).multiplyScalar(.95 + t * .1);
+  const grassCol = (x, z) => { const t = tint(x, z), d = patch(x, z); if (!opt.noDirt && d > .84) return C.copy(pick(pal.dirt, (t * 1.7) % 1)).multiplyScalar(.95 + t * .1);
     return C.copy(pick(pal.grass, t)).multiplyScalar(.93 + (R() * .1)); };
   const face = (A, B, D) => { const cx = (A[0] + B[0] + D[0]) / 3, cz = (A[2] + B[2] + D[2]) / 3; tri(A, B, D, grassCol(cx, cz)); };
   /* 고리 사이 띠: 각도 순으로 두 고리를 지퍼처럼 엮음 */
@@ -79,4 +79,19 @@ export function makeLand(seed, radius, pal, opt = {}) {
   g.computeVertexNormals();   /* 겹친 점이 없으므로 면 법선 = 평평한 면 */
   const ix = new Uint32Array(pos.length / 3); for (let i = 0; i < ix.length; i++) ix[i] = i; g.setIndex(new THREE.BufferAttribute(ix, 1));
   return { geo: g, rim: rim.map(q => q.p), lip: lip.map(q => q.p), radius, rad };
+}
+
+/* 층 사이 원근 조각: 각진 바위 덩어리 (반지름 1 기준 · 놓을 때 크기를 키움) · cap = 윗면에 풀 */
+export function makeChunk(seed, pal, cap) {
+  const R = rnd(seed), g = new THREE.IcosahedronGeometry(1, 1), P = g.attributes.position, J = new Map(), sq = .55 + R() * .35;
+  for (let i = 0; i < P.count; i++) { const x = P.getX(i), y = P.getY(i), z = P.getZ(i), key = `${x.toFixed(3)},${y.toFixed(3)},${z.toFixed(3)}`;
+    if (!J.has(key)) J.set(key, .72 + R() * .5); const j = J.get(key); let ny = y * j * sq; if (cap && ny > .25) ny = .25 + (ny - .25) * .25;   /* 풀 얹힌 것은 윗면이 평평 */
+    P.setXYZ(i, x * j, ny - (y < -.3 ? (-.3 - y) * (.6 + R() * .01) : 0), z * j); }
+  const col = [], C = new THREE.Color(), a = new THREE.Vector3(), b = new THREE.Vector3(), c = new THREE.Vector3(), n = new THREE.Vector3();
+  for (let i = 0; i < P.count; i += 3) { a.fromBufferAttribute(P, i); b.fromBufferAttribute(P, i + 1); c.fromBufferAttribute(P, i + 2); n.crossVectors(b.clone().sub(a), c.clone().sub(a)).normalize();
+    const cy = (a.y + b.y + c.y) / 3; if (cap && n.y > .55) C.copy(pal.grass[Math.floor(R() * pal.grass.length)]);
+    else C.copy(pal.rock[Math.floor(R() * pal.rock.length)]).multiplyScalar(.75 + (cy + 1) * .18 + R() * .08);
+    for (let k = 0; k < 3; k++) col.push(C.r, C.g, C.b); }
+  g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3)); g.deleteAttribute('uv'); g.computeVertexNormals();
+  const ix = new Uint32Array(P.count); for (let i = 0; i < ix.length; i++) ix[i] = i; g.setIndex(new THREE.BufferAttribute(ix, 1)); return g;
 }

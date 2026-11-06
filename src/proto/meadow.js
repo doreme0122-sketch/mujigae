@@ -8,7 +8,7 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { deinterleaveGeometry } from 'three/addons/utils/BufferGeometryUtils.js';
-import { makeLand, paletteFrom } from './land.js?v=11062029';
+import { makeLand, makeChunk, paletteFrom } from './land.js?v=11062058';
 
 export const MEADOW = { R0: 187, R1: 240, UP: 20, DN: -30, TOP: -1.0, SC: 1 / 2 };   /* SC: 받은 섬 모델 크기의 2분의 1 (사용자 2026-11-06: 원래는 너무 크고 3분의 1은 너무 작음) */   /* 가운데층 섬 윗면 = 기체(높이 .7)보다 1.7m 아래 */
 const SECT = 10, CELL = 1;
@@ -25,17 +25,19 @@ function topOf(prims) {
   const ys = [...bins.keys()].sort((p, q) => q - p); let acc = 0; for (const y of ys) { acc += bins.get(y); if (acc >= tot * .4) return y; } return 0;
 }
 
-export async function makeMeadow(scene, url, onProgress = () => {}, decorUrl = null) {
-  const LD = new GLTFLoader(), [gl, gd] = await Promise.all([LD.loadAsync(url), decorUrl ? LD.loadAsync(decorUrl) : null]); onProgress(.5);
+export async function makeMeadow(scene, url, onProgress = () => {}, decorUrl = null, loUrl = null) {
+  const LD = new GLTFLoader(), [gl, gd, glo] = await Promise.all([LD.loadAsync(url), decorUrl ? LD.loadAsync(decorUrl) : null, loUrl ? LD.loadAsync(loUrl) : null]); onProgress(.5);
   /* 섬 종류별: 재질별 조각 · 윗면 높이 · 바닥 높이 · 둘레 반지름 */
   const KIT = {};
   gl.scene.updateMatrixWorld(true);
   const DECO = { tree: [], bush: [], rock: [], tiny: [], hang: [] };
+  if (glo) { glo.scene.updateMatrixWorld(true); for (const c of [...glo.scene.children]) { c.name = 'lo:' + c.name; gl.scene.add(c); } }   /* 아래층 섬: 30m 아래 · 구름빛으로 흐려지는 거리라 면을 줄인 모양을 씀 (가운데층은 원래 모양) */
   if (gd) { gd.scene.updateMatrixWorld(true); for (const c of [...gd.scene.children]) { const kd = c.name.split('_')[0]; if (DECO[kd]) DECO[kd].push(c.name); gl.scene.add(c); } gl.scene.updateMatrixWorld(true); }
   for (const node of gl.scene.children) { const prims = []; const bb = new THREE.Box3();
     node.traverse(o => { if (!o.isMesh) return; const g = o.geometry.clone(); deinterleaveGeometry(g); if (!g.index) { const ix = new Uint32Array(g.attributes.position.count); for (let i = 0; i < ix.length; i++) ix[i] = i; g.setIndex(new THREE.BufferAttribute(ix, 1)); } if (g.attributes.uv) g.deleteAttribute('uv'); g.applyMatrix4(o.matrixWorld); if (!g.attributes.color) return; prims.push({ geo: g, mat: o.material.name || 'Terrain', src: o.material }); g.computeBoundingBox(); bb.union(g.boundingBox); });
-    const top = DECO[node.name.split('_')[0]] ? 0 : topOf(prims), rad = Math.max(bb.max.x - bb.min.x, bb.max.z - bb.min.z) / 2;
+    const top = DECO[node.name.split('_')[0]] ? 0 : node.name.startsWith('lo:') ? null : topOf(prims), rad = Math.max(bb.max.x - bb.min.x, bb.max.z - bb.min.z) / 2;
     KIT[node.name] = { prims, top, bot: bb.min.y, hi: bb.max.y, rad }; }
+  for (const k in KIT) if (k.startsWith('lo:') && KIT[k.slice(3)]) { const F = KIT[k.slice(3)]; KIT[k].top = F.top; }   /* 윗면 높이는 원래 모양 기준 */
   const MATS = {}; for (const k in KIT) for (const p of KIT[k].prims) MATS[p.mat] = p.src;
   const PAL = paletteFrom(KIT['Island_Plateau_Wide'].prims.concat(KIT['Island_Forest_Dense'].prims));
 
@@ -43,19 +45,20 @@ export async function makeMeadow(scene, url, onProgress = () => {}, decorUrl = n
   const { R0, R1, UP, DN, TOP, SC } = MEADOW, place = [];   /* { k, x, z, y, yaw, layer, s } */
   const deg = Math.PI / 180, SA = Math.PI * 2 / SECT;
   const at = (th, r) => [Math.cos(th) * r, Math.sin(th) * r], rf = f => R0 + f * (R1 - R0);   /* rf: 초원 띠 안쪽(0) → 바깥(1) */
-  const clash = (p, q) => p !== 'deco' && q !== 'deco' && (p === q || p === 'pillar' || q === 'pillar' || ((p === 'mid' || p === 'rock') && (q === 'mid' || q === 'rock')));   /* 꾸밈은 땅 위에만 얹으므로 빼고 · 기둥은 모든 층을 뚫음 · 발아래 바위는 가운데층 섬 몸통과 겹치면 안 됨 */
+  const clash = (p, q) => p !== 'deco' && q !== 'deco' && p !== 'gap' && q !== 'gap' && (p === q || p === 'pillar' || q === 'pillar' || ((p === 'mid' || p === 'rock') && (q === 'mid' || q === 'rock')));   /* 꾸밈은 땅 위에만 얹으므로 빼고 · 기둥은 모든 층을 뚫음 · 발아래 바위는 가운데층 섬 몸통과 겹치면 안 됨 */
   const fits = (x, z, rr, layer) => { const r = Math.hypot(x, z); if (r - rr < R0 + 2 || r + rr > R1 - 6) return false;
     for (const q of place) { if (!clash(q.layer, layer)) continue; if (Math.hypot(q.x - x, q.z - z) < q.rr + rr + 1.2) return false; } return true; };
   const clearOfBase = (x, z, rr, th0) => { const th = Math.atan2(z, x), d = Math.atan2(Math.sin(th - th0), Math.cos(th - th0)) * Math.hypot(x, z); return !(Math.abs(d) < 15 + rr && Math.hypot(x, z) > rf(.4) - rr); };   /* 기지 출구 앞 길은 비워 둠 */
-  const put = (k, x, z, layer, yaw, extra = {}) => { const K = KIT[k], s = extra.abs ? 1 : (extra.s || 1) * SC, sy = layer === 'pillar' ? .9 : s;   /* 기둥만 높이는 거의 그대로 → 가늘고 높게 세 층을 뚫음 */
-    const y = layer === 'up' ? UP - K.top * sy : layer === 'dn' ? DN - K.top * sy : layer === 'pillar' ? UP + 6 - K.hi * sy : layer === 'rock' || layer === 'deco' ? extra.y : TOP - K.top * sy;
+  const put = (k, x, z, layer, yaw, extra = {}) => { const K = KIT[k], s = extra.gs || (extra.abs ? 1 : (extra.s || 1) * SC), sy = layer === 'pillar' ? .9 : s;   /* 기둥만 높이는 거의 그대로 → 가늘고 높게 세 층을 뚫음 */
+    const y = layer === 'up' ? UP - K.top * sy : layer === 'dn' ? DN - K.top * sy : layer === 'pillar' ? UP + 6 - K.hi * sy : layer === 'rock' || layer === 'deco' || layer === 'gap' ? extra.y : TOP - K.top * sy;
     place.push({ ...extra, k, x, z, y, yaw, layer, s, sy, rr: extra.land ? K.rad : K.rad * s * .78, pillar: layer === 'pillar' }); };
   /* ── 넓은 땅: 새 땅 판 + 받은 섬에서 떼어 낸 나무·덤불·바위·풀꽃·뿌리 ── */
   let landN = 0; const LANDS = [];
   const addLand = (x, z, radius, seed, opt = {}) => { const L = makeLand(seed, radius, PAL, opt), k = 'land_' + (landN++), R = rnd(seed * 31 + 7);
     const bb = new THREE.Box3().setFromBufferAttribute(L.geo.attributes.position);
     KIT[k] = { prims: [{ geo: L.geo, mat: 'Terrain', src: MATS.Terrain }], top: 0, bot: bb.min.y, hi: bb.max.y, rad: radius * 1.12 };
-    const yaw = R() * 6.28; put(k, x, z, 'mid', yaw, { abs: true, land: true }); LANDS.push({ k, x, z, radius });
+    const LY = opt.layer || 'mid', BY = LY === 'dn' ? DN : TOP, rl = LY === 'dn' ? 'dn' : undefined, dens = opt.dens || 1;
+    const yaw = R() * 6.28; put(k, x, z, LY, yaw, { abs: true, land: true }); LANDS.push({ k, x, z, radius, layer: LY });
     /* 윗면 높이 찾기 (꾸밈을 땅에 딱 붙이려고) */
     const P = L.geo.attributes.position, topTris = []; for (let i = 0; i < P.count; i += 3) { const ay = P.getY(i), by = P.getY(i + 1), cy = P.getY(i + 2); if (Math.min(ay, by, cy) > -.6) topTris.push(i); }
     const hAt = (lx, lz) => { for (const i of topTris) { const x0 = P.getX(i), z0 = P.getZ(i), x1 = P.getX(i + 1), z1 = P.getZ(i + 1), x2 = P.getX(i + 2), z2 = P.getZ(i + 2);
@@ -67,23 +70,30 @@ export async function makeMeadow(scene, url, onProgress = () => {}, decorUrl = n
         if (opt.clear && Math.hypot(lx, lz) < opt.clear + (kind === 'tiny' ? 0 : 1.5)) continue;
         if ((kind === 'tree' || kind === 'bush') && R() > grove(lx, lz) + .25) continue;   /* 나무는 숲처럼 몰려 자람 */
         const h = hAt(lx, lz); if (h === null) continue; const [wx, wz] = toW(lx, lz), list = DECO[kind]; if (!list.length) return;
-        put(list[Math.floor(R() * list.length)], wx, wz, 'deco', R() * 6.28, { s: sc * (.85 + R() * .4), y: TOP + h - .04, deco: kind }); got++; } };
-    deco('tree', Math.round(area / 30), 1); deco('bush', Math.round(area / 24), 1); deco('rock', Math.round(area / 55), 1); deco('tiny', Math.round(area / 18), 1, .6);
+        if (opt.lane != null && kind !== 'tiny' && Math.abs(-Math.sin(opt.lane) * wx + Math.cos(opt.lane) * wz) < 5) continue;   /* 기지 출구 앞 길은 비워 둠 (풀꽃만) */
+        put(list[Math.floor(R() * list.length)], wx, wz, 'deco', R() * 6.28, { s: sc * (.85 + R() * .4), y: BY + h - .04, deco: kind, rl }); got++; } };
+    deco('tree', Math.round(area / 30 * dens), 1); deco('bush', Math.round(area / 24 * dens), 1); deco('rock', Math.round(area / 55 * dens), 1); deco('tiny', Math.round(area / 18 * dens), 1, .6);
     /* 테두리에 늘어진 뿌리·덩굴: 둘레를 따라 듬성듬성 */
     if (DECO.hang.length) for (let i = 0; i < L.lip.length; i += 2) { if (R() < .35) continue; const [lx, ly, lz] = L.lip[i], k2 = .97, [wx, wz] = toW(lx * k2, lz * k2);
-      put(DECO.hang[Math.floor(R() * DECO.hang.length)], wx, wz, 'deco', R() * 6.28, { s: .9 + R() * .3, y: TOP + ly + .25, deco: 'hang' }); }
+      put(DECO.hang[Math.floor(R() * DECO.hang.length)], wx, wz, 'deco', R() * 6.28, { s: .9 + R() * .3, y: BY + ly + .25, deco: 'hang', rl }); }
     return k; };
   const BIG = ['Island_Plateau_Wide', 'Island_Twin_Falls', 'Island_Forest_Dense', 'Island_Bowl', 'Island_Ridge_Long', 'Island_Mushroom', 'Island_Keel', 'Island_Tilted_A', 'Island_Medium', 'Island_Flat_Low'];
   const MID = ['Island_Chunk_Round', 'Island_Small', 'Island_Crag', 'Island_Medium', 'Island_Flat_Low', 'Island_Chunk_Round'];
   const PIL = ['Island_Needle', 'Island_Spire_Crown', 'Island_Mesa_Tall', 'Island_Lean_Pillar', 'Island_Tower'];
   const ROCK = ['Rock_Floating_A', 'Rock_Mushroom_Small', 'Rock_Keel_Small'];
   const UPS = ['Island_Small', 'Island_Chunk_Round', 'Island_Medium', 'Island_Bowl', 'Island_Keel'];
-  const DNS = ['Island_Flat_Low', 'Island_Ridge_Long', 'Island_Forest_Dense', 'Island_Mushroom', 'Island_Tilted_A', 'Island_Twin_Falls'];
+  const DNS = ['Island_Flat_Low', 'Island_Ridge_Long', 'Island_Forest_Dense', 'Island_Mushroom', 'Island_Tilted_A', 'Island_Twin_Falls', 'Island_Plateau_Wide', 'Island_Bowl', 'Island_Medium', 'Island_Keel', 'Island_Chunk_Round', 'Island_Small']
+    .map(n => KIT['lo:' + n] ? 'lo:' + n : n);
+  /* 층 사이 원근 조각: 갈 수 없는 공간 → 단순한 각진 바위 덩어리 여러 모양 (사용자 2026-11-06: 단순화해서 보여 줘도 됨) */
+  const CHUNK = []; for (let i = 0; i < 8; i++) { const c = makeChunk(77 + i * 13, PAL, i % 3 === 0); const k = 'chunk_' + i; c.computeBoundingBox();
+    KIT[k] = { prims: [{ geo: c, mat: 'Terrain', src: MATS.Terrain }], top: 0, bot: c.boundingBox.min.y, hi: c.boundingBox.max.y, rad: 1 }; CHUNK.push(k); }
   const TREASURE = [];
   /* 보물 던전 섬: 기지 사이 다섯 곳 · 위 → 아래 → 위 → 아래 → 위 */
   for (let j = 0; j < 5; j++) { const th = (j * 2 + .5) * SA, [x, z] = at(th, rf(.3)), up = j % 2 === 0, k = j % 2 === 0 ? 'Island_Treasure_Ruins' : 'Island_Treasure_Vault';
     put(k, x, z, up ? 'up' : 'dn', th + Math.PI / 2, { treasure: true }); TREASURE.push({ x, z, layer: up ? 'up' : 'dn', y: (up ? UP : DN), k }); }
   for (let i = 0; i < SECT; i++) { const th0 = i * SA, R = rnd(1000 + i * 77), sd = i % 2 ? 1 : -1;
+    /* 태어나는 곳 출구 앞: 기체 아래로 깔리는 넓은 풀밭 · 길 양옆만 꾸밈 (사용자 2026-11-06: 앞이 너무 썰렁함) */
+    { const [x, z] = at(th0, R1 - 20); addLand(x, z, 12.5, 300 + i * 11, { lane: th0 }); }
     /* 몬스터 둥지 (가운데층) — 출구에서 비스듬히 보이는 자리 */
     /* 몬스터 둥지: 지름 32m쯤 넓은 땅 한가운데 · 가운데는 싸울 자리로 평평하게 비움 (사용자 2026-11-06: 몬스터 있는 곳은 대지가 넓어야 함) */
     { const th = th0 + sd * 10 * deg, [x, z] = at(th, rf(.5)); addLand(x, z, 15 + R() * 2, 500 + i * 13, { clear: 6.5 });
@@ -100,7 +110,11 @@ export async function makeMeadow(scene, url, onProgress = () => {}, decorUrl = n
     tryPut([PIL[i % PIL.length], PIL[(i + 2) % PIL.length]], 'pillar', 2, rf(.12), rf(.8));
     tryPut(ROCK, 'rock', 16, rf(.04), rf(.96), { y: () => -4 - R() * 9, s: () => 1 + R() * .8 });   /* 기체 발아래 떠 있는 바위 */
     tryPut(UPS, 'up', 5, rf(.06), rf(.9));
-    tryPut(DNS, 'dn', 7, rf(.04), rf(.94)); }
+    tryPut(DNS, 'dn', 22, rf(.0), rf(.98));   /* 아래층을 꽉 차 보이게 (실제로 내려가는 곳은 보물 던전 몇 곳뿐) */
+    for (let n = 0, t = 0; n < 2 && t < 60; t++) { const th = th0 + (R() - .5) * SA * .9, rr = 9 + R() * 5, r = rf(.1) + R() * (rf(.9) - rf(.1)), [x, z] = at(th, r);
+      if (!fits(x, z, rr * 1.12, 'dn')) continue; addLand(x, z, rr, 2000 + i * 29 + t, { layer: 'dn', dens: .55 }); n++; }   /* 아래층 넓은 땅 */
+    for (let n = 0; n < 45; n++) { const th = th0 + (R() - .5) * SA, r = R0 - 6 + R() * (R1 - R0 + 2), [x, z] = at(th, r), sc = .7 + Math.pow(R(), 2.4) * 3.3, y = -6 - R() * 20;
+      put(CHUNK[Math.floor(R() * CHUNK.length)], x, z, 'gap', R() * 6.28, { abs: true, s: 1, y, gs: sc }); } }
 
   /* ── 칠하는 방식: 이 그림체는 면마다 평평한 색 → 빛 반사를 점마다 정밀 계산하는 무거운 방식 대신,
         꼭짓점에서 해·하늘·땅빛만 한 번 계산하고 화면 점마다는 그 색을 그대로 씀 (모양·색은 같고 계산은 훨씬 적음)
@@ -129,6 +143,7 @@ export async function makeMeadow(scene, url, onProgress = () => {}, decorUrl = n
           ${layer === 'pillar' ? '{ float near = smoothstep(10., 34., distance(vWp.xz, uCam.xz)), hi = smoothstep(2.5, 6., vWp.y); if (bay(gl_FragCoord.xy) > mix(1., mix(.25, 1., near), hi)) discard; }' : ''}
           ${layer === 'up' ? '{ float near = smoothstep(14., 40., distance(vWp.xz, uCam.xz)); if (bay(gl_FragCoord.xy) > mix(.22, .55, near)) discard; col = mix(col, vec3(1., .99, .96), .22); }' : ''}
           ${layer === 'dn' ? '{ float k = clamp((-vWp.y - 15.) / 50., 0., 1.); col = mix(col * .72, vec3(.5, .6, .78), .35 + k * .45); }' : ''}
+          ${layer === 'gap' ? '{ float k = clamp((-vWp.y - 3.) / 26., 0., 1.); col = mix(col * (1. - k * .25), vec3(.55, .64, .8), .12 + k * .5); }' : ''}
           gl_FragColor = linearToOutputTexel(vec4(col, vA)); }` });
     return m; };
   const MAT = {}; const matFor = (name, layer) => { const key = name + '|' + layer; return MAT[key] || (MAT[key] = tone(MATS[name], layer)); };
@@ -139,7 +154,7 @@ export async function makeMeadow(scene, url, onProgress = () => {}, decorUrl = n
   for (const k in KIT) { const K = KIT[k]; bs.makeEmpty(); for (const p of K.prims) { p.geo.computeBoundingBox(); bs.union(p.geo.boundingBox); } K.sph = bs.getBoundingSphere(new THREE.Sphere()); }
   const root = new THREE.Group(); root.name = 'meadow'; scene.add(root);
   const SETS = new Map();
-  for (const p of place) { const L = p.layer === 'rock' || p.layer === 'deco' ? 'mid' : p.layer;
+  for (const p of place) { const L = p.rl || (p.layer === 'rock' || p.layer === 'deco' ? 'mid' : p.layer);
     m4.compose(new THREE.Vector3(p.x, p.y, p.z), q.setFromAxisAngle(up, p.yaw), new THREE.Vector3(p.s, p.sy, p.s)); p.m = m4.clone();
     const c = KIT[p.k].sph.center.clone().applyMatrix4(p.m); p.c = c; p.r = KIT[p.k].sph.radius * Math.max(p.s, p.sy);
     const key = p.k + '|' + L; if (!SETS.has(key)) SETS.set(key, { k: p.k, L, list: [] }); SETS.get(key).list.push(p); }
