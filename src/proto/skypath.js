@@ -9,12 +9,12 @@
    · 가는 동안 공격받지 않음 · 가운데층에 있을 땐 윗층 섬을 점무늬로 옅게 비킴 · 식물(나무·풀)은 막지 않음 */
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
-import { makeBloom } from '../core/hangar/bloom.js?v=11061643';
-import { makePerf } from './perf.js?v=11061643';
+import { makeBloom } from '../core/hangar/bloom.js?v=11061648';
+import { makePerf } from './perf.js?v=11061648';
 import { makeGlow } from '../preview/glow.js';
-import { makeGlbIsle } from './glbisle.js?v=11061643';
-import { makeFlight, FLY } from './flight.js?v=11061643';
-import { gate4, pedestal } from './gates.js?v=11061643';
+import { makeGlbIsle } from './glbisle.js?v=11061648';
+import { makeFlight, FLY } from './flight.js?v=11061648';
+import { gate4, pedestal } from './gates.js?v=11061648';
 
 const $ = s => document.querySelector(s), clamp = THREE.MathUtils.clamp, HOVER = FLY.HOVER, GAP = 2.9;
 const UP = new THREE.Color(1.45, 1.05, .42), DN = new THREE.Color(.72, .48, 1.55);
@@ -99,7 +99,6 @@ export async function start(canvas, onProgress = () => {}) {
     let best = null, bd = -1; for (let x = -16; x <= 16; x += .5) for (let z = -16; z <= 16; z += .5) { if (G.blocked(x, z)) continue; const gy = G.groundFast(x, z); if (gy == null || Math.abs(gy + GAP - HOVER) > 1.2) continue; let ok = true; for (let a = 0; a < 8 && ok; a++) if (G.groundFast(x + Math.cos(a * .785) * 1.4, z + Math.sin(a * .785) * 1.4) == null) ok = false; if (!ok) continue;
       const d = Math.hypot(x + Lk.o.x - gx.x, z + Lk.o.z - gx.z); if (d > bd && d < 22) { bd = d; best = [x, z, gy]; } }
     if (best) chest.position.set(Lk.o.x + best[0], Lk.o.y + best[2], Lk.o.z + best[1]); };
-    if (s) chest.position.set(Lk.o.x + s[0], Lk.o.y + s[2], Lk.o.z + s[1]); };
   place();
   onProgress(.62);
   /* ── 내 기체 ── */
