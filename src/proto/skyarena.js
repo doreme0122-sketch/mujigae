@@ -6,14 +6,15 @@
    · 지형 뒤로 간 기체는 안 보임(게임 규칙) · 따라가는 기체만 지형 너머로 윤곽이 비침 */
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
-import { makeBloom } from '../core/hangar/bloom.js?v=11061204';
-import { makePerf } from './perf.js?v=11061204';
+import { makeBloom } from '../core/hangar/bloom.js?v=11061243';
+import { makePerf } from './perf.js?v=11061243';
 import { buildShip, engineSpots } from '../core/ships/build.js';
 import { makeGlow } from '../preview/glow.js';
-import { makeGlbIsle } from './glbisle.js?v=11061204';
+import { makeGlbIsle } from './glbisle.js?v=11061243';
 
 const $ = s => document.querySelector(s), clamp = THREE.MathUtils.clamp;
 const HOVER = .7, LEN = 2;
+const MAPS = +(new URLSearchParams(location.search).get('s') || 1 / 3);   /* 맵 크기 = 보내준 v7의 3분의 1 (사용자 2026-11-06 확정) · 시험: 주소 끝 &s=0.5 */
 /* 기체 10대: 모양·칠이 서로 다르게 · 탄 색은 기체마다 (누가 쏜 건지 보이게) */
 const ROSTER = [
   [1, 1, 'ruby', '루비', [1.4, .35, .45]], [2, 1, 'AURUM', '오름', [1.4, 1.05, .35]], [3, 1, 'lime', '라임', [.6, 1.4, .4]],
@@ -30,13 +31,14 @@ export async function start(canvas, onProgress = () => {}) {
   const glow = makeGlow(); scene.add(glow.mesh);
   onProgress(.1);
   /* 맵 */
-  const GI = await new Promise(res => { const g = makeGlbIsle(HOVER, res, { url: './assets/skyislands_v7.glb' }); scene.add(g.mesh); });
+  const GI = await new Promise(res => { const g = makeGlbIsle(HOVER, res, { url: './assets/skyislands_v7.glb', scale: MAPS }); scene.add(g.mesh); });
   onProgress(.6);
   const wall = (x, z) => GI.gridAt(x, z) || Math.abs(x) > GI.lim.x || Math.abs(z) > GI.lim.z;
   /* 두 점 사이가 트였나 (탄·시야): 0.5m마다 지형 칸을 봄 */
   const clear = (x0, z0, x1, z1) => { const d = Math.hypot(x1 - x0, z1 - z0), n = Math.ceil(d / .5); for (let i = 1; i < n; i++) { const k = i / n; if (GI.gridAt(x0 + (x1 - x0) * k, z0 + (z1 - z0) * k)) return false; } return true; };
-  const freeSpot = () => { for (let i = 0; i < 400; i++) { const R = i < 250 ? 40 : 70, x = (Math.random() * 2 - 1) * Math.min(R, GI.lim.x - 6), z = (Math.random() * 2 - 1) * Math.min(R, GI.lim.z - 6);   /* 가운데 둘레에서 먼저 찾음 — 싸움이 한데 모이게 */
-      if (!GI.blocked(x, z) && GI.groundFast(x, z) != null && S.every(o => o === S.me || o.dead || Math.hypot(o.x - x, o.z - z) > 12)) return [x, z]; }
+  const freeSpot = () => { for (let i = 0; i < 400; i++) { const R = i < 250 ? .45 : .9, x = (Math.random() * 2 - 1) * (GI.lim.x - 6) * R, z = (Math.random() * 2 - 1) * (GI.lim.z - 6) * R;   /* 가운데 둘레에서 먼저 찾음 — 싸움이 한데 모이게 */
+      if (!GI.blocked(x, z) && GI.groundFast(x, z) != null && S.every(o => o === S.me || o.dead || Math.hypot(o.x - x, o.z - z) > (i < 300 ? 12 * MAPS + 4 : 3))) return [x, z]; }   /* 서로 떨어진 빈 곳 · 못 찾으면 가깝더라도 빈 곳 */
+    for (let i = 0; i < 2000; i++) { const x = (Math.random() * 2 - 1) * GI.lim.x, z = (Math.random() * 2 - 1) * GI.lim.z; if (!GI.blocked(x, z)) return [x, z]; }
     return [0, 0]; };
   /* 그림자: 바로 아래 지형 윗면에 · 높이 떠 있을수록 넓고 옅게 · 아래가 비면 사라짐 */
   const shM = () => new THREE.ShaderMaterial({ transparent: true, depthWrite: false, uniforms: { uA: { value: .5 } },
@@ -71,7 +73,7 @@ export async function start(canvas, onProgress = () => {}) {
   const feed = $('#feed'); const say = (a, b) => { const d = document.createElement('div'); d.innerHTML = `<b style="color:rgb(${a.col.map(v => Math.min(255, v / 1.4 * 255 | 0))})">${a.name}</b> → <span style="color:rgb(${b.col.map(v => Math.min(255, v / 1.4 * 255 | 0))})">${b.name}</span>`; feed.prepend(d); setTimeout(() => d.remove(), 4000); while (feed.children.length > 5) feed.lastChild.remove(); };
 
   /* ── 카메라: 각도(땅에서 몇 도) · 거리 · 따라갈 기체 (또는 자유: 화면을 끌어 옮김) ── */
-  const cam = { x: 0, z: 0, ang: 45, dist: 46, follow: 0 };
+  const cam = { x: 0, z: 0, ang: 45, dist: 25, follow: 0 };
   const angEl = $('#ang'), angV = $('#angv'), distEl = $('#dist'), distV = $('#distv');
   const readA = () => { cam.ang = +angEl.value; angV.textContent = cam.ang + '°'; drawGauge(); }, readD = () => { cam.dist = +distEl.value; distV.textContent = cam.dist + 'm'; };
   angEl.addEventListener('input', readA); distEl.addEventListener('input', readD);

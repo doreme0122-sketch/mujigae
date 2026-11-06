@@ -22,7 +22,7 @@ export function makeGlbIsle(hover, onReady, opt = {}) {
         vec3 col=mix(vec3(.62,.72,.9),vec3(.97,.98,1.),c); gl_FragColor=vec4(col,1.); }` }));
   grp.add(sea); api.sea = sea;
   new GLTFLoader().load(new URL(opt.url || './assets/ref_skyislands.glb', import.meta.url).href, g => {
-    const root = g.scene; root.updateMatrixWorld(true);
+    const root = g.scene; if (opt.scale) root.scale.setScalar(opt.scale); root.updateMatrixWorld(true);   /* 맵 크기 조절 (기체 크기는 그대로) */
     let big = null, bigW = 0;
     root.traverse(o => { if (!o.isMesh) return; const b = new THREE.Box3().setFromObject(o), s = b.getSize(new THREE.Vector3()), w = s.x * s.z; if (w > bigW) { bigW = w; big = { o, b }; } });
     const rc0 = new THREE.Raycaster(), dn0 = new THREE.Vector3(0, -1, 0);

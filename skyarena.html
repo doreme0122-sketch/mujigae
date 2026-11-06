@@ -47,7 +47,7 @@ input[type=range]{flex:1;min-width:0;accent-color:#b9ff4a;height:20px;margin:0}
 </style>
 <script>
 window.__ver = fetch('ver.json?t=' + Date.now(), { cache: 'no-store' }).then(r => r.json()).then(j => {
-  const f = location.pathname.split('/').pop() || 'index.html', want = j[f], mine = window.__mine = '11061204';
+  const f = location.pathname.split('/').pop() || 'index.html', want = j[f], mine = window.__mine = '11061243';
   if (want && +want > +mine) { location.replace(f + '?v=' + want + '&r=' + Date.now() + location.hash); return new Promise(() => {}); } }).catch(() => {});
 </script>
 <script type="importmap">{"imports":{"three":"./vendor/three.module.js","three/addons/":"./vendor/addons/"}}</script>
@@ -61,7 +61,7 @@ window.__ver = fetch('ver.json?t=' + Date.now(), { cache: 'no-store' }).then(r =
   <div id="view">
     <div id="angbox"><svg id="gauge" viewBox="0 0 52 48" aria-hidden="true"></svg><div><div class="big" id="angv">45°</div><div class="sub">땅에서 카메라까지 각도</div></div></div>
     <div class="row"><label for="ang">각도</label><input id="ang" type="range" min="10" max="90" step="1" value="45"></div>
-    <div class="row"><label for="dist">거리</label><input id="dist" type="range" min="14" max="140" step="1" value="46"><output id="distv">46m</output></div>
+    <div class="row"><label for="dist">거리</label><input id="dist" type="range" min="14" max="140" step="1" value="25"><output id="distv">25m</output></div>
     <div class="fol"><button id="prev" type="button" aria-label="이전 기체">◀</button><div id="who"></div><button id="next" type="button" aria-label="다음 기체">▶</button></div>
   </div>
 </div>
@@ -69,7 +69,7 @@ window.__ver = fetch('ver.json?t=' + Date.now(), { cache: 'no-store' }).then(r =
 <div id="rot">기기를 가로로 돌려 주세요</div>
 <script type="module">
 await window.__ver;
-const { start } = await import('./src/proto/skyarena.js?v=11061204');
+const { start } = await import('./src/proto/skyarena.js?v=11061243');
 const bar = document.querySelector('#load i');
 start(document.querySelector('#cv'), p => { bar.style.transform = `scaleX(${p})`; })
   .then(() => setTimeout(() => document.querySelector('#load').classList.add('done'), 300))
