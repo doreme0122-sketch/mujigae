@@ -55,7 +55,7 @@ button{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:poin
 /* 고정 주소나 예전 번호로 열어도 늘 최신: 최신 판 번호(ver.json, 기억하지 않고 매번 새로 받음)와 다르면 최신 번호 주소로 바로 넘어감 */
 window.__ver = fetch('ver.json?t=' + Date.now(), { cache: 'no-store' }).then(r => r.json()).then(j => {
   /* 비교는 주소 번호가 아니라 '이 페이지 안에 실제로 든 판 번호'와 함 — 같은 주소에 예전 내용이 폰에 기억돼 있으면 주소만 보고는 모름 */
-  const f = location.pathname.split('/').pop() || 'index.html', want = j[f], mine = window.__mine = '11062116';
+  const f = location.pathname.split('/').pop() || 'index.html', want = j[f], mine = window.__mine = '11062147';
   if (want && +want > +mine) { location.replace(f + '?v=' + want + '&r=' + Date.now() + location.hash); return new Promise(() => {}); } }).catch(() => {});
 </script>
 <script type="importmap">{"imports":{"three":"./vendor/three.module.js","three/addons/":"./vendor/addons/"}}</script>
@@ -73,7 +73,7 @@ window.__ver = fetch('ver.json?t=' + Date.now(), { cache: 'no-store' }).then(r =
 <div id="rot">기기를 가로로 돌려 주세요</div>
 <script type="module">
 await window.__ver;
-const { start } = await import('./src/proto/floorlabview.js?v=11062116');
+const { start } = await import('./src/proto/floorlabview.js?v=11062147');
 const bar = document.querySelector('#load i');
 start(document.querySelector('#cv'), p => { bar.style.transform = `scaleX(${p})`; })
   .then(() => setTimeout(() => document.querySelector('#load').classList.add('done'), 300))

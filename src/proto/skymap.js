@@ -7,19 +7,19 @@
    · 태어나 출구로 튀어 나가면 바로 조이스틱 · 기지 고리(9m)를 벗어나는 순간 보호막 3초 + 가속 5초 */
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
-import { makeBloom } from '../core/hangar/bloom.js?v=11062116';
-import { makePad } from '../core/hangar/pad.js?v=11062116';
-import { makeMag } from '../core/hangar/mag.js?v=11062116';
+import { makeBloom } from '../core/hangar/bloom.js?v=11062147';
+import { makePad } from '../core/hangar/pad.js?v=11062147';
+import { makeMag } from '../core/hangar/mag.js?v=11062147';
 import { buildShip } from '../core/ships/build.js';
-import { makeGoldStar } from './goldstar.js?v=11062116';
-import { makeArena, SPEED, WAVE_R0 } from './arena.js?v=11062116';
-import { makeGuardians, GUARD } from './guardian.js?v=11062116';
-import { makeBirth, BIRTH } from './birth.js?v=11062116';
-import { makePerf } from './perf.js?v=11062116';
+import { makeGoldStar } from './goldstar.js?v=11062147';
+import { makeArena, SPEED, WAVE_R0 } from './arena.js?v=11062147';
+import { makeGuardians, GUARD } from './guardian.js?v=11062147';
+import { makeBirth, BIRTH } from './birth.js?v=11062147';
+import { makePerf } from './perf.js?v=11062147';
 import { makeGlow } from '../preview/glow.js';
-import { makeFlight, FLY } from './flight.js?v=11062116';
-import { pedestal } from './gates.js?v=11062116';
-import { makeMeadow, MEADOW } from './meadow.js?v=11062116';
+import { makeFlight, FLY } from './flight.js?v=11062147';
+import { pedestal } from './gates.js?v=11062147';
+import { makeMeadow, MEADOW } from './meadow.js?v=11062147';
 
 const $ = s => document.querySelector(s), clamp = THREE.MathUtils.clamp, HOVER = FLY.HOVER;
 const R = 240, NB = 10, GAPH = 5.6, BASE_D = 0;     /* 맵 반지름 · 기지 수 · 벽 틈 반 폭(= 기지 반지름) · 기지 가운데는 벽 선 위 (앞 절반은 맵 안, 뒤 절반은 맵 밖 · 사용자 2026-11-06) */
@@ -131,7 +131,7 @@ export async function start(canvas, onProgress = () => {}) {
   const stand = new THREE.Group(); B0.w.add(stand);
   onProgress(.4);
   /* ── 초원 고리 ── */
-  const meadow = await makeMeadow(scene, new URL('./assets/kit_meadow.glb?v=11062116', import.meta.url).href, p => onProgress(.4 + p * .4), new URL('./assets/kit_meadow_decor.glb?v=11062116', import.meta.url).href, new URL('./assets/kit_meadow_lo.glb?v=11062116', import.meta.url).href);
+  const meadow = await makeMeadow(scene, new URL('./assets/kit_meadow.glb?v=11062147', import.meta.url).href, p => onProgress(.4 + p * .4), new URL('./assets/kit_meadow_decor.glb?v=11062147', import.meta.url).href, new URL('./assets/kit_meadow_lo.glb?v=11062147', import.meta.url).href);
   onProgress(.82);
   /* ── 조이스틱으로 모는 기체 ── */
   /* 막힘: 맵 안은 자유 · 기지 안에선 판(계단 단 안쪽)과 출구 길만 · 무지개 벽과 그 바깥(우주)은 막힘 */
