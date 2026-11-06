@@ -8,7 +8,8 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { deinterleaveGeometry } from 'three/addons/utils/BufferGeometryUtils.js';
-import { makeLand, makeChunk, paletteFrom } from './land.js?v=11062253';
+import { makeLand, makeChunk, paletteFrom } from './land.js?v=11062257';
+import { CLOUD_NOISE } from './clouds.js?v=11062257';
 
 export const MEADOW = { R0: 187, R1: 240, UP: 20, DN: -30, TOP: -3.0, SC: 1 / 2 };   /* TOP: 가운데층 땅 높이 — 기체(.7)보다 3.7m 아래 → 나무 꼭대기 위로 날게 (사용자 2026-11-06: 나무에 걸림) */   /* SC: 받은 섬 모델 크기의 2분의 1 (사용자 2026-11-06: 원래는 너무 크고 3분의 1은 너무 작음) */   /* 가운데층 섬 윗면 = 기체(높이 .7)보다 1.7m 아래 */
 const SECT = 10, CELL = 1;
@@ -138,14 +139,15 @@ export async function makeMeadow(scene, url, onProgress = () => {}, decorUrl = n
         꼭짓점에서 해·하늘·땅빛만 한 번 계산하고 화면 점마다는 그 색을 그대로 씀 (모양·색은 같고 계산은 훨씬 적음)
         층마다: 위층 = 밝게 + 점무늬로 옅게(기체 가까이선 더 옅게) · 아래층 = 어둡고 아래로 갈수록 구름빛 · 기둥 = 기체보다 높은 부분이 가까이 오면 점무늬로 비켜 줌 ── */
   const uCam = { value: new THREE.Vector3() };
-  const LIT = { uSun: { value: new THREE.Vector3(-9, 14, -8).normalize() }, uSunC: { value: new THREE.Color(0xfff0dc).multiplyScalar(2.8 / Math.PI) },
+  const LIT = { uT: { value: 0 }, uSun: { value: new THREE.Vector3(-9, 14, -8).normalize() }, uSunC: { value: new THREE.Color(0xfff0dc).multiplyScalar(2.8 / Math.PI) },
     uSky: { value: new THREE.Color(0xb7c8e8).multiplyScalar(.85 / Math.PI + .38) }, uGnd: { value: new THREE.Color(0x3a3020).multiplyScalar(.85 / Math.PI + .38) } };
   const BAY = 'float bay(vec2 p){ vec2 q=mod(floor(p),4.); int i=int(q.x)+int(q.y)*4; float m[16]=float[16](0.,8.,2.,10.,12.,4.,14.,6.,3.,11.,1.,9.,15.,7.,13.,5.); return (m[i]+.5)/16.; }\n';
   const tone = (src, layer) => {
     const em = src.emissive ? src.emissive.clone() : new THREE.Color(0);
     const m = new THREE.ShaderMaterial({ vertexColors: true, transparent: src.transparent, depthWrite: src.depthWrite, side: src.side,
       uniforms: { ...LIT, uCam, uEm: { value: em } },
-      vertexShader: `uniform vec3 uSun, uSunC, uSky, uGnd, uEm; varying vec3 vC; varying float vA; varying vec3 vWp;
+      vertexShader: `uniform vec3 uSun, uSunC, uSky, uGnd, uEm; uniform float uT; varying vec3 vC; varying float vA; varying vec3 vWp;
+        ${layer === 'mid' || layer === 'pillar' || layer === 'upgap' ? CLOUD_NOISE : ''}
         void main(){ mat4 M = modelMatrix * instanceMatrix; vec4 w = M * vec4(position, 1.); vWp = w.xyz;
           vec3 n = normalize(mat3(M) * normal);
           #ifdef USE_COLOR_ALPHA
@@ -153,7 +155,9 @@ export async function makeMeadow(scene, url, onProgress = () => {}, decorUrl = n
           #else
             vec3 c = color; vA = 1.;
           #endif
-          vC = c * (uSunC * max(dot(n, uSun), 0.) + mix(uGnd, uSky, n.y * .5 + .5)) + uEm;
+          float shd = 0.;
+          ${layer === 'mid' || layer === 'pillar' || layer === 'upgap' ? 'shd = smoothstep(.2, .6, sn(w.xz * .016 + vec2(uT * .012, uT * .005)) * .5 + .5) * .62;' : ''}   /* 땅 위로 천천히 지나가는 구름 그림자 */
+          vC = c * (uSunC * max(dot(n, uSun), 0.) * (1. - shd) + mix(uGnd, uSky, n.y * .5 + .5)) + uEm;
           gl_Position = projectionMatrix * viewMatrix * w; }`,
       fragmentShader: `uniform vec3 uCam; varying vec3 vC; varying float vA; varying vec3 vWp;
         void main(){ vec3 col = vC;
@@ -205,7 +209,7 @@ export async function makeMeadow(scene, url, onProgress = () => {}, decorUrl = n
           if (w.y < Y0 || w.y > Y1) continue; const gx = cellOf(w.x), gz = cellOf(w.z); if (gx >= 0 && gz >= 0 && gx < N && gz < N) grid[gz * N + gx] = 1; } } } }
   onProgress(1);
   const blocked = (x, z) => { const gx = cellOf(x), gz = cellOf(z); return gx >= 0 && gz >= 0 && gx < N && gz < N && grid[gz * N + gx] === 1; };
-  const update = (ship, camera) => { uCam.value.copy(ship); if (camera) cull(camera); };
+  const update = (ship, camera, t = 0) => { uCam.value.copy(ship); LIT.uT.value = t; if (camera) cull(camera); };
   const info = () => ({ shown, calls, tris: Math.round(tris), total: place.length });
   return { root, blocked, update, info, place, TREASURE, KIT };
 }
