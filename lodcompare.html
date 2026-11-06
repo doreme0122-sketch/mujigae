@@ -11,11 +11,12 @@ const sc = new THREE.Scene(); sc.background = new THREE.Color(0xcfdcec); const c
 sc.add(new THREE.HemisphereLight(0xb7c8e8, 0x3a3020, 1.1)); const sun = new THREE.DirectionalLight(0xfff0dc, 2.6); sun.position.set(-9, 14, -8); sc.add(sun);
 const L = new GLTFLoader(), q = new URLSearchParams(location.search), only = q.get('only');
 const tgt0 = 0;
-const [A, B] = await Promise.all(['src/proto/assets/kit_meadow.glb', 'src/proto/assets/kit_meadow_lo.glb'].map(u => L.loadAsync(u)));
+const kitA = q.get('a') || 'kit_meadow', kitB = q.get('b') || 'kit_meadow_lo';
+const [A, B] = await Promise.all(['src/proto/assets/' + kitA + '.glb', 'src/proto/assets/' + kitB + '.glb'].map(u => L.loadAsync(u)));
 const tri = o => { let n = 0; o.traverse(m => { if (m.isMesh) n += (m.geometry.index ? m.geometry.index.count : m.geometry.attributes.position.count) / 3; }); return n; };
-const names = A.scene.children.map(c => c.name).filter(n => !only || n.includes(only)); const cols = Math.ceil(Math.sqrt(names.length * 1.6)), G = 46;
+const names = A.scene.children.map(c => c.name).filter(n => !only || n.includes(only)); const G = +(q.get('g') || 46), cols = Math.ceil(Math.sqrt(names.length * 1.6));
 let t0 = 0, t1 = 0;
-names.forEach((n, i) => { const a = A.scene.getObjectByName(n).clone(), b = B.scene.getObjectByName(n).clone(); t0 += tri(a); t1 += tri(b);
+names.forEach((n, i) => { const a = A.scene.getObjectByName(n).clone(), b = (B.scene.getObjectByName(n) || new THREE.Group()).clone(); t0 += tri(a); t1 += tri(b);
   const x = (i % cols - (cols - 1) / 2) * G, z = Math.floor(i / cols) * G * 2.2; a.position.set(x, 0, z); b.position.set(x, 0, z + G * 1.0); if (only) { a.position.set(-G * .55, 0, 0); b.position.set(G * .55, 0, 0); } sc.add(a, b); });
 document.getElementById('hud').textContent += ` · 면 ${Math.round(t0)} → ${Math.round(t1)} (${Math.round(t1 / t0 * 100)}%)`;
 const rows = Math.ceil(names.length / cols), tgt = new THREE.Vector3(0, 0, rows * G * 2.2 / 2 - G * .5); let yaw = 0, pit = .75, dis = Math.max(160, cols * G * 1.15) * (only ? .45 : 1);
