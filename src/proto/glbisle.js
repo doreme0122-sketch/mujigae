@@ -25,32 +25,44 @@ export function makeGlbIsle(hover, onReady) {
     const root = g.scene; root.updateMatrixWorld(true);
     let big = null, bigW = 0;
     root.traverse(o => { if (!o.isMesh) return; const b = new THREE.Box3().setFromObject(o), s = b.getSize(new THREE.Vector3()), w = s.x * s.z; if (w > bigW) { bigW = w; big = { o, b }; } });
-    /* 가운데 큰 섬 윗면: 그 섬 꼭짓점 중 가운데 쪽 높은 점들의 높이 (위로 솟은 기둥은 빼고) */
-    const top = (() => { const p = big.o.geometry.attributes.position, v = new THREE.Vector3(), ys = []; const c = big.b.getCenter(new THREE.Vector3());
-      for (let i = 0; i < p.count; i++) { v.fromBufferAttribute(p, i).applyMatrix4(big.o.matrixWorld); if (Math.hypot(v.x - c.x, v.z - c.z) < (big.b.max.x - big.b.min.x) * .35) ys.push(v.y); }
-      ys.sort((a, b) => a - b); return ys[Math.floor(ys.length * .6)]; })();
+    const rc0 = new THREE.Raycaster(), dn0 = new THREE.Vector3(0, -1, 0);
+    /* 가운데 큰 섬 풀밭 높이: 섬 위 여러 곳에서 아래로 쏘아 맞은 "위를 보는 면" 높이의 가운데값 (기둥·나무 꼭대기는 빠짐) */
+    const top = (() => { const c = big.b.getCenter(new THREE.Vector3()), sx = (big.b.max.x - big.b.min.x) * .4, sz = (big.b.max.z - big.b.min.z) * .4, ys = [];
+      for (let i = 0; i < 15; i++) for (let j = 0; j < 15; j++) { rc0.set(new THREE.Vector3(c.x + (i / 7 - 1) * sx, big.b.max.y + 5, c.z + (j / 7 - 1) * sz), dn0);
+        const hs = rc0.intersectObject(big.o, false); for (const h of hs) { const n = h.face.normal.clone().transformDirection(big.o.matrixWorld); if (n.y > .85) { ys.push(h.point.y); break; } } }
+      ys.sort((a, b) => a - b); return ys[Math.floor(ys.length * .5)] ?? big.b.max.y; })();
     const c0 = big.b.getCenter(new THREE.Vector3());
-    root.position.set(-c0.x, hover - 1.2 - top, -c0.z); grp.add(root); root.updateMatrixWorld(true);
+    root.position.set(-c0.x, hover - 1.6 - top, -c0.z); grp.add(root); root.updateMatrixWorld(true);   /* 기체가 가운데 섬 풀밭보다 1.6m 위 */
     root.traverse(o => { if (o.isMesh) { meshes.push(o); o.frustumCulled = true; if (o.material) { o.material.envMapIntensity = .6; } } });
-    /* 막힘: 기체 높이 ±1m에 걸친 삼각형의 점들을 모아 메시마다 덩어리별 원으로 */
-    const v = new THREE.Vector3(), pts = [];
-    for (const m of meshes) { const p = m.geometry.attributes.position, ix = m.geometry.index; const n = ix ? ix.count : p.count, A = [new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3()];
-      for (let i = 0; i < n; i += 3) { for (let k = 0; k < 3; k++) A[k].fromBufferAttribute(p, ix ? ix.getX(i + k) : i + k).applyMatrix4(m.matrixWorld);
-        const lo = Math.min(A[0].y, A[1].y, A[2].y), hi = Math.max(A[0].y, A[1].y, A[2].y); if (hi < hover - .3 || lo > hover + 1.5) continue;
-        for (let k = 0; k < 3; k++) pts.push([A[k].x, A[k].z]); pts.push([(A[0].x + A[1].x + A[2].x) / 3, (A[0].z + A[1].z + A[2].z) / 3]); } }
-    /* 가까운 점끼리 묶어 원 하나로 */
-    const used = new Array(pts.length).fill(false);
-    for (let i = 0; i < pts.length; i++) { if (used[i]) continue; const cl = [i]; used[i] = true;
-      for (let q = 0; q < cl.length; q++) { const a = pts[cl[q]]; for (let j = 0; j < pts.length; j++) if (!used[j] && Math.hypot(pts[j][0] - a[0], pts[j][1] - a[1]) < 1.5) { used[j] = true; cl.push(j); } }
-      let cx = 0, cz = 0; for (const k of cl) { cx += pts[k][0]; cz += pts[k][1]; } cx /= cl.length; cz /= cl.length; let r = 0; for (const k of cl) r = Math.max(r, Math.hypot(pts[k][0] - cx, pts[k][1] - cz));
-      blockers.push({ x: cx, z: cz, r: r + .8 }); }
+    /* 막힘 = 보이는 모양 그대로 (사용자 2026-11-06: 구조물에서 멀리 떨어져 있는데도 못 가는 데가 있음)
+       0.4m 칸 바둑판에, 지형 면 위의 점을 촘촘히 찍어 기체 높이(-0.5 ~ +0.8m)에 걸친 점만 칸을 채움 · 물(폭포)은 뺌 · 기체 몸 반지름만큼만 여유 */
+    const bb = new THREE.Box3(); for (const m of meshes) bb.union(new THREE.Box3().setFromObject(m));
+    const G = .4, gx0 = bb.min.x - 2, gz0 = bb.min.z - 2, GW = Math.ceil((bb.max.x - bb.min.x + 4) / G), GH = Math.ceil((bb.max.z - bb.min.z + 4) / G), grid = new Uint8Array(GW * GH);
+    const A = new THREE.Vector3(), Bv = new THREE.Vector3(), C = new THREE.Vector3(), P = new THREE.Vector3(), lo = hover - .5, hi = hover + .8;
+    for (const m of meshes) { const geo = m.geometry, p = geo.attributes.position, ix = geo.index, groups = geo.groups.length ? geo.groups : [{ start: 0, count: ix ? ix.count : p.count, materialIndex: 0 }], mats = Array.isArray(m.material) ? m.material : [m.material];
+      for (const gr of groups) { const mt = mats[gr.materialIndex] || mats[0]; if (mt && /water/i.test(mt.name)) continue;
+        for (let i = gr.start; i < gr.start + gr.count; i += 3) { const id = k => ix ? ix.getX(i + k) : i + k;
+          A.fromBufferAttribute(p, id(0)).applyMatrix4(m.matrixWorld); Bv.fromBufferAttribute(p, id(1)).applyMatrix4(m.matrixWorld); C.fromBufferAttribute(p, id(2)).applyMatrix4(m.matrixWorld);
+          if (Math.max(A.y, Bv.y, C.y) < lo || Math.min(A.y, Bv.y, C.y) > hi) continue;
+          const L = Math.max(A.distanceTo(Bv), Bv.distanceTo(C), C.distanceTo(A)), n = Math.max(2, Math.ceil(L / .2));
+          for (let u = 0; u <= n; u++) for (let w = 0; w <= n - u; w++) { const a = u / n, b2 = w / n; P.set(0, 0, 0).addScaledVector(A, 1 - a - b2).addScaledVector(Bv, a).addScaledVector(C, b2);
+            if (P.y < lo || P.y > hi) continue; const cx = Math.floor((P.x - gx0) / G), cz = Math.floor((P.z - gz0) / G); if (cx >= 0 && cz >= 0 && cx < GW && cz < GH) grid[cz * GW + cx] = 1; } } } }
+    /* 속 채우기: 바깥에서 물 붓듯 채워 닿지 않는 빈칸(기둥 속처럼 둘러싸인 곳)은 막힘으로 */
+    { const out = new Uint8Array(GW * GH), q = []; const push = (x, z) => { const k = z * GW + x; if (x < 0 || z < 0 || x >= GW || z >= GH || out[k] || grid[k]) return; out[k] = 1; q.push(k); };
+      for (let x = 0; x < GW; x++) { push(x, 0); push(x, GH - 1); } for (let z = 0; z < GH; z++) { push(0, z); push(GW - 1, z); }
+      while (q.length) { const k = q.pop(), x = k % GW, z = (k / GW) | 0; push(x + 1, z); push(x - 1, z); push(x, z + 1); push(x, z - 1); }
+      for (let k = 0; k < grid.length; k++) if (!out[k]) grid[k] = 1; }
+    api.gridAt = (x, z) => { const cx = Math.floor((x - gx0) / G), cz = Math.floor((z - gz0) / G); return cx >= 0 && cz >= 0 && cx < GW && cz < GH && grid[cz * GW + cx] === 1; };
+    const RAD = .55;   /* 기체 몸 반지름 */
+    api.blocked = (x, z) => { if (Math.abs(x) > api.lim.x || Math.abs(z) > api.lim.z) return true; for (let a = 0; a < 8; a++) if (api.gridAt(x + Math.cos(a * .785) * RAD, z + Math.sin(a * .785) * RAD)) return true; return api.gridAt(x, z); };
+    api.top = top;
     /* 그림자 자리 · 가려짐 판정 */
     const rc = new THREE.Raycaster(), dn = new THREE.Vector3(0, -1, 0);
     api.groundAt = (x, z) => { rc.set(new THREE.Vector3(x, hover + .5, z), dn); rc.far = 200; const h = rc.intersectObjects(meshes, false)[0]; return h ? h.point.y : null; };
     api.occluded = (camPos, x, y, z) => { const to = new THREE.Vector3(x, y, z), d = to.clone().sub(camPos), L = d.length(); rc.set(camPos, d.normalize()); rc.far = L - .6; return rc.intersectObjects(meshes, false).length > 0; };
     sea.position.y = new THREE.Box3().setFromObject(root).min.y - 25;
-    /* 날 수 있는 범위 = 구조물이 있는 곳까지만 (사용자 2026-11-06: 구조물에서 경계가 너무 멀어 제대로 확인 못 함) */
-    { const bb = new THREE.Box3(); for (const m of meshes) bb.union(new THREE.Box3().setFromObject(m)); api.lim.x = Math.max(Math.abs(bb.min.x), Math.abs(bb.max.x)) * .82; api.lim.z = Math.max(Math.abs(bb.min.z), Math.abs(bb.max.z)) * .85; }
+    /* 날 수 있는 범위: 구조물 둘레로 넉넉히 (사용자 2026-11-06: 갈 수 있는 공간을 막아 놔서 확인이 안 됨) */
+    api.lim.x = Math.max(Math.abs(bb.min.x), Math.abs(bb.max.x)) + 14; api.lim.z = Math.max(Math.abs(bb.min.z), Math.abs(bb.max.z)) + 12;
     api.ready = true; onReady?.(api);
   });
   return api;

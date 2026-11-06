@@ -5,25 +5,25 @@
    무게: 바닥 판 하나 + 기체 둘 + 빛 알갱이 한 묶음 + 그림자 판 둘 */
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
-import { makeBloom } from '../core/hangar/bloom.js?v=11061108';
-import { makePerf } from './perf.js?v=11061108';
+import { makeBloom } from '../core/hangar/bloom.js?v=11061126';
+import { makePerf } from './perf.js?v=11061126';
 import { buildShip, engineSpots } from '../core/ships/build.js';
 import { makeGlow } from '../preview/glow.js';
-import { makeFlight, FLY } from './flight.js?v=11061108';
-import { makeFloorLab, LAB, JOIN, sdBlob, sdRoad, blobR } from './floorlab.js?v=11061108';
-import { makeMassWall, STYLES } from './wallmass.js?v=11061108';
-import { makeIceWall } from './icewall.js?v=11061108';
-import { SNOW_U } from './snowtone.js?v=11061108';
-import { iceWallMaterial, snowMaterial } from './icewall.js?v=11061108';
-import { makeRuinWall, ruinMaterial } from './ruins.js?v=11061108';
-import { makeCoralWall, coralMaterial, coral } from './coral.js?v=11061108';
-import { makeTrailMap } from './trailmap.js?v=11061108';
-import { makeThemedHide } from './hidetheme.js?v=11061108';
-import { makePlantBush } from './plantbush.js?v=11061108';
-import { makeCrystalWall, crystalMaterial } from './crystal.js?v=11061108';
-import { makeLavaWall, lavaWallMaterial } from './lavawall.js?v=11061108';
-import { makeSkyCanyon } from './skycanyon.js?v=11061108';
-import { makeGlbIsle } from './glbisle.js?v=11061108';
+import { makeFlight, FLY } from './flight.js?v=11061126';
+import { makeFloorLab, LAB, JOIN, sdBlob, sdRoad, blobR } from './floorlab.js?v=11061126';
+import { makeMassWall, STYLES } from './wallmass.js?v=11061126';
+import { makeIceWall } from './icewall.js?v=11061126';
+import { SNOW_U } from './snowtone.js?v=11061126';
+import { iceWallMaterial, snowMaterial } from './icewall.js?v=11061126';
+import { makeRuinWall, ruinMaterial } from './ruins.js?v=11061126';
+import { makeCoralWall, coralMaterial, coral } from './coral.js?v=11061126';
+import { makeTrailMap } from './trailmap.js?v=11061126';
+import { makeThemedHide } from './hidetheme.js?v=11061126';
+import { makePlantBush } from './plantbush.js?v=11061126';
+import { makeCrystalWall, crystalMaterial } from './crystal.js?v=11061126';
+import { makeLavaWall, lavaWallMaterial } from './lavawall.js?v=11061126';
+import { makeSkyCanyon } from './skycanyon.js?v=11061126';
+import { makeGlbIsle } from './glbisle.js?v=11061126';
 
 const $ = s => document.querySelector(s), clamp = THREE.MathUtils.clamp;
 const VIEWS = [{ id: 'game', name: '게임 시점', h: 42, tilt: .38 }, { id: 'near', name: '가까이', h: 18, tilt: .6 }, { id: 'far', name: '멀리', h: 90, tilt: .3 }];
@@ -271,5 +271,5 @@ export async function start(canvas, onProgress = () => {}) {
     el.style.cssText = 'position:fixed;left:max(18px,env(safe-area-inset-left,0px));bottom:calc(env(safe-area-inset-bottom,0px) + 14px);font-size:11px;color:rgba(185,255,74,.7);pointer-events:none'; document.body.appendChild(el); }
   tour.querySelectorAll('.fl')[5].dispatchEvent(new PointerEvent('pointerdown'));   /* 처음엔 새 이음 시험부터 */
   onProgress(1);
-  window.__fl = { renderer, SKY, G: { ZONE, xgal, cgal, rgal, lgal, gal, walls }, blk: (k, x, z) => hitBlk(k, x, z), cam, set: i => tour.querySelectorAll('.fl')[i].dispatchEvent(new PointerEvent('pointerdown')), FS, E };
+  window.__fl = { renderer, SKY, get GI() { return GI; }, G: { ZONE, xgal, cgal, rgal, lgal, gal, walls }, blk: (k, x, z) => hitBlk(k, x, z), cam, set: i => tour.querySelectorAll('.fl')[i].dispatchEvent(new PointerEvent('pointerdown')), FS, E };
 }
