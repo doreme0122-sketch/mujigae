@@ -9,12 +9,12 @@
    · 가는 동안 공격받지 않음 · 가운데층에 있을 땐 윗층 섬을 점무늬로 옅게 비킴 · 식물(나무·풀)은 막지 않음 */
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
-import { makeBloom } from '../core/hangar/bloom.js?v=11061701';
-import { makePerf } from './perf.js?v=11061701';
+import { makeBloom } from '../core/hangar/bloom.js?v=11061702';
+import { makePerf } from './perf.js?v=11061702';
 import { makeGlow } from '../preview/glow.js';
-import { makeGlbIsle } from './glbisle.js?v=11061701';
-import { makeFlight, FLY } from './flight.js?v=11061701';
-import { gate4, pedestal } from './gates.js?v=11061701';
+import { makeGlbIsle } from './glbisle.js?v=11061702';
+import { makeFlight, FLY } from './flight.js?v=11061702';
+import { gate4, pedestal } from './gates.js?v=11061702';
 
 const $ = s => document.querySelector(s), clamp = THREE.MathUtils.clamp, HOVER = FLY.HOVER, GAP = 2.9;
 const UP = new THREE.Color(1.45, 1.05, .42), DN = new THREE.Color(.72, .48, 1.55);
@@ -35,7 +35,8 @@ function makeSound() {
   let ch = null;
   return {
     chargeStart() { if (!ac) return; this.chargeStop(true); const t = ac.currentTime, out = ac.createGain(); out.gain.value = 0; out.connect(master);
-      const o1 = ac.createOscillator(), o2 = ac.createOscillator(), g1 = ac.createGain(); o1.type = 'sine'; o2.type = 'triangle'; o1.frequency.setValueAtTime(110, t); o1.frequency.exponentialRampToValueAtTime(330, t + 3); o2.frequency.setValueAtTime(165, t); o2.frequency.exponentialRampToValueAtTime(495, t + 3); g1.gain.value = .5;
+      const o1 = ac.createOscillator(), o2 = ac.createOscillator(), g1 = ac.createGain(); o1.type = 'sine'; o2.type = 'triangle'; const cv1 = new Float32Array(64), cv2 = new Float32Array(64); for (let i = 0; i < 64; i++) { const u = i / 63, f = 110 * Math.pow(12, u * u * u); cv1[i] = f; cv2[i] = f * 1.5; }   /* 처음은 낮게 그대로 · 3초로 갈수록 가파르게 높아짐 (110 → 약 1320Hz · 사용자 2026-11-06) */
+      o1.frequency.setValueCurveAtTime(cv1, t, 3); o2.frequency.setValueCurveAtTime(cv2, t, 3); g1.gain.value = .5;
       o1.connect(g1); o2.connect(g1); g1.connect(out); out.gain.linearRampToValueAtTime(.16, t + .4); out.gain.linearRampToValueAtTime(.3, t + 3); o1.start(t); o2.start(t);
       const bells = [];   /* 맑은 종소리는 뺌 (사용자 2026-11-06) */
       ch = { out, osc: [o1, o2], bells }; },
