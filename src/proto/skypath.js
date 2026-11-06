@@ -8,11 +8,11 @@
    · 층 높이 · 떨어진 거리는 막대로 바꿔 봄 (볼륨감 찾기) */
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
-import { makeBloom } from '../core/hangar/bloom.js?v=11061544';
-import { makePerf } from './perf.js?v=11061544';
+import { makeBloom } from '../core/hangar/bloom.js?v=11061557';
+import { makePerf } from './perf.js?v=11061557';
 import { makeGlow } from '../preview/glow.js';
-import { makeGlbIsle } from './glbisle.js?v=11061544';
-import { makeFlight, FLY } from './flight.js?v=11061544';
+import { makeGlbIsle } from './glbisle.js?v=11061557';
+import { makeFlight, FLY } from './flight.js?v=11061557';
 
 const $ = s => document.querySelector(s), clamp = THREE.MathUtils.clamp, HOVER = FLY.HOVER;
 const UP = new THREE.Color(1.5, 1.12, .45), DN = new THREE.Color(.75, .5, 1.6);   /* 빛 색: 금빛 = 윗층 · 보랏빛 = 아래층 */
@@ -141,7 +141,7 @@ export async function start(canvas, onProgress = () => {}) {
         float spark=step(.985,h(floor(vec2(x*8.,flow*2.))))*.9;
         float ends=smoothstep(0.,.04,vU.y)*smoothstep(1.,.96,vU.y);
         float fade=mix(1.,.55,vU.y);
-        float a=(edge*.22+core*.55+chev*edge*.5+spark*edge*.7)*ends*fade;
+        float a=(edge*.22+core*.55+spark*edge*.7)*ends*fade;   /* 꺾쇠 무늬 뺌 (사용자 2026-11-06) */
         gl_FragColor=vec4(uC*a*uA*.75,1.); }` });
   const buildPath = (key) => { for (const m of (P[key]?.meshes || [])) { pathGrp.remove(m); m.geometry.dispose(); }
     const Ld = L[key], pad = Ld.pad, o = Ld.o, A0 = new THREE.Vector3(EX, EG + .3, EZ), B0 = new THREE.Vector3(o.x + pad[0], o.y + pad[2] + .3, o.z + pad[1]);

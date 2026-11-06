@@ -9,12 +9,12 @@
      - 이웃 땅 색이 바위에 살짝 배어 있음(얼음 성운 옆 바위는 푸르스름, 용암 옆은 붉은 기)
    · 무게: 벽 전체가 한 덩어리 → 그리기 1번. 지도 칸마다 삼각형 몇 개(가장자리 칸만 옆면) */
 import * as THREE from 'three';
-import { MAP, toWorld } from './mapfloor.js?v=11061544';
-import { makeRidge, updateRidge, rockMaterial, chunk } from './rocks.js?v=11061544';
-import { makeIceRidge, iceMaterial, block } from './ice.js?v=11061544';
-import { makeCrystalRidge, crystalMaterial, prism } from './crystal.js?v=11061544';
-import { makeRuinRidge, updateRuins, ruinMaterial, pillar, arc } from './ruins.js?v=11061544';
-import { makeCoralRidge, coralMaterial, coral } from './coral.js?v=11061544';
+import { MAP, toWorld } from './mapfloor.js?v=11061557';
+import { makeRidge, updateRidge, rockMaterial, chunk } from './rocks.js?v=11061557';
+import { makeIceRidge, iceMaterial, block } from './ice.js?v=11061557';
+import { makeCrystalRidge, crystalMaterial, prism } from './crystal.js?v=11061557';
+import { makeRuinRidge, updateRuins, ruinMaterial, pillar, arc } from './ruins.js?v=11061557';
+import { makeCoralRidge, coralMaterial, coral } from './coral.js?v=11061557';
 
 export function makeFieldWall(B, floor, ridges = []) {
   const { N, F, cell } = B, S = MAP.SCALE, ISO = .5;

@@ -48,7 +48,7 @@ input[type=range]{flex:1;min-width:0;accent-color:#b9ff4a;height:18px;margin:0}
 </style>
 <script>
 window.__ver = fetch('ver.json?t=' + Date.now(), { cache: 'no-store' }).then(r => r.json()).then(j => {
-  const f = location.pathname.split('/').pop() || 'index.html', want = j[f], mine = window.__mine = '11061544';
+  const f = location.pathname.split('/').pop() || 'index.html', want = j[f], mine = window.__mine = '11061557';
   if (want && +want > +mine) { location.replace(f + '?v=' + want + '&r=' + Date.now() + location.hash); return new Promise(() => {}); } }).catch(() => {});
 </script>
 <script type="importmap">{"imports":{"three":"./vendor/three.module.js","three/addons/":"./vendor/addons/"}}</script>
@@ -58,7 +58,8 @@ window.__ver = fetch('ver.json?t=' + Date.now(), { cache: 'no-store' }).then(r =
   <div id="head"><b>빛의 길 입구 시안</b><span>화면을 끌면 문 둘레를 돌아봄 · 두 손가락으로 거리</span></div>
   <div id="fps"></div>
   <div id="view"><button id="tog" type="button">설정 접기 ▴</button>
-    <div class="cap">문 고르기</div><div class="seg" id="sg"><button class="on" type="button">1 돌 고리</button><button type="button">3 덩굴 유적</button><button type="button">4 흩어진 고리</button></div>
+    <button id="go" type="button" style="font-size:12.5px;padding:7px 4px;border:1px solid var(--g);border-radius:10px;color:#f2ffe2;background:rgba(var(--gr),.2)">기체 들어가 보기 · 0.5초 + 3초</button>
+    <div class="cap">문 고르기</div><div class="seg" id="sg"><button type="button">1 돌 고리</button><button type="button">3 덩굴 유적</button><button class="on" type="button">4 흩어진 고리</button></div>
     <div class="cap">빛</div><div class="seg" id="so"><button class="on" type="button">켜짐</button><button type="button">꺼짐</button></div>
     <div class="seg" id="sd"><button class="on" type="button">윗층 (금빛)</button><button type="button">아래층 (보랏빛)</button></div>
     <div class="cap">크기 비교 기체</div><div class="seg" id="ss"><button class="on" type="button">보기</button><button type="button">숨기기</button></div>
@@ -71,7 +72,7 @@ window.__ver = fetch('ver.json?t=' + Date.now(), { cache: 'no-store' }).then(r =
 <div id="rot">기기를 가로로 돌려 주세요</div>
 <script type="module">
 await window.__ver;
-const { start } = await import('./src/proto/gates.js?v=11061544');
+const { start } = await import('./src/proto/gates.js?v=11061557');
 const bar = document.querySelector('#load i');
 document.querySelector('#tog').onclick = () => { const v = document.querySelector('#view'); v.classList.toggle('shut'); document.querySelector('#tog').textContent = v.classList.contains('shut') ? '설정 펴기 ▾' : '설정 접기 ▴'; };
 start(document.querySelector('#cv'), p => { bar.style.transform = `scaleX(${p})`; })

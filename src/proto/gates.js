@@ -7,8 +7,8 @@
    · 문 앞쪽으로 빛 띠 길이 뻗어 나감 (확정된 빛의 길) */
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
-import { makeBloom } from '../core/hangar/bloom.js?v=11061544';
-import { makePerf } from './perf.js?v=11061544';
+import { makeBloom } from '../core/hangar/bloom.js?v=11061557';
+import { makePerf } from './perf.js?v=11061557';
 import { makeGlow } from '../preview/glow.js';
 import { buildShip, engineSpots } from '../core/ships/build.js';
 
@@ -48,7 +48,7 @@ const filmMat = () => new THREE.ShaderMaterial({ ...AB, side: THREE.DoubleSide, 
     void main(){ float r=length(vP)/2.45; float rim=smoothstep(.7,1.,r)*smoothstep(1.02,.97,r);
       float streak=pow(h(vec2(floor(vP.x*9.),0.)),6.)*(.5+.5*sin(vP.y*3.-uT*4.+h(vec2(floor(vP.x*9.),1.))*6.));
       float pull=.5+.5*sin(r*18.+uT*5.);
-      float a=(rim*1.1+streak*.35+pull*.12*(1.-r))*smoothstep(1.02,.98,r);
+      float a=(rim*1.1+pull*.12*(1.-r))*smoothstep(1.02,.98,r);   /* 세로 줄기 뺌 (사용자 2026-11-06: 비스듬히 보면 바닥 줄무늬처럼 보임) */
       gl_FragColor=vec4(uC*a*uA,1.); }` });
 /* 빛 띠 길 (빛의 길 확정 모양) */
 const roadMat = (kind) => new THREE.ShaderMaterial({ ...AB, side: THREE.DoubleSide, uniforms: { uC: { value: new THREE.Color() }, uA: { value: 0 }, uT: { value: 0 }, uL: { value: 30 }, uK: { value: kind } },
@@ -59,7 +59,7 @@ const roadMat = (kind) => new THREE.ShaderMaterial({ ...AB, side: THREE.DoubleSi
       float flow=s-uT*14.; float chev=uK<.5 ? smoothstep(.55,.95,fract((flow-abs(x)*1.4)/3.2)) : 0.;
       float spark=step(.985,h(floor(vec2(x*8.,flow*2.))))*.9;
       float ends=smoothstep(0.,.05,vU.y)*smoothstep(1.,.9,vU.y), fade=mix(1.,.55,vU.y);
-      gl_FragColor=vec4(uC*(edge*.22+core*.55+chev*edge*.5+spark*edge*.7)*ends*fade*uA*.75,1.); }` });
+      gl_FragColor=vec4(uC*(edge*.22+core*.55+spark*edge*.7)*ends*fade*uA*.75,1.); }` });   /* 꺾쇠 무늬 뺌 (사용자 2026-11-06) */
 
 /* 받침 섬: 풀 덮인 둥근 윗면 + 층진 바위 몸통 (참고 그림처럼 문이 섬 하나를 다 차지) */
 function pedestal(seed) {
@@ -198,10 +198,9 @@ function gate4() {
   /* 조각난 원판: 부채꼴 판 열둘 + 바깥 테 · 금빛 동심 고리 */
   for (let i = 0; i < 12; i++) { const a0 = i / 12 * Math.PI * 2 + .02, a1 = (i + 1) / 12 * Math.PI * 2 - .02;
     const s = new THREE.Mesh(tint(jitter(sector(1.2, 4.4, a0, a1, .3, .04).rotateX(-Math.PI / 2), .04, .3), i % 2 ? 0xc9c0ae : 0xbab19f, .12), STONE); s.position.y = .17; g.add(s);
-    const ed = new THREE.Mesh(sector(4.0, 4.06, a0 + .04, a1 - .04, .02, 0).rotateX(-Math.PI / 2), glowMat()); ed.position.y = .33; g.add(ed); glows.push([ed, .5]);
     const blk = new THREE.Mesh(tint(jitter(new THREE.BoxGeometry(.5, .5, .7), .06), 0x9e9583, .1), STONE); blk.position.set(Math.cos(a0 + .26) * 4.5, .2, Math.sin(a0 + .26) * 4.5); blk.rotation.y = -a0; g.add(blk); }
   const hub = new THREE.Mesh(tint(jitter(new THREE.CylinderGeometry(1.18, 1.25, .34, 12).translate(0, .17, 0), .03), 0xd7cfbe, .1), STONE); g.add(hub);
-  const disc = new THREE.Mesh(new THREE.CircleGeometry(4.0, 72).rotateX(-Math.PI / 2), discMat()); disc.position.y = .35; disc.renderOrder = 5; disc.material.uniforms.uK.value = 1; g.add(disc); discs.push(disc);
+  /* 바닥에는 빛 효과 없음 (사용자 2026-11-06) */
   /* 갈라진 고리 조각: 크기·틈이 들쑥날쑥 · 안쪽 테두리 금빛 · 따로 떠서 오르내림 */
   const ring = new THREE.Group(); ring.position.y = C + .2; g.add(ring); const frags = [];
   let a = .1; while (a < Math.PI * 2 - .3) { const len = .32 + rnd() * .34, a0 = a, a1 = Math.min(a + len, Math.PI * 2 + .05); a = a1 + .1 + rnd() * .16;
@@ -214,11 +213,15 @@ function gate4() {
   const film = new THREE.Mesh(new THREE.CircleGeometry(2.5, 64), filmMat()); film.position.y = C + .2; film.renderOrder = 6; g.add(film); films.push(film);
   /* 둘레를 맴도는 빛 상자 */
   const cubes = []; for (let i = 0; i < 11; i++) { const s = .22 + rnd() * .16, cb = new THREE.Group(); const core = new THREE.Mesh(new THREE.BoxGeometry(s, s, s), glowMat()); const edge = new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.BoxGeometry(s * 1.25, s * 1.25, s * 1.25)), new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: .8 }));
-    cb.add(core, edge); g.add(cb); glows.push([core, .55]); cubes.push({ cb, r: 3.75 + rnd() * .6, a: rnd() * 6.283, sp: .12 + rnd() * .12, z: (rnd() - .5) * .8, sp2: rnd() * 2 }); }
-  return { g, glows, films, discs, idle: new THREE.Color(1.1, .8, .35), update(t, a) { ring.rotation.z = t * .12 * (.4 + a);
+    cb.add(core, edge); g.add(cb); cubes.push({ core, edge, cb, r: 3.75 + rnd() * .6, a: rnd() * 6.283, sp: .12 + rnd() * .12, z: (rnd() - .5) * .8, sp2: rnd() * 2 }); }
+  let spin = 0, ringA = 0; const cc = new THREE.Color();
+  return { g, glows, films, discs, idle: new THREE.Color(1.1, .8, .35), update(t, a, col, dt, ch = 0) {
+      /* 기체가 문에서 0.5초 머문 뒤 3초(ch 0→1): 고리 조각과 빛 상자가 점점 빠르게 돌고, 빛 상자가 점점 밝아짐 (기체가 기울며 트는 것과 함께) */
+      spin += ((ch > 0 ? .12 + ch * ch * 4.5 : .12 * (.4 + a)) - spin) * Math.min(1, dt * (ch > 0 ? 6 : 2)); ringA += spin * dt; ring.rotation.z = ringA;
+      for (const c of cubes) { cc.copy(col).multiplyScalar(.45 + ch * 1.4); c.core.material.color.copy(cc); c.edge.material.opacity = .35 + ch * .65; c.cb.scale.setScalar(1 + ch * .25); }
       for (const f of frags) { const k = Math.sin(t * 1.1 + f.ph); f.fg.position.set(Math.cos(f.am) * (f.dr + k * .05), Math.sin(f.am) * (f.dr + k * .05), f.dz + k * .04); }
       inner[0].rotation.set(Math.sin(t * .5) * .12, Math.cos(t * .4) * .12, t * .5); inner[1].rotation.set(Math.cos(t * .6) * .16, Math.sin(t * .5) * .1, -t * .7); inner[2].rotation.set(Math.sin(t * .8) * .2, 0, t * .9);
-      for (const c of cubes) { c.a += .016 * c.sp * (1 + a); c.cb.position.set(Math.cos(c.a) * c.r, C + .2 + Math.sin(c.a) * c.r, c.z + Math.sin(t + c.sp2) * .15); c.cb.rotation.set(t * c.sp * 3, t * c.sp * 2, 0); } } };
+      for (const c of cubes) { c.a += dt * c.sp * (1 + a + ch * ch * 14); c.cb.position.set(Math.cos(c.a) * c.r, C + .2 + Math.sin(c.a) * c.r, c.z + Math.sin(t + c.sp2) * .15); c.cb.rotation.set(t * c.sp * 3, t * c.sp * 2, 0); } } };
 }
 
 export async function start(canvas, onProgress = () => {}) {
@@ -259,7 +262,7 @@ export async function start(canvas, onProgress = () => {}) {
   seg('#sv', [[45, 25], [32, 13], [8, 14]], 'view', () => { [st.ang, st.dist] = st.view; $('#ang').value = st.ang; $('#dist').value = st.dist; drawV(); });
   const drawV = () => { $('#angv').textContent = st.ang + '°'; $('#distv').textContent = st.dist + 'm'; };
   $('#ang').oninput = e => { st.ang = +e.target.value; drawV(); }; $('#dist').oninput = e => { st.dist = +e.target.value; drawV(); }; drawV();
-  st.sel = 0; document.querySelector('#sg button').click();
+  document.querySelectorAll('#sg button')[2].click();
   /* 끌어서 문 둘레를 돌아봄 · 두 손가락/휠 = 거리 */
   { let px = null; const pts = new Map(); let pd = 0;
     canvas.addEventListener('pointerdown', e => { pts.set(e.pointerId, [e.clientX, e.clientY]); canvas.setPointerCapture(e.pointerId); px = e.clientX; });
@@ -274,20 +277,29 @@ export async function start(canvas, onProgress = () => {}) {
   function size() { const r = canvas.getBoundingClientRect(); [Wd, Hd] = perf.size(r.width, r.height); renderer.setSize(Wd, Hd, false); bloom.size(Wd, Hd); camera.aspect = Wd / Hd; camera.updateProjectionMatrix(); glow.uRes.value.set(Wd, Hd); }
   addEventListener('resize', size); size(); bloom.setSamples(perf.st.aa ? 4 : 0);
 
-  const cam = { x: -26, y: SHIP_Y, z: 0 }, tmp = new THREE.Color(), onC = new THREE.Color(), v3 = new THREE.Vector3();
-  let t = 0, last = performance.now(), act = 1;
+  const cam = { x: 26, y: SHIP_Y, z: 0 }, tmp = new THREE.Color(), onC = new THREE.Color(), v3 = new THREE.Vector3();
+  let t = 0, last = performance.now(), act = 1, CH = 0; const SQ = { ph: 'idle', t: 0 };
+  $('#go').onclick = () => { SQ.ph = 'in'; SQ.t = 0; st.on = 1; };
   renderer.setAnimationLoop(now => { try {
     const dt = clamp((now - last) / 1000, 0, .05); last = now; t += dt;
     act += (st.on - act) * Math.min(1, dt * 3);
     const col = st.dir === 'dn' ? DNC : UPC;
     for (const [i, Gt] of GATES.entries()) { const G = Gt.G;
-      G.update(t, act, col, dt);
+      G.update(t, act, col, dt, i === st.sel ? CH : 0);
       for (const [m, w] of G.glows) { tmp.copy(G.idle).multiplyScalar(.18 + w * .15); onC.copy(col).multiplyScalar(.3 + w * .8); m.material.color.copy(tmp.lerp(onC, act)); }
       for (const f of G.films) { f.material.uniforms.uC.value.copy(col); f.material.uniforms.uA.value = .08 + act * .5; f.material.uniforms.uT.value = t; }
       for (const d of G.discs) { d.material.uniforms.uC.value.copy(act > .02 ? col : G.idle); d.material.uniforms.uA.value = .2 + act * .9; d.material.uniforms.uT.value = t; }
       for (const r of Gt.road) { r.material.uniforms.uC.value.copy(col); r.material.uniforms.uA.value = act; r.material.uniforms.uT.value = t; } }
-    /* 기체: 고른 문 한가운데서 살짝 떠 있음 */
-    const R = GATES[st.sel].root; ship.visible = st.ship; ship.position.set(R.position.x, SHIP_Y + Math.sin(t * 2.1) * .06, R.position.z + .2); ship.rotation.set(0, 0, Math.sin(t * .9) * .04); ship.updateMatrixWorld(true);
+    /* 기체: 고른 문 한가운데서 살짝 떠 있음 · '들어가 보기'면 날아 들어와 0.5초 멈춤 → 3초 동안 갈 쪽으로 천천히 기울며 틂 → 빛 띠를 따라 멀리 날아감(카메라는 그대로) */
+    const R = GATES[st.sel].root, cv = GATES[st.sel].curve; ship.visible = st.ship && SQ.ph !== 'gone';
+    SQ.t += dt; let px = 0, py = SHIP_Y + Math.sin(t * 2.1) * .06, pz = .2, yaw = 0, bank = Math.sin(t * .9) * .04, pitch = 0; CH = Math.max(0, CH - dt * .8);
+    const look = cv.getPointAt(.3), wantYaw = Math.atan2(-look.x, -look.z), wantPitch = Math.atan2(look.y - SHIP_Y, Math.hypot(look.x, look.z));
+    if (SQ.ph === 'in') { const u = Math.min(1, SQ.t / 1.1), e = 1 - Math.pow(1 - u, 3); pz = THREE.MathUtils.lerp(9, .2, e); py = SHIP_Y + (1 - e) * .4; if (u >= 1) { SQ.ph = 'wait'; SQ.t = 0; } }
+    else if (SQ.ph === 'wait') { if (SQ.t >= .5) { SQ.ph = 'charge'; SQ.t = 0; } }
+    else if (SQ.ph === 'charge') { const u = Math.min(1, SQ.t / 3), e = u * u * (3 - 2 * u); CH = u; yaw = wantYaw * e; bank = -Math.sign(wantYaw) * .35 * Math.sin(Math.min(1, u * 1.4) * Math.PI * .5) * (1 - Math.max(0, u - .85) / .15 * .3); pitch = wantPitch * .5 * e; if (u >= 1) { SQ.ph = 'go'; SQ.t = 0; } }
+    else if (SQ.ph === 'go') { CH = 1; const u = Math.min(1, SQ.t / 1.8), e = u * u * u * (u * (u * 6 - 15) + 10), p = cv.getPointAt(e), tg = cv.getTangentAt(e); px = p.x; py = p.y + .3; pz = p.z; yaw = Math.atan2(-tg.x, -tg.z); pitch = Math.atan2(tg.y, Math.hypot(tg.x, tg.z)); bank = -.25; if (u >= 1) { SQ.ph = 'gone'; SQ.t = 0; } }
+    else if (SQ.ph === 'gone') { if (SQ.t > 1.2) { SQ.ph = 'idle'; SQ.t = 0; } }
+    ship.position.set(R.position.x + px, py, R.position.z + pz); ship.rotation.set(0, yaw, 0); ship.rotateX(pitch); ship.rotateZ(bank); ship.updateMatrixWorld(true);
     glow.begin();
     if (ship.visible) for (const p of ENG) { v3.copy(p).applyMatrix4(sm.matrixWorld); glow.add(v3.x, v3.y, v3.z, 0, 0, .5, .14, 3, [1.3, .45, .4], .9); }
     for (const Gt of GATES) for (let k = 0; k < 10; k++) { const u = (t * .12 + k / 10) % 1, p = Gt.curve.getPointAt(u); glow.add(Gt.root.position.x + p.x, p.y + .2, Gt.root.position.z + p.z, 0, .12, 0, .09, 3, col.toArray(), Math.sin(u * Math.PI) * act, k); }
@@ -299,5 +311,5 @@ export async function start(canvas, onProgress = () => {}) {
     renderer.setRenderTarget(bloom.scene); renderer.clear(); renderer.render(scene, camera);
     bloom.render(Wd, Hd, !perf.st.bloom); perf.tick(dt);
   } catch (e) { console.error('[입구 시안]', e); } });
-  window.__gt = { st, GATES };
+  window.__gt = { st, GATES, SQ };
 }
