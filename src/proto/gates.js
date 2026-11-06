@@ -7,8 +7,8 @@
    · 문 앞쪽으로 빛 띠 길이 뻗어 나감 (확정된 빛의 길) */
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
-import { makeBloom } from '../core/hangar/bloom.js?v=11062302';
-import { makePerf } from './perf.js?v=11062302';
+import { makeBloom } from '../core/hangar/bloom.js?v=11062305';
+import { makePerf } from './perf.js?v=11062305';
 import { makeGlow } from '../preview/glow.js';
 import { buildShip, engineSpots } from '../core/ships/build.js';
 

@@ -7,21 +7,21 @@
    · 태어나 출구로 튀어 나가면 바로 조이스틱 · 기지 고리(9m)를 벗어나는 순간 보호막 3초 + 가속 5초 */
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
-import { makeBloom } from '../core/hangar/bloom.js?v=11062302';
-import { makePad } from '../core/hangar/pad.js?v=11062302';
-import { makeMag } from '../core/hangar/mag.js?v=11062302';
+import { makeBloom } from '../core/hangar/bloom.js?v=11062305';
+import { makePad } from '../core/hangar/pad.js?v=11062305';
+import { makeMag } from '../core/hangar/mag.js?v=11062305';
 import { buildShip } from '../core/ships/build.js';
-import { makeGoldStar } from './goldstar.js?v=11062302';
-import { makeArena, SPEED, WAVE_R0 } from './arena.js?v=11062302';
-import { makeGuardians, GUARD } from './guardian.js?v=11062302';
-import { makeBirth, BIRTH } from './birth.js?v=11062302';
-import { makePerf } from './perf.js?v=11062302';
+import { makeGoldStar } from './goldstar.js?v=11062305';
+import { makeArena, SPEED, WAVE_R0 } from './arena.js?v=11062305';
+import { makeGuardians, GUARD } from './guardian.js?v=11062305';
+import { makeBirth, BIRTH } from './birth.js?v=11062305';
+import { makePerf } from './perf.js?v=11062305';
 import { makeGlow } from '../preview/glow.js';
-import { makeFlight, FLY } from './flight.js?v=11062302';
-import { pedestal } from './gates.js?v=11062302';
-import { makeMeadow, MEADOW } from './meadow.js?v=11062302';
-import { makeClouds } from './clouds.js?v=11062302';
-import { makeLife } from './life.js?v=11062302';
+import { makeFlight, FLY } from './flight.js?v=11062305';
+import { pedestal, gate4 } from './gates.js?v=11062305';
+import { makeMeadow, MEADOW } from './meadow.js?v=11062305';
+import { makeClouds } from './clouds.js?v=11062305';
+import { makeLife } from './life.js?v=11062305';
 
 const $ = s => document.querySelector(s), clamp = THREE.MathUtils.clamp, HOVER = FLY.HOVER;
 const R = 240, NB = 10, GAPH = 5.6, BASE_D = 0;     /* 맵 반지름 · 기지 수 · 벽 틈 반 폭(= 기지 반지름) · 기지 가운데는 벽 선 위 (앞 절반은 맵 안, 뒤 절반은 맵 밖 · 사용자 2026-11-06) */
@@ -142,8 +142,31 @@ export async function start(canvas, onProgress = () => {}) {
   const stand = new THREE.Group(); B0.w.add(stand);
   onProgress(.4);
   /* ── 초원 고리 ── */
-  const meadow = await makeMeadow(scene, new URL('./assets/kit_meadow.glb?v=11062302', import.meta.url).href, p => onProgress(.4 + p * .4), new URL('./assets/kit_meadow_decor.glb?v=11062302', import.meta.url).href, new URL('./assets/kit_meadow_lo.glb?v=11062302', import.meta.url).href);
+  const meadow = await makeMeadow(scene, new URL('./assets/kit_meadow.glb?v=11062305', import.meta.url).href, p => onProgress(.4 + p * .4), new URL('./assets/kit_meadow_decor.glb?v=11062305', import.meta.url).href, new URL('./assets/kit_meadow_lo.glb?v=11062305', import.meta.url).href);
   const clouds = makeClouds(scene, { R0: MEADOW.R0, R1: MEADOW.R1 });   /* 층 사이 흘러가는 구름 · 기체 높이 숨는 구름 */
+  /* ── 위아래 문 다섯: 흩어진 고리 문(0.8배) + 보물 던전 섬까지 뻗는 빛 띠 (위층 = 금빛 · 아래층 = 보랏빛) ── */
+  const GATE_H = HOVER - MEADOW.TOP, gates = [], roadMs = [];
+  const roadM = () => new THREE.ShaderMaterial({ ...AB, side: THREE.DoubleSide, uniforms: { uC: { value: new THREE.Color() }, uA: { value: 1 }, uT: { value: 0 }, uL: { value: 60 } },
+    vertexShader: 'varying vec2 vU; void main(){ vU = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.); }',
+    fragmentShader: `uniform vec3 uC; uniform float uA, uT, uL; varying vec2 vU; float h(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+      void main(){ float x = vU.x * 2. - 1., s = vU.y * uL; float edge = exp(-x * x * 3.5), core = exp(-x * x * 40.);
+        float flow = s - uT * 14.; float spark = step(.985, h(floor(vec2(x * 8., flow * 2.)))) * .9; float ends = smoothstep(0., .03, vU.y) * smoothstep(1., .97, vU.y);
+        gl_FragColor = vec4(uC * (edge * .22 + core * .55 + spark * edge * .7) * ends * uA * .75, 1.); }` });
+  const ribbon = (curve, w) => { const n = Math.ceil(curve.getLength() * 3), pos = [], uv = [], idx = [], up0 = new THREE.Vector3(0, 1, 0), T = new THREE.Vector3(), Bn = new THREE.Vector3(), p = new THREE.Vector3();
+    for (let i = 0; i <= n; i++) { const u = i / n; curve.getPointAt(u, p); curve.getTangentAt(u, T); Bn.crossVectors(T, up0); if (Bn.lengthSq() < 1e-6) Bn.set(1, 0, 0); Bn.normalize();
+      pos.push(p.x - Bn.x * w, p.y - .25, p.z - Bn.z * w, p.x + Bn.x * w, p.y - .25, p.z + Bn.z * w); uv.push(0, u, 1, u); if (i < n) { const k = i * 2; idx.push(k, k + 1, k + 2, k + 1, k + 3, k + 2); } }
+    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2)); g.setIndex(idx); return g; };
+  for (const Gd of meadow.GATES) { const G = gate4(GATE_H / .8); G.g.scale.setScalar(.8); const root = new THREE.Group(); root.add(G.g); scene.add(root);
+    const dx = Gd.tx - Gd.x, dz = Gd.tz - Gd.z, l = Math.hypot(dx, dz), ax = dx / l, az = dz / l;
+    root.position.set(Gd.x, MEADOW.TOP, Gd.z); root.rotation.y = Math.atan2(-ax, -az);   /* 고리가 빛의 길 쪽을 바라봄 */
+    /* 빛의 길: 문에서 수평으로 나가 → 오르거나 내려가며(되돌아 출렁이지 않게) → 던전 섬 가장자리 앞에서 다시 수평 */
+    const y0 = HOVER, y1 = Gd.ty + GATE_H, ex = Gd.tx - ax * (Gd.rad + 1), ez = Gd.tz - az * (Gd.rad + 1), pts = [];
+    for (let i = 0; i <= 24; i++) { const u = i / 24, k = THREE.MathUtils.smoothstep(u, .12, .82); pts.push(new THREE.Vector3(Gd.x + (ex - Gd.x) * u, y0 + (y1 - y0) * k, Gd.z + (ez - Gd.z) * u)); }
+    const curve = new THREE.CatmullRomCurve3(pts), rm = roadM(), col = Gd.layer === 'up' ? new THREE.Color(1.15, .82, .35) : new THREE.Color(.75, .45, 1.2);
+    rm.uniforms.uC.value.copy(col); rm.uniforms.uL.value = curve.getLength(); roadMs.push(rm);
+    const road = new THREE.Mesh(ribbon(curve, 1.1), rm); road.renderOrder = 8; road.frustumCulled = false; scene.add(road);
+    gates.push({ G, x: Gd.x, z: Gd.z, ax, az, col }); }
+  const gateBlocked = (x, z) => { for (const g of gates) { const dx = x - g.x, dz = z - g.z, along = dx * g.ax + dz * g.az, lat = Math.abs(dx * -g.az + dz * g.ax); if (Math.abs(along) < .5 && lat > 1.9 && lat < 3.0) return true; } return false; };   /* 고리 돌 조각은 기체를 막음 */
   const life = makeLife(scene, meadow, { R0: MEADOW.R0, R1: MEADOW.R1 });   /* 새 떼 · 나비 · 꽃가루 · 폭포 물보라 · 떨어지는 돌 */
   onProgress(.82);
   /* ── 조이스틱으로 모는 기체 ── */
@@ -152,7 +175,7 @@ export async function start(canvas, onProgress = () => {}) {
   const baseAt = (x, z) => BASES.find(b => Math.hypot(x - b.x, z - b.z) < 6.2);
   const B = { blocked: (x, z) => { const b = baseAt(x, z);
       if (b) { const lx = (x - b.x) * b.dx + (z - b.z) * b.dz, lz = -(x - b.x) * b.dz + (z - b.z) * b.dx; return !(Math.hypot(lx, lz) < FL || (lx > 0 && Math.abs(lz) < EXH)); }   /* 계단 단에 묻히지 않게 */
-      return Math.hypot(x, z) > R - .9 || meadow.blocked(x, z); }, region: () => 0 };   /* 초원 섬: 기체 높이를 지나는 바위·땅만 막음 (풀·나무는 통과) */
+      return Math.hypot(x, z) > R - .9 || meadow.blocked(x, z) || gateBlocked(x, z); }, region: () => 0 };   /* 초원 섬: 기체 높이를 지나는 바위·땅만 막음 (풀·나무는 통과) */
   const fly = await makeFlight(renderer, B, [B0.x, B0.z], 0); scene.add(fly); const FS = fly.userData.S; fly.visible = false;
   const oldSh = []; fly.traverse(o => { if (o.isMesh && o.renderOrder === 1 && o.geometry.type === 'PlaneGeometry') oldSh.push(o); });
   /* 기체는 한 대만 (사용자 2026-11-06): 조이스틱으로 모는 그 기체가 태어나는 동안엔 기지 판 위(기지 안)에 앉아 있다가, 태어나면 그대로 이어서 몬다 */
@@ -219,7 +242,7 @@ export async function start(canvas, onProgress = () => {}) {
     for (let i = bolts.length - 1; i >= 0; i--) { const b = bolts[i], r0 = Math.hypot(b.x, b.z); b.x += b.vx * dt; b.z += b.vz * dt; b.life -= dt; const r1 = Math.hypot(b.x, b.z);
       if (B.blocked(b.x, b.z)) { if (!baseAt(b.x, b.z) && r1 > R - 1.5) { const ka = R / r1; HITS[hitI++ % HITS.length].set(b.x * ka, HOVER + .3, b.z * ka, t); fx.push({ x: b.x * ka, z: b.z * ka, t: 0 }); } else fx.push({ x: b.x, z: b.z, t: 0 }); bolts.splice(i, 1); continue; }   /* 무지개 벽에 맞으면 무지개빛이 번짐 · 기지 계단 단엔 불꽃만 */
       if (b.life <= 0) bolts.splice(i, 1); }
-    wallM.uniforms.uT.value = t; seamM.uniforms.uT.value = t; xrayM.uniforms.uT.value = t; wallM.uniforms.uP.value.set(flying ? FS.x : B0.x, flying ? FS.z : B0.z);
+    wallM.uniforms.uT.value = t; seamM.uniforms.uT.value = t; xrayM.uniforms.uT.value = t; for (const g of gates) g.G.update(t, 1, g.col, dt, 0); for (const m of roadMs) m.uniforms.uT.value = t; wallM.uniforms.uP.value.set(flying ? FS.x : B0.x, flying ? FS.z : B0.z);
     glow.begin();
     for (const b of bolts) glow.add(b.x, HOVER + .3, b.z, -b.vx * .04, 0, -b.vz * .04, .18, 0, [.5, 1.2, .7], 1, b.x);
     for (let i = fx.length - 1; i >= 0; i--) { const f = fx[i]; f.t += dt; if (f.t > .3) { fx.splice(i, 1); continue; } glow.add(f.x, HOVER + .3, f.z, 0, 0, 0, .5 + f.t * 3, 3, [1.2, 1.1, 1.3], 1 - f.t / .3); }

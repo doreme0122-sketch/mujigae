@@ -8,8 +8,8 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { deinterleaveGeometry } from 'three/addons/utils/BufferGeometryUtils.js';
-import { makeLand, makeChunk, makePillar, makeWall, paletteFrom } from './land.js?v=11062302';
-import { CLOUD_NOISE } from './clouds.js?v=11062302';
+import { makeLand, makeChunk, makePillar, makeWall, paletteFrom } from './land.js?v=11062305';
+import { CLOUD_NOISE } from './clouds.js?v=11062305';
 
 export const MEADOW = { R0: 187, R1: 240, UP: 20, DN: -30, TOP: -3.0, SC: 1 / 2 };   /* TOP: 가운데층 땅 높이 — 기체(.7)보다 3.7m 아래 → 나무 꼭대기 위로 날게 (사용자 2026-11-06: 나무에 걸림) */   /* SC: 받은 섬 모델 크기의 2분의 1 (사용자 2026-11-06: 원래는 너무 크고 3분의 1은 너무 작음) */   /* 가운데층 섬 윗면 = 기체(높이 .7)보다 1.7m 아래 */
 const SECT = 10, CELL = 1;
@@ -107,6 +107,10 @@ export async function makeMeadow(scene, url, onProgress = () => {}, decorUrl = n
   /* 보물 던전 섬: 기지 사이 다섯 곳 · 위 → 아래 → 위 → 아래 → 위 */
   for (let j = 0; j < 5; j++) { const th = (j * 2 + .5) * SA, [x, z] = at(th, rf(.3)), up = j % 2 === 0, k = j % 2 === 0 ? 'Island_Treasure_Ruins' : 'Island_Treasure_Vault';
     put(k, x, z, up ? 'up' : 'dn', th + Math.PI / 2, { treasure: true }); TREASURE.push({ x, z, layer: up ? 'up' : 'dn', y: (up ? UP : DN), k }); }
+  /* 위아래 문 (사용자 2026-11-06): 보물 던전 섬마다 하나 · 던전 바로 밑이 아니라 바깥쪽으로 조금 떨어진 작은 땅 위 → 빛의 길이 멀리 뻗어 가는 게 보임 */
+  const GATES = [];
+  for (const T of TREASURE) { const th = Math.atan2(T.z, T.x), [gx, gz] = at(th + (TREASURE.indexOf(T) % 2 ? -1 : 1) * .045, rf(.74));
+    const k = addLand(gx, gz, 7.5, 4000 + GATES.length * 37, { clear: 5.2 }); GATES.push({ x: gx, z: gz, tx: T.x, tz: T.z, layer: T.layer, ty: T.layer === 'up' ? UP : DN, rad: KIT[T.k].rad * SC * .8 }); }
   for (let i = 0; i < SECT; i++) { const th0 = i * SA, R = rnd(1000 + i * 77), sd = i % 2 ? 1 : -1;
     /* 태어나는 곳 출구 앞: 기체 아래로 깔리는 넓은 풀밭 · 길 양옆만 꾸밈 (사용자 2026-11-06: 앞이 너무 썰렁함) */
     { const [x, z] = at(th0, R1 - 20); addLand(x, z, 12.5, 300 + i * 11, { lane: th0 }); }
@@ -233,5 +237,5 @@ export async function makeMeadow(scene, url, onProgress = () => {}, decorUrl = n
     const P = wp.geo.attributes.position; let lo = 1e9; for (let i = 0; i < P.count; i++) lo = Math.min(lo, P.getY(i)); const v = new THREE.Vector3(), acc = new THREE.Vector3(); let n = 0;
     for (let i = 0; i < P.count; i++) if (P.getY(i) < lo + .6) { acc.add(v.fromBufferAttribute(P, i)); n++; }
     if (n) { acc.divideScalar(n).applyMatrix4(p.m); if (acc.y < -4) MIST.push(acc.clone()); } }
-  return { root, blocked, update, info, place, TREASURE, KIT, LANDS, MIST, PAL, CHUNK };
+  return { root, blocked, update, info, place, TREASURE, GATES, KIT, LANDS, MIST, PAL, CHUNK };
 }
