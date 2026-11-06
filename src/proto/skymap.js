@@ -1,5 +1,5 @@
 /* 전체 맵 1단계 — 태어나는 곳 + 무지개 홀로그램 벽 (사용자 2026-11-06)
-   · 맵 = 동그라미 · 가장자리에서 한가운데까지 보통 속도 20초 (반지름 240m)
+   · 맵 = 동그라미 · 지름 720m (반지름 360m · 사용자 미니맵 기준, 2026-11-06) · 바깥 고리 280~360m = 초원(meadow.js)
    · 맵 끝 = 무지개 홀로그램 벽: 늘 은은하게 보임 · 닿으면 튕기지 않고 그냥 막힘 · 총을 쏘면 맞은 자리에서 무지개빛이 표면을 따라 번짐
    · 태어나는 곳 10곳 = 벽 바깥(맵 테두리 뒤) · 출구만 벽을 뚫고 맵 안으로 이어짐 · 모두 한가운데에서 같은 거리
    · 태어나는 곳 모양 = '빛의 닻'(금테 별 판 · 수호 탑 일곱 · 계단 단 · 유성이 꽂히며 태어남)을 하늘섬에 맞게 다듬음:
@@ -7,21 +7,22 @@
    · 태어나 출구로 튀어 나가면 바로 조이스틱 · 기지 고리(9m)를 벗어나는 순간 보호막 3초 + 가속 5초 */
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
-import { makeBloom } from '../core/hangar/bloom.js?v=11061851';
-import { makePad } from '../core/hangar/pad.js?v=11061851';
-import { makeMag } from '../core/hangar/mag.js?v=11061851';
+import { makeBloom } from '../core/hangar/bloom.js?v=11061929';
+import { makePad } from '../core/hangar/pad.js?v=11061929';
+import { makeMag } from '../core/hangar/mag.js?v=11061929';
 import { buildShip } from '../core/ships/build.js';
-import { makeGoldStar } from './goldstar.js?v=11061851';
-import { makeArena, SPEED, WAVE_R0 } from './arena.js?v=11061851';
-import { makeGuardians, GUARD } from './guardian.js?v=11061851';
-import { makeBirth, BIRTH } from './birth.js?v=11061851';
-import { makePerf } from './perf.js?v=11061851';
+import { makeGoldStar } from './goldstar.js?v=11061929';
+import { makeArena, SPEED, WAVE_R0 } from './arena.js?v=11061929';
+import { makeGuardians, GUARD } from './guardian.js?v=11061929';
+import { makeBirth, BIRTH } from './birth.js?v=11061929';
+import { makePerf } from './perf.js?v=11061929';
 import { makeGlow } from '../preview/glow.js';
-import { makeFlight, FLY } from './flight.js?v=11061851';
-import { pedestal } from './gates.js?v=11061851';
+import { makeFlight, FLY } from './flight.js?v=11061929';
+import { pedestal } from './gates.js?v=11061929';
+import { makeMeadow, MEADOW } from './meadow.js?v=11061929';
 
 const $ = s => document.querySelector(s), clamp = THREE.MathUtils.clamp, HOVER = FLY.HOVER;
-const R = 240, NB = 10, GAPH = 5.6, BASE_D = 0;     /* 맵 반지름 · 기지 수 · 벽 틈 반 폭(= 기지 반지름) · 기지 가운데는 벽 선 위 (앞 절반은 맵 안, 뒤 절반은 맵 밖 · 사용자 2026-11-06) */
+const R = 360, NB = 10, GAPH = 5.6, BASE_D = 0;     /* 맵 반지름 · 기지 수 · 벽 틈 반 폭(= 기지 반지름) · 기지 가운데는 벽 선 위 (앞 절반은 맵 안, 뒤 절반은 맵 밖 · 사용자 2026-11-06) */
 const SHIPL = 2.9, BS = 2 / SHIPL, BASE_Y = .42;     /* 기지 단위(기체 2.9) → 맵 단위(기체 2m) · 판 위 기체가 나는 높이에 오도록 */
 const AB = { transparent: true, depthWrite: false, blending: THREE.AdditiveBlending };
 
@@ -61,7 +62,7 @@ export async function start(canvas, onProgress = () => {}) {
         vec3 col=mix(sky*mix(1.,.35,k),space,smoothstep(.2,1.,k))+stars;
         col+=vec3(.35,.6,1.15)*exp(-pow((k-.32)/.16,2.))*.32;                               /* 대기 빛 띠: 은은하게 */
         gl_FragColor=vec4(col+cl*k*vec3(.15,.18,.25),1.); }` }));
-  sea.position.y = -60; scene.add(sea);
+  sea.position.y = -150; scene.add(sea);   /* 아래층(−50m) 섬 밑으로 구름 바다가 깔리게 */
   onProgress(.1);
 
   /* ── 무지개 홀로그램 벽 ── */
@@ -90,7 +91,7 @@ export async function start(canvas, onProgress = () => {}) {
         /* 곧게 잘린 회색 띠 없애기 (사용자 2026-11-06): 아주 비스듬히 보이는 면은 부드럽게 사라짐 · 기체에서 먼 벽(맞은편 벽 등)은 옅어짐 */
         float graze=smoothstep(.03,.28,nv), far=smoothstep(170.,70.,distance(vW.xz,uP));
         gl_FragColor=vec4(col*1.15,clamp(al,0.,.9)*vf*open*graze*far); }` });
-  const wall = new THREE.Mesh(new THREE.CylinderGeometry(R, R, 90, 720, 1, true).translate(0, -4, 0), wallM); wall.renderOrder = 20; wall.frustumCulled = false; scene.add(wall);
+  const wall = new THREE.Mesh(new THREE.CylinderGeometry(R, R, 90, 1080, 1, true).translate(0, -4, 0), wallM); wall.renderOrder = 20; wall.frustumCulled = false; scene.add(wall);
   /* 틈 양옆 기둥: 홀로그램을 비추는 돌기둥 (흰 돌 · 금 띠 · 틈 쪽에 무지개 줄) */
   const postM = new THREE.MeshStandardMaterial({ color: 0xe6dfcf, roughness: .7, flatShading: true }), goldM = new THREE.MeshStandardMaterial({ color: 0xe2b35c, metalness: 1, roughness: .3 });
   const seamM = new THREE.ShaderMaterial({ ...AB, uniforms: { uT: { value: 0 } }, vertexShader: 'varying vec2 vU; void main(){ vU=uv; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.); }',
@@ -128,14 +129,17 @@ export async function start(canvas, onProgress = () => {}) {
 
   /* ── 태어나는 기체 (기지 0) ── */
   const stand = new THREE.Group(); B0.w.add(stand);
-  onProgress(.75);
+  onProgress(.4);
+  /* ── 초원 고리 ── */
+  const meadow = await makeMeadow(scene, new URL('./assets/kit_meadow.glb?v=11061929', import.meta.url).href, p => onProgress(.4 + p * .4));
+  onProgress(.82);
   /* ── 조이스틱으로 모는 기체 ── */
   /* 막힘: 맵 안은 자유 · 기지 안에선 판(계단 단 안쪽)과 출구 길만 · 무지개 벽과 그 바깥(우주)은 막힘 */
   const FL = 4.3 * BS - .25, EXH = 1.6;   /* 기지 판 반지름(계단 단 안쪽) · 출구 길 반 폭 */
   const baseAt = (x, z) => BASES.find(b => Math.hypot(x - b.x, z - b.z) < 6.2);
   const B = { blocked: (x, z) => { const b = baseAt(x, z);
       if (b) { const lx = (x - b.x) * b.dx + (z - b.z) * b.dz, lz = -(x - b.x) * b.dz + (z - b.z) * b.dx; return !(Math.hypot(lx, lz) < FL || (lx > 0 && Math.abs(lz) < EXH)); }   /* 계단 단에 묻히지 않게 */
-      return Math.hypot(x, z) > R - .9; }, region: () => 0 };
+      return Math.hypot(x, z) > R - .9 || meadow.blocked(x, z); }, region: () => 0 };   /* 초원 섬: 기체 높이를 지나는 바위·땅만 막음 (풀·나무는 통과) */
   const fly = await makeFlight(renderer, B, [B0.x, B0.z], 0); scene.add(fly); const FS = fly.userData.S; fly.visible = false;
   const oldSh = []; fly.traverse(o => { if (o.isMesh && o.renderOrder === 1 && o.geometry.type === 'PlaneGeometry') oldSh.push(o); });
   /* 기체는 한 대만 (사용자 2026-11-06): 조이스틱으로 모는 그 기체가 태어나는 동안엔 기지 판 위(기지 안)에 앉아 있다가, 태어나면 그대로 이어서 몬다 */
@@ -204,13 +208,13 @@ export async function start(canvas, onProgress = () => {}) {
     const k = Math.min(1, dt * (flying ? 4 : 2)); cam.x += (tx - cam.x) * k; cam.z += (tz - cam.z) * k;
     camD += (cfg.dist * (flying ? 1 : .7) - camD) * Math.min(1, dt * 1.2);   /* 태어나는 동안 가까이 → 몰기 시작하면 천천히 물러남 */
     const a = cfg.ang * Math.PI / 180, D = camD; camera.position.set(cam.x, cam.y + D * Math.sin(a), cam.z + D * Math.cos(a)); camera.lookAt(cam.x, cam.y, cam.z); camera.updateMatrixWorld();
-    sea.position.x = cam.x; sea.position.z = cam.z; sea.material.uniforms.uT.value = t;
-    { const r = Math.hypot(FS.x, FS.z); say.textContent = !flying ? '태어나는 중' : baseAt(FS.x, FS.z) ? '태어나는 곳 · 출구로 나가면 맵 안' : r > R - 25 ? '무지개 벽 가까이 · 쏘면 무지개빛이 번져요' : '맵 안 · 한가운데까지 ' + Math.round(r) + 'm'; }
+    sea.position.x = cam.x; sea.position.z = cam.z; sea.material.uniforms.uT.value = t; meadow.update(v3.set(cam.x, HOVER, cam.z));
+    { const r = Math.hypot(FS.x, FS.z); say.textContent = !flying ? '태어나는 중' : baseAt(FS.x, FS.z) ? '태어나는 곳 · 출구로 나가면 맵 안' : r > R - 25 ? '초원 · 무지개 벽 가까이 · 쏘면 무지개빛이 번져요' : (r > MEADOW.R0 ? '초원' : '맵 안') + ' · 한가운데까지 ' + Math.round(r) + 'm'; }
     /* 별똥별이 꽂힐 때 공간 일그러짐 충격파 (시작 기지와 같은 효과) */
     if (WARP.s > 0) { B0.w.localToWorld(v3.set(0, .2, 0)); v3.project(camera); bloom.warp(v3.x * .5 + .5, v3.y * .5 + .5, WARP.r, WARP.s, Wd / Hd); } else bloom.warp(.5, .5, 0, 0, Wd / Hd);
     renderer.setRenderTarget(bloom.scene); renderer.clear(); renderer.render(scene, camera);
     bloom.render(Wd, Hd, !perf.st.bloom); perf.tick(dt);
   } catch (e) { console.error('[전체 맵]', e); } });
   onProgress(1);
-  window.__sm = { FS, fly, BASES, cam, cfg, HITS, get t() { return t; }, get flying() { return flying; }, wake };
+  window.__sm = { meadow, FS, fly, BASES, cam, cfg, HITS, get t() { return t; }, get flying() { return flying; }, wake };
 }
