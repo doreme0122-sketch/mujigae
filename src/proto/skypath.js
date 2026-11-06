@@ -9,12 +9,12 @@
    · 가는 동안 공격받지 않음 · 가운데층에 있을 땐 윗층 섬을 점무늬로 옅게 비킴 · 식물(나무·풀)은 막지 않음 */
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
-import { makeBloom } from '../core/hangar/bloom.js?v=11061657';
-import { makePerf } from './perf.js?v=11061657';
+import { makeBloom } from '../core/hangar/bloom.js?v=11061701';
+import { makePerf } from './perf.js?v=11061701';
 import { makeGlow } from '../preview/glow.js';
-import { makeGlbIsle } from './glbisle.js?v=11061657';
-import { makeFlight, FLY } from './flight.js?v=11061657';
-import { gate4, pedestal } from './gates.js?v=11061657';
+import { makeGlbIsle } from './glbisle.js?v=11061701';
+import { makeFlight, FLY } from './flight.js?v=11061701';
+import { gate4, pedestal } from './gates.js?v=11061701';
 
 const $ = s => document.querySelector(s), clamp = THREE.MathUtils.clamp, HOVER = FLY.HOVER, GAP = 2.9;
 const UP = new THREE.Color(1.45, 1.05, .42), DN = new THREE.Color(.72, .48, 1.55);
@@ -23,8 +23,8 @@ const smooth = (a, b, x) => { const k = clamp((x - a) / (b - a), 0, 1); return k
 
 
 /* ── 소리 (파일 없이 화면 안에서 만듦 · 문이 켜져 있을 땐 소리 없음 — 게임에 방해 (사용자 2026-11-06)) ──
-   준비 3초: 낮은 울림이 점점 높아지고 맑은 종소리가 빛 상자 수(11)만큼 점점 빠르게 더해짐 · 움직이면 사그라듦
-   출발: 짧은 쿵(충격파) + 슉 튀어 나가는 바람 · 이동: 스치는 바람이 잦아듦 · 도착: 미끄러지듯 멈추는 부드러운 소리 */
+   준비 3초: 낮은 울림이 점점 높아짐(종소리 없음) · 움직이면 사그라듦
+   출발: 짧은 쿵(충격파) + 슉 튀어 나가는 바람 · 이동: 스치는 바람이 잦아듦 · 도착 소리 없음 (사용자 2026-11-06) */
 function makeSound() {
   let ac = null, master = null, noiseBuf = null;
   const init = () => { if (ac) { if (ac.state === 'suspended') ac.resume(); return; } try { ac = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { return; }
@@ -37,9 +37,7 @@ function makeSound() {
     chargeStart() { if (!ac) return; this.chargeStop(true); const t = ac.currentTime, out = ac.createGain(); out.gain.value = 0; out.connect(master);
       const o1 = ac.createOscillator(), o2 = ac.createOscillator(), g1 = ac.createGain(); o1.type = 'sine'; o2.type = 'triangle'; o1.frequency.setValueAtTime(110, t); o1.frequency.exponentialRampToValueAtTime(330, t + 3); o2.frequency.setValueAtTime(165, t); o2.frequency.exponentialRampToValueAtTime(495, t + 3); g1.gain.value = .5;
       o1.connect(g1); o2.connect(g1); g1.connect(out); out.gain.linearRampToValueAtTime(.16, t + .4); out.gain.linearRampToValueAtTime(.3, t + 3); o1.start(t); o2.start(t);
-      const notes = [523.3, 587.3, 659.3, 784, 880, 1046.5, 1174.7, 1318.5, 1568, 1760, 2093], bells = [];   /* 맑은 종소리 열하나: 빛 상자 하나씩 · 갈수록 촘촘하게 */
-      for (let i = 0; i < 11; i++) { const at = t + 3 * Math.pow((i + 1) / 11, 1.6) - .05, b = ac.createOscillator(), b2 = ac.createOscillator(), bg = ac.createGain(); b.type = 'sine'; b2.type = 'sine'; b.frequency.value = notes[i]; b2.frequency.value = notes[i] * 2.01;
-        bg.gain.setValueAtTime(0, at); bg.gain.linearRampToValueAtTime(.12, at + .008); bg.gain.exponentialRampToValueAtTime(.0005, at + .9); b.connect(bg); b2.connect(bg); bg.connect(out); b.start(at); b2.start(at); b.stop(at + 1); b2.stop(at + 1); bells.push(b, b2); }
+      const bells = [];   /* 맑은 종소리는 뺌 (사용자 2026-11-06) */
       ch = { out, osc: [o1, o2], bells }; },
     chargeStop(quick) { if (!ac || !ch) return; const t = ac.currentTime, c = ch; ch = null; c.out.gain.cancelScheduledValues(t); c.out.gain.setValueAtTime(c.out.gain.value, t); c.out.gain.linearRampToValueAtTime(0, t + (quick ? .05 : .35));
       for (const o of [...c.osc, ...c.bells]) try { o.stop(t + .4); } catch (e) {} },
@@ -192,7 +190,7 @@ export async function start(canvas, onProgress = () => {}) {
     if (mode === 'trip') { const tr = trip; tr.u = Math.min(1, tr.u + dt / tr.dur); const e = 1 - Math.pow(1 - tr.u, 2.6), s = tr.back ? 1 - e : e;
       tr.p.curve.getPointAt(clamp(s, 0, 1), v3); tr.p.curve.getTangentAt(clamp(s, 0, 1), tan); if (tr.back) tan.negate(); tr.s = e;
       FS.dashUntil = t + 1; FS.dashVx = (v3.x - FS.x) / Math.max(dt, 1e-3); FS.dashVz = (v3.z - FS.z) / Math.max(dt, 1e-3); fly.position.y = v3.y - HOVER; FS.aim = Math.atan2(-tan.x, -tan.z); FS.tripPitch = Math.atan2(tan.y, Math.hypot(tan.x, tan.z));
-      if (tr.u >= 1) { FS.dashUntil = 0; FS.aim = null; FS.tripPitch = 0; SND.arrive(); lock = tr.back ? gEnt[tr.key] : gExit[tr.key]; mode = tr.back ? 'mid' : tr.key; fly.position.y = flightY(mode) - HOVER; fly.userData.moveTo(v3.x, v3.z); FS.vx = tan.x * 2; FS.vz = tan.z * 2; trip = null; } }
+      if (tr.u >= 1) { FS.dashUntil = 0; FS.aim = null; FS.tripPitch = 0; lock = tr.back ? gEnt[tr.key] : gExit[tr.key]; mode = tr.back ? 'mid' : tr.key; fly.position.y = flightY(mode) - HOVER; fly.userData.moveTo(v3.x, v3.z); FS.vx = tan.x * 2; FS.vz = tan.z * 2; trip = null; } }
     fly.updateMatrixWorld(true); fly.userData.update(t, dt); for (const o of oldSh) o.visible = false;
     { const sh = fly.children[0]; if (FS.tripPitch) sh.rotateX(FS.tripPitch * .7); if (FS.chPitch) sh.rotateX(FS.chPitch); if (FS.chBank) sh.rotateZ(FS.chBank); }
     say.textContent = mode === 'trip' ? (trip.back ? '돌아가는 중 · 공격받지 않음' : (trip.key === 'up' ? '윗층으로' : '아래층으로') + ' 가는 중 · 공격받지 않음') : charge ? `출발 준비 ${Math.ceil(3 - charge.u * 3)} · 움직이면 취소` : mode === 'mid' ? '가운데층 · 빛나는 문 한가운데서 멈추면 출발' : (mode === 'up' ? '윗층' : '아래층') + ' 던전 · 출구 문 한가운데서 멈추면 돌아감';
