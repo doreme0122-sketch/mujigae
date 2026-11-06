@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="ko"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>하늘섬 난전</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<meta name="theme-color" content="#04060e">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@300;400;500;600&family=Audiowide&display=swap">
+<style>
+:root{color-scheme:dark;--g:#b9ff4a;--gr:185,255,74;--ink:#d3d9ea;--mute:#8d96ad;--void:#04060e;
+  --kr:'IBM Plex Sans KR','Noto Sans KR',system-ui,sans-serif;--en:'Audiowide',ui-sans-serif,sans-serif}
+*{box-sizing:border-box} [hidden]{display:none!important}
+html,body{margin:0;height:100%;background:var(--void);color:var(--ink);font-family:var(--kr);overflow:hidden;touch-action:none;-webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent;-webkit-touch-callout:none}
+button{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:pointer}
+#cv{position:fixed;inset:0;width:100%;height:100%;display:block}
+#tags{position:fixed;inset:0;pointer-events:none}
+#ui{position:fixed;inset:0;pointer-events:none}
+#ui > *{pointer-events:auto}
+#head{position:absolute;top:calc(env(safe-area-inset-top,0px) + 12px);left:max(18px,env(safe-area-inset-left,0px));display:flex;flex-direction:column;gap:2px;pointer-events:none;text-shadow:0 0 6px rgba(0,0,0,.6)}
+#head b{font-weight:500;font-size:14px;color:var(--g);letter-spacing:.06em}
+#head span{font-size:10.5px;color:#e8eef8;letter-spacing:.04em}
+#feed{position:absolute;top:calc(env(safe-area-inset-top,0px) + 54px);left:max(18px,env(safe-area-inset-left,0px));display:flex;flex-direction:column;gap:3px;pointer-events:none}
+#feed div{font-size:11.5px;padding:3px 9px;border-radius:10px;background:rgba(4,8,16,.6);color:#c9d2dc;animation:in .3s}
+#feed b,#feed span{font-weight:500}
+@keyframes in{from{opacity:0;transform:translateX(-8px)}}
+#fps{position:absolute;top:calc(env(safe-area-inset-top,0px) + 12px);right:max(18px,env(safe-area-inset-right,0px));font-family:var(--en);font-size:10px;letter-spacing:.12em;color:rgba(var(--gr),.8);pointer-events:none;text-shadow:0 0 4px rgba(0,0,0,.8)}
+/* 오른쪽 아래: 보는 각도 · 거리 · 따라갈 기체 */
+#view{position:absolute;right:max(16px,env(safe-area-inset-right,0px));bottom:calc(env(safe-area-inset-bottom,0px) + 14px);width:min(224px,38vw);display:flex;flex-direction:column;gap:5px;
+  padding:8px 11px 9px;border:1px solid rgba(var(--gr),.25);border-radius:14px;background:rgba(4,8,14,.66)}
+.row{display:flex;align-items:center;gap:9px}
+.row label{font-size:11.5px;color:rgba(var(--gr),.8);width:30px;flex:none}
+.row output{font-family:var(--en);font-size:13px;color:var(--g);width:44px;text-align:right;flex:none}
+input[type=range]{flex:1;min-width:0;accent-color:#b9ff4a;height:20px;margin:0}
+#angbox{display:flex;align-items:center;gap:8px}
+#gauge{width:36px;height:33px;flex:none}
+#angbox .big{font-family:var(--en);font-size:19px;color:var(--g);letter-spacing:.02em}
+#angbox .sub{font-size:10.5px;color:var(--mute)}
+.fol{display:flex;align-items:center;gap:6px}
+.fol button{width:28px;height:24px;border:1px solid rgba(var(--gr),.35);border-radius:9px;color:var(--g);font-size:13px;flex:none}
+#who{flex:1;min-width:0;text-align:center;font-size:11.5px;color:#e8eef8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#load{position:fixed;inset:0;display:grid;place-content:center;gap:14px;background:var(--void);transition:opacity .6s .1s;z-index:9;text-align:center}
+#load.done{opacity:0;pointer-events:none}
+#load p{margin:0;font-size:12px;color:rgba(var(--gr),.7);letter-spacing:.1em}
+#load .b{width:180px;height:2px;background:rgba(var(--gr),.15);overflow:hidden}
+#load i{display:block;height:100%;background:var(--g);transform:scaleX(0);transform-origin:left;transition:transform .4s}
+#rot{display:none}
+@media (orientation:portrait){#rot{display:grid;place-content:center;position:fixed;inset:0;background:var(--void);z-index:20;color:var(--g);font-size:14px;letter-spacing:.06em;padding-inline:max(16px,env(safe-area-inset-left,0px)) max(16px,env(safe-area-inset-right,0px))}}
+</style>
+<script>
+window.__ver = fetch('ver.json?t=' + Date.now(), { cache: 'no-store' }).then(r => r.json()).then(j => {
+  const f = location.pathname.split('/').pop() || 'index.html', want = j[f], mine = window.__mine = '11061204';
+  if (want && +want > +mine) { location.replace(f + '?v=' + want + '&r=' + Date.now() + location.hash); return new Promise(() => {}); } }).catch(() => {});
+</script>
+<script type="importmap">{"imports":{"three":"./vendor/three.module.js","three/addons/":"./vendor/addons/"}}</script>
+</head><body>
+<canvas id="cv"></canvas>
+<div id="tags"></div>
+<div id="ui">
+  <div id="head"><b>하늘섬 난전</b><span>기체 10대가 알아서 싸워요 · 화면을 끌면 자유 보기 · 두 손가락으로 거리</span></div>
+  <div id="feed"></div>
+  <div id="fps"></div>
+  <div id="view">
+    <div id="angbox"><svg id="gauge" viewBox="0 0 52 48" aria-hidden="true"></svg><div><div class="big" id="angv">45°</div><div class="sub">땅에서 카메라까지 각도</div></div></div>
+    <div class="row"><label for="ang">각도</label><input id="ang" type="range" min="10" max="90" step="1" value="45"></div>
+    <div class="row"><label for="dist">거리</label><input id="dist" type="range" min="14" max="140" step="1" value="46"><output id="distv">46m</output></div>
+    <div class="fol"><button id="prev" type="button" aria-label="이전 기체">◀</button><div id="who"></div><button id="next" type="button" aria-label="다음 기체">▶</button></div>
+  </div>
+</div>
+<div id="load"><p>하늘섬을 띄우고 있어요</p><div class="b"><i></i></div></div>
+<div id="rot">기기를 가로로 돌려 주세요</div>
+<script type="module">
+await window.__ver;
+const { start } = await import('./src/proto/skyarena.js?v=11061204');
+const bar = document.querySelector('#load i');
+start(document.querySelector('#cv'), p => { bar.style.transform = `scaleX(${p})`; })
+  .then(() => setTimeout(() => document.querySelector('#load').classList.add('done'), 300))
+  .catch(err => { document.querySelector('#load p').textContent = '불러오지 못했어요: ' + err.message; console.error(err); });
+</script>
+</body></html>
