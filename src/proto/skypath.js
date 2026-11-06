@@ -9,19 +9,51 @@
    · 가는 동안 공격받지 않음 · 가운데층에 있을 땐 윗층 섬을 점무늬로 옅게 비킴 · 식물(나무·풀)은 막지 않음 */
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
-import { makeBloom } from '../core/hangar/bloom.js?v=11061648';
-import { makePerf } from './perf.js?v=11061648';
+import { makeBloom } from '../core/hangar/bloom.js?v=11061657';
+import { makePerf } from './perf.js?v=11061657';
 import { makeGlow } from '../preview/glow.js';
-import { makeGlbIsle } from './glbisle.js?v=11061648';
-import { makeFlight, FLY } from './flight.js?v=11061648';
-import { gate4, pedestal } from './gates.js?v=11061648';
+import { makeGlbIsle } from './glbisle.js?v=11061657';
+import { makeFlight, FLY } from './flight.js?v=11061657';
+import { gate4, pedestal } from './gates.js?v=11061657';
 
 const $ = s => document.querySelector(s), clamp = THREE.MathUtils.clamp, HOVER = FLY.HOVER, GAP = 2.9;
 const UP = new THREE.Color(1.45, 1.05, .42), DN = new THREE.Color(.72, .48, 1.55);
 const AB = { transparent: true, depthWrite: false, blending: THREE.AdditiveBlending };
 const smooth = (a, b, x) => { const k = clamp((x - a) / (b - a), 0, 1); return k * k * (3 - 2 * k); };
 
+
+/* ── 소리 (파일 없이 화면 안에서 만듦 · 문이 켜져 있을 땐 소리 없음 — 게임에 방해 (사용자 2026-11-06)) ──
+   준비 3초: 낮은 울림이 점점 높아지고 맑은 종소리가 빛 상자 수(11)만큼 점점 빠르게 더해짐 · 움직이면 사그라듦
+   출발: 짧은 쿵(충격파) + 슉 튀어 나가는 바람 · 이동: 스치는 바람이 잦아듦 · 도착: 미끄러지듯 멈추는 부드러운 소리 */
+function makeSound() {
+  let ac = null, master = null, noiseBuf = null;
+  const init = () => { if (ac) { if (ac.state === 'suspended') ac.resume(); return; } try { ac = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { return; }
+    master = ac.createGain(); master.gain.value = .55; const comp = ac.createDynamicsCompressor(); master.connect(comp); comp.connect(ac.destination);
+    noiseBuf = ac.createBuffer(1, ac.sampleRate * 2, ac.sampleRate); const d = noiseBuf.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1; };
+  addEventListener('pointerdown', init); addEventListener('keydown', init);
+  const noise = () => { const n = ac.createBufferSource(); n.buffer = noiseBuf; n.loop = true; return n; };
+  let ch = null;
+  return {
+    chargeStart() { if (!ac) return; this.chargeStop(true); const t = ac.currentTime, out = ac.createGain(); out.gain.value = 0; out.connect(master);
+      const o1 = ac.createOscillator(), o2 = ac.createOscillator(), g1 = ac.createGain(); o1.type = 'sine'; o2.type = 'triangle'; o1.frequency.setValueAtTime(110, t); o1.frequency.exponentialRampToValueAtTime(330, t + 3); o2.frequency.setValueAtTime(165, t); o2.frequency.exponentialRampToValueAtTime(495, t + 3); g1.gain.value = .5;
+      o1.connect(g1); o2.connect(g1); g1.connect(out); out.gain.linearRampToValueAtTime(.16, t + .4); out.gain.linearRampToValueAtTime(.3, t + 3); o1.start(t); o2.start(t);
+      const notes = [523.3, 587.3, 659.3, 784, 880, 1046.5, 1174.7, 1318.5, 1568, 1760, 2093], bells = [];   /* 맑은 종소리 열하나: 빛 상자 하나씩 · 갈수록 촘촘하게 */
+      for (let i = 0; i < 11; i++) { const at = t + 3 * Math.pow((i + 1) / 11, 1.6) - .05, b = ac.createOscillator(), b2 = ac.createOscillator(), bg = ac.createGain(); b.type = 'sine'; b2.type = 'sine'; b.frequency.value = notes[i]; b2.frequency.value = notes[i] * 2.01;
+        bg.gain.setValueAtTime(0, at); bg.gain.linearRampToValueAtTime(.12, at + .008); bg.gain.exponentialRampToValueAtTime(.0005, at + .9); b.connect(bg); b2.connect(bg); bg.connect(out); b.start(at); b2.start(at); b.stop(at + 1); b2.stop(at + 1); bells.push(b, b2); }
+      ch = { out, osc: [o1, o2], bells }; },
+    chargeStop(quick) { if (!ac || !ch) return; const t = ac.currentTime, c = ch; ch = null; c.out.gain.cancelScheduledValues(t); c.out.gain.setValueAtTime(c.out.gain.value, t); c.out.gain.linearRampToValueAtTime(0, t + (quick ? .05 : .35));
+      for (const o of [...c.osc, ...c.bells]) try { o.stop(t + .4); } catch (e) {} },
+    depart(dur) { if (!ac) return; this.chargeStop(true); const t = ac.currentTime;
+      { const o = ac.createOscillator(), g = ac.createGain(); o.type = 'sine'; o.frequency.setValueAtTime(95, t); o.frequency.exponentialRampToValueAtTime(38, t + .35); g.gain.setValueAtTime(.0001, t); g.gain.exponentialRampToValueAtTime(.55, t + .012); g.gain.exponentialRampToValueAtTime(.0005, t + .45); o.connect(g); g.connect(master); o.start(t); o.stop(t + .5); }   /* 쿵 */
+      { const n = noise(), f = ac.createBiquadFilter(), g = ac.createGain(); f.type = 'bandpass'; f.Q.value = .9; f.frequency.setValueAtTime(2600, t); f.frequency.exponentialRampToValueAtTime(500, t + .7); g.gain.setValueAtTime(.0001, t); g.gain.exponentialRampToValueAtTime(.4, t + .03); g.gain.exponentialRampToValueAtTime(.001, t + .75); n.connect(f); f.connect(g); g.connect(master); n.start(t); n.stop(t + .8); }   /* 슉 */
+      { const n = noise(), f = ac.createBiquadFilter(), g = ac.createGain(); f.type = 'bandpass'; f.Q.value = .6; f.frequency.setValueAtTime(900, t); f.frequency.exponentialRampToValueAtTime(320, t + dur); g.gain.setValueAtTime(.0001, t); g.gain.exponentialRampToValueAtTime(.16, t + .15); g.gain.exponentialRampToValueAtTime(.001, t + dur + .1); n.connect(f); f.connect(g); g.connect(master); n.start(t); n.stop(t + dur + .2); } },   /* 스치는 바람: 잦아듦 */
+    arrive() { if (!ac) return; const t = ac.currentTime;
+      { const n = noise(), f = ac.createBiquadFilter(), g = ac.createGain(); f.type = 'lowpass'; f.frequency.setValueAtTime(1400, t); f.frequency.exponentialRampToValueAtTime(260, t + .5); g.gain.setValueAtTime(.0001, t); g.gain.exponentialRampToValueAtTime(.18, t + .04); g.gain.exponentialRampToValueAtTime(.001, t + .6); n.connect(f); f.connect(g); g.connect(master); n.start(t); n.stop(t + .65); }   /* 미끄러지듯 */
+      { const o = ac.createOscillator(), g = ac.createGain(); o.type = 'sine'; o.frequency.setValueAtTime(392, t); o.frequency.exponentialRampToValueAtTime(330, t + .5); g.gain.setValueAtTime(.0001, t); g.gain.exponentialRampToValueAtTime(.09, t + .05); g.gain.exponentialRampToValueAtTime(.0005, t + .9); o.connect(g); g.connect(master); o.start(t); o.stop(t + 1); } } };   /* 내려앉는 부드러운 울림 */
+}
+
 export async function start(canvas, onProgress = () => {}) {
+  const SND = makeSound();
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: false, powerPreference: 'high-performance' });
   renderer.toneMapping = THREE.NoToneMapping; renderer.autoClear = false; renderer.setClearColor(0xbcd2ea, 1);
   const scene = new THREE.Scene(), camera = new THREE.PerspectiveCamera(40, 1, .5, 1200), bloom = makeBloom(renderer, { samples: 0 });
@@ -139,7 +171,7 @@ export async function start(canvas, onProgress = () => {}) {
   const v3 = new THREE.Vector3(), tan = new THREE.Vector3(), tmp = new THREE.Color(), onC = new THREE.Color(), motes = [];
   let t = 0, last = performance.now(), fade = 1, charge = null, lock = null;   /* lock: 막 도착한 문 — 한 번 벗어나야 다시 켜짐 */
   const startTrip = (key, back) => { const p = P[key], from = back ? gExit[key] : gEnt[key]; const dir = p.curve.getTangentAt(back ? 1 : 0); if (back) dir.negate();
-    trip = { key, back, u: 0, dur: clamp(p.len / 30, 1.1, 1.8), p, cam0: new THREE.Vector3(cam.x, cam.y, cam.z) }; mode = 'trip'; FS.aim = null;
+    trip = { key, back, u: 0, dur: clamp(p.len / 30, 1.1, 1.8), p, cam0: new THREE.Vector3(cam.x, cam.y, cam.z) }; mode = 'trip'; FS.aim = null; SND.depart(trip.dur);
     shock.position.set(FS.x, flightY(back ? key : 'mid'), FS.z).addScaledVector(dir, -.7); shock.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), dir); SW.t = 0; SW.c = (key === 'dn' ? DN : UP).clone(); };
   renderer.setAnimationLoop(now => { try {
     const dt = clamp((now - last) / 1000, 0, .05); last = now; t += dt;
@@ -149,10 +181,10 @@ export async function start(canvas, onProgress = () => {}) {
     for (const g of G4) { const live = g.layer === 'mid' ? on && g.key === key : true; g.act += ((live ? 1 : 0) - g.act) * Math.min(1, dt * 3);
       const inG = here.includes(g) && live && g !== lock && Math.hypot(FS.x - g.x, FS.z - g.z) < 1.6;
       if (inG && spd < 1.2 && !(charge && charge.g !== g)) { g.stay += dt; } else { g.stay = 0; }
-      if (g.stay > .5 && !charge) { const back = g.layer !== 'mid', c = P[g.key].curve, look = c.getPointAt(back ? .8 : .2), wantYaw = Math.atan2(-(look.x - FS.x), -(look.z - FS.z)); charge = { g, u: 0, yaw0: FS.head, wantYaw, back }; }
+      if (g.stay > .5 && !charge) { const back = g.layer !== 'mid', c = P[g.key].curve, look = c.getPointAt(back ? .8 : .2), wantYaw = Math.atan2(-(look.x - FS.x), -(look.z - FS.z)); charge = { g, u: 0, yaw0: FS.head, wantYaw, back }; SND.chargeStart(); }
       g.ch = charge?.g === g ? charge.u : Math.max(0, g.ch - dt * .8); }
     if (lock && Math.hypot(FS.x - lock.x, FS.z - lock.z) > 2.5) lock = null;
-    if (charge) { const c = charge, g = c.g; if (Math.hypot(FS.x - g.x, FS.z - g.z) > 1.9 || spd > 2.6) { charge = null; FS.aim = null; FS.chBank = 0; }   /* 움직이면 취소 */
+    if (charge) { const c = charge, g = c.g; if (Math.hypot(FS.x - g.x, FS.z - g.z) > 1.9 || spd > 2.6) { charge = null; FS.aim = null; FS.chBank = 0; SND.chargeStop(); }   /* 움직이면 취소 */
       else { c.u = Math.min(1, c.u + dt / 3); const e = c.u * c.u * (3 - 2 * c.u), dY = Math.atan2(Math.sin(c.wantYaw - c.yaw0), Math.cos(c.wantYaw - c.yaw0)); FS.aim = c.yaw0 + dY * e;   /* 갈 쪽으로 천천히 틂 */
         FS.chBank = -Math.sign(dY || 1) * Math.min(.5, Math.abs(dY) * .3 + .12) * Math.sin(c.u * Math.PI); FS.chPitch = (c.back ? 0 : (g.key === 'up' ? .18 : -.14)) * e;
         if (c.u >= 1) { charge = null; FS.chBank = 0; FS.chPitch = 0; startTrip(g.key, c.back); } } }
@@ -160,7 +192,7 @@ export async function start(canvas, onProgress = () => {}) {
     if (mode === 'trip') { const tr = trip; tr.u = Math.min(1, tr.u + dt / tr.dur); const e = 1 - Math.pow(1 - tr.u, 2.6), s = tr.back ? 1 - e : e;
       tr.p.curve.getPointAt(clamp(s, 0, 1), v3); tr.p.curve.getTangentAt(clamp(s, 0, 1), tan); if (tr.back) tan.negate(); tr.s = e;
       FS.dashUntil = t + 1; FS.dashVx = (v3.x - FS.x) / Math.max(dt, 1e-3); FS.dashVz = (v3.z - FS.z) / Math.max(dt, 1e-3); fly.position.y = v3.y - HOVER; FS.aim = Math.atan2(-tan.x, -tan.z); FS.tripPitch = Math.atan2(tan.y, Math.hypot(tan.x, tan.z));
-      if (tr.u >= 1) { FS.dashUntil = 0; FS.aim = null; FS.tripPitch = 0; lock = tr.back ? gEnt[tr.key] : gExit[tr.key]; mode = tr.back ? 'mid' : tr.key; fly.position.y = flightY(mode) - HOVER; fly.userData.moveTo(v3.x, v3.z); FS.vx = tan.x * 2; FS.vz = tan.z * 2; trip = null; } }
+      if (tr.u >= 1) { FS.dashUntil = 0; FS.aim = null; FS.tripPitch = 0; SND.arrive(); lock = tr.back ? gEnt[tr.key] : gExit[tr.key]; mode = tr.back ? 'mid' : tr.key; fly.position.y = flightY(mode) - HOVER; fly.userData.moveTo(v3.x, v3.z); FS.vx = tan.x * 2; FS.vz = tan.z * 2; trip = null; } }
     fly.updateMatrixWorld(true); fly.userData.update(t, dt); for (const o of oldSh) o.visible = false;
     { const sh = fly.children[0]; if (FS.tripPitch) sh.rotateX(FS.tripPitch * .7); if (FS.chPitch) sh.rotateX(FS.chPitch); if (FS.chBank) sh.rotateZ(FS.chBank); }
     say.textContent = mode === 'trip' ? (trip.back ? '돌아가는 중 · 공격받지 않음' : (trip.key === 'up' ? '윗층으로' : '아래층으로') + ' 가는 중 · 공격받지 않음') : charge ? `출발 준비 ${Math.ceil(3 - charge.u * 3)} · 움직이면 취소` : mode === 'mid' ? '가운데층 · 빛나는 문 한가운데서 멈추면 출발' : (mode === 'up' ? '윗층' : '아래층') + ' 던전 · 출구 문 한가운데서 멈추면 돌아감';

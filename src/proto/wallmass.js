@@ -7,11 +7,11 @@
    · 무게: 벽 한 줄 = 몸통 1번 + 봉우리 1번 그리기 */
 import * as THREE from 'three';
 import { mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js';
-import { rockMaterial, chunk } from './rocks.js?v=11061648';
-import { iceMaterial, block } from './ice.js?v=11061648';
-import { crystalMaterial, prism } from './crystal.js?v=11061648';
-import { ruinMaterial, pillar } from './ruins.js?v=11061648';
-import { coralMaterial, coral } from './coral.js?v=11061648';
+import { rockMaterial, chunk } from './rocks.js?v=11061657';
+import { iceMaterial, block } from './ice.js?v=11061657';
+import { crystalMaterial, prism } from './crystal.js?v=11061657';
+import { ruinMaterial, pillar } from './ruins.js?v=11061657';
+import { coralMaterial, coral } from './coral.js?v=11061657';
 
 const hs = (x, y, z) => { const s = Math.sin(x * 127.1 + y * 311.7 + z * 74.7) * 43758.5453; return s - Math.floor(s); };
 const vn = (x, y, z) => { const ix = Math.floor(x), iy = Math.floor(y), iz = Math.floor(z), fx = x - ix, fy = y - iy, fz = z - iz, u = fx * fx * (3 - 2 * fx), v = fy * fy * (3 - 2 * fy), w = fz * fz * (3 - 2 * fz);
