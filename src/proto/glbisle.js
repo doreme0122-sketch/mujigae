@@ -34,18 +34,18 @@ export function makeGlbIsle(hover, onReady, opt = {}) {
     const c0 = big.b.getCenter(new THREE.Vector3());
     root.position.set(-c0.x, hover - (opt.gap ?? 1.6) - top, -c0.z); grp.add(root); root.updateMatrixWorld(true);   /* 기체가 가운데 섬 풀밭보다 1.6m 위 */
     /* 높이 띠: 기체 둘레 지형에서 기체와 같은 높이인 곳을 따라 빛나는 가는 띠 (띠 위 = 막힘 · 아래 = 넘어감) */
-    api.uShip = { value: new THREE.Vector3(0, hover, 0) }; api.uBand = { value: 0 }; api.uSee = { value: new THREE.Vector4(0, 0, 0, 0) };
+    api.uShip = { value: new THREE.Vector3(0, hover, 0) }; api.uBand = { value: 0 }; api.uSee = { value: new THREE.Vector4(0, 0, 0, 0) }; api.uFade = { value: 0 };
     root.traverse(o => { if (!o.isMesh) return; const ms = Array.isArray(o.material) ? o.material : [o.material];
-      for (const mt of ms) { if (!mt || /water/i.test(mt.name)) continue; const leaf = /foliage/i.test(mt.name); mt.onBeforeCompile = sh => { sh.uniforms.uShip = api.uShip; sh.uniforms.uBand = api.uBand; sh.uniforms.uSee = api.uSee;
+      for (const mt of ms) { if (!mt || /water/i.test(mt.name)) continue; const leaf = /foliage/i.test(mt.name); mt.onBeforeCompile = sh => { sh.uniforms.uShip = api.uShip; sh.uniforms.uBand = api.uBand; sh.uniforms.uSee = api.uSee; sh.uniforms.uFade = api.uFade;
           sh.vertexShader = 'varying vec3 vWp;\n' + sh.vertexShader.replace('#include <worldpos_vertex>', '#include <worldpos_vertex>\n vWp=(modelMatrix*vec4(transformed,1.)).xyz;');
-          sh.fragmentShader = 'uniform vec3 uShip; uniform float uBand; uniform vec4 uSee; varying vec3 vWp;\n' + (leaf ? `float sB2(vec2 a){ a=floor(a); return fract(dot(a,vec2(.5,a.y*.75))); }
+          sh.fragmentShader = ('uniform vec3 uShip; uniform float uBand; uniform vec4 uSee; uniform float uFade; varying vec3 vWp;\nfloat fB2(vec2 a){ a=floor(a); return fract(dot(a,vec2(.5,a.y*.75))); }\nfloat fB4(vec2 a){ return fB2(.5*a)*.25+fB2(a); }\n' + (leaf ? `float sB2(vec2 a){ a=floor(a); return fract(dot(a,vec2(.5,a.y*.75))); }
 float sB4(vec2 a){ return sB2(.5*a)*.25+sB2(a); }\n` : '') + sh.fragmentShader.replace('void main() {', leaf ? `void main() {
   { float sd=length(vWp-uSee.xyz); float k=smoothstep(2.6,1.2,sd)*uSee.w; if(k>.01 && sB4(gl_FragCoord.xy)<k*.8) discard; }   /* 나무 속에 숨은 내 기체가 보이게: 둘레 잎만 점무늬로 비킴 */` : 'void main() {').replace('#include <dithering_fragment>', `#include <dithering_fragment>
             { float dy=vWp.y-uShip.y; int md=int(uBand+.5);
               if(md==1){ float under=smoothstep(.05,-1.2,dy); gl_FragColor.rgb=mix(gl_FragColor.rgb,vec3(.93,.96,1.),under*.78); gl_FragColor.rgb+=vec3(1.)*smoothstep(.25,.0,abs(dy))*.35; }   /* 구름 바다: 내 높이 아래는 안개에 잠김 */
               else if(md==2){ float up=smoothstep(-.05,.35,dy); gl_FragColor.rgb=mix(gl_FragColor.rgb,gl_FragColor.rgb*vec3(1.15,.55,.5),up*.7); }   /* 높은 지형만 붉게 */
               else if(md==3){ gl_FragColor.rgb+=vec3(1.,.8,.25)*smoothstep(.14,.0,abs(dy))*1.8; }   /* 내 높이에 금색 선 */
-            }`); };
+            }`)).replace('void main() {', 'void main() {\n  if(uFade>.001 && fB4(gl_FragCoord.xy)+.02<uFade) discard;');   /* 섬 통째로 점무늬로 비킴 (가운데층에서 윗층 섬을 옅게) */ };
         mt.customProgramCacheKey = () => leaf ? 'bandLeaf' : 'band'; mt.needsUpdate = true; } });
     root.traverse(o => { if (o.isMesh) { meshes.push(o); o.frustumCulled = true; if (o.material) { o.material.envMapIntensity = .6; } } });
     /* 막힘 = 보이는 모양 그대로 (사용자 2026-11-06: 구조물에서 멀리 떨어져 있는데도 못 가는 데가 있음)

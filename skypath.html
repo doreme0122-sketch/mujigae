@@ -48,24 +48,22 @@ input[type=range]{flex:1;min-width:0;accent-color:#b9ff4a;height:18px;margin:0}
 </style>
 <script>
 window.__ver = fetch('ver.json?t=' + Date.now(), { cache: 'no-store' }).then(r => r.json()).then(j => {
-  const f = location.pathname.split('/').pop() || 'index.html', want = j[f], mine = window.__mine = '11061610';
+  const f = location.pathname.split('/').pop() || 'index.html', want = j[f], mine = window.__mine = '11061627';
   if (want && +want > +mine) { location.replace(f + '?v=' + want + '&r=' + Date.now() + location.hash); return new Promise(() => {}); } }).catch(() => {});
 </script>
 <script type="importmap">{"imports":{"three":"./vendor/three.module.js","three/addons/":"./vendor/addons/"}}</script>
 </head><body>
 <canvas id="cv"></canvas>
 <div id="ui">
-  <div id="head"><b>빛의 길 시험</b><span>화면 왼쪽을 끌어 몰기 · 컴퓨터는 WASD · 빛나는 입구 위로 날아가면 출발</span></div>
+  <div id="head"><b>빛의 길 시험</b><span>화면 왼쪽을 끌어 몰기 · 컴퓨터는 WASD · 빛나는 문 한가운데서 멈추면 출발</span></div>
   <div id="fps"></div>
   <div id="where"></div>
   <div id="view"><button id="tog" type="button">설정 접기 ▴</button>
-    <div class="cap">입구 모양</div><div class="seg" id="sg"><button class="on" type="button">선돌</button><button type="button">고리</button><button type="button">꽃</button><button type="button">샘</button></div>
-    <div class="cap">빛의 길</div><div class="seg" id="sp"><button class="on" type="button">빛 띠</button><button type="button">나선</button><button type="button">고리</button></div>
     <div class="cap">보물이 생긴 층</div><div class="seg" id="st"><button class="on" type="button">윗층</button><button type="button">아래층</button><button type="button">없음</button></div>
     <div class="cap">층 자리 (가운데층 기준)</div>
-    <div class="row"><label for="lup">윗층</label><input id="lup" type="range" min="3" max="30" step="1" value="8"><output id="lupv"></output></div>
-    <div class="row"><label for="ldn">아래층</label><input id="ldn" type="range" min="4" max="40" step="1" value="14"><output id="ldnv"></output></div>
-    <div class="row"><label for="lfar">거리</label><input id="lfar" type="range" min="12" max="80" step="1" value="26"><output id="lfarv"></output></div>
+    <div class="row"><label for="lup">윗층</label><input id="lup" type="range" min="5" max="40" step="1" value="20"><output id="lupv"></output></div>
+    <div class="row"><label for="ldn">아래층</label><input id="ldn" type="range" min="5" max="50" step="1" value="30"><output id="ldnv"></output></div>
+    <div class="row"><label for="lfar">거리</label><input id="lfar" type="range" min="30" max="110" step="1" value="55"><output id="lfarv"></output></div>
     <div class="cap">카메라</div>
     <div class="row"><label for="ang">각도</label><input id="ang" type="range" min="15" max="90" step="1" value="45"><output id="angv"></output></div>
     <div class="row"><label for="dist">거리</label><input id="dist" type="range" min="12" max="80" step="1" value="25"><output id="distv"></output></div>
@@ -75,7 +73,7 @@ window.__ver = fetch('ver.json?t=' + Date.now(), { cache: 'no-store' }).then(r =
 <div id="rot">기기를 가로로 돌려 주세요</div>
 <script type="module">
 await window.__ver;
-const { start } = await import('./src/proto/skypath.js?v=11061610');
+const { start } = await import('./src/proto/skypath.js?v=11061627');
 const bar = document.querySelector('#load i');
 document.querySelector('#tog').onclick = () => { const v = document.querySelector('#view'); v.classList.toggle('shut'); document.querySelector('#tog').textContent = v.classList.contains('shut') ? '설정 펴기 ▾' : '설정 접기 ▴'; };
 start(document.querySelector('#cv'), p => { bar.style.transform = `scaleX(${p})`; })

@@ -7,8 +7,8 @@
    · 문 앞쪽으로 빛 띠 길이 뻗어 나감 (확정된 빛의 길) */
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
-import { makeBloom } from '../core/hangar/bloom.js?v=11061610';
-import { makePerf } from './perf.js?v=11061610';
+import { makeBloom } from '../core/hangar/bloom.js?v=11061627';
+import { makePerf } from './perf.js?v=11061627';
 import { makeGlow } from '../preview/glow.js';
 import { buildShip, engineSpots } from '../core/ships/build.js';
 
@@ -62,7 +62,7 @@ const roadMat = (kind) => new THREE.ShaderMaterial({ ...AB, side: THREE.DoubleSi
       gl_FragColor=vec4(uC*(edge*.22+core*.55+spark*edge*.7)*ends*fade*uA*.75,1.); }` });   /* 꺾쇠 무늬 뺌 (사용자 2026-11-06) */
 
 /* 받침 섬: 풀 덮인 둥근 윗면 + 층진 바위 몸통 (참고 그림처럼 문이 섬 하나를 다 차지) */
-function pedestal(seed) {
+export function pedestal(seed) {
   SEED = seed; const g = new THREE.Group();
   const N = 22, top = [], R = 7.2;
   for (let i = 0; i < N; i++) { const a = i / N * Math.PI * 2, r = R * (1 + (rnd() - .5) * .14); top.push([Math.cos(a) * r, Math.sin(a) * r]); }
@@ -192,9 +192,9 @@ function gate3() {
 }
 
 /* ── 4 흩어진 고리 ── */
-function gate4() {
+export function gate4(C0) {
   SEED = 404; const g = new THREE.Group(), glows = [], films = [], discs = [];
-  const C = SHIP_Y;
+  const C = C0 ?? SHIP_Y;   /* 고리 가운데 높이(받침 바닥에서) = 기체 나는 높이 */
   /* 조각난 원판: 부채꼴 판 열둘 + 바깥 테 · 금빛 동심 고리 */
   for (let i = 0; i < 12; i++) { const a0 = i / 12 * Math.PI * 2 + .02, a1 = (i + 1) / 12 * Math.PI * 2 - .02;
     const s = new THREE.Mesh(tint(jitter(sector(1.2, 4.4, a0, a1, .3, .04).rotateX(-Math.PI / 2), .04, .3), i % 2 ? 0xc9c0ae : 0xbab19f, .12), STONE); s.position.y = .17; g.add(s);
