@@ -1,7 +1,7 @@
 /* 전체 맵 — 초원 고리 (Lv1, 사용자 2026-11-06 미니맵 기준)
    · 맵 반지름 240m(우리가 정한 크기 · 사용자 2026-11-06) 중 바깥 고리 187~240m가 초원(미니맵 비율 그대로). 섬 모양은 사용자가 준 3층 월드의 초원 섬 25종(kit_meadow.glb)을 그대로 씀
    · 층: 가운데층(기체가 나는 층, 섬 윗면이 기체 아래에 깔림) · 위층 +20m(밝게, 기체를 가리지 않게 점무늬로 옅게) · 아래층 −30m(어둡게, 구름 쪽으로 흐려짐)
-   · 공평하게: 기지 10곳마다 같은 몫 — 기지 앞을 가운데로 한 조각(36°)마다 몬스터 둥지 1 · 큰 섬 2 · 작은·중간 섬 9 · 층을 뚫는 기둥 2 · 발아래 바위 8 · 위층 섬 2 · 아래층 섬 3 (섬은 받은 모델의 3분의 1 크기)
+   · 공평하게: 기지 10곳마다 같은 몫 — 기지 앞을 가운데로 한 조각(36°)마다 몬스터 둥지 1 · 큰 섬 4 · 작은·중간 섬 26 · 층을 뚫는 기둥 2 · 발아래 바위 16 · 위층 섬 5 · 아래층 섬 7 (가벼운 섬 모델 kit_meadow_lo: 겉모습은 그대로 · 면은 원래의 15%) (섬은 받은 모델의 3분의 1 크기)
    · 보물 던전 섬 5 = 기지 사이 다섯 곳 (위층 3 · 아래층 2, 번갈아) — 가운데층엔 보물 없음
    · 막힘: 가운데층 섬 중 기체 높이를 지나는 바위·땅만 막음(위에서 단면을 1m 칸으로 찍음). 풀·나무·물은 안 막음. 위·아래층 섬은 다른 층이라 안 막음
    · 그리기: 조각마다 · 층마다 · 재질마다 한 덩어리로 합침 → 화면 밖 조각은 통째로 안 그림 */
@@ -9,7 +9,7 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { mergeGeometries, deinterleaveGeometry } from 'three/addons/utils/BufferGeometryUtils.js';
 
-export const MEADOW = { R0: 187, R1: 240, UP: 20, DN: -30, TOP: -1.0, SC: 1 / 3 };   /* SC: 받은 섬 모델 크기의 3분의 1 (사용자 2026-11-06: 섬과 지형이 너무 큼 → 하늘섬 난전과 같은 비율) */   /* 가운데층 섬 윗면 = 기체(높이 .7)보다 1.7m 아래 */
+export const MEADOW = { R0: 187, R1: 240, UP: 20, DN: -30, TOP: -1.0, SC: 1 / 2 };   /* SC: 받은 섬 모델 크기의 2분의 1 (사용자 2026-11-06: 원래는 너무 크고 3분의 1은 너무 작음) */   /* 가운데층 섬 윗면 = 기체(높이 .7)보다 1.7m 아래 */
 const SECT = 10, CELL = 1;
 
 const rnd = seed => { let s = seed >>> 0; return () => ((s = (s * 1664525 + 1013904223) >>> 0) / 4294967296); };
@@ -41,7 +41,7 @@ export async function makeMeadow(scene, url, onProgress = () => {}) {
   const at = (th, r) => [Math.cos(th) * r, Math.sin(th) * r], rf = f => R0 + f * (R1 - R0);   /* rf: 초원 띠 안쪽(0) → 바깥(1) */
   const clash = (p, q) => p === q || p === 'pillar' || q === 'pillar' || ((p === 'mid' || p === 'rock') && (q === 'mid' || q === 'rock'));   /* 기둥은 모든 층을 뚫음 · 발아래 바위는 가운데층 섬 몸통과 겹치면 안 됨 */
   const fits = (x, z, rr, layer) => { const r = Math.hypot(x, z); if (r - rr < R0 + 2 || r + rr > R1 - 6) return false;
-    for (const q of place) { if (!clash(q.layer, layer)) continue; if (Math.hypot(q.x - x, q.z - z) < q.rr + rr + 2) return false; } return true; };
+    for (const q of place) { if (!clash(q.layer, layer)) continue; if (Math.hypot(q.x - x, q.z - z) < q.rr + rr + 1.2) return false; } return true; };
   const clearOfBase = (x, z, rr, th0) => { const th = Math.atan2(z, x), d = Math.atan2(Math.sin(th - th0), Math.cos(th - th0)) * Math.hypot(x, z); return !(Math.abs(d) < 15 + rr && Math.hypot(x, z) > rf(.4) - rr); };   /* 기지 출구 앞 길은 비워 둠 */
   const put = (k, x, z, layer, yaw, extra = {}) => { const K = KIT[k], s = (extra.s || 1) * SC, sy = layer === 'pillar' ? .9 : s;   /* 기둥만 높이는 거의 그대로 → 가늘고 높게 세 층을 뚫음 */
     const y = layer === 'up' ? UP - K.top * sy : layer === 'dn' ? DN - K.top * sy : layer === 'pillar' ? UP + 6 - K.hi * sy : layer === 'rock' ? extra.y : TOP - K.top * sy;
@@ -61,16 +61,17 @@ export async function makeMeadow(scene, url, onProgress = () => {}) {
     { const th = th0 + sd * 10 * deg, [x, z] = at(th, rf(.53)); put(i % 2 ? 'Island_Lair_Arena' : 'Island_Lair_Nest', x, z, 'mid', th + R() * 6.28, { camp: true }); }
     /* 큰 섬: 둥지 반대쪽 */
     { const th = th0 - sd * 9 * deg, [x, z] = at(th, rf(.23)); put(BIG[i], x, z, 'mid', R() * 6.28); }
-    { const th = th0 + sd * 3 * deg, [x, z] = at(th, rf(.2)); put(BIG[(i + 5) % BIG.length], x, z, 'mid', R() * 6.28); }   /* 섬이 작아진 만큼 큰 섬 하나 더 */
-    const tryPut = (list, layer, n, rMin, rMax, ex = {}) => { let got = 0; for (let tries = 0; tries < 80 && got < n; tries++) {
+    { const th = th0 + sd * 3 * deg, [x, z] = at(th, rf(.2)); put(BIG[(i + 5) % BIG.length], x, z, 'mid', R() * 6.28); }   /* 큰 섬 하나 더 */
+    const tryPut = (list, layer, n, rMin, rMax, ex = {}) => { let got = 0; for (let tries = 0; tries < n * 30 && got < n; tries++) {
       const k = list[Math.floor(R() * list.length)], th = th0 + (R() - .5) * SA * .96, r = rMin + R() * (rMax - rMin), [x, z] = at(th, r), K = KIT[k], s0 = ex.s ? ex.s() : 1, s = s0 * SC;
       if (layer !== 'up' && layer !== 'dn' && !clearOfBase(x, z, K.rad * s * .78, th0)) continue;
       if (!fits(x, z, K.rad * s * .78, layer)) continue; put(k, x, z, layer, R() * 6.28, { s: s0, y: ex.y ? ex.y() : 0 }); got++; } };
-    tryPut(MID, 'mid', 9, rf(.07), rf(.9));
+    tryPut(BIG, 'mid', 2, rf(.15), rf(.85));
+    tryPut(MID, 'mid', 26, rf(.04), rf(.94));
     tryPut([PIL[i % PIL.length], PIL[(i + 2) % PIL.length]], 'pillar', 2, rf(.12), rf(.8));
-    tryPut(ROCK, 'rock', 8, rf(.07), rf(.93), { y: () => -4 - R() * 9, s: () => 1 + R() * .8 });   /* 기체 발아래 떠 있는 바위 */
-    tryPut(UPS, 'up', 2, rf(.1), rf(.85));
-    tryPut(DNS, 'dn', 3, rf(.1), rf(.9)); }
+    tryPut(ROCK, 'rock', 16, rf(.04), rf(.96), { y: () => -4 - R() * 9, s: () => 1 + R() * .8 });   /* 기체 발아래 떠 있는 바위 */
+    tryPut(UPS, 'up', 5, rf(.06), rf(.9));
+    tryPut(DNS, 'dn', 7, rf(.04), rf(.94)); }
 
   /* ── 층마다 다른 빛: 위층 = 밝게 + 점무늬로 옅게(기체·카메라 가까이선 더 옅게) · 아래층 = 어둡고 아래로 갈수록 구름빛으로 흐려짐 ── */
   const uCam = { value: new THREE.Vector3() };

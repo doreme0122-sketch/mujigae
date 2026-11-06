@@ -1,0 +1,28 @@
+<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>섬 면 줄이기 비교</title>
+<style>html,body{margin:0;height:100%;background:#cfdcec;overflow:hidden;font-family:system-ui,sans-serif}#cv{width:100%;height:100%;display:block}
+#hud{position:fixed;left:12px;top:10px;color:#203040;font-size:13px;background:rgba(255,255,255,.7);padding:6px 10px;border-radius:10px}</style>
+<script type="importmap">{"imports":{"three":"./vendor/three.module.js","three/addons/":"./vendor/addons/"}}</script></head><body>
+<canvas id="cv"></canvas><div id="hud">윗줄(하나만 볼 땐 왼쪽) = 원래 섬 · 아랫줄(오른쪽) = 면을 줄인 섬 · 끌면 돌려 보기</div>
+<script type="module">
+import * as THREE from 'three'; import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+const cv = document.getElementById('cv'), r = new THREE.WebGLRenderer({ canvas: cv, antialias: true }); r.setPixelRatio(Math.min(2, devicePixelRatio));
+const sc = new THREE.Scene(); sc.background = new THREE.Color(0xcfdcec); const cam = new THREE.PerspectiveCamera(35, 1, .5, 3000);
+sc.add(new THREE.HemisphereLight(0xb7c8e8, 0x3a3020, 1.1)); const sun = new THREE.DirectionalLight(0xfff0dc, 2.6); sun.position.set(-9, 14, -8); sc.add(sun);
+const L = new GLTFLoader(), q = new URLSearchParams(location.search), only = q.get('only');
+const tgt0 = 0;
+const [A, B] = await Promise.all(['src/proto/assets/kit_meadow.glb', 'src/proto/assets/kit_meadow_lo.glb'].map(u => L.loadAsync(u)));
+const tri = o => { let n = 0; o.traverse(m => { if (m.isMesh) n += (m.geometry.index ? m.geometry.index.count : m.geometry.attributes.position.count) / 3; }); return n; };
+const names = A.scene.children.map(c => c.name).filter(n => !only || n.includes(only)); const cols = Math.ceil(Math.sqrt(names.length * 1.6)), G = 46;
+let t0 = 0, t1 = 0;
+names.forEach((n, i) => { const a = A.scene.getObjectByName(n).clone(), b = B.scene.getObjectByName(n).clone(); t0 += tri(a); t1 += tri(b);
+  const x = (i % cols - (cols - 1) / 2) * G, z = Math.floor(i / cols) * G * 2.2; a.position.set(x, 0, z); b.position.set(x, 0, z + G * 1.0); if (only) { a.position.set(-G * .55, 0, 0); b.position.set(G * .55, 0, 0); } sc.add(a, b); });
+document.getElementById('hud').textContent += ` · 면 ${Math.round(t0)} → ${Math.round(t1)} (${Math.round(t1 / t0 * 100)}%)`;
+const rows = Math.ceil(names.length / cols), tgt = new THREE.Vector3(0, 0, rows * G * 2.2 / 2 - G * .5); let yaw = 0, pit = .75, dis = Math.max(160, cols * G * 1.15) * (only ? .45 : 1);
+const place = () => { cam.position.set(tgt.x + Math.sin(yaw) * Math.cos(pit) * dis, tgt.y + Math.sin(pit) * dis, tgt.z + Math.cos(yaw) * Math.cos(pit) * dis); cam.lookAt(tgt); };
+let drag = null; cv.addEventListener('pointerdown', e => { drag = [e.clientX, e.clientY, yaw, pit]; cv.setPointerCapture(e.pointerId); });
+cv.addEventListener('pointermove', e => { if (!drag) return; yaw = drag[2] - (e.clientX - drag[0]) * .006; pit = Math.min(1.5, Math.max(.05, drag[3] + (e.clientY - drag[1]) * .006)); });
+cv.addEventListener('pointerup', () => drag = null); cv.addEventListener('wheel', e => { dis *= Math.exp(e.deltaY * .001); }, { passive: true });
+const size = () => { r.setSize(innerWidth, innerHeight, false); cam.aspect = innerWidth / innerHeight; cam.updateProjectionMatrix(); }; addEventListener('resize', size); size();
+r.setAnimationLoop(() => { place(); r.render(sc, cam); }); window.__ready = true;
+</script></body></html>
