@@ -1,5 +1,5 @@
 /* 전체 맵 1단계 — 태어나는 곳 + 무지개 홀로그램 벽 (사용자 2026-11-06)
-   · 맵 = 동그라미 · 지름 720m (반지름 360m · 사용자 미니맵 기준, 2026-11-06) · 바깥 고리 280~360m = 초원(meadow.js)
+   · 맵 = 동그라미 · 반지름 240m (가장자리에서 한가운데까지 20초 · 사용자 2026-11-06 다시 확정) · 바깥 고리 187~240m = 초원(meadow.js)
    · 맵 끝 = 무지개 홀로그램 벽: 늘 은은하게 보임 · 닿으면 튕기지 않고 그냥 막힘 · 총을 쏘면 맞은 자리에서 무지개빛이 표면을 따라 번짐
    · 태어나는 곳 10곳 = 벽 바깥(맵 테두리 뒤) · 출구만 벽을 뚫고 맵 안으로 이어짐 · 모두 한가운데에서 같은 거리
    · 태어나는 곳 모양 = '빛의 닻'(금테 별 판 · 수호 탑 일곱 · 계단 단 · 유성이 꽂히며 태어남)을 하늘섬에 맞게 다듬음:
@@ -7,22 +7,22 @@
    · 태어나 출구로 튀어 나가면 바로 조이스틱 · 기지 고리(9m)를 벗어나는 순간 보호막 3초 + 가속 5초 */
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
-import { makeBloom } from '../core/hangar/bloom.js?v=11061945';
-import { makePad } from '../core/hangar/pad.js?v=11061945';
-import { makeMag } from '../core/hangar/mag.js?v=11061945';
+import { makeBloom } from '../core/hangar/bloom.js?v=11061952';
+import { makePad } from '../core/hangar/pad.js?v=11061952';
+import { makeMag } from '../core/hangar/mag.js?v=11061952';
 import { buildShip } from '../core/ships/build.js';
-import { makeGoldStar } from './goldstar.js?v=11061945';
-import { makeArena, SPEED, WAVE_R0 } from './arena.js?v=11061945';
-import { makeGuardians, GUARD } from './guardian.js?v=11061945';
-import { makeBirth, BIRTH } from './birth.js?v=11061945';
-import { makePerf } from './perf.js?v=11061945';
+import { makeGoldStar } from './goldstar.js?v=11061952';
+import { makeArena, SPEED, WAVE_R0 } from './arena.js?v=11061952';
+import { makeGuardians, GUARD } from './guardian.js?v=11061952';
+import { makeBirth, BIRTH } from './birth.js?v=11061952';
+import { makePerf } from './perf.js?v=11061952';
 import { makeGlow } from '../preview/glow.js';
-import { makeFlight, FLY } from './flight.js?v=11061945';
-import { pedestal } from './gates.js?v=11061945';
-import { makeMeadow, MEADOW } from './meadow.js?v=11061945';
+import { makeFlight, FLY } from './flight.js?v=11061952';
+import { pedestal } from './gates.js?v=11061952';
+import { makeMeadow, MEADOW } from './meadow.js?v=11061952';
 
 const $ = s => document.querySelector(s), clamp = THREE.MathUtils.clamp, HOVER = FLY.HOVER;
-const R = 360, NB = 10, GAPH = 5.6, BASE_D = 0;     /* 맵 반지름 · 기지 수 · 벽 틈 반 폭(= 기지 반지름) · 기지 가운데는 벽 선 위 (앞 절반은 맵 안, 뒤 절반은 맵 밖 · 사용자 2026-11-06) */
+const R = 240, NB = 10, GAPH = 5.6, BASE_D = 0;     /* 맵 반지름 · 기지 수 · 벽 틈 반 폭(= 기지 반지름) · 기지 가운데는 벽 선 위 (앞 절반은 맵 안, 뒤 절반은 맵 밖 · 사용자 2026-11-06) */
 const SHIPL = 2.9, BS = 2 / SHIPL, BASE_Y = .42;     /* 기지 단위(기체 2.9) → 맵 단위(기체 2m) · 판 위 기체가 나는 높이에 오도록 */
 const AB = { transparent: true, depthWrite: false, blending: THREE.AdditiveBlending };
 
@@ -62,7 +62,7 @@ export async function start(canvas, onProgress = () => {}) {
         vec3 col=mix(sky*mix(1.,.35,k),space,smoothstep(.2,1.,k))+stars;
         col+=vec3(.35,.6,1.15)*exp(-pow((k-.32)/.16,2.))*.32;                               /* 대기 빛 띠: 은은하게 */
         gl_FragColor=vec4(col+cl*k*vec3(.15,.18,.25),1.); }` }));
-  sea.position.y = -150; scene.add(sea);   /* 아래층(−50m) 섬 밑으로 구름 바다가 깔리게 */
+  sea.position.y = -150; scene.add(sea);   /* 아래층(−30m) 섬 밑으로 구름 바다가 깔리게 */
   onProgress(.1);
 
   /* ── 무지개 홀로그램 벽 ── */
@@ -131,7 +131,7 @@ export async function start(canvas, onProgress = () => {}) {
   const stand = new THREE.Group(); B0.w.add(stand);
   onProgress(.4);
   /* ── 초원 고리 ── */
-  const meadow = await makeMeadow(scene, new URL('./assets/kit_meadow.glb?v=11061945', import.meta.url).href, p => onProgress(.4 + p * .4));
+  const meadow = await makeMeadow(scene, new URL('./assets/kit_meadow.glb?v=11061952', import.meta.url).href, p => onProgress(.4 + p * .4));
   onProgress(.82);
   /* ── 조이스틱으로 모는 기체 ── */
   /* 막힘: 맵 안은 자유 · 기지 안에선 판(계단 단 안쪽)과 출구 길만 · 무지개 벽과 그 바깥(우주)은 막힘 */
