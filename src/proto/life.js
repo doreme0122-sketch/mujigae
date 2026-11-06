@@ -1,27 +1,32 @@
 /* 하늘 맵 — 살아 있는 것들 (사용자 2026-11-06)
-   · 새 떼: 넓은 땅 위에 앉아 쪼다가, 기체가 가까이 오면 한꺼번에 놀라 날아올라 하늘을 한 바퀴 돌고 다시 내려앉음
+   · 새 떼: 작은 섬 위에 앉아 쪼다가 (갈매기 · 참새 · 꼬리 긴 파랑새), 기체가 가까이 오면 한꺼번에 놀라 날아올라 하늘을 한 바퀴 돌고 다시 내려앉음
    · 나비: 꽃밭 위를 팔랑이며 맴돎 · 꽃가루: 햇빛에 반짝이며 떠다님
    · 폭포 물보라: 폭포 끝에서 물안개가 피어오름
    · 떨어지는 흙·돌: 섬 가장자리에서 작은 돌 조각이 이따금 떨어져 구름 속으로 사라짐
    모두 한 종류마다 한 번에 그림 · 기체에서 먼 것은 움직임 계산을 건너뜀 */
 import * as THREE from 'three';
-import { makeChunk } from './land.js?v=11062305';
+import { makeChunk } from './land.js?v=11062343';
 
 const rnd = seed => { let s = seed >>> 0; return () => ((s = (s * 1664525 + 1013904223) >>> 0) / 4294967296); };
 const smooth = t => t * t * (3 - 2 * t);
 const LITV = `uniform vec3 uSun; varying vec3 vC;
   vec3 lit(vec3 c, vec3 n){ return c * (vec3(1., .94, .86) * .89 * max(dot(n, uSun), 0.) + mix(vec3(.11,.09,.06), vec3(.66,.7,.79), n.y * .5 + .5)); }`;
 
-/* 새: 몸통(마름모꼴) · 꼬리 깃 · 날개 둘(끝은 짙게) · 노란 부리 — 날개 점은 aW(-1 왼쪽 · 1 오른쪽 · 0 몸)로 표시해 날갯짓 */
-function birdGeo() {
-  const P = [], C = [], W = [], white = [.93, .93, .9], gray = [.62, .66, .72], dark = [.28, .3, .34], beak = [.95, .72, .25];
+/* 새 (사용자 2026-11-06: 종류 몇 가지) — 몸통(마름모꼴) · 꼬리 깃 · 날개 둘(끝은 짙게) · 부리. 날개 점은 aW(-1 왼쪽 · 1 오른쪽 · 0 몸)
+   종류마다 색 · 몸 크기 · 꼬리 길이 · 날개 길이가 다름 */
+export const BIRDS = {
+  gull:    { body: [.93, .93, .9], back: [.62, .66, .72], tip: [.24, .26, .3], beak: [.95, .72, .25], tail: .14, wing: .36, chest: [.95, .95, .93], scale: 2.4, flap: 9,  flapFly: .7,  glide: .55, n: [5, 7],  circle: 11, high: 7,  bob: .4,  look: '갈매기' },
+  sparrow: { body: [.55, .42, .3],  back: [.42, .32, .22], tip: [.22, .17, .12], beak: [.3, .25, .2],   tail: .12, wing: .26, chest: [.86, .78, .64], scale: 1.1, flap: 26, flapFly: 1.15, glide: 0,   n: [9, 13], circle: 5,  high: 3.5, bob: 1.4, look: '참새' },
+  blue:    { body: [.22, .45, .9],  back: [.15, .32, .72], tip: [.08, .12, .3], beak: [.2, .2, .22],   tail: .34, wing: .3,  chest: [.98, .55, .25], scale: 1.6, flap: 16, flapFly: .95, glide: .2,  n: [4, 6],  circle: 7,  high: 5,  bob: .9,  look: '파랑새(꼬리 긴)' } };
+function birdGeo(sp) {
+  const P = [], C = [], W = [], { body, back, tip, beak, chest, tail, wing } = sp;
   const t = (a, b, c, col, w = [0, 0, 0]) => { P.push(...a, ...b, ...c); for (let i = 0; i < 3; i++) { C.push(...col); W.push(w[i]); } };
   const N = [0, 0, .2], T = [0, .02, -.18], L = [-.055, 0, .02], Rr = [.055, 0, .02], U = [0, .065, .02], D = [0, -.05, .02];
-  t(N, U, L, white); t(N, Rr, U, white); t(N, L, D, white); t(N, D, Rr, white); t(T, L, U, gray); t(T, U, Rr, gray); t(T, D, L, white); t(T, Rr, D, white);
+  t(N, U, L, body); t(N, Rr, U, body); t(N, L, D, chest); t(N, D, Rr, chest); t(T, L, U, back); t(T, U, Rr, back); t(T, D, L, chest); t(T, Rr, D, chest);
   t([0, .01, .2], [-.015, 0, .26], [.015, 0, .26], beak);
-  t([-.05, .02, -.15], [0, .03, -.3], [.05, .02, -.15], gray);
-  for (const sd of [-1, 1]) { const r0 = [sd * .04, .03, .05], r1 = [sd * .04, .03, -.07], m = [sd * .2, .035, -.02], tip = [sd * .36, .03, -.08];
-    t(r0, m, r1, gray, [0, sd * .55, 0]); t(m, tip, r1, dark, [sd * .55, sd, 0]); }
+  t([-.05, .02, -.15], [0, .03, -.15 - tail], [.05, .02, -.15], back); if (tail > .25) t([-.03, .02, -.15], [-.06, .03, -.15 - tail * .9], [0, .03, -.15 - tail], tip);   /* 긴 꼬리는 두 갈래 */
+  for (const sd of [-1, 1]) { const r0 = [sd * .04, .03, .05], r1 = [sd * .04, .03, -.07], m = [sd * wing * .55, .035, -.02], tp = [sd * wing, .03, -.08];
+    t(r0, m, r1, back, [0, sd * .55, 0]); t(m, tp, r1, tip, [sd * .55, sd, 0]); }
   const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(P, 3)); g.setAttribute('color', new THREE.Float32BufferAttribute(C, 3)); g.setAttribute('aW', new THREE.Float32BufferAttribute(W, 1));
   g.computeVertexNormals(); return g;
 }
@@ -30,23 +35,27 @@ export function makeLife(scene, meadow, { R0, R1, HOVER = .7 } = {}) {
   const R = rnd(4242), U = { uT: { value: 0 }, uSun: { value: new THREE.Vector3(-9, 14, -8).normalize() } };
   const mids = meadow.LANDS.filter(L => L.layer === 'mid' && L.yAt);
 
-  /* ── 새 떼: 기지 하나 몫마다 한 무리 (둥지 땅이 아닌 넓은 땅) ── */
-  const flocks = [];
-  for (const L of mids.filter(L => !L.camp)) { if (R() < .25) continue; const birds = []; const cx = L.x + (R() - .5) * L.radius * .6, cz = L.z + (R() - .5) * L.radius * .6;
-    for (let i = 0; i < 7 + Math.floor(R() * 5); i++) { const a = R() * 6.28, d = Math.sqrt(R()) * 2.6, x = cx + Math.cos(a) * d, z = cz + Math.sin(a) * d, y = L.yAt(x, z); if (y === null) continue;
-      birds.push({ hx: x, hy: y, hz: z, yaw: R() * 6.28, ph: R() * 6.28, sp: .85 + R() * .3, peck: R() * 4, x, y, z, fy: 0, flap: 0 }); }
-    if (birds.length > 3) flocks.push({ cx, cz, cy: birds[0].hy, birds, t0: -1e9, dir: R() * 6.28 }); }
-  const NB = flocks.reduce((a, f) => a + f.birds.length, 0), bg = birdGeo();
-  const bF = new THREE.InstancedBufferAttribute(new Float32Array(NB * 2), 2); bF.setUsage(THREE.DynamicDrawUsage); bg.setAttribute('aF', bF);
-  const birdM = new THREE.ShaderMaterial({ uniforms: U, vertexColors: true,
-    vertexShader: `attribute float aW; attribute vec2 aF; ${LITV}
-      void main(){ vec3 p = position; float ang = aF.y * sin(aF.x) ; float s = abs(aW);
-        if (s > 0.) { float a = ang * sign(aW); p.y += sin(a) * abs(p.x) * 1.1; p.x *= cos(a * .8); p.y += aF.y * .02; }   /* 날갯짓: 날개 끝이 위아래로 크게 */
-        if (s == 0. && aF.y == 0.) p.y += max(0., sin(aF.x)) * .015;                                                   /* 앉아 있을 땐 고개를 까딱 */
-        mat4 M = modelMatrix * instanceMatrix; vec3 n = normalize(mat3(M) * normal);
-        vC = lit(color, n); gl_Position = projectionMatrix * viewMatrix * M * vec4(p, 1.); }`,
-    fragmentShader: `varying vec3 vC; void main(){ gl_FragColor = linearToOutputTexel(vec4(vC, 1.)); }`, side: THREE.DoubleSide });
-  const birdMesh = new THREE.InstancedMesh(bg, birdM, Math.max(1, NB)); birdMesh.frustumCulled = false; birdMesh.count = 0; scene.add(birdMesh);
+  /* ── 새 떼 (사용자 2026-11-06: 넓은 곳 말고 작은 섬 위주): 가운데층 작은 섬 위에 한 무리씩 · 종류는 섬마다 운으로 ── */
+  const SMALL = new Set(['Island_Small', 'Island_Chunk_Round', 'Island_Flat_Low', 'Island_Tilted_A', 'Island_Mushroom', 'Island_Medium', 'Island_Bowl', 'Island_Crag']);
+  const KINDS = Object.keys(BIRDS), flocks = [];
+  for (const p of meadow.place) { if (p.layer !== 'mid' || !SMALL.has(p.k) || R() > .32 || flocks.length >= 48) continue;
+    const K = meadow.KIT[p.k], top = p.y + K.top * p.sy, rad = K.rad * p.s * .32, kind = KINDS[Math.floor(R() * KINDS.length)], S = BIRDS[kind], birds = [];
+    const cnt = S.n[0] + Math.floor(R() * (S.n[1] - S.n[0] + 1));
+    for (let i = 0; i < cnt; i++) { const a = R() * 6.28, d = Math.sqrt(R()) * rad, x = p.x + Math.cos(a) * d, z = p.z + Math.sin(a) * d;
+      birds.push({ hx: x, hy: top + .02, hz: z, yaw: R() * 6.28, ph: R() * 6.28, sp: .85 + R() * .3, peck: R() * 4 }); }
+    flocks.push({ kind, S, cx: p.x, cz: p.z, cy: top, birds, t0: -1e9, dir: R() * 6.28 }); }
+  const BM = {};
+  for (const kind of KINDS) { const S = BIRDS[kind], NB = flocks.filter(f => f.kind === kind).reduce((a, f) => a + f.birds.length, 0), bg = birdGeo(S);
+    const bF = new THREE.InstancedBufferAttribute(new Float32Array(Math.max(1, NB) * 2), 2); bF.setUsage(THREE.DynamicDrawUsage); bg.setAttribute('aF', bF);
+    const m = new THREE.ShaderMaterial({ uniforms: U, vertexColors: true, side: THREE.DoubleSide,
+      vertexShader: `attribute float aW; attribute vec2 aF; ${LITV}
+        void main(){ vec3 p = position; float ang = aF.y * sin(aF.x); float s = abs(aW);
+          if (s > 0.) { float a = ang * sign(aW); p.y += sin(a) * abs(p.x) * 1.1; p.x *= cos(a * .8); p.y += aF.y * .02; }   /* 날갯짓: 날개 끝이 위아래로 크게 */
+          if (s == 0. && aF.y == 0.) p.y += max(0., sin(aF.x)) * .015;                                                   /* 앉아 있을 땐 고개를 까딱 */
+          mat4 M = modelMatrix * instanceMatrix; vec3 n = normalize(mat3(M) * normal);
+          vC = lit(color, n); gl_Position = projectionMatrix * viewMatrix * M * vec4(p, 1.); }`,
+      fragmentShader: `varying vec3 vC; void main(){ gl_FragColor = linearToOutputTexel(vec4(vC, 1.)); }` });
+    const mesh = new THREE.InstancedMesh(bg, m, Math.max(1, NB)); mesh.frustumCulled = false; mesh.count = 0; scene.add(mesh); BM[kind] = { mesh, bF }; }
 
   /* ── 나비 (날개 두 장) + 꽃가루 ── */
   const NBF = mids.length * 5, bfG = new THREE.InstancedBufferGeometry();
@@ -94,24 +103,26 @@ export function makeLife(scene, meadow, { R0, R1, HOVER = .7 } = {}) {
   const ND = 36, dGeo = makeChunk(919, meadow.PAL, false), dMat = new THREE.MeshLambertMaterial({ vertexColors: true });
   const debris = new THREE.InstancedMesh(dGeo, dMat, ND); debris.frustumCulled = false; debris.count = ND; scene.add(debris);
   const DS = Array.from({ length: ND }, () => ({ life: 0, p: new THREE.Vector3(), v: new THREE.Vector3(), r: new THREE.Euler(), w: new THREE.Vector3(), s: .1 })); let dI = 0, dT = 0;
-  const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), sv = new THREE.Vector3(), ev = new THREE.Euler();
+  const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), sv = new THREE.Vector3(), sv2 = new THREE.Vector3(), ev = new THREE.Euler();
 
   const update = (t, dt, ship, cam) => { U.uT.value = t;
-    /* 새 */
-    let n = 0; const F = bF.array;
-    for (const f of flocks) { const dC = Math.hypot(f.cx - cam.x, f.cz - cam.z); if (dC > 110) continue;
+    /* 새: 종류마다 나는 법이 다름 — 갈매기는 크게 돌며 미끄러지듯(날갯짓을 쉬기도) · 참새는 낮고 좁게 통통 튀듯 빠르게 · 파랑새는 물결치듯 */
+    const cntK = {}; for (const kind of KINDS) cntK[kind] = 0;
+    for (const f of flocks) { const dC = Math.hypot(f.cx - cam.x, f.cz - cam.z); if (dC > 110) continue; const S = f.S, B = BM[f.kind], F = B.bF.array;
       const near = Math.hypot(f.cx - ship.x, f.cz - ship.z) < 8; if (near && t - f.t0 > 12) { f.t0 = t; f.dir = Math.atan2(f.cz - ship.z, f.cx - ship.x); }   /* 놀라서 기체 반대쪽으로 */
       const e = t - f.t0;
-      for (const b of f.birds) { let x = b.hx, y = b.hy, z = b.hz, yaw = b.yaw, flapA = 0, ph = 0;
-        if (e < 12) { const ee = Math.max(0, e - b.sp * .25), cr = 9 + b.sp * 3, H = 6 + b.sp * 3, w = ee * .55 * b.sp + b.ph * .15;
-          const ox = f.cx + Math.cos(f.dir) * 6, oz = f.cz + Math.sin(f.dir) * 6;
-          const fx = ox + Math.cos(w + f.dir) * cr, fz = oz + Math.sin(w + f.dir) * cr, fy = f.cy + H + Math.sin(w * 2 + b.ph) * .8;
-          const up = smooth(Math.min(1, ee / 1.6)), down = smooth(Math.max(0, (ee - 8.5) / 3));
-          const k = up * (1 - down); x = b.hx + (fx - b.hx) * k; y = b.hy + (fy - b.hy) * k; z = b.hz + (fz - b.hz) * k;
-          yaw = Math.atan2(-Math.sin(w + f.dir), Math.cos(w + f.dir)) + (down > 0 ? 0 : 0); flapA = k > .02 ? (up < 1 ? 1.1 : .75) : 0; ph = t * (up < 1 || down > 0 ? 24 : 15) + b.ph; }
+      for (const b of f.birds) { let x = b.hx, y = b.hy, z = b.hz, yaw = b.yaw, flapA = 0, ph = 0; const n = cntK[f.kind]++;
+        if (e < 12) { const ee = Math.max(0, e - b.sp * .25), cr = S.circle + b.sp * S.circle * .3, H = S.high + b.sp * 2, w = ee * (5.5 / S.circle) * b.sp + b.ph * .15;
+          const ox = f.cx + Math.cos(f.dir) * S.circle * .6, oz = f.cz + Math.sin(f.dir) * S.circle * .6;
+          const fx = ox + Math.cos(w + f.dir) * cr, fz = oz + Math.sin(w + f.dir) * cr, fy = f.cy + H + Math.sin(w * 2 + b.ph) * S.bob * .6 + Math.abs(Math.sin(t * 5 + b.ph)) * S.bob * .25 * (f.kind === 'sparrow' ? 1 : 0);
+          const upk = smooth(Math.min(1, ee / 1.6)), down = smooth(Math.max(0, (ee - 8.5) / 3)), k = upk * (1 - down);
+          x = b.hx + (fx - b.hx) * k; y = b.hy + (fy - b.hy) * k; z = b.hz + (fz - b.hz) * k;
+          yaw = Math.atan2(-Math.sin(w + f.dir), Math.cos(w + f.dir));
+          const glide = S.glide > 0 && upk >= 1 && down === 0 && Math.sin(t * .9 + b.ph) > 1 - S.glide * 1.6;   /* 갈매기: 날개를 펴고 미끄러짐 */
+          flapA = k > .02 ? (glide ? .08 : upk < 1 ? S.flapFly * 1.3 : S.flapFly) : 0; ph = t * (upk < 1 || down > 0 ? S.flap * 1.5 : S.flap) + b.ph; }
         else { ph = t * 3 + b.ph + Math.sin(t * .7 + b.peck) * 2; }
-        m4.compose(sv.set(x, y + .02, z), q.setFromEuler(ev.set(0, yaw, 0)), sv.clone().set(2.4, 2.4, 2.4)); m4.toArray(birdMesh.instanceMatrix.array, n * 16);   /* 날개 편 길이 약 1.7m */ F[n * 2] = ph; F[n * 2 + 1] = flapA; n++; } }
-    birdMesh.count = n; if (n) { birdMesh.instanceMatrix.needsUpdate = true; bF.needsUpdate = true; }
+        m4.compose(sv.set(x, y + .02, z), q.setFromEuler(ev.set(0, yaw, 0)), sv2.set(S.scale, S.scale, S.scale)); m4.toArray(B.mesh.instanceMatrix.array, n * 16); F[n * 2] = ph; F[n * 2 + 1] = flapA; } }
+    for (const kind of KINDS) { const B = BM[kind]; B.mesh.count = cntK[kind]; if (cntK[kind]) { B.mesh.instanceMatrix.needsUpdate = true; B.bF.needsUpdate = true; } }
     /* 떨어지는 돌 */
     dT -= dt; if (dT <= 0) { dT = .35 + Math.random() * .5; let L = null, best = 1e9; for (const l of mids) { const d = Math.hypot(l.x - ship.x, l.z - ship.z); if (d < best && d < 60) { best = d; L = l; } }
       if (L) { const e = L.rim[Math.floor(Math.random() * L.rim.length)], D = DS[dI++ % ND]; D.life = 4.5; D.p.set(e[0], e[1] - .3, e[2]); D.v.set((e[0] - L.x) * .02, -.2, (e[2] - L.z) * .02); D.w.set(Math.random() * 3, Math.random() * 3, Math.random() * 3); D.s = .06 + Math.random() * .14; } }
