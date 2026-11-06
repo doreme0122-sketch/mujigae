@@ -7,18 +7,18 @@
    · 태어나 출구로 튀어 나가면 바로 조이스틱 · 기지 고리(9m)를 벗어나는 순간 보호막 3초 + 가속 5초 */
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
-import { makeBloom } from '../core/hangar/bloom.js?v=11061759';
-import { makePad } from '../core/hangar/pad.js?v=11061759';
-import { makeMag } from '../core/hangar/mag.js?v=11061759';
+import { makeBloom } from '../core/hangar/bloom.js?v=11061808';
+import { makePad } from '../core/hangar/pad.js?v=11061808';
+import { makeMag } from '../core/hangar/mag.js?v=11061808';
 import { buildShip } from '../core/ships/build.js';
-import { makeGoldStar } from './goldstar.js?v=11061759';
-import { makeArena, SPEED, WAVE_R0 } from './arena.js?v=11061759';
-import { makeGuardians, GUARD } from './guardian.js?v=11061759';
-import { makeBirth, BIRTH } from './birth.js?v=11061759';
-import { makePerf } from './perf.js?v=11061759';
+import { makeGoldStar } from './goldstar.js?v=11061808';
+import { makeArena, SPEED, WAVE_R0 } from './arena.js?v=11061808';
+import { makeGuardians, GUARD } from './guardian.js?v=11061808';
+import { makeBirth, BIRTH } from './birth.js?v=11061808';
+import { makePerf } from './perf.js?v=11061808';
 import { makeGlow } from '../preview/glow.js';
-import { makeFlight, FLY } from './flight.js?v=11061759';
-import { pedestal } from './gates.js?v=11061759';
+import { makeFlight, FLY } from './flight.js?v=11061808';
+import { pedestal } from './gates.js?v=11061808';
 
 const $ = s => document.querySelector(s), clamp = THREE.MathUtils.clamp, HOVER = FLY.HOVER;
 const R = 240, NB = 10, GAPH = 5.6, BASE_D = 0;     /* 맵 반지름 · 기지 수 · 벽 틈 반 폭(= 기지 반지름) · 기지 가운데는 벽 선 위 (앞 절반은 맵 안, 뒤 절반은 맵 밖 · 사용자 2026-11-06) */
@@ -67,14 +67,14 @@ export async function start(canvas, onProgress = () => {}) {
   /* ── 무지개 홀로그램 벽 ── */
   const HITS = Array.from({ length: 10 }, () => new THREE.Vector4(0, -999, 0, -99)); let hitI = 0;
   const wallM = new THREE.ShaderMaterial({ transparent: true, depthWrite: false, side: THREE.DoubleSide,
-    uniforms: { uT: { value: 0 }, uR: { value: R }, uGap: { value: GAPH }, uHit: { value: HITS }, uGapOn: { value: 1 } },
+    uniforms: { uT: { value: 0 }, uR: { value: R }, uGap: { value: GAPH }, uHit: { value: HITS }, uGapOn: { value: 1 }, uP: { value: new THREE.Vector2() } },
     vertexShader: 'varying vec3 vW; varying vec3 vN; void main(){ vec4 w=modelMatrix*vec4(position,1.); vW=w.xyz; vN=normalize(mat3(modelMatrix)*normal); gl_Position=projectionMatrix*viewMatrix*w; }',
-    fragmentShader: `uniform float uT, uR, uGap, uGapOn; uniform vec4 uHit[10]; varying vec3 vW; varying vec3 vN;
+    fragmentShader: `uniform float uT, uR, uGap, uGapOn; uniform vec2 uP; uniform vec4 uHit[10]; varying vec3 vW; varying vec3 vN;
       vec3 rb(float h){ return .5+.5*cos(6.2832*(h+vec3(0.,.33,.67))); }
       void main(){ float a=atan(vW.z,vW.x), st=6.2831853/10., k=a-st*floor(a/st+.5), arc=abs(k)*uR;
         float open=uGapOn>.5 ? smoothstep(uGap-.2,uGap+.7,arc) : 1.;                  /* 출구 틈 (통로 벽에는 틈 없음) */
         float u=a*uR, y=vW.y;
-        vec3 V=normalize(cameraPosition-vW); float fr=1.-abs(dot(normalize(vN),V)); fr=fr*fr;
+        vec3 V=normalize(cameraPosition-vW); float nv=abs(dot(normalize(vN),V)), fr=1.-nv; fr=fr*fr;
         /* 홀로그램 결: 엇갈린 마름모 격자 · 위로 흐르는 가는 주사선 · 천천히 흐르는 무지개 */
         vec2 q=vec2(u*.5+y*.5, u*.5-y*.5)*.45; vec2 f=abs(fract(q)-.5); float grid=smoothstep(.46,.5,max(f.x,f.y));
         float scan=pow(.5+.5*sin(y*5.-uT*2.4),18.);
@@ -87,7 +87,9 @@ export async function start(canvas, onProgress = () => {}) {
         for(int i=0;i<10;i++){ vec4 hh=uHit[i]; float age=uT-hh.w; if(age<0.||age>1.8) continue; float d=distance(vW,hh.xyz), rr=age*10.;
           float ring=exp(-pow((d-rr)/(.6+age*.6),2.))*(1.-age/1.8), core=exp(-d*d*.35)*max(0.,1.-age*3.);
           col+=rb(d*.06-age*.6)*(ring*1.6+core*2.); al+=ring*.55+core*.6; }
-        gl_FragColor=vec4(col*1.15,clamp(al,0.,.9)*vf*open); }` });
+        /* 곧게 잘린 회색 띠 없애기 (사용자 2026-11-06): 아주 비스듬히 보이는 면은 부드럽게 사라짐 · 기체에서 먼 벽(맞은편 벽 등)은 옅어짐 */
+        float graze=smoothstep(.03,.28,nv), far=smoothstep(170.,70.,distance(vW.xz,uP));
+        gl_FragColor=vec4(col*1.15,clamp(al,0.,.9)*vf*open*graze*far); }` });
   const wall = new THREE.Mesh(new THREE.CylinderGeometry(R, R, 90, 720, 1, true).translate(0, -4, 0), wallM); wall.renderOrder = 20; wall.frustumCulled = false; scene.add(wall);
   /* 틈 양옆 기둥: 홀로그램을 비추는 돌기둥 (흰 돌 · 금 띠 · 틈 쪽에 무지개 줄) */
   const postM = new THREE.MeshStandardMaterial({ color: 0xe6dfcf, roughness: .7, flatShading: true }), goldM = new THREE.MeshStandardMaterial({ color: 0xe2b35c, metalness: 1, roughness: .3 });
@@ -126,7 +128,7 @@ export async function start(canvas, onProgress = () => {}) {
         if (hh < .05) continue; const sh = new THREE.Shape(); sh.moveTo(Math.cos(a0) * r1, Math.sin(a0) * r1); sh.lineTo(Math.cos(a1) * r1, Math.sin(a1) * r1); sh.lineTo(Math.cos(a1) * r0, Math.sin(a1) * r0); sh.lineTo(Math.cos(a0) * r0, Math.sin(a0) * r0);
         const g = new THREE.ExtrudeGeometry(sh, { depth: hh, bevelEnabled: false }); g.rotateX(-Math.PI / 2); const m = new THREE.Mesh(g, q % 2 ? stepM : stepM2); back.add(m);
         const lip = new THREE.Mesh(new THREE.BoxGeometry(.06, .05, (r1 - r0)), goldM); lip.position.set(Math.cos((a0 + a1) / 2) * (r0 + r1) / 2, hh + .02, Math.sin((a0 + a1) / 2) * (r0 + r1) / 2); lip.rotation.y = -(a0 + a1) / 2; if (q % 3 === 0) back.add(lip); }
-      const edgeR = new THREE.Mesh(new THREE.TorusGeometry(r0 + .02, .035, 4, 48, span * 2 * .86), seamGlow); edgeR.rotation.x = Math.PI / 2; edgeR.rotation.z = -(Math.PI - span * .86); edgeR.position.y = h * .92; back.add(edgeR); }
+    }
     Object.assign(b, { root, w, pad, star, ring, guards, mag, dx, dz }); };
   for (let i = 0; i < NB; i++) mkBase(BASES[i], i === 0);
   const B0 = BASES[0];
@@ -200,7 +202,7 @@ export async function start(canvas, onProgress = () => {}) {
     for (let i = bolts.length - 1; i >= 0; i--) { const b = bolts[i], r0 = Math.hypot(b.x, b.z); b.x += b.vx * dt; b.z += b.vz * dt; b.life -= dt; const r1 = Math.hypot(b.x, b.z);
       if (B.blocked(b.x, b.z)) { if (!baseAt(b.x, b.z) && r1 > R - 1.5) { const ka = R / r1; HITS[hitI++ % HITS.length].set(b.x * ka, HOVER + .3, b.z * ka, t); fx.push({ x: b.x * ka, z: b.z * ka, t: 0 }); } else fx.push({ x: b.x, z: b.z, t: 0 }); bolts.splice(i, 1); continue; }   /* 무지개 벽에 맞으면 무지개빛이 번짐 · 기지 계단 단엔 불꽃만 */
       if (b.life <= 0) bolts.splice(i, 1); }
-    wallM.uniforms.uT.value = t; seamM.uniforms.uT.value = t;
+    wallM.uniforms.uT.value = t; seamM.uniforms.uT.value = t; wallM.uniforms.uP.value.set(flying ? FS.x : B0.x, flying ? FS.z : B0.z);
     glow.begin();
     for (const b of bolts) glow.add(b.x, HOVER + .3, b.z, -b.vx * .04, 0, -b.vz * .04, .18, 0, [.5, 1.2, .7], 1, b.x);
     for (let i = fx.length - 1; i >= 0; i--) { const f = fx[i]; f.t += dt; if (f.t > .3) { fx.splice(i, 1); continue; } glow.add(f.x, HOVER + .3, f.z, 0, 0, 0, .5 + f.t * 3, 3, [1.2, 1.1, 1.3], 1 - f.t / .3); }
