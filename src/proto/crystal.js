@@ -5,7 +5,7 @@
    · 맞으면: 맞은 자리 근처(지름 3m 남짓) 결정 속으로 들어간 빛이 면마다 다르게 꺾여 면마다 다른 색으로 0.7초쯤 반짝인다(칠한 무지개가 아님).
      맞은 결정은 움찔 움츠러들었다가 다시 뻗는다. */
 import * as THREE from 'three';
-import { HITS } from './rocks.js?v=11061334';
+import { HITS } from './rocks.js?v=11061503';
 
 /* 결정 하나 (밑 0 ~ 기둥 끝 1 ~ 머리 꼭짓점 1.0+tip). 모든 삼각형을 바깥쪽으로 맞춘다 */
 export function prism(seed) {
