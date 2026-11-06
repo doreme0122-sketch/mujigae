@@ -7,8 +7,8 @@
    단위는 자기장 판과 같음. */
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { sweep, posNor } from './floatring.js?v=11061825';
-import { GUARD_ANG, GUARD, guardScale } from './guardian.js?v=11061825';
+import { sweep, posNor } from './floatring.js?v=11061839';
+import { GUARD_ANG, GUARD, guardScale, TIER3, isBack, guardSeat } from './guardian.js?v=11061839';
 
 
 /* 건담처럼 장갑판을 조립한 느낌의 검은 판 선 — 면 위치로 바로 그림(텍스처 없음, 가벼움)
@@ -52,7 +52,8 @@ export const SPEED = 5;
 export const WAVE_R0 = 7.0 + .85 + .3;   /* 빛 물결이 출발하는 반지름 (맨 바깥 고리 바로 밖) */   /* 켜지는 빛이 바깥에서 가운데로 오는 빠르기 (판 단위/초) */
 export const ARENA = { floor: 4.3, t1: [4.3, 5.3, .34], t2: [5.3, 7.0, .95], skirt: .85, exitHalf: .34, ramp: .3 };
 
-export function makeArena() {
+export function makeArena(opt = {}) {
+  const back = opt.back;   /* [a0, a1]: 그 범위에 2층 바깥으로 3층 단을 한 칸 더 세움 (탑은 그 위로) */
   const G = new THREE.Group(), { floor: RF, t1, t2, skirt: SK, exitHalf: EH, ramp: RS } = ARENA;
   /* 금은 판(금테 별)에만. 판 아래 바닥 = 검은 건메탈, 계단 윗면 = 은색 메탈, 세로면 = 건메탈 + 밝은 에너지 빛 */
   const silver = panelLines(new THREE.MeshPhysicalMaterial({ color: 0xc2c8d2, metalness: .45, roughness: .42, clearcoat: .6, clearcoatRoughness: .2, envMapIntensity: .9, sheen: .4, sheenColor: 0x9fc2ff }));
@@ -86,9 +87,9 @@ export function makeArena() {
     const P = (aa, y) => [Math.cos(aa) * r, y, Math.sin(aa) * r]; const p = [P(a, y0), P(b, y0), P(b, y1), P(a, y1)]; glowPos.push(...p[0], ...p[1], ...p[2], ...p[0], ...p[2], ...p[3]);
     for (let j = 0; j < 6; j++) { glowK.push(k); glowS.push(-1); } } };
   const OV = .045, TH = .06;
-  const riser = (r, y0, y1, i) => { const n = 64 + i * 12;
-    for (let k = 0; k < n; k++) { const aa = M0 + (M1 - M0) * (k + .5) / n, g = new THREE.BoxGeometry(.03, y1 - y0 - .02, .045); g.translate(r - .014, (y0 + y1) / 2, 0); g.rotateY(-aa); L.rib.push(posNor(g)); }
-    const ym = (y0 + y1) / 2; band(r - .006, ym - .03, ym + .03, i); band(r - .005, y1 - .025, y1 - .012, i + 10); };
+  const riser = (r, y0, y1, i, a0 = M0, a1 = M1) => { const n = Math.round((64 + i * 12) * (a1 - a0) / (M1 - M0));
+    for (let k = 0; k < n; k++) { const aa = a0 + (a1 - a0) * (k + .5) / n, g = new THREE.BoxGeometry(.03, y1 - y0 - .02, .045); g.translate(r - .014, (y0 + y1) / 2, 0); g.rotateY(-aa); L.rib.push(posNor(g)); }
+    const ym = (y0 + y1) / 2; band(r - .006, ym - .03, ym + .03, i, a0, a1); band(r - .005, y1 - .025, y1 - .012, i + 10, a0, a1); };
 
   /* ── 1층: 낮고 얇은 단 ── */
   { const [r0, r1, h] = t1;
@@ -103,11 +104,12 @@ export function makeArena() {
   riser(q0, t1[2], H - .1, 1);
   const R = (() => { let v = 1234; return () => (v = (v * 9301 + 49297) % 233280) / 233280; })();
   /* 가장 가까운 탑까지 각도 거리 */
-  const near = a => { let m = 9; for (const g of GUARD_ANG) { const d = Math.abs(Math.atan2(Math.sin(a - g), Math.cos(a - g))) - (1 - guardScale(g)) * seatA0; if (d < m) m = d; } return m; };
+  const near = (a, up = false) => { let m = 9; for (const g of GUARD_ANG) { if (isBack(g, back) !== up) continue; const d = Math.abs(Math.atan2(Math.sin(a - g), Math.cos(a - g))) - (1 - guardScale(g)) * seatA0; if (d < m) m = d; } return m; };
   const SEAT = .8, seatA = (SEAT + .06) / GUARD.r, seatA0 = seatA;                        /* 탑을 앉히는 둥근 자리 반지름 */
   /* 2층 윗면: 탑에서 멀어지는 순서대로 정해진 장갑판이 되풀이됨 — 탑 옆은 무거운 덮개판 → 겹친 판 → 통풍칸 → 겹친 판 → … (양쪽 대칭, 정돈됨) */
-  const N = 56, da = (M1 - M0) / N, SEQ = ['cover', 'overlap', 'vent', 'overlap'];
-  for (let k = 0; k < N; k++) { const a0 = M0 + k * da + .007, a1 = a0 + da - .014, am = (a0 + a1) / 2, d = near(am);
+  const SEQ = ['cover', 'overlap', 'vent', 'overlap'];
+  const plates = (q0, q1, H, P0, P1, N, up) => { const da = (P1 - P0) / N;
+  for (let k = 0; k < N; k++) { const a0 = P0 + k * da + .007, a1 = a0 + da - .014, am = (a0 + a1) / 2, d = near(am, up);
     if (d < seatA) continue;                                                    /* 탑 자리 */
     const kind = SEQ[Math.floor((d - seatA) / da) % SEQ.length];
     if (kind === 'overlap') {  /* 겹친 장갑판: 안쪽 낮은 판 + 바깥 높은 판(모따기) + 볼트 */
@@ -124,9 +126,32 @@ export function makeArena() {
       L.silver.push(sweep([[q0 + .02, H - .04], [q1 - .02, H - .04], [q1 - .02, H + .03], [q1 - .1, H + .08], [q0 + .1, H + .08], [q0 + .02, H + .03]], a0, a1));
       L.silverHi.push(sweep([[q0 + .45, H + .08], [q1 - .4, H + .08], [q1 - .45, H + .13], [q0 + .5, H + .13]], a0 + .02, a1 - .02));
       L.dark.push(sweep([[q0 + .7, H + .13], [q0 + .95, H + .13], [q0 + .95, H + .135], [q0 + .7, H + .135]], am - .02, am + .02));
-    } }
+    } } };
+  plates(q0, q1, H, M0, M1, 56, false);
+  /* ── 3층(뒤쪽만): 2층 바깥에 같은 장갑 단을 한 칸 더 — 2층보다 조금 높게. 양끝은 출구 양옆처럼 부드럽게 내려앉음. 뒤쪽 탑들이 그 위에 앉음 ── */
+  const H3 = H + TIER3.dy, [z0, z1] = [TIER3.r0, TIER3.r1], B0 = back ? back[0] : 0, B1 = back ? back[1] : 0, BM0 = B0 + RS, BM1 = B1 - RS;
+  const ramped3 = prof => [sweep(prof, B0, BM0, undefined, 40, (u, y) => y > 0 ? Math.max(.004, y * sm(u)) : y), sweep(prof, BM0, BM1), sweep(prof, BM1, B1, undefined, 40, (u, y) => y > 0 ? Math.max(.004, y * sm(1 - u)) : y)];
+  if (back) {
+    L.gun.push(...ramped3([[z0, -.12], [z1, -.12], [z1, H3 - .1], [z0, H3 - .1]]));
+    L.silver.push(...ramped3([[z0 - OV, H3 - .1], [z1, H3 - .1], [z1, H3 - .04], [z0 - OV + .02, H3 - .04], [z0 - OV, H3 - .055]]));
+    riser(z0, H - .04, H3 - .1, 2, BM0, BM1);                                           /* 2층 → 3층 세로면: 같은 갈빗대 + 에너지 빛 */
+    plates(z0, z1, H3, BM0, BM1, Math.round(56 * (BM1 - BM0) / (M1 - M0) * (z0 + z1) / (q0 + q1)), true);
+    /* 3층 바깥: 2층과 같은 겹친 비탈 장갑 */
+    const sk = [[z1 - .02, -.12], [z1 + SK, -.12], [z1 + SK, .05], [z1 + SK * .55, .3], [z1 + .02, H3 - .12]];
+    L.gold.push(...ramped3(sk));
+    const NS = Math.round(36 * (BM1 - BM0) / (M1 - M0)), ds = (BM1 - BM0) / NS;
+    for (let k = 0; k < NS; k++) { const a0 = BM0 + k * ds + .006, a1 = a0 + ds - .012;
+      L.silver.push(sweep([[z1 - .03, H3 - .1], [z1 + SK * .5, .36], [z1 + SK * .5, .42], [z1 - .03, H3 - .04]], a0, a1));
+      L.blue.push(sweep([[z1 + SK * .45, .2], [z1 + SK + .02, .02], [z1 + SK + .02, .07], [z1 + SK * .45, .27]], a0 + .01, a1 - .01));
+      band(z1 + SK * .52, .3, .34, 20, a0 + .01, a1 - .01); }
+    /* 밑면: 받침 위로 튀어나온 단 아래를 비스듬히 마감 */
+    L.gun.push(sweep([[z0 - .1, -.12], [z1 + SK + .02, -.12], [z0 + .4, -.62]], B0 + .02, B1 - .02));
+    /* 금 테: 3층 단 모서리 */
+    { const r = z0 - OV, h = H3 - .04; L.gold.push(...ramped3([[r - .03, h - .06], [r + .02, h - .065], [r + .1, h + .004], [r + .1, h + .02], [r + .01, h + .02], [r - .03, h - .02]])); }
+  }
+  const q2H = H;
   /* 탑 자리: 둥글게 판 우묵한 자리(짙은 바닥) + 솟은 은색 테 + 테 안쪽 빛 고리. 탑이 그 안에 앉음 */
-  for (const g of GUARD_ANG) { const cx = Math.cos(g) * GUARD.r, cz = Math.sin(g) * GUARD.r, sc = guardScale(g);
+  for (const g of GUARD_ANG) { const st = guardSeat(g, back), H = q2H + st.up, cx = Math.cos(g) * st.r, cz = Math.sin(g) * st.r, sc = guardScale(g);
     const put = geo => { geo.scale(sc, 1, sc); geo.translate(cx, 0, cz); return geo; };
     L.dark.push(put(sweep([[0.001, H - .045], [SEAT - .1, H - .045], [SEAT - .1, H - .03], [0.001, H - .03]], 0, Math.PI * 2, undefined, 48)));
     L.gold.push(put(sweep([[SEAT - .12, H - .045], [SEAT + .04, H - .045], [SEAT + .04, H + .08], [SEAT - .02, H + .14], [SEAT - .1, H + .14], [SEAT - .12, H + .1]], 0, Math.PI * 2, undefined, 64)));
@@ -136,7 +161,7 @@ export function makeArena() {
   { const sk = [[q1 - .02, -.12], [q1 + SK, -.12], [q1 + SK, .05], [q1 + SK * .55, .3], [q1 + .02, H - .12]];
     L.gold.push(...ramped(sk));                                   /* 맨 바깥 고리: 금 */
     const NS = 36, ds = (M1 - M0) / NS;
-    for (let k = 0; k < NS; k++) { const a0 = M0 + k * ds + .006, a1 = a0 + ds - .012;
+    for (let k = 0; k < NS; k++) { const a0 = M0 + k * ds + .006, a1 = a0 + ds - .012; if (back && a0 > BM0 && a1 < BM1) continue;   /* 3층 단 속에 묻히는 칸은 뺌 */
       L.silver.push(sweep([[q1 - .03, H - .1], [q1 + SK * .5, .36], [q1 + SK * .5, .42], [q1 - .03, H - .04]], a0, a1));              /* 윗 비탈판 */
       L.blue.push(sweep([[q1 + SK * .45, .2], [q1 + SK + .02, .02], [q1 + SK + .02, .07], [q1 + SK * .45, .27]], a0 + .01, a1 - .01));   /* 박힌 가로 네모: 푸른 빛 */
       band(q1 + SK * .52, .3, .34, 20, a0 + .01, a1 - .01); } }                   /* 두 판 사이 빛 */
@@ -154,7 +179,7 @@ export function makeArena() {
   /* ── 에너지 길: 꼭대기 단 → 계단을 타고 내려와 → 바닥 → 별의 갈래 사이. s: 바깥 1 → 안 0 ── */
   const e = .005;
   for (const a of GUARD_ANG) { const c = Math.cos(a), s = Math.sin(a), nx = -s, nz = c, diag = Math.abs(Math.cos(2 * a)) < .5;
-    const path = [[GUARD.r - SEAT * guardScale(a) + .02, H - .03 + e], [q0 - OV - e, H - .04 + e], [q0 - OV - e, t1[2] + e], [t1[0] - OV - e, t1[2] + e], [t1[0] - OV - e, .004], [diag ? 2.0 : 3.2, .004]];
+    const st = guardSeat(a, back), path = [...(st.up ? [[st.r - SEAT * guardScale(a) + .02, H3 - .03 + e], [z0 - OV - e, H3 - .04 + e], [z0 - OV - e, H - .04 + e]] : [[GUARD.r - SEAT * guardScale(a) + .02, H - .03 + e]]), [q0 - OV - e, H - .04 + e], [q0 - OV - e, t1[2] + e], [t1[0] - OV - e, t1[2] + e], [t1[0] - OV - e, .004], [diag ? 2.0 : 3.2, .004]];
     const segL = []; let tot = 0; for (let i = 0; i < path.length - 1; i++) { const l = Math.hypot(path[i + 1][0] - path[i][0], path[i + 1][1] - path[i][1]); segL.push(l); tot += l; }
     /* 홈: 바닥·계단에 파인 짙은 길 + 양옆 파란 실선 */
     let acc = 0;
