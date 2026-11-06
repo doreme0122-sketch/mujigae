@@ -7,18 +7,18 @@
    · 태어나 출구로 튀어 나가면 바로 조이스틱 · 기지 고리(9m)를 벗어나는 순간 보호막 3초 + 가속 5초 */
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
-import { makeBloom } from '../core/hangar/bloom.js?v=11061752';
-import { makePad } from '../core/hangar/pad.js?v=11061752';
-import { makeMag } from '../core/hangar/mag.js?v=11061752';
+import { makeBloom } from '../core/hangar/bloom.js?v=11061759';
+import { makePad } from '../core/hangar/pad.js?v=11061759';
+import { makeMag } from '../core/hangar/mag.js?v=11061759';
 import { buildShip } from '../core/ships/build.js';
-import { makeGoldStar } from './goldstar.js?v=11061752';
-import { makeArena, SPEED, WAVE_R0 } from './arena.js?v=11061752';
-import { makeGuardians, GUARD } from './guardian.js?v=11061752';
-import { makeBirth, BIRTH } from './birth.js?v=11061752';
-import { makePerf } from './perf.js?v=11061752';
+import { makeGoldStar } from './goldstar.js?v=11061759';
+import { makeArena, SPEED, WAVE_R0 } from './arena.js?v=11061759';
+import { makeGuardians, GUARD } from './guardian.js?v=11061759';
+import { makeBirth, BIRTH } from './birth.js?v=11061759';
+import { makePerf } from './perf.js?v=11061759';
 import { makeGlow } from '../preview/glow.js';
-import { makeFlight, FLY } from './flight.js?v=11061752';
-import { pedestal } from './gates.js?v=11061752';
+import { makeFlight, FLY } from './flight.js?v=11061759';
+import { pedestal } from './gates.js?v=11061759';
 
 const $ = s => document.querySelector(s), clamp = THREE.MathUtils.clamp, HOVER = FLY.HOVER;
 const R = 240, NB = 10, GAPH = 5.6, BASE_D = 0;     /* 맵 반지름 · 기지 수 · 벽 틈 반 폭(= 기지 반지름) · 기지 가운데는 벽 선 위 (앞 절반은 맵 안, 뒤 절반은 맵 밖 · 사용자 2026-11-06) */
@@ -49,9 +49,18 @@ export async function start(canvas, onProgress = () => {}) {
     fragmentShader: `uniform float uT; varying vec3 vW; float h(vec2 p){ return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453); }
       float n(vec2 p){ vec2 i=floor(p),f=fract(p); f=f*f*(3.-2.*f); return mix(mix(h(i),h(i+vec2(1,0)),f.x),mix(h(i+vec2(0,1)),h(i+vec2(1,1)),f.x),f.y); }
       void main(){ float rr=length(vW.xz);
-        if(rr>${R}.){ vec2 g=floor(vW.xz*.35); float st=step(.985,h(g)); float tw=.55+.45*sin(uT*1.7+h(g+3.)*40.); vec2 f=fract(vW.xz*.35)-.5; float d=exp(-dot(f,f)*60.);
-          gl_FragColor=vec4(vec3(.85,.9,1.)*st*tw*d*(.5+h(g+7.)*.8)+vec3(.006,.008,.018),1.); return; }   /* 맵 바깥 = 검은 우주 · 맑게 별만 (사용자 2026-11-06) */
-        vec2 p=vW.xz*.015+vec2(uT*.004,0.); float c=n(p)*.5+n(p*2.1)*.3+n(p*4.3)*.2; c=smoothstep(.3,.8,c); gl_FragColor=vec4(mix(vec3(.62,.72,.9),vec3(.97,.98,1.),c),1.); }` }));
+        /* 하늘 → 우주: 구름 모양대로 울퉁불퉁하게 옅어지며 하늘빛이 어두워지고 별이 하나둘 · 경계를 따라 푸른 대기 빛 (사용자 2026-11-06) */
+        vec2 p=vW.xz*.015+vec2(uT*.004,0.); float c=n(p)*.5+n(p*2.1)*.3+n(p*4.3)*.2;
+        float edge=rr-${R}.-8.-(n(vW.xz*.02)*.6+n(vW.xz*.05)*.4)*38.;                    /* 구름 가닥이 우주 쪽으로 들쭉날쭉 */
+        float k=smoothstep(-6.,34.,edge);                                                  /* 0 = 하늘 · 1 = 우주 */
+        float cl=smoothstep(.3+k*.4,.8+k*.15,c)*(1.-k);                                     /* 구름이 점점 옅어져 흩어짐 */
+        vec3 sky=mix(vec3(.62,.72,.9),vec3(.97,.98,1.),cl);
+        vec3 space=vec3(.006,.008,.018);
+        vec2 g=floor(vW.xz*.35); float st=step(.985,h(g)); float tw=.55+.45*sin(uT*1.7+h(g+3.)*40.); vec2 f=fract(vW.xz*.35)-.5; float sd=exp(-dot(f,f)*60.);
+        vec3 stars=vec3(.85,.9,1.)*st*tw*sd*(.5+h(g+7.)*.8)*smoothstep(.35,1.,k);
+        vec3 col=mix(sky*mix(1.,.35,k),space,smoothstep(.2,1.,k))+stars;
+        col+=vec3(.35,.6,1.15)*exp(-pow((k-.32)/.16,2.))*.32;                               /* 대기 빛 띠: 은은하게 */
+        gl_FragColor=vec4(col+cl*k*vec3(.15,.18,.25),1.); }` }));
   sea.position.y = -60; scene.add(sea);
   onProgress(.1);
 
@@ -96,12 +105,29 @@ export async function start(canvas, onProgress = () => {}) {
   onProgress(.25);
 
   /* ── 태어나는 곳 10곳: 받침 섬 + 하늘빛 '빛의 닻' (출구가 한가운데를 바라봄) ── */
+  const keelM = new THREE.MeshStandardMaterial({ color: 0xe4ddcd, roughness: .7, metalness: .05, flatShading: true }), stepM = new THREE.MeshStandardMaterial({ color: 0xe9e3d5, roughness: .62, metalness: .06 }), stepM2 = new THREE.MeshStandardMaterial({ color: 0xdcd4c2, roughness: .68, metalness: .06 });
+  const seamGlow = new THREE.MeshBasicMaterial({ color: new THREE.Color(.45, .72, 1.35), toneMapped: false });
   const mkBase = (b, full) => { const root = new THREE.Group(); root.position.set(b.x, 0, b.z); scene.add(root);
-    const ped = pedestal(31 + BASES.indexOf(b) * 5); ped.scale.setScalar(1.25); ped.position.y = BASE_Y - .4;   /* 받침 섬 풀이 기지 바닥을 덮지 않게 */ root.add(ped);
     const w = new THREE.Group(); w.position.y = BASE_Y; w.scale.setScalar(BS); const dx = -Math.cos(b.ang), dz = -Math.sin(b.ang); w.rotation.y = Math.atan2(-dz, dx); root.add(w);   /* 기지의 +x(출구) → 한가운데 쪽 */
     const pad = makePad(); w.add(pad); const star = makeGoldStar(); w.add(star); const ring = makeArena(); w.add(ring); const guards = makeGuardians(); w.add(guards);
     let mag = null; if (full) { mag = makeMag(pad, { dust: false }); w.add(mag); mag.userData.setMode(1); }
-    skyTone(w); Object.assign(b, { root, w, pad, star, ring, guards, mag, dx, dz }); };
+    skyTone(w);
+    /* 섬 대신: 기지 아래를 마감하는 받침 — 층층이 좁아지는 흰 돌 · 금 띠 · 푸른 빛 홈 · 끝에 매달린 수정 */
+    const k = new THREE.Group(); k.position.y = BASE_Y - .02; k.rotation.y = w.rotation.y; root.add(k);
+    const prof = [[5.46, 0], [5.3, -.28], [4.7, -.42], [4.45, -1.05], [3.6, -1.25], [3.3, -2.05], [2.3, -2.3], [1.9, -3.25], [.95, -3.6], [.55, -4.6], [0, -5.2]].map(([x, y]) => new THREE.Vector2(x, y));
+    k.add(new THREE.Mesh(new THREE.LatheGeometry(prof, 40), keelM));
+    for (const [r, y] of [[5.33, -.24], [4.5, -1.02], [3.35, -2.02], [1.95, -3.2]]) { const ring2 = new THREE.Mesh(new THREE.TorusGeometry(r, .06, 6, 64), goldM); ring2.rotation.x = Math.PI / 2; ring2.position.y = y; k.add(ring2); }
+    for (let q = 0; q < 12; q++) { const a = q / 12 * Math.PI * 2, sm2 = new THREE.Mesh(new THREE.BoxGeometry(.05, .05, 1.1), seamGlow); sm2.position.set(Math.cos(a) * 4.05, -1.15, Math.sin(a) * 4.05); sm2.rotation.y = -a + Math.PI / 2; sm2.rotation.x = .1; k.add(sm2); }
+    const tip = new THREE.Mesh(new THREE.OctahedronGeometry(.42, 0), new THREE.MeshStandardMaterial({ color: 0xbfe6ff, emissive: 0x2a4a88, roughness: .15, flatShading: true })); tip.scale.y = 2.2; tip.position.y = -6; k.add(tip);
+    /* 뒤쪽은 계단 단을 더 높이 쌓아 막음 (출구 반대쪽 반원 · 양끝은 부드럽게 낮아짐) — 높은 단 위에 금 테 · 푸른 빛 홈 */
+    const back = new THREE.Group(); back.position.y = BASE_Y; back.rotation.y = w.rotation.y; root.add(back);
+    for (const [r0, r1, h, span] of [[3.75, 5.45, 1.25, 1.95], [4.3, 5.45, 2.05, 1.7], [4.85, 5.45, 2.85, 1.45]]) {
+      const n = 26; for (let q = 0; q < n; q++) { const a0 = Math.PI - span + q / n * span * 2, a1 = a0 + span * 2 / n, mid = (q + .5) / n * 2 - 1, hh = h * Math.min(1, (1 - Math.abs(mid)) * 4.5);   /* 양끝은 낮아지며 이어짐 */
+        if (hh < .05) continue; const sh = new THREE.Shape(); sh.moveTo(Math.cos(a0) * r1, Math.sin(a0) * r1); sh.lineTo(Math.cos(a1) * r1, Math.sin(a1) * r1); sh.lineTo(Math.cos(a1) * r0, Math.sin(a1) * r0); sh.lineTo(Math.cos(a0) * r0, Math.sin(a0) * r0);
+        const g = new THREE.ExtrudeGeometry(sh, { depth: hh, bevelEnabled: false }); g.rotateX(-Math.PI / 2); const m = new THREE.Mesh(g, q % 2 ? stepM : stepM2); back.add(m);
+        const lip = new THREE.Mesh(new THREE.BoxGeometry(.06, .05, (r1 - r0)), goldM); lip.position.set(Math.cos((a0 + a1) / 2) * (r0 + r1) / 2, hh + .02, Math.sin((a0 + a1) / 2) * (r0 + r1) / 2); lip.rotation.y = -(a0 + a1) / 2; if (q % 3 === 0) back.add(lip); }
+      const edgeR = new THREE.Mesh(new THREE.TorusGeometry(r0 + .02, .035, 4, 48, span * 2 * .86), seamGlow); edgeR.rotation.x = Math.PI / 2; edgeR.rotation.z = -(Math.PI - span * .86); edgeR.position.y = h * .92; back.add(edgeR); }
+    Object.assign(b, { root, w, pad, star, ring, guards, mag, dx, dz }); };
   for (let i = 0; i < NB; i++) mkBase(BASES[i], i === 0);
   const B0 = BASES[0];
   onProgress(.6);
