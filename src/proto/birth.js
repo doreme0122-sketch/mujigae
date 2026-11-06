@@ -10,7 +10,7 @@
    · 빛이 가장 밝을 때 기체가 나오고, 빛이 걷히면 기체가 서 있음
    무게: 태어날 때 2초 남짓만 그림. 꼬리·빛 가닥은 각각 한 덩어리, 부스러기·조각은 점 묶음 한 번씩 */
 import * as THREE from 'three';
-import { makeMeteor, METEOR } from './meteor.js?v=11061808';
+import { makeMeteor, METEOR } from './meteor.js?v=11061814';
 
 export const BIRTH = { PRE: METEOR.FALL, END: 2.0 };   /* 떨어지는 빛 = 유성 (meteor.js) */
 const TOP = 16;
