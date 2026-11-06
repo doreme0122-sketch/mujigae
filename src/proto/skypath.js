@@ -8,11 +8,11 @@
    · 층 높이 · 떨어진 거리는 막대로 바꿔 봄 (볼륨감 찾기) */
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
-import { makeBloom } from '../core/hangar/bloom.js?v=11061557';
-import { makePerf } from './perf.js?v=11061557';
+import { makeBloom } from '../core/hangar/bloom.js?v=11061605';
+import { makePerf } from './perf.js?v=11061605';
 import { makeGlow } from '../preview/glow.js';
-import { makeGlbIsle } from './glbisle.js?v=11061557';
-import { makeFlight, FLY } from './flight.js?v=11061557';
+import { makeGlbIsle } from './glbisle.js?v=11061605';
+import { makeFlight, FLY } from './flight.js?v=11061605';
 
 const $ = s => document.querySelector(s), clamp = THREE.MathUtils.clamp, HOVER = FLY.HOVER;
 const UP = new THREE.Color(1.5, 1.12, .45), DN = new THREE.Color(.75, .5, 1.6);   /* 빛 색: 금빛 = 윗층 · 보랏빛 = 아래층 */
