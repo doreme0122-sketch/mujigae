@@ -13,10 +13,6 @@ export const GUARD = { r: 6.15, y: .91, DOWN: .6 };   /* DOWN: 결정에서 받�
 export const GUARD_ANG = [1, 2, 3, 4, 5, 6, 7].map(k => k * Math.PI / 4);
 /* 새로 넣은 셋(별의 끝 방향)은 낮고 작게 */
 export const guardScale = a => Math.abs(Math.cos(2 * a)) > .5 ? .7 : 1;
-/* 뒤쪽 3층 단 (하늘 맵 기지 · 사용자 2026-11-06): 출구 반대쪽 back=[a0,a1] 범위에 기존 계단을 한 칸 더 세우고, 그 범위의 탑은 그 위로 올림 */
-export const TIER3 = { r0: 7.0, r1: 8.75, dy: .5 };
-export const isBack = (a, back) => !!back && a >= back[0] && a <= back[1];
-export const guardSeat = (a, back) => isBack(a, back) ? { r: (TIER3.r0 + TIER3.r1) / 2, y: GUARD.y + TIER3.dy, up: TIER3.dy } : { r: GUARD.r, y: GUARD.y, up: 0 };
 const NI = g => { for (const k of Object.keys(g.attributes)) if (k !== 'position' && k !== 'normal') g.deleteAttribute(k); return g.index ? g.toNonIndexed() : g; };
 const lathe = (pts, seg = 8, phase = Math.PI / 8) => NI(new THREE.LatheGeometry(pts.map(([r, y]) => new THREE.Vector2(r, y)), seg, phase));
 
@@ -64,7 +60,7 @@ function baseParts() {
   return { P, slits, top: 1.16 };
 }
 
-export function makeGuardians(opt = {}) {
+export function makeGuardians() {
   const G = new THREE.Group(), { r: RR, y: Y0, DOWN } = GUARD;
   const gun = new THREE.MeshPhysicalMaterial({ color: 0x1d2026, metalness: .9, roughness: .28, clearcoat: .5, clearcoatRoughness: .2, envMapIntensity: 1.05, side: THREE.DoubleSide });
   const silver = new THREE.MeshPhysicalMaterial({ color: 0xccd2db, metalness: .4, roughness: .38, clearcoat: .5, clearcoatRoughness: .15, envMapIntensity: 1.15, side: THREE.DoubleSide });
@@ -80,8 +76,8 @@ export function makeGuardians(opt = {}) {
   gemOuter.customProgramCacheKey = () => 'gemOuter';
   const gemCore = new THREE.MeshBasicMaterial({ color: 0x6aa0ff, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false });
   /* 받침 빛 틈: s=0 위 → 1 아래 */
-  const sMat = new THREE.ShaderMaterial({ uniforms: { uT, uOn, uFire, uSc: { value: 1 } }, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide,
-    vertexShader: 'attribute float aS; uniform float uSc; varying float vS; varying float vY; void main(){ vS=aS; vec4 w=modelMatrix*vec4(position,1.); vY='+Y0.toFixed(3)+' + position.y*uSc; gl_Position=projectionMatrix*viewMatrix*w; }',   /* 높이는 탑 자기 기준(올린 탑도 같은 때에 바닥 도착 · 기지를 줄이거나 띄워도 그대로) */
+  const sMat = new THREE.ShaderMaterial({ uniforms: { uT, uOn, uFire }, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide,
+    vertexShader: 'attribute float aS; varying float vS; varying float vY; void main(){ vS=aS; vec4 w=modelMatrix*vec4(position,1.); vY=w.y; gl_Position=projectionMatrix*viewMatrix*w; }',
     fragmentShader: `uniform float uT, uOn, uFire; varying float vS; varying float vY;
       void main(){ float e = uT - uFire, hy = ${(Y0 + .9).toFixed(3)} - e * ${(.9 / DOWN).toFixed(3)};   /* 빛 머리 높이: 모든 탑이 같은 높이·같은 속도로 */
         float pour = exp(-(((vY - hy) * 12.)*((vY - hy) * 12.))) * step(0., e) * step(${(Y0 - .1).toFixed(3)}, hy);
@@ -111,9 +107,9 @@ export function makeGuardians(opt = {}) {
     vertexShader: 'varying vec2 vU; void main(){ vU=uv*2.-1.; vec4 c=modelViewMatrix*vec4(0.,0.,0.,1.); c.xy+=position.xy; gl_Position=projectionMatrix*c; }',
     fragmentShader: 'uniform float uI; varying vec2 vU; void main(){ float r=length(vU); float core=exp(-r*r*16.)*.6, soft=exp(-r*r*4.)*.22, streak=0.;   /* 결정 모양이 보이게 둥글고 옅게 (뭉쳐 형상처럼 보이지 않게) */ float edge=1.-smoothstep(.55,1.,max(abs(vU.x),abs(vU.y))); gl_FragColor=vec4(vec3(.45,.7,1.35)*(core+soft+streak)*uI*edge,1.); }' });
   const units = [];
-  for (let k = 0; k < GUARD_ANG.length; k++) { const a = GUARD_ANG[k], st = guardSeat(a, opt.back), u = new THREE.Group(); u.position.set(Math.cos(a) * st.r, st.y, Math.sin(a) * st.r); u.rotation.y = -a; u.scale.setScalar(guardScale(a));
+  for (let k = 0; k < GUARD_ANG.length; k++) { const a = GUARD_ANG[k], u = new THREE.Group(); u.position.set(Math.cos(a) * RR, Y0, Math.sin(a) * RR); u.rotation.y = -a; u.scale.setScalar(guardScale(a));
     u.add(new THREE.Mesh(gunG, gun), new THREE.Mesh(silverG, silver), new THREE.Mesh(darkG, dark), new THREE.Mesh(goldG, gold));
-    const smM = sMat.clone(); smM.uniforms = { uT, uOn, uFire, uSc: { value: guardScale(a) } }; const sm = new THREE.Mesh(slitG, smM); sm.renderOrder = 3; u.add(sm);
+    const sm = new THREE.Mesh(slitG, sMat); sm.renderOrder = 3; u.add(sm);
     const cl = new THREE.Group(); cl.position.y = top + .02; u.add(cl);
     const core = new THREE.Mesh(coreG, gemCore); core.renderOrder = 4; cl.add(core);
     const outer = new THREE.Mesh(outerG, gemOuter); outer.renderOrder = 5; cl.add(outer);

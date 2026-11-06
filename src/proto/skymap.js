@@ -7,18 +7,18 @@
    · 태어나 출구로 튀어 나가면 바로 조이스틱 · 기지 고리(9m)를 벗어나는 순간 보호막 3초 + 가속 5초 */
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
-import { makeBloom } from '../core/hangar/bloom.js?v=11061839';
-import { makePad } from '../core/hangar/pad.js?v=11061839';
-import { makeMag } from '../core/hangar/mag.js?v=11061839';
+import { makeBloom } from '../core/hangar/bloom.js?v=11061851';
+import { makePad } from '../core/hangar/pad.js?v=11061851';
+import { makeMag } from '../core/hangar/mag.js?v=11061851';
 import { buildShip } from '../core/ships/build.js';
-import { makeGoldStar } from './goldstar.js?v=11061839';
-import { makeArena, SPEED, WAVE_R0 } from './arena.js?v=11061839';
-import { makeGuardians, GUARD } from './guardian.js?v=11061839';
-import { makeBirth, BIRTH } from './birth.js?v=11061839';
-import { makePerf } from './perf.js?v=11061839';
+import { makeGoldStar } from './goldstar.js?v=11061851';
+import { makeArena, SPEED, WAVE_R0 } from './arena.js?v=11061851';
+import { makeGuardians, GUARD } from './guardian.js?v=11061851';
+import { makeBirth, BIRTH } from './birth.js?v=11061851';
+import { makePerf } from './perf.js?v=11061851';
 import { makeGlow } from '../preview/glow.js';
-import { makeFlight, FLY } from './flight.js?v=11061839';
-import { pedestal } from './gates.js?v=11061839';
+import { makeFlight, FLY } from './flight.js?v=11061851';
+import { pedestal } from './gates.js?v=11061851';
 
 const $ = s => document.querySelector(s), clamp = THREE.MathUtils.clamp, HOVER = FLY.HOVER;
 const R = 240, NB = 10, GAPH = 5.6, BASE_D = 0;     /* 맵 반지름 · 기지 수 · 벽 틈 반 폭(= 기지 반지름) · 기지 가운데는 벽 선 위 (앞 절반은 맵 안, 뒤 절반은 맵 밖 · 사용자 2026-11-06) */
@@ -109,10 +109,9 @@ export async function start(canvas, onProgress = () => {}) {
   /* ── 태어나는 곳 10곳: 받침 섬 + 하늘빛 '빛의 닻' (출구가 한가운데를 바라봄) ── */
   const keelM = new THREE.MeshStandardMaterial({ color: 0xe4ddcd, roughness: .7, metalness: .05, flatShading: true }), stepM = new THREE.MeshStandardMaterial({ color: 0xe9e3d5, roughness: .62, metalness: .06 }), stepM2 = new THREE.MeshStandardMaterial({ color: 0xdcd4c2, roughness: .68, metalness: .06 });
   const seamGlow = new THREE.MeshBasicMaterial({ color: new THREE.Color(.45, .72, 1.35), toneMapped: false });
-  const BACK = [Math.PI - 1.95, Math.PI + 1.95];   /* 예전 높은 단이 시작되던 자리부터 */
   const mkBase = (b, full) => { const root = new THREE.Group(); root.position.set(b.x, 0, b.z); scene.add(root);
     const w = new THREE.Group(); w.position.y = BASE_Y; w.scale.setScalar(BS); const dx = -Math.cos(b.ang), dz = -Math.sin(b.ang); w.rotation.y = Math.atan2(-dz, dx); root.add(w);   /* 기지의 +x(출구) → 한가운데 쪽 */
-    const pad = makePad(); w.add(pad); const star = makeGoldStar(); w.add(star); const ring = makeArena({ back: BACK }); w.add(ring); const guards = makeGuardians({ back: BACK }); w.add(guards);   /* 뒤쪽 반: 기존 계단을 한 칸 더(조금 높게) · 뒤쪽 탑 다섯은 그 위 (사용자 2026-11-06) */
+    const pad = makePad(); w.add(pad); const star = makeGoldStar(); w.add(star); const ring = makeArena(); w.add(ring); const guards = makeGuardians(); w.add(guards);   /* 뒤쪽은 덮어 쌓은 계단 없이, 보이지 않게 막기만 (사용자 2026-11-06) */
     let mag = null; if (full) { mag = makeMag(pad, { dust: false }); w.add(mag); mag.userData.setMode(1); }
     skyTone(w);
     /* 섬 대신: 기지 아래를 마감하는 받침 — 층층이 좁아지는 흰 돌 · 금 띠 · 푸른 빛 홈 · 끝에 매달린 수정 */
