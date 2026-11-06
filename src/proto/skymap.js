@@ -7,18 +7,18 @@
    · 태어나 출구로 튀어 나가면 바로 조이스틱 · 기지 고리(9m)를 벗어나는 순간 보호막 3초 + 가속 5초 */
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
-import { makeBloom } from '../core/hangar/bloom.js?v=11061814';
-import { makePad } from '../core/hangar/pad.js?v=11061814';
-import { makeMag } from '../core/hangar/mag.js?v=11061814';
+import { makeBloom } from '../core/hangar/bloom.js?v=11061825';
+import { makePad } from '../core/hangar/pad.js?v=11061825';
+import { makeMag } from '../core/hangar/mag.js?v=11061825';
 import { buildShip } from '../core/ships/build.js';
-import { makeGoldStar } from './goldstar.js?v=11061814';
-import { makeArena, SPEED, WAVE_R0 } from './arena.js?v=11061814';
-import { makeGuardians, GUARD } from './guardian.js?v=11061814';
-import { makeBirth, BIRTH } from './birth.js?v=11061814';
-import { makePerf } from './perf.js?v=11061814';
+import { makeGoldStar } from './goldstar.js?v=11061825';
+import { makeArena, SPEED, WAVE_R0 } from './arena.js?v=11061825';
+import { makeGuardians, GUARD } from './guardian.js?v=11061825';
+import { makeBirth, BIRTH } from './birth.js?v=11061825';
+import { makePerf } from './perf.js?v=11061825';
 import { makeGlow } from '../preview/glow.js';
-import { makeFlight, FLY } from './flight.js?v=11061814';
-import { pedestal } from './gates.js?v=11061814';
+import { makeFlight, FLY } from './flight.js?v=11061825';
+import { pedestal } from './gates.js?v=11061825';
 
 const $ = s => document.querySelector(s), clamp = THREE.MathUtils.clamp, HOVER = FLY.HOVER;
 const R = 240, NB = 10, GAPH = 5.6, BASE_D = 0;     /* 맵 반지름 · 기지 수 · 벽 틈 반 폭(= 기지 반지름) · 기지 가운데는 벽 선 위 (앞 절반은 맵 안, 뒤 절반은 맵 밖 · 사용자 2026-11-06) */
@@ -136,9 +136,6 @@ export async function start(canvas, onProgress = () => {}) {
 
   /* ── 태어나는 기체 (기지 0) ── */
   const stand = new THREE.Group(); B0.w.add(stand);
-  const sb = await buildShip(1, 1, 'ruby', { renderer, size: SHIPL }); const bship = sb.root, bsm = sb.root.children[0]; stand.add(bship); bship.rotation.y = -Math.PI / 2;
-  const shipHalf = new THREE.Box3().setFromObject(bsm).getSize(new THREE.Vector3()).y * bship.scale.x / 2;
-  const birth = makeBirth(bship); B0.w.add(birth);
   onProgress(.75);
   /* ── 조이스틱으로 모는 기체 ── */
   /* 막힘: 맵 안은 자유 · 기지 안에선 판(계단 단 안쪽)과 출구 길만 · 무지개 벽과 그 바깥(우주)은 막힘 */
@@ -149,20 +146,25 @@ export async function start(canvas, onProgress = () => {}) {
       return Math.hypot(x, z) > R - .9; }, region: () => 0 };
   const fly = await makeFlight(renderer, B, [B0.x, B0.z], 0); scene.add(fly); const FS = fly.userData.S; fly.visible = false;
   const oldSh = []; fly.traverse(o => { if (o.isMesh && o.renderOrder === 1 && o.geometry.type === 'PlaneGeometry') oldSh.push(o); });
+  /* 기체는 한 대만 (사용자 2026-11-06): 조이스틱으로 모는 그 기체가 태어나는 동안엔 기지 판 위(기지 안)에 앉아 있다가, 태어나면 그대로 이어서 몬다 */
+  const bship = fly.children[0], S0 = bship.scale.x, bsm = bship.children[0];
+  const shipHalf = new THREE.Box3().setFromObject(bship).getSize(new THREE.Vector3()).y / BS / 2;   /* 기지 단위로 */
+  const birth = makeBirth(bship); B0.w.add(birth);
   onProgress(.9);
 
   /* ── 태어나기 → 튀어 나가기 (빛의 닻 순서 그대로: 탑 → 빛 물결 → 금테 별 → 정중앙에 모이는 순간 유성이 꽂힘) ── */
   let holdAt = 1e9, W0 = 0, onAt = 1e9, born = false, launchAt = 1e9, flying = false; const FILL = 1.62 / SPEED, tw = r => W0 + (WAVE_R0 - r) / SPEED;
   const wake = t0 => { W0 = t0 + GUARD.DOWN; B0.guards.userData.fire(t0); B0.ring.userData.wake(W0); B0.star.userData.fire(tw(2.55), (2.55 - 1.8) / SPEED); holdAt = tw(1.62); onAt = tw(0) - BIRTH.PRE; born = false;
-    launchAt = onAt + BIRTH.PRE + 1.0;   /* 태어나 빛이 걷히면 바로 조이스틱 (자동으로 튀어 나가는 장면 없음 · 사용자 2026-11-06) */ flying = false; fly.visible = false; stand.add(bship); bship.position.set(0, 0, 0); bship.rotation.set(0, -Math.PI / 2, 0); bship.visible = false; };
+    launchAt = onAt + BIRTH.PRE + 1.0;   /* 태어나 빛이 걷히면 바로 조이스틱 (자동으로 튀어 나가는 장면 없음 · 사용자 2026-11-06) */ flying = false; fly.visible = false; stand.add(bship); bship.scale.setScalar(S0 / BS); bship.position.set(0, 0, 0); bship.rotation.set(0, -Math.PI / 2, 0); bship.visible = false; };
   /* 출발 충격 고리 */
   const shockM = new THREE.ShaderMaterial({ ...AB, side: THREE.DoubleSide, uniforms: { uR: { value: 0 }, uI: { value: 0 } },
     vertexShader: 'varying vec2 vP; void main(){ vP=position.xy; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.); }',
     fragmentShader: `uniform float uR, uI; varying vec2 vP; void main(){ float r=length(vP); vec3 c=vec3(0.); for(int i=0;i<6;i++){ float w=float(i)/5.; float q=(r-uR*(1.+(w-.5)*.12))/.05; c+=(.5+.5*cos(6.2832*(w+vec3(0.,.33,.67))))*exp(-q*q); } gl_FragColor=vec4(c/3.*uI,1.); }` });
   const shock = new THREE.Mesh(new THREE.CircleGeometry(3, 96), shockM); shock.renderOrder = 9; shock.visible = false; scene.add(shock); let shockT = 9;
-  const launch = t => { bship.updateMatrixWorld(true); const p = new THREE.Vector3().setFromMatrixPosition(bship.matrixWorld); bship.visible = false; birth.userData.stop();
-    const head = Math.atan2(-B0.dx, -B0.dz); fly.userData.moveTo(p.x, p.z, head); fly.position.y = 0; fly.visible = true; flying = true;
-    FS.armed = true; FS.vx = FS.vz = 0; };   /* 그 자리에서 바로 몰기 · 기지 고리 9m를 벗어나면 보호막 3초 · 가속 5초 */
+  const launch = t => { bship.updateMatrixWorld(true); const p = new THREE.Vector3(), q = new THREE.Quaternion(); bship.getWorldPosition(p); bship.getWorldQuaternion(q); birth.userData.stop();
+    const yaw = new THREE.Euler().setFromQuaternion(q, 'YXZ').y;   /* 판 위에 있던 그대로의 자리 · 높이 · 방향에서 이어 몬다 */
+    fly.add(bship); bship.scale.setScalar(S0); bship.visible = true; fly.userData.moveTo(p.x, p.z, yaw); fly.position.y = p.y - HOVER; fly.visible = true; flying = true;
+    FS.armed = true; FS.vx = FS.vz = 0; };   /* 기지 고리 9m를 벗어나면 보호막 3초 · 가속 5초 */
   $('#again').onclick = () => wake(t + .3);
 
   /* ── 쏘기: 버튼을 누르고 있거나 스페이스 ── */
@@ -193,7 +195,7 @@ export async function start(canvas, onProgress = () => {}) {
     birth.userData.update(t, dt); { const S = birth.userData.S; WARP.r = S.warpR; WARP.s = S.warpS; for (const o of [B0.pad, B0.mag, B0.star, stand]) o.position.y = S.punch; B0.star.userData.burst(S.burst); B0.ring.userData.impact(S.impR, S.impK); }
     if (!flying && t >= launchAt) launch(t);
     /* 기체 */
-    if (flying) { fly.updateMatrixWorld(true); fly.userData.update(t, dt); for (const o of oldSh) o.visible = false; }
+    if (flying) { fly.position.y += (0 - fly.position.y) * Math.min(1, dt * 1.5); fly.updateMatrixWorld(true); fly.userData.update(t, dt);   /* 판 위 높이에서 비행 높이로 스르륵 */ for (const o of oldSh) o.visible = false; }
     if (shockT < .8) { shockT += dt; shock.visible = true; shockM.uniforms.uR.value = .3 + shockT * 4.5; shockM.uniforms.uI.value = Math.max(0, 1 - shockT / .8) * 1.3; } else shock.visible = false;
     /* 쏘기 · 벽에 맞으면 무지개빛이 번짐 */
     cool -= dt; if (flying && fireOn && cool <= 0) { cool = .16; const h = FS.head, x = FS.x - Math.sin(h) * 1.2, z = FS.z - Math.cos(h) * 1.2; bolts.push({ x, z, vx: -Math.sin(h) * 40 + FS.vx * .5, vz: -Math.cos(h) * 40 + FS.vz * .5, life: 1.6 }); }
@@ -206,7 +208,7 @@ export async function start(canvas, onProgress = () => {}) {
     for (let i = fx.length - 1; i >= 0; i--) { const f = fx[i]; f.t += dt; if (f.t > .3) { fx.splice(i, 1); continue; } glow.add(f.x, HOVER + .3, f.z, 0, 0, 0, .5 + f.t * 3, 3, [1.2, 1.1, 1.3], 1 - f.t / .3); }
     glow.end(); glow.uT.value = t;
     /* 카메라 */
-    let tx, tz; if (flying) { const sp = fly.children[0].position; tx = sp.x + FS.vx * .25; tz = sp.z + FS.vz * .25; } else { tx = B0.x; tz = B0.z; }
+    let tx, tz; if (flying) { const sp = bship.position; tx = sp.x + FS.vx * .25; tz = sp.z + FS.vz * .25; } else { tx = B0.x; tz = B0.z; }
     const k = Math.min(1, dt * (flying ? 4 : 2)); cam.x += (tx - cam.x) * k; cam.z += (tz - cam.z) * k;
     camD += (cfg.dist * (flying ? 1 : .7) - camD) * Math.min(1, dt * 1.2);   /* 태어나는 동안 가까이 → 몰기 시작하면 천천히 물러남 */
     const a = cfg.ang * Math.PI / 180, D = camD; camera.position.set(cam.x, cam.y + D * Math.sin(a), cam.z + D * Math.cos(a)); camera.lookAt(cam.x, cam.y, cam.z); camera.updateMatrixWorld();
