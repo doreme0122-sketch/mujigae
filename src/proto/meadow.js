@@ -1,7 +1,7 @@
 /* 전체 맵 — 초원 고리 (Lv1, 사용자 2026-11-06 미니맵 기준)
    · 맵 지름 720m(반지름 360m) 중 바깥 고리 280~360m가 초원. 섬 모양은 사용자가 준 3층 월드의 초원 섬 25종(kit_meadow.glb)을 그대로 씀
    · 층: 가운데층(기체가 나는 층, 섬 윗면이 기체 아래에 깔림) · 위층 +20m(밝게, 기체를 가리지 않게 점무늬로 옅게) · 아래층 −50m(어둡게, 구름 쪽으로 흐려짐)
-   · 공평하게: 기지 10곳마다 같은 몫 — 기지 앞을 가운데로 한 조각(36°)마다 몬스터 둥지 1 · 큰 섬 1 · 작은·중간 섬 6 · 층을 뚫는 기둥 1 · 발아래 바위 7 · 위층 섬 2 · 아래층 섬 3
+   · 공평하게: 기지 10곳마다 같은 몫 — 기지 앞을 가운데로 한 조각(36°)마다 몬스터 둥지 1 · 큰 섬 2 · 작은·중간 섬 9 · 층을 뚫는 기둥 2 · 발아래 바위 8 · 위층 섬 2 · 아래층 섬 3 (섬은 받은 모델의 3분의 1 크기)
    · 보물 던전 섬 5 = 기지 사이 다섯 곳 (위층 3 · 아래층 2, 번갈아) — 가운데층엔 보물 없음
    · 막힘: 가운데층 섬 중 기체 높이를 지나는 바위·땅만 막음(위에서 단면을 1m 칸으로 찍음). 풀·나무·물은 안 막음. 위·아래층 섬은 다른 층이라 안 막음
    · 그리기: 조각마다 · 층마다 · 재질마다 한 덩어리로 합침 → 화면 밖 조각은 통째로 안 그림 */
@@ -9,7 +9,7 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { mergeGeometries, deinterleaveGeometry } from 'three/addons/utils/BufferGeometryUtils.js';
 
-export const MEADOW = { R0: 280, R1: 360, UP: 20, DN: -50, TOP: -1.0 };   /* 가운데층 섬 윗면 = 기체(높이 .7)보다 1.7m 아래 */
+export const MEADOW = { R0: 280, R1: 360, UP: 20, DN: -50, TOP: -1.0, SC: 1 / 3 };   /* SC: 받은 섬 모델 크기의 3분의 1 (사용자 2026-11-06: 섬과 지형이 너무 큼 → 하늘섬 난전과 같은 비율) */   /* 가운데층 섬 윗면 = 기체(높이 .7)보다 1.7m 아래 */
 const SECT = 10, CELL = 1;
 
 const rnd = seed => { let s = seed >>> 0; return () => ((s = (s * 1664525 + 1013904223) >>> 0) / 4294967296); };
@@ -36,16 +36,16 @@ export async function makeMeadow(scene, url, onProgress = () => {}) {
   const MATS = {}; for (const k in KIT) for (const p of KIT[k].prims) MATS[p.mat] = p.src;
 
   /* ── 놓을 자리 정하기 (조각마다 같은 몫 · 운은 조각마다 다르게) ── */
-  const { R0, R1, UP, DN, TOP } = MEADOW, place = [];   /* { k, x, z, y, yaw, layer, s } */
+  const { R0, R1, UP, DN, TOP, SC } = MEADOW, place = [];   /* { k, x, z, y, yaw, layer, s } */
   const deg = Math.PI / 180, SA = Math.PI * 2 / SECT;
   const at = (th, r) => [Math.cos(th) * r, Math.sin(th) * r];
   const clash = (p, q) => p === q || p === 'pillar' || q === 'pillar' || ((p === 'mid' || p === 'rock') && (q === 'mid' || q === 'rock'));   /* 기둥은 모든 층을 뚫음 · 발아래 바위는 가운데층 섬 몸통과 겹치면 안 됨 */
   const fits = (x, z, rr, layer) => { const r = Math.hypot(x, z); if (r - rr < R0 + 2 || r + rr > R1 - 6) return false;
-    for (const q of place) { if (!clash(q.layer, layer)) continue; if (Math.hypot(q.x - x, q.z - z) < q.rr + rr + 3) return false; } return true; };
+    for (const q of place) { if (!clash(q.layer, layer)) continue; if (Math.hypot(q.x - x, q.z - z) < q.rr + rr + 2) return false; } return true; };
   const clearOfBase = (x, z, rr, th0) => { const th = Math.atan2(z, x), d = Math.atan2(Math.sin(th - th0), Math.cos(th - th0)) * Math.hypot(x, z); return !(Math.abs(d) < 15 + rr && Math.hypot(x, z) > 312 - rr); };   /* 기지 출구 앞 길은 비워 둠 */
-  const put = (k, x, z, layer, yaw, extra = {}) => { const K = KIT[k], s = extra.s || 1;
-    const y = layer === 'up' ? UP - K.top * s : layer === 'dn' ? DN - K.top * s : layer === 'pillar' ? UP + 6 - K.hi * s : layer === 'rock' ? extra.y : TOP - K.top * s;
-    place.push({ ...extra, k, x, z, y, yaw, layer, s, rr: K.rad * s * .78, pillar: layer === 'pillar' }); };
+  const put = (k, x, z, layer, yaw, extra = {}) => { const K = KIT[k], s = (extra.s || 1) * SC, sy = layer === 'pillar' ? .9 : s;   /* 기둥만 높이는 거의 그대로 → 가늘고 높게 세 층을 뚫음 */
+    const y = layer === 'up' ? UP - K.top * sy : layer === 'dn' ? DN - K.top * sy : layer === 'pillar' ? UP + 6 - K.hi * sy : layer === 'rock' ? extra.y : TOP - K.top * sy;
+    place.push({ ...extra, k, x, z, y, yaw, layer, s, sy, rr: K.rad * s * .78, pillar: layer === 'pillar' }); };
   const BIG = ['Island_Plateau_Wide', 'Island_Twin_Falls', 'Island_Forest_Dense', 'Island_Bowl', 'Island_Ridge_Long', 'Island_Mushroom', 'Island_Keel', 'Island_Tilted_A', 'Island_Medium', 'Island_Flat_Low'];
   const MID = ['Island_Chunk_Round', 'Island_Small', 'Island_Crag', 'Island_Medium', 'Island_Flat_Low', 'Island_Chunk_Round'];
   const PIL = ['Island_Needle', 'Island_Spire_Crown', 'Island_Mesa_Tall', 'Island_Lean_Pillar', 'Island_Tower'];
@@ -61,13 +61,14 @@ export async function makeMeadow(scene, url, onProgress = () => {}) {
     { const th = th0 + sd * 10 * deg, [x, z] = at(th, 322); put(i % 2 ? 'Island_Lair_Arena' : 'Island_Lair_Nest', x, z, 'mid', th + R() * 6.28, { camp: true }); }
     /* 큰 섬: 둥지 반대쪽 */
     { const th = th0 - sd * 9 * deg, [x, z] = at(th, 298); put(BIG[i], x, z, 'mid', R() * 6.28); }
+    { const th = th0 + sd * 3 * deg, [x, z] = at(th, 296); put(BIG[(i + 5) % BIG.length], x, z, 'mid', R() * 6.28); }   /* 섬이 작아진 만큼 큰 섬 하나 더 */
     const tryPut = (list, layer, n, rMin, rMax, ex = {}) => { let got = 0; for (let tries = 0; tries < 80 && got < n; tries++) {
-      const k = list[Math.floor(R() * list.length)], th = th0 + (R() - .5) * SA * .96, r = rMin + R() * (rMax - rMin), [x, z] = at(th, r), K = KIT[k], s = ex.s ? ex.s() : 1;
+      const k = list[Math.floor(R() * list.length)], th = th0 + (R() - .5) * SA * .96, r = rMin + R() * (rMax - rMin), [x, z] = at(th, r), K = KIT[k], s0 = ex.s ? ex.s() : 1, s = s0 * SC;
       if (layer !== 'up' && layer !== 'dn' && !clearOfBase(x, z, K.rad * s * .78, th0)) continue;
-      if (!fits(x, z, K.rad * s * .78, layer)) continue; put(k, x, z, layer, R() * 6.28, { s, y: ex.y ? ex.y() : 0 }); got++; } };
-    tryPut(MID, 'mid', 6, 286, 352);
-    tryPut([PIL[i % PIL.length]], 'pillar', 1, 292, 340);
-    tryPut(ROCK, 'rock', 7, 286, 354, { y: () => -7 - R() * 12, s: () => .8 + R() * .6 });   /* 기체 발아래 떠 있는 바위 */
+      if (!fits(x, z, K.rad * s * .78, layer)) continue; put(k, x, z, layer, R() * 6.28, { s: s0, y: ex.y ? ex.y() : 0 }); got++; } };
+    tryPut(MID, 'mid', 9, 286, 352);
+    tryPut([PIL[i % PIL.length], PIL[(i + 2) % PIL.length]], 'pillar', 2, 290, 344);
+    tryPut(ROCK, 'rock', 8, 286, 354, { y: () => -4 - R() * 9, s: () => 1 + R() * .8 });   /* 기체 발아래 떠 있는 바위 */
     tryPut(UPS, 'up', 2, 288, 348);
     tryPut(DNS, 'dn', 3, 288, 352); }
 
@@ -89,7 +90,7 @@ export async function makeMeadow(scene, url, onProgress = () => {}) {
   /* ── 조각 · 층 · 재질마다 한 덩어리로 ── */
   const groups = new Map(), m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), up = new THREE.Vector3(0, 1, 0);
   for (const p of place) { const th = Math.atan2(p.z, p.x), sec = ((Math.round(th / SA) % SECT) + SECT) % SECT, L = p.layer === 'rock' ? 'mid' : p.layer;
-    m4.compose(new THREE.Vector3(p.x, p.y, p.z), q.setFromAxisAngle(up, p.yaw), new THREE.Vector3(p.s, p.s, p.s)); p.m = m4.clone();
+    m4.compose(new THREE.Vector3(p.x, p.y, p.z), q.setFromAxisAngle(up, p.yaw), new THREE.Vector3(p.s, p.sy, p.s)); p.m = m4.clone();
     for (const pr of KIT[p.k].prims) { const key = sec + '|' + L + '|' + pr.mat; if (!groups.has(key)) groups.set(key, { list: [], mat: matFor(pr.mat, L) }); groups.get(key).list.push(pr.geo.clone().applyMatrix4(p.m)); } }
   const root = new THREE.Group(); root.name = 'meadow'; scene.add(root);
   for (const [, g] of groups) { const geo = mergeGeometries(g.list, false); g.list.forEach(x => x.dispose()); geo.computeBoundingSphere(); root.add(new THREE.Mesh(geo, g.mat)); }
@@ -99,7 +100,7 @@ export async function makeMeadow(scene, url, onProgress = () => {}) {
   const N = Math.ceil(R1 * 2 / CELL) + 2, grid = new Uint8Array(N * N), cellOf = v => Math.floor((v + R1 + 1) / CELL);
   const Y0 = .1, Y1 = 1.6, a = new THREE.Vector3(), b = new THREE.Vector3(), c = new THREE.Vector3(), w = new THREE.Vector3();
   for (const p of place) { if (p.layer !== 'mid' && p.layer !== 'pillar') continue;
-    if (p.y + KIT[p.k].hi * p.s < Y0 || p.y + KIT[p.k].bot * p.s > Y1) continue;
+    if (p.y + KIT[p.k].hi * p.sy < Y0 || p.y + KIT[p.k].bot * p.sy > Y1) continue;
     for (const pr of KIT[p.k].prims) { if (pr.mat === 'Foliage' || pr.mat === 'Water') continue; const P = pr.geo.attributes.position, I = pr.geo.index, cnt = I ? I.count : P.count;
       for (let i = 0; i < cnt; i += 3) { a.fromBufferAttribute(P, I ? I.getX(i) : i).applyMatrix4(p.m); b.fromBufferAttribute(P, I ? I.getX(i + 1) : i + 1).applyMatrix4(p.m); c.fromBufferAttribute(P, I ? I.getX(i + 2) : i + 2).applyMatrix4(p.m);
         if (Math.max(a.y, b.y, c.y) < Y0 || Math.min(a.y, b.y, c.y) > Y1) continue;
