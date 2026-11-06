@@ -9,12 +9,12 @@
    · 가는 동안 공격받지 않음 · 가운데층에 있을 땐 윗층 섬을 점무늬로 옅게 비킴 · 식물(나무·풀)은 막지 않음 */
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
-import { makeBloom } from '../core/hangar/bloom.js?v=11061627';
-import { makePerf } from './perf.js?v=11061627';
+import { makeBloom } from '../core/hangar/bloom.js?v=11061643';
+import { makePerf } from './perf.js?v=11061643';
 import { makeGlow } from '../preview/glow.js';
-import { makeGlbIsle } from './glbisle.js?v=11061627';
-import { makeFlight, FLY } from './flight.js?v=11061627';
-import { gate4, pedestal } from './gates.js?v=11061627';
+import { makeGlbIsle } from './glbisle.js?v=11061643';
+import { makeFlight, FLY } from './flight.js?v=11061643';
+import { gate4, pedestal } from './gates.js?v=11061643';
 
 const $ = s => document.querySelector(s), clamp = THREE.MathUtils.clamp, HOVER = FLY.HOVER, GAP = 2.9;
 const UP = new THREE.Color(1.45, 1.05, .42), DN = new THREE.Color(.72, .48, 1.55);
@@ -79,8 +79,10 @@ export async function start(canvas, onProgress = () => {}) {
       for (const g of [ge, gx]) { g.root.position.set(g.x, flightY(g.layer) - GAP, g.z);   /* 고리 가운데 = 기체 높이 */ g.root.rotation.y = Math.atan2(-g.ax, -g.az); }
       const yA = flightY('mid'), yB = flightY(k), A0 = new THREE.Vector3(ge.x, yA, ge.z), B0 = new THREE.Vector3(gx.x, yB, gx.z), d = new THREE.Vector3(ge.ax, 0, ge.az);
       /* 문에서 수평으로 나감 → 휘며 오르내림 → 출구 앞 7m부터 다시 수평 → 출구 한가운데 */
-      const pts = [A0, A0.clone().addScaledVector(d, 6), A0.clone().lerp(B0, .38).setY(k === 'up' ? yA + (yB - yA) * .55 + 3 : yA + 2.5), A0.clone().lerp(B0, .72).setY(k === 'up' ? yB + 3.5 : yA + (yB - yA) * .6), B0.clone().addScaledVector(d, -7), B0];
-      const curve = new THREE.CatmullRomCurve3(pts, false, 'centripetal', .5), len = curve.getLength();
+      const pts = [A0, A0.clone().addScaledVector(d, 6), A0.clone().lerp(B0, .36).setY(yA + (yB - yA) * .5), A0.clone().lerp(B0, .6).setY(yB), B0.clone().addScaledVector(d, -8), B0];   /* 수평으로 나가 → 오르거나 내려가다 → 도착 높이에서 바로 수평 (넘어갔다 되돌아오는 출렁임 없음 · 사용자 2026-11-06) */
+      const c0 = new THREE.CatmullRomCurve3(pts, false, 'centripetal'), up = yB > yA, sm = [];   /* 높이는 한 방향으로만 (곡선이 살짝 넘치거나 처지는 것도 눌러 줌) */
+      let yc = yA; for (let i = 0; i <= 80; i++) { const p = c0.getPointAt(i / 80); yc = up ? clamp(Math.max(yc, p.y), yA, yB) : clamp(Math.min(yc, p.y), yB, yA); p.y = yc; sm.push(p); }
+      const curve = new THREE.CatmullRomCurve3(sm, false, 'centripetal'), len = curve.getLength();
       for (const m of (P[k]?.meshes || [])) { pathGrp.remove(m); m.geometry.dispose(); }
       const meshes = [[.62, 0], [1.3, 2]].map(([w, kind]) => { const m = new THREE.Mesh(ribbon(curve, w), roadM(kind)); m.material.uniforms.uL.value = len; m.renderOrder = 7; m.frustumCulled = false; pathGrp.add(m); return m; });
       P[k] = { curve, len, meshes }; }
