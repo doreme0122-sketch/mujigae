@@ -1,19 +1,19 @@
 /* 태어나서 스킬 고르기 보기 — 빛의 닻에서 태어남 → 공격·이동·방해 스킬 고르기 → 출격 (기지는 padringview와 같음) */
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
-import { makeBloom } from '../core/hangar/bloom.js?v=11061605';
-import { makePad } from '../core/hangar/pad.js?v=11061605';
-import { makeMag } from '../core/hangar/mag.js?v=11061605';
+import { makeBloom } from '../core/hangar/bloom.js?v=11061610';
+import { makePad } from '../core/hangar/pad.js?v=11061610';
+import { makeMag } from '../core/hangar/mag.js?v=11061610';
 import { buildShip, engineSpots } from '../core/ships/build.js';
-import { makeGoldStar } from './goldstar.js?v=11061605';
-import { makeArena, SPEED, WAVE_R0 } from './arena.js?v=11061605';
-import { makeGuardians, GUARD } from './guardian.js?v=11061605';
-import { makeFloor, FLOORS } from './floor.js?v=11061605';
-import { makePerf } from './perf.js?v=11061605';
-import { makeBirth, BIRTH } from './birth.js?v=11061605';
-import { makeSortie, SORTIE } from './sortie.js?v=11061605';
-import { makeSkillPick, PICK_CSS } from './skillpick.js?v=11061605';
-import { makeDemo } from './skilldemo.js?v=11061605';
+import { makeGoldStar } from './goldstar.js?v=11061610';
+import { makeArena, SPEED, WAVE_R0 } from './arena.js?v=11061610';
+import { makeGuardians, GUARD } from './guardian.js?v=11061610';
+import { makeFloor, FLOORS } from './floor.js?v=11061610';
+import { makePerf } from './perf.js?v=11061610';
+import { makeBirth, BIRTH } from './birth.js?v=11061610';
+import { makeSortie, SORTIE } from './sortie.js?v=11061610';
+import { makeSkillPick, PICK_CSS } from './skillpick.js?v=11061610';
+import { makeDemo } from './skilldemo.js?v=11061610';
 
 const $ = s => document.querySelector(s), clamp = THREE.MathUtils.clamp;
 const SHIPL = 2.9;     /* 기체 길이: 자기장 판(지름 3.2)보다 약간 작게 */

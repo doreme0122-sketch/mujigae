@@ -7,8 +7,8 @@
    · 문 앞쪽으로 빛 띠 길이 뻗어 나감 (확정된 빛의 길) */
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
-import { makeBloom } from '../core/hangar/bloom.js?v=11061605';
-import { makePerf } from './perf.js?v=11061605';
+import { makeBloom } from '../core/hangar/bloom.js?v=11061610';
+import { makePerf } from './perf.js?v=11061610';
 import { makeGlow } from '../preview/glow.js';
 import { buildShip, engineSpots } from '../core/ships/build.js';
 
@@ -48,7 +48,7 @@ const filmMat = () => new THREE.ShaderMaterial({ ...AB, side: THREE.DoubleSide, 
     void main(){ float r=length(vP)/2.45; float rim=smoothstep(.7,1.,r)*smoothstep(1.02,.97,r);
       float streak=pow(h(vec2(floor(vP.x*9.),0.)),6.)*(.5+.5*sin(vP.y*3.-uT*4.+h(vec2(floor(vP.x*9.),1.))*6.));
       float pull=.5+.5*sin(r*18.+uT*5.);
-      float a=(rim*1.1+pull*.12*(1.-r))*smoothstep(1.02,.98,r);   /* 세로 줄기 뺌 (사용자 2026-11-06: 비스듬히 보면 바닥 줄무늬처럼 보임) */
+      float a=(rim*.7+.05)*smoothstep(1.02,.98,r);   /* 선 고리(물결) 뺌 · 가장자리만 은은하게 (사용자 2026-11-06) */   /* 세로 줄기 뺌 (사용자 2026-11-06: 비스듬히 보면 바닥 줄무늬처럼 보임) */
       gl_FragColor=vec4(uC*a*uA,1.); }` });
 /* 빛 띠 길 (빛의 길 확정 모양) */
 const roadMat = (kind) => new THREE.ShaderMaterial({ ...AB, side: THREE.DoubleSide, uniforms: { uC: { value: new THREE.Color() }, uA: { value: 0 }, uT: { value: 0 }, uL: { value: 30 }, uK: { value: kind } },
@@ -209,19 +209,18 @@ function gate4() {
     for (const z of [-.39, .39]) { const gr = new THREE.Mesh(sector(2.92, 2.98, a0 + .05, a1 - .05, .02, 0), glowMat()); gr.position.z = z; fg.add(gr); glows.push([gr, .35]); }
     ring.add(fg); frags.push({ fg, ph: rnd() * 6, dr: (rnd() - .5) * .25, dz: (rnd() - .5) * .35, am: (a0 + a1) / 2 }); }
   /* 안쪽 빛 고리 셋 · 가운데 굴 같은 동심 물결 */
-  const inner = [[2.15, .045], [1.65, .035], [1.15, .03]].map(([r, tb], k) => { const m = new THREE.Mesh(new THREE.TorusGeometry(r, tb, 6, 72), glowMat()); m.position.y = C + .2; g.add(m); glows.push([m, .45]); return m; });
+  /* 안쪽 빛 고리 셋은 뺌 (사용자 2026-11-06: 원 안의 선 고리) */
   const film = new THREE.Mesh(new THREE.CircleGeometry(2.5, 64), filmMat()); film.position.y = C + .2; film.renderOrder = 6; g.add(film); films.push(film);
   /* 둘레를 맴도는 빛 상자 */
   const cubes = []; for (let i = 0; i < 11; i++) { const s = .22 + rnd() * .16, cb = new THREE.Group(); const core = new THREE.Mesh(new THREE.BoxGeometry(s, s, s), glowMat()); const edge = new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.BoxGeometry(s * 1.25, s * 1.25, s * 1.25)), new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: .8 }));
-    cb.add(core, edge); g.add(cb); cubes.push({ core, edge, cb, r: 3.95, a: i / 11 * Math.PI * 2, sp: .1, z: 0, sp2: i * .57 }); }   /* 원 둘레에 고르게 (사용자 2026-11-06) */
+    cb.add(core, edge); g.add(cb); cubes.push({ core, edge, cb, r: 3.75 + rnd() * .6, a: (i + (rnd() - .5) * .45) / 11 * Math.PI * 2, sp: .1, z: (rnd() - .5) * .8, sp2: rnd() * 2 }); }   /* 아까처럼 크기·거리·앞뒤가 들쑥날쑥 · 대신 둘레에 고르게 퍼지고 다 같은 빠르기로 돌아 빈 곳이 안 생김 (사용자 2026-11-06) */
   let spin = 0, ringA = 0; const cc = new THREE.Color();
   return { g, glows, films, discs, idle: new THREE.Color(1.1, .8, .35), update(t, a, col, dt, ch = 0) {
       /* 기체가 문에서 0.5초 머문 뒤 3초(ch 0→1): 고리 조각과 빛 상자가 점점 빠르게 돌고, 빛 상자가 점점 밝아짐 (기체가 기울며 트는 것과 함께) */
       spin += ((ch > 0 ? .12 + ch * ch * 4.5 : .12 * (.4 + a)) - spin) * Math.min(1, dt * (ch > 0 ? 6 : 2)); ringA += spin * dt; ring.rotation.z = ringA;
       for (const c of cubes) { cc.copy(col).multiplyScalar(.45 + ch * 1.4); c.core.material.color.copy(cc); c.edge.material.opacity = .35 + ch * .65; c.cb.scale.setScalar(1 + ch * .25); }
       for (const f of frags) { const k = Math.sin(t * 1.1 + f.ph); f.fg.position.set(Math.cos(f.am) * (f.dr + k * .05), Math.sin(f.am) * (f.dr + k * .05), f.dz + k * .04); }
-      inner[0].rotation.set(Math.sin(t * .5) * .12, Math.cos(t * .4) * .12, t * .5); inner[1].rotation.set(Math.cos(t * .6) * .16, Math.sin(t * .5) * .1, -t * .7); inner[2].rotation.set(Math.sin(t * .8) * .2, 0, t * .9);
-      for (const c of cubes) { c.a += dt * (c.sp * (1 + a) + ch * ch * 1.6); c.cb.position.set(Math.cos(c.a) * c.r, C + .2 + Math.sin(c.a) * c.r, Math.sin(t * 1.2 + c.sp2) * .12);   /* 더 느리게 · 다 같이 돎 */ c.cb.rotation.set(t * c.sp * 3, t * c.sp * 2, 0); } } };
+      for (const c of cubes) { c.a += dt * (c.sp * (1 + a) + ch * ch * 1.6); c.cb.position.set(Math.cos(c.a) * c.r, C + .2 + Math.sin(c.a) * c.r, c.z + Math.sin(t * 1.2 + c.sp2) * .12);   /* 더 느리게 · 다 같이 돎 */ c.cb.rotation.set(t * c.sp * 3, t * c.sp * 2, 0); } } };
 }
 
 export async function start(canvas, onProgress = () => {}) {
@@ -278,6 +277,14 @@ export async function start(canvas, onProgress = () => {}) {
   addEventListener('resize', size); size(); bloom.setSamples(perf.st.aa ? 4 : 0);
 
   const cam = { x: 26, y: SHIP_Y, z: 0 }, tmp = new THREE.Color(), onC = new THREE.Color(), v3 = new THREE.Vector3();
+  /* 출발 충격파: 기체 뒤에서 얇은 빛 고리가 한 번 퍼지며 사라짐 (과하지 않게) */
+  const shockM = new THREE.ShaderMaterial({ ...AB, side: THREE.DoubleSide, uniforms: { uC: { value: new THREE.Color() }, uA: { value: 0 }, uK: { value: 0 } },
+    vertexShader: 'varying vec2 vP; void main(){ vP=position.xy; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.); }',
+    fragmentShader: `uniform vec3 uC; uniform float uA, uK; varying vec2 vP;
+      void main(){ float r=length(vP); float w=mix(.10,.035,uK); float ring=exp(-pow((r-.92)/w,2.)); float inner=smoothstep(.92,.2,r)*.18*(1.-uK);
+        gl_FragColor=vec4(uC*(ring+inner)*uA,1.); }` });
+  const shock = new THREE.Mesh(new THREE.CircleGeometry(1, 48), shockM); shock.visible = false; shock.renderOrder = 9; scene.add(shock); const SW = { t: 9 };
+  const boom = (R, p, tg) => { shock.position.copy(p).add(R.position).addScaledVector(tg, -.6); shock.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), tg); SW.t = 0; };
   let t = 0, last = performance.now(), act = 1, CH = 0; const SQ = { ph: 'idle', t: 0 };
   const DIRS = [['정면에서', 0], ['뒤에서', Math.PI], ['왼쪽 앞에서', -.9], ['오른쪽 뒤에서', 2.3]]; SQ.k = 0; SQ.yaw0 = 0;
   const goTxt = () => { $('#go').textContent = `기체 들어가 보기 · ${DIRS[SQ.k][0]}`; }; goTxt();
@@ -300,9 +307,10 @@ export async function start(canvas, onProgress = () => {}) {
     else if (SQ.ph === 'wait') { if (SQ.t >= .5) { SQ.ph = 'charge'; SQ.t = 0; } }
     else if (SQ.ph === 'charge') { const u = Math.min(1, SQ.t / 3), e = u * u * (3 - 2 * u); CH = u; const dY = Math.atan2(Math.sin(wantYaw - SQ.yaw0), Math.cos(wantYaw - SQ.yaw0)); yaw = SQ.yaw0 + dY * e;   /* 들어온 방향에서 갈 쪽으로 3초 동안 천천히 돎 · 도는 쪽으로 몸을 기울임 */
       bank = -Math.sign(dY || 1) * Math.min(.5, Math.abs(dY) * .3 + .12) * Math.sin(u * Math.PI); pitch = wantPitch * .5 * e; if (u >= 1) { SQ.ph = 'go'; SQ.t = 0; } }
-    else if (SQ.ph === 'go') { CH = 1; const u = Math.min(1, SQ.t / 1.8), e = u * u * u * (u * (u * 6 - 15) + 10), p = cv.getPointAt(e), tg = cv.getTangentAt(e); px = p.x; py = p.y + .3; pz = p.z; yaw = Math.atan2(-tg.x, -tg.z); pitch = Math.atan2(tg.y, Math.hypot(tg.x, tg.z)); bank = -.25; if (u >= 1) { SQ.ph = 'gone'; SQ.t = 0; } }
+    else if (SQ.ph === 'go') { CH = 1; if (SQ.t <= dt + 1e-4) boom(R, ship.position.clone().sub(R.position), cv.getTangentAt(0)); const u = Math.min(1, SQ.t / 1.15), e = 1 - Math.pow(1 - u, 2.6),   /* 3초 뒤 출발: 처음부터 확 빠르게 (점점 느려지며 멀어짐) */ p = cv.getPointAt(e), tg = cv.getTangentAt(e); px = p.x; py = p.y + .3; pz = p.z; yaw = Math.atan2(-tg.x, -tg.z); pitch = Math.atan2(tg.y, Math.hypot(tg.x, tg.z)); bank = -.25; if (u >= 1) { SQ.ph = 'gone'; SQ.t = 0; } }
     else if (SQ.ph === 'gone') { if (SQ.t > 1.2) { SQ.ph = 'idle'; SQ.t = 0; SQ.yaw0 = 0; } }
     ship.position.set(R.position.x + px, py, R.position.z + pz); ship.rotation.set(0, yaw, 0); ship.rotateX(pitch); ship.rotateZ(bank); ship.updateMatrixWorld(true);
+    if (SW.t < .5) { SW.t += dt; const k = SW.t / .5; shock.visible = true; shock.scale.setScalar(.6 + k * 3.6); shockM.uniforms.uK.value = k; shockM.uniforms.uA.value = (1 - k) * (1 - k) * .9; shockM.uniforms.uC.value.copy(col); } else shock.visible = false;
     glow.begin();
     if (ship.visible) for (const p of ENG) { v3.copy(p).applyMatrix4(sm.matrixWorld); glow.add(v3.x, v3.y, v3.z, 0, 0, .5, .14, 3, [1.3, .45, .4], .9); }
     for (const Gt of GATES) for (let k = 0; k < 10; k++) { const u = (t * .12 + k / 10) % 1, p = Gt.curve.getPointAt(u); glow.add(Gt.root.position.x + p.x, p.y + .2, Gt.root.position.z + p.z, 0, .12, 0, .09, 3, col.toArray(), Math.sin(u * Math.PI) * act, k); }
