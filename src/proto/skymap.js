@@ -131,7 +131,7 @@ export async function start(canvas, onProgress = () => {}) {
   const stand = new THREE.Group(); B0.w.add(stand);
   onProgress(.4);
   /* ── 초원 고리 ── */
-  const meadow = await makeMeadow(scene, new URL('./assets/kit_meadow.glb?v=11062029', import.meta.url).href, p => onProgress(.4 + p * .4), new URL('./assets/kit_meadow_decor.glb', import.meta.url).href);
+  const meadow = await makeMeadow(scene, new URL('./assets/kit_meadow.glb?v=11062029', import.meta.url).href, p => onProgress(.4 + p * .4), new URL('./assets/kit_meadow_decor.glb?v=11062029', import.meta.url).href);
   onProgress(.82);
   /* ── 조이스틱으로 모는 기체 ── */
   /* 막힘: 맵 안은 자유 · 기지 안에선 판(계단 단 안쪽)과 출구 길만 · 무지개 벽과 그 바깥(우주)은 막힘 */
