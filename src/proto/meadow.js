@@ -8,7 +8,7 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { deinterleaveGeometry } from 'three/addons/utils/BufferGeometryUtils.js';
-import { makeLand, makeChunk, paletteFrom } from './land.js?v=11062058';
+import { makeLand, makeChunk, paletteFrom } from './land.js?v=11062116';
 
 export const MEADOW = { R0: 187, R1: 240, UP: 20, DN: -30, TOP: -1.0, SC: 1 / 2 };   /* SC: 받은 섬 모델 크기의 2분의 1 (사용자 2026-11-06: 원래는 너무 크고 3분의 1은 너무 작음) */   /* 가운데층 섬 윗면 = 기체(높이 .7)보다 1.7m 아래 */
 const SECT = 10, CELL = 1;
@@ -45,12 +45,12 @@ export async function makeMeadow(scene, url, onProgress = () => {}, decorUrl = n
   const { R0, R1, UP, DN, TOP, SC } = MEADOW, place = [];   /* { k, x, z, y, yaw, layer, s } */
   const deg = Math.PI / 180, SA = Math.PI * 2 / SECT;
   const at = (th, r) => [Math.cos(th) * r, Math.sin(th) * r], rf = f => R0 + f * (R1 - R0);   /* rf: 초원 띠 안쪽(0) → 바깥(1) */
-  const clash = (p, q) => p !== 'deco' && q !== 'deco' && p !== 'gap' && q !== 'gap' && (p === q || p === 'pillar' || q === 'pillar' || ((p === 'mid' || p === 'rock') && (q === 'mid' || q === 'rock')));   /* 꾸밈은 땅 위에만 얹으므로 빼고 · 기둥은 모든 층을 뚫음 · 발아래 바위는 가운데층 섬 몸통과 겹치면 안 됨 */
+  const clash = (p, q) => p !== 'deco' && q !== 'deco' && p !== 'gap' && q !== 'gap' && (p === q || (p === 'up' && q === 'upgap') || (p === 'upgap' && q === 'up') || p === 'pillar' || q === 'pillar' || ((p === 'mid' || p === 'rock') && (q === 'mid' || q === 'rock')));   /* 꾸밈은 땅 위에만 얹으므로 빼고 · 기둥은 모든 층을 뚫음 · 발아래 바위는 가운데층 섬 몸통과 겹치면 안 됨 */
   const fits = (x, z, rr, layer) => { const r = Math.hypot(x, z); if (r - rr < R0 + 2 || r + rr > R1 - 6) return false;
     for (const q of place) { if (!clash(q.layer, layer)) continue; if (Math.hypot(q.x - x, q.z - z) < q.rr + rr + 1.2) return false; } return true; };
   const clearOfBase = (x, z, rr, th0) => { const th = Math.atan2(z, x), d = Math.atan2(Math.sin(th - th0), Math.cos(th - th0)) * Math.hypot(x, z); return !(Math.abs(d) < 15 + rr && Math.hypot(x, z) > rf(.4) - rr); };   /* 기지 출구 앞 길은 비워 둠 */
   const put = (k, x, z, layer, yaw, extra = {}) => { const K = KIT[k], s = extra.gs || (extra.abs ? 1 : (extra.s || 1) * SC), sy = layer === 'pillar' ? .9 : s;   /* 기둥만 높이는 거의 그대로 → 가늘고 높게 세 층을 뚫음 */
-    const y = layer === 'up' ? UP - K.top * sy : layer === 'dn' ? DN - K.top * sy : layer === 'pillar' ? UP + 6 - K.hi * sy : layer === 'rock' || layer === 'deco' || layer === 'gap' ? extra.y : TOP - K.top * sy;
+    const y = layer === 'up' ? UP - K.top * sy : layer === 'dn' ? DN - K.top * sy : layer === 'pillar' ? UP + 6 - K.hi * sy : layer === 'rock' || layer === 'deco' || layer === 'gap' || layer === 'upgap' ? extra.y : TOP - K.top * sy;
     place.push({ ...extra, k, x, z, y, yaw, layer, s, sy, rr: extra.land ? K.rad : K.rad * s * .78, pillar: layer === 'pillar' }); };
   /* ── 넓은 땅: 새 땅 판 + 받은 섬에서 떼어 낸 나무·덤불·바위·풀꽃·뿌리 ── */
   let landN = 0; const LANDS = [];
@@ -60,7 +60,7 @@ export async function makeMeadow(scene, url, onProgress = () => {}, decorUrl = n
     const LY = opt.layer || 'mid', BY = LY === 'dn' ? DN : TOP, rl = LY === 'dn' ? 'dn' : undefined, dens = opt.dens || 1;
     const yaw = R() * 6.28; put(k, x, z, LY, yaw, { abs: true, land: true }); LANDS.push({ k, x, z, radius, layer: LY });
     /* 윗면 높이 찾기 (꾸밈을 땅에 딱 붙이려고) */
-    const P = L.geo.attributes.position, topTris = []; for (let i = 0; i < P.count; i += 3) { const ay = P.getY(i), by = P.getY(i + 1), cy = P.getY(i + 2); if (Math.min(ay, by, cy) > -.6) topTris.push(i); }
+    const P = L.geo.attributes.position, topTris = []; for (let i = 0; i < P.count; i += 3) { const ay = P.getY(i), by = P.getY(i + 1), cy = P.getY(i + 2); if (Math.min(ay, by, cy) > -1.3) topTris.push(i); }
     const hAt = (lx, lz) => { for (const i of topTris) { const x0 = P.getX(i), z0 = P.getZ(i), x1 = P.getX(i + 1), z1 = P.getZ(i + 1), x2 = P.getX(i + 2), z2 = P.getZ(i + 2);
       const d = (z1 - z2) * (x0 - x2) + (x2 - x1) * (z0 - z2); if (Math.abs(d) < 1e-9) continue; const u = ((z1 - z2) * (lx - x2) + (x2 - x1) * (lz - z2)) / d, v = ((z2 - z0) * (lx - x2) + (x0 - x2) * (lz - z2)) / d, w = 1 - u - v;
       if (u >= -1e-4 && v >= -1e-4 && w >= -1e-4) return u * P.getY(i) + v * P.getY(i + 1) + w * P.getY(i + 2); } return null; };
@@ -72,7 +72,7 @@ export async function makeMeadow(scene, url, onProgress = () => {}, decorUrl = n
         const h = hAt(lx, lz); if (h === null) continue; const [wx, wz] = toW(lx, lz), list = DECO[kind]; if (!list.length) return;
         if (opt.lane != null && kind !== 'tiny' && Math.abs(-Math.sin(opt.lane) * wx + Math.cos(opt.lane) * wz) < 5) continue;   /* 기지 출구 앞 길은 비워 둠 (풀꽃만) */
         put(list[Math.floor(R() * list.length)], wx, wz, 'deco', R() * 6.28, { s: sc * (.85 + R() * .4), y: BY + h - .04, deco: kind, rl }); got++; } };
-    deco('tree', Math.round(area / 30 * dens), 1); deco('bush', Math.round(area / 24 * dens), 1); deco('rock', Math.round(area / 55 * dens), 1); deco('tiny', Math.round(area / 18 * dens), 1, .6);
+    deco('tree', Math.round(area / 30 * dens), 1); deco('bush', Math.round(area / 18 * dens), 1); deco('rock', Math.round(area / 55 * dens), 1); deco('tiny', Math.round(area / 7 * dens), 1, .6);   /* 풀포기·꽃은 촘촘히 */
     /* 테두리에 늘어진 뿌리·덩굴: 둘레를 따라 듬성듬성 */
     if (DECO.hang.length) for (let i = 0; i < L.lip.length; i += 2) { if (R() < .35) continue; const [lx, ly, lz] = L.lip[i], k2 = .97, [wx, wz] = toW(lx * k2, lz * k2);
       put(DECO.hang[Math.floor(R() * DECO.hang.length)], wx, wz, 'deco', R() * 6.28, { s: .9 + R() * .3, y: BY + ly + .25, deco: 'hang', rl }); }
@@ -114,7 +114,12 @@ export async function makeMeadow(scene, url, onProgress = () => {}, decorUrl = n
     for (let n = 0, t = 0; n < 2 && t < 60; t++) { const th = th0 + (R() - .5) * SA * .9, rr = 9 + R() * 5, r = rf(.1) + R() * (rf(.9) - rf(.1)), [x, z] = at(th, r);
       if (!fits(x, z, rr * 1.12, 'dn')) continue; addLand(x, z, rr, 2000 + i * 29 + t, { layer: 'dn', dens: .55 }); n++; }   /* 아래층 넓은 땅 */
     for (let n = 0; n < 45; n++) { const th = th0 + (R() - .5) * SA, r = R0 - 6 + R() * (R1 - R0 + 2), [x, z] = at(th, r), sc = .7 + Math.pow(R(), 2.4) * 3.3, y = -6 - R() * 20;
-      put(CHUNK[Math.floor(R() * CHUNK.length)], x, z, 'gap', R() * 6.28, { abs: true, s: 1, y, gs: sc }); } }
+      put(CHUNK[Math.floor(R() * CHUNK.length)], x, z, 'gap', R() * 6.28, { abs: true, s: 1, y, gs: sc }); }
+    /* 가운데층~위층 사이(+5~+15m): 갈 수 없는 떠 있는 섬·바위 → 위로도 층층이 쌓인 하늘이 보이게 (사용자 2026-11-06) */
+    for (let n = 0, t = 0; n < 7 && t < 200; t++) { const k = UPS[Math.floor(R() * UPS.length)], th = th0 + (R() - .5) * SA, r = rf(.02) + R() * (rf(.95) - rf(.02)), [x, z] = at(th, r), s0 = .7 + R() * .6, rr = KIT[k].rad * s0 * SC * .78;
+      if (!fits(x, z, rr, 'upgap')) continue; put(k, x, z, 'upgap', R() * 6.28, { s: s0, y: Math.max(6 + R() * 9, 2.8 - KIT[k].bot * s0 * SC) - KIT[k].top * s0 * SC, rl: 'upgap' }); n++; }   /* 몸통 끝이 기체 높이보다 위에 오게 */
+    for (let n = 0; n < 16; n++) { const th = th0 + (R() - .5) * SA, r = R0 - 4 + R() * (R1 - R0), [x, z] = at(th, r), sc = .6 + Math.pow(R(), 2.2) * 2.6;
+      put(CHUNK[Math.floor(R() * CHUNK.length)], x, z, 'gap', R() * 6.28, { abs: true, s: 1, y: 4.5 + R() * 11, gs: sc, rl: 'upgap' }); } }
 
   /* ── 칠하는 방식: 이 그림체는 면마다 평평한 색 → 빛 반사를 점마다 정밀 계산하는 무거운 방식 대신,
         꼭짓점에서 해·하늘·땅빛만 한 번 계산하고 화면 점마다는 그 색을 그대로 씀 (모양·색은 같고 계산은 훨씬 적음)
@@ -138,10 +143,8 @@ export async function makeMeadow(scene, url, onProgress = () => {}, decorUrl = n
           vC = c * (uSunC * max(dot(n, uSun), 0.) + mix(uGnd, uSky, n.y * .5 + .5)) + uEm;
           gl_Position = projectionMatrix * viewMatrix * w; }`,
       fragmentShader: `uniform vec3 uCam; varying vec3 vC; varying float vA; varying vec3 vWp;
-        ${layer === 'up' || layer === 'pillar' ? BAY : ''}
         void main(){ vec3 col = vC;
-          ${layer === 'pillar' ? '{ float near = smoothstep(10., 34., distance(vWp.xz, uCam.xz)), hi = smoothstep(2.5, 6., vWp.y); if (bay(gl_FragCoord.xy) > mix(1., mix(.25, 1., near), hi)) discard; }' : ''}
-          ${layer === 'up' ? '{ float near = smoothstep(14., 40., distance(vWp.xz, uCam.xz)); if (bay(gl_FragCoord.xy) > mix(.22, .55, near)) discard; col = mix(col, vec3(1., .99, .96), .22); }' : ''}
+          ${layer === 'up' || layer === 'upgap' ? '{ float k = clamp((vWp.y - 2.) / 20., 0., 1.); col = mix(col, vec3(.98, .99, 1.), .06 + k * .14); }' : ''}   /* 점무늬로 비키지 않음 (사용자 2026-11-06: 그냥 가려지게, 기체는 윤곽으로) · 높을수록 살짝 하늘빛 */
           ${layer === 'dn' ? '{ float k = clamp((-vWp.y - 15.) / 50., 0., 1.); col = mix(col * .72, vec3(.5, .6, .78), .35 + k * .45); }' : ''}
           ${layer === 'gap' ? '{ float k = clamp((-vWp.y - 3.) / 26., 0., 1.); col = mix(col * (1. - k * .25), vec3(.55, .64, .8), .12 + k * .5); }' : ''}
           gl_FragColor = linearToOutputTexel(vec4(col, vA)); }` });

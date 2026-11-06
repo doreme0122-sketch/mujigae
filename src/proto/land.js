@@ -29,26 +29,35 @@ export function paletteFrom(prims) {
 /* 땅 한 판 → Terrain 한 덩어리 (위 = y 0 근처 · 아래로 약 10m) */
 export function makeLand(seed, radius, pal, opt = {}) {
   const R = rnd(seed), edge = ring(R, 11), edge2 = ring(R, 23), bump = field(R, radius * .45), patch = field(R, Math.max(2.5, radius * .2)), tint = field(R, 2.2);
-  const NA = Math.max(40, Math.round(radius * 4.6)), rad = a => radius * (1 + edge(a) * .16 + edge2(a) * .06);
+  const rad = a => radius * (1 + edge(a) * .16 + edge2(a) * .06);
   const pos = [], col = [], C = new THREE.Color();
   const pick = (list, t) => list[Math.min(list.length - 1, Math.floor(t * list.length))];
   const tri = (A, B, D, c) => { pos.push(...A, ...B, ...D); for (let i = 0; i < 3; i++) col.push(c.r, c.g, c.b); };
   const clear = opt.clear || 0;   /* 가운데 평평하게 비울 반지름 (둥지·싸움 자리) */
-  /* 윗면: 가운데 → 가장자리로 고리를 몇 겹, 고리마다 점을 조금씩 흔듦 */
-  const RINGS = [0, .1, .19, .28, .37, .46, .55, .63, .71, .78, .85, .91, .96, 1];
-  const pts = RINGS.map((f, ri) => { const n = ri === 0 ? 1 : Math.max(8, Math.round(NA * Math.min(1, f + .15))), ph = R() * 6.28;
-    return Array.from({ length: n }, (_, k) => { const a = ri === 0 ? 0 : ph + (k + (R() - .5) * .5) / n * Math.PI * 2, rr = ri === 0 ? 0 : rad(a) * f * (ri === RINGS.length - 1 ? 1 : 1 + (R() - .5) * .06);
-      const x = Math.cos(a) * rr, z = Math.sin(a) * rr, dc = Math.hypot(x, z), flat = clear ? smooth(Math.min(1, Math.max(0, (dc - clear) / 3))) : 1;
-      const y = ((bump(x, z) - .5) * .7 + (R() - .5) * .12) * flat * (1 - smooth(Math.max(0, f - .85) / .15) * .6) - (f >= 1 ? .12 : 0);
-      return { a: ri === 0 ? 0 : a, p: [x, y, z] }; }).sort((p, q) => p.a - q.a); });
-  const grassCol = (x, z) => { const t = tint(x, z), d = patch(x, z); if (!opt.noDirt && d > .84) return C.copy(pick(pal.dirt, (t * 1.7) % 1)).multiplyScalar(.95 + t * .1);
-    return C.copy(pick(pal.grass, t)).multiplyScalar(.93 + (R() * .1)); };
-  const face = (A, B, D) => { const cx = (A[0] + B[0] + D[0]) / 3, cz = (A[2] + B[2] + D[2]) / 3; tri(A, B, D, grassCol(cx, cz)); };
+  /* 윗면 (사용자 2026-11-06: 지표면이 이상함 → 받은 섬처럼): 고리 간격 약 1.1m로 고르게 잘게 · 완만한 언덕과 꺼진 곳 ·
+     흙은 삼각형 조각이 아니라 굽이진 길 + 둥근 자리로, 풀과 섞이며 번짐 · 풀색은 받은 섬의 풀색 둘 사이를 부드럽게 오감 */
+  const hill = field(R, radius * .55), hill2 = field(R, 3.2), SP = 1.1, NR = Math.max(4, Math.round(radius / SP));
+  const pa = R() * 6.28, pw = 1 / (radius * (.28 + R() * .18)), pph = R() * 6.28, pamp = radius * (.18 + R() * .14), poff = (R() - .5) * radius * .5;
+  const pathW = (x, z) => { const u = x * Math.cos(pa) + z * Math.sin(pa), v = -x * Math.sin(pa) + z * Math.cos(pa), d = Math.abs(v - poff - Math.sin(u * pw * 6.28 + pph) * pamp);
+    return 1 - smooth(Math.min(1, Math.max(0, (d - .55) / 1.1))); };
+  const RINGS = Array.from({ length: NR + 1 }, (_, i) => i / NR);
+  const pts = RINGS.map((f, ri) => { const ph = R() * 6.28, n = ri === 0 ? 1 : Math.max(7, Math.round(Math.PI * 2 * radius * f / SP));
+    return Array.from({ length: n }, (_, k) => { const a = ri === 0 ? 0 : ph + (k + (R() - .5) * .45) / n * Math.PI * 2, last = ri === RINGS.length - 1, rr = ri === 0 ? 0 : rad(a) * f * (last ? 1 : 1 + (R() - .5) * .05);
+      const x = Math.cos(a) * rr, z = Math.sin(a) * rr, dc = Math.hypot(x, z), flat = clear ? smooth(Math.min(1, Math.max(0, (dc - clear) / 3.5))) : 1, edgeK = 1 - smooth(Math.max(0, f - .8) / .2) * .75;
+      const y = ((hill(x, z) - .45) * 1.25 + (hill2(x, z) - .5) * .35 + (R() - .5) * .06) * flat * edgeK - (last ? .1 : 0);
+      let w = opt.noDirt ? 0 : Math.max(pathW(x, z) * (clear ? .5 : 1), smooth(Math.min(1, Math.max(0, (patch(x, z) - .72) / .16))));
+      if (clear) w = Math.max(w, (1 - smooth(Math.min(1, Math.max(0, (dc - clear + 1.2) / 2.6)))) * .85);   /* 둥지 둘레: 밟혀 드러난 흙 */
+      return { a: ri === 0 ? 0 : ((a % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2), p: [x, y, z], w }; }).sort((p, q) => p.a - q.a); });   /* 각도를 0~2π로 맞춰야 고리끼리 엮을 때 길쭉한 삼각형이 안 생김 */
+  const G2 = pal.grass.slice(0, 3), D2 = pal.dirt.slice(0, 2), cg = new THREE.Color(), cd = new THREE.Color();
+  const surf = (x, z, w) => { const t = tint(x, z) * (G2.length - 1), i0 = Math.floor(t), fr = t - i0; cg.copy(G2[i0]).lerp(G2[Math.min(G2.length - 1, i0 + 1)], smooth(fr)).multiplyScalar(.96 + R() * .07);
+    const td = tint(x * .7 + 9, z * .7) * (D2.length - 1), j0 = Math.floor(td); cd.copy(D2[j0]).lerp(D2[Math.min(D2.length - 1, j0 + 1)], td - j0).multiplyScalar(.95 + R() * .08);
+    return C.copy(cg).lerp(cd, smooth(Math.min(1, Math.max(0, (w - .3) / .45)))); };
+  const face = (A, B, D, wA = 0, wB = 0, wD = 0) => { const cx = (A[0] + B[0] + D[0]) / 3, cz = (A[2] + B[2] + D[2]) / 3; tri(A, B, D, surf(cx, cz, (wA + wB + wD) / 3)); };
   /* 고리 사이 띠: 각도 순으로 두 고리를 지퍼처럼 엮음 */
-  const zip = (I, O) => { if (I.length === 1) { for (let k = 0; k < O.length; k++) face(I[0].p, O[(k + 1) % O.length].p, O[k].p); return; }
+  const zip = (I, O) => { const F = (a, b, d) => face(a.p, b.p, d.p, a.w, b.w, d.w); if (I.length === 1) { for (let k = 0; k < O.length; k++) F(I[0], O[(k + 1) % O.length], O[k]); return; }
     let i = 0, o = 0; const ni = I.length, no = O.length, ang = (L, k) => L[k % L.length].a + Math.floor(k / L.length) * Math.PI * 2;
     while (i < ni || o < no) { const ai = ang(I, i + 1), ao = ang(O, o + 1);
-      if (o >= no || (i < ni && ai < ao)) { face(I[i % ni].p, I[(i + 1) % ni].p, O[o % no].p); i++; } else { face(I[i % ni].p, O[(o + 1) % no].p, O[o % no].p); o++; } } };
+      if (o >= no || (i < ni && ai < ao)) { F(I[i % ni], I[(i + 1) % ni], O[o % no]); i++; } else { F(I[i % ni], O[(o + 1) % no], O[o % no]); o++; } } };
   for (let r = 0; r < pts.length - 1; r++) zip(pts[r], pts[r + 1]);
   const TOPN = pos.length;
   /* 가장자리 풀 턱: 윗면 끝에서 살짝 바깥·아래로 접힌 진한 풀 */
