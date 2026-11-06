@@ -6,11 +6,11 @@
    · 지형 뒤로 간 기체는 안 보임(게임 규칙) · 따라가는 기체만 지형 너머로 윤곽이 비침 */
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
-import { makeBloom } from '../core/hangar/bloom.js?v=11061243';
-import { makePerf } from './perf.js?v=11061243';
+import { makeBloom } from '../core/hangar/bloom.js?v=11061334';
+import { makePerf } from './perf.js?v=11061334';
 import { buildShip, engineSpots } from '../core/ships/build.js';
 import { makeGlow } from '../preview/glow.js';
-import { makeGlbIsle } from './glbisle.js?v=11061243';
+import { makeGlbIsle } from './glbisle.js?v=11061334';
 
 const $ = s => document.querySelector(s), clamp = THREE.MathUtils.clamp;
 const HOVER = .7, LEN = 2;
@@ -31,8 +31,9 @@ export async function start(canvas, onProgress = () => {}) {
   const glow = makeGlow(); scene.add(glow.mesh);
   onProgress(.1);
   /* 맵 */
-  const GI = await new Promise(res => { const g = makeGlbIsle(HOVER, res, { url: './assets/skyislands_v7.glb', scale: MAPS }); scene.add(g.mesh); });
+  const GI = await new Promise(res => { const g = makeGlbIsle(HOVER, res, { url: './assets/skyislands_v7.glb', scale: MAPS, gap: 2.9 }   /* 가운데 섬 풀밭보다 2.9m 위 (사용자 2026-11-06: 기체를 1m쯤 올려 큰 섬 땅 위를 스치고 그 섬 나무는 숨는 자리로) */); scene.add(g.mesh); });
   onProgress(.6);
+  const hidFrom = (o, s) => o.inTree && (o.reveal || 0) <= 0 && Math.hypot(o.x - s.x, o.z - s.z) > 3.5;   /* 나무 속 기체는 바로 곁(3.5m)이 아니면 안 보임 */
   const wall = (x, z) => GI.gridAt(x, z) || Math.abs(x) > GI.lim.x || Math.abs(z) > GI.lim.z;
   /* 두 점 사이가 트였나 (탄·시야): 0.5m마다 지형 칸을 봄 */
   const clear = (x0, z0, x1, z1) => { const d = Math.hypot(x1 - x0, z1 - z0), n = Math.ceil(d / .5); for (let i = 1; i < n; i++) { const k = i / n; if (GI.gridAt(x0 + (x1 - x0) * k, z0 + (z1 - z0) * k)) return false; } return true; };
@@ -65,7 +66,8 @@ export async function start(canvas, onProgress = () => {}) {
     .hud b{font-weight:500;font-size:10.5px;color:var(--c);text-shadow:0 0 4px rgba(0,0,0,.9),0 0 8px rgba(0,0,0,.5)}
     .hud .hp{position:relative;width:40px;height:5px;background:rgba(8,10,20,.75);border:1px solid rgba(8,10,20,.85)}
     .hud .hp i{position:absolute;left:0;top:0;bottom:0;background:var(--c)}
-    .hud.on b{text-decoration:underline;text-underline-offset:3px}`;
+    .hud.on b{text-decoration:underline;text-underline-offset:3px}
+    .hud.hid b::after{content:' · 나무 속에 숨음';color:#d8ffb0}`;
   document.head.appendChild(css);
   for (const s of S) { const el = document.createElement('div'); el.className = 'hud'; const c = s.col.map(v => Math.min(255, v / 1.4 * 255 | 0));
     el.style.setProperty('--c', `rgb(${c})`); el.innerHTML = `<b>${s.name}</b><div class="hp"><i></i></div>`; $('#tags').appendChild(el); s.el = el; s.bar = el.querySelector('i'); }
@@ -116,15 +118,20 @@ export async function start(canvas, onProgress = () => {}) {
     for (const s of S) {
       if (s.dead) { if ((s.back -= dt) <= 0) { [s.x, s.z] = freeSpot(); s.hp = 1; s.dead = false; s.vx = s.vz = 0; s.root.visible = true; flash(s.x, s.z, [.7, 1.1, 1.4], 1); } continue; }
       if ((s.think -= dt) <= 0) { s.think = .4 + Math.random() * .4;   /* 가까운 상대를 고름 — 트인 곳에 보이는 상대를 더 좋아함 */
-        let best = null, bs = 1e9; for (const o of S) { if (o === s || o.dead) continue; const d = Math.hypot(o.x - s.x, o.z - s.z) * (clear(s.x, s.z, o.x, o.z) ? 1 : 1.8) * (o === s.tgt ? .8 : 1); if (d < bs) { bs = d; best = o; } }
-        s.tgt = best; if (Math.random() < .08) s.orbit *= -1; }
+        let best = null, bs = 1e9; for (const o of S) { if (o === s || o.dead || hidFrom(o, s)) continue; const d = Math.hypot(o.x - s.x, o.z - s.z) * (clear(s.x, s.z, o.x, o.z) ? 1 : 1.8) * (o === s.tgt ? .8 : 1); if (d < bs) { bs = d; best = o; } }
+        s.tgt = best; if (Math.random() < .08) s.orbit *= -1;
+        /* 많이 맞았으면 가까운 나무 속으로 숨으러 감 · 다 낫거나 들키면 다시 나옴 */
+        if (s.hp < .35 && !s.goal) { let g = null, gd = 30; for (const p of GI.treeSpots) { const d = Math.hypot(p[0] - s.x, p[1] - s.z); if (d < gd) { gd = d; g = p; } } s.goal = g; }
+        if (s.goal && (s.hp > .7 || (s.inTree && s.tgt && Math.hypot(s.tgt.x - s.x, s.tgt.z - s.z) < 4))) s.goal = null; }
+      if (s.tgt && (s.tgt.dead || hidFrom(s.tgt, s))) s.tgt = null;   /* 나무 속으로 사라진 상대는 놓침 */
       const o = s.tgt; let want = s.head;
       if (o) { const dx = o.x - s.x, dz = o.z - s.z, d = Math.hypot(dx, dz) || 1, toA = Math.atan2(-dx, -dz);
         want = d > 13 ? toA : d < 6 ? toA + Math.PI * .75 * s.orbit : toA + Math.PI * .5 * s.orbit * (1.2 - d / 13); }   /* 멀면 다가가고 · 가까우면 비켜 돌고 · 알맞으면 옆으로 돌며 쏨 */
       else want = s.head + Math.sin(t * .5 + s.phase) * .5;
+      if (s.goal) want = Math.atan2(-(s.goal[0] - s.x), -(s.goal[1] - s.z));
       /* 앞이 막혔으면 비어 있는 쪽으로: 원하는 방향 둘레를 차례로 봐서 처음 트인 쪽 */
       let go = want; for (const k of TRY) { if (fwdFree(s.x, s.z, want + k, 6)) { go = want + k; break; } }
-      const sp = s.sp * (o && Math.hypot(o.x - s.x, o.z - s.z) < 9 ? .85 : 1);
+      const sp = s.sp * (s.goal && s.inTree ? .22 : o && Math.hypot(o.x - s.x, o.z - s.z) < 9 ? .85 : 1);   /* 숨은 동안은 잎 속에서 살살 움직임 */
       const tvx = -Math.sin(go) * sp, tvz = -Math.cos(go) * sp, ac = Math.min(1, dt * 2.6);
       s.vx += (tvx - s.vx) * ac; s.vz += (tvz - s.vz) * ac;
       /* 서로 겹치지 않게 살짝 밀어냄 */
@@ -139,8 +146,9 @@ export async function start(canvas, onProgress = () => {}) {
       /* 쏨: 가까이 · 겨눈 쪽 · 사이가 트였을 때만 */
       if ((s.cool -= dt) <= 0 && o) { const dx = o.x - s.x, dz = o.z - s.z, d = Math.hypot(dx, dz); const off = Math.abs(THREE.MathUtils.euclideanModulo(Math.atan2(-dx, -dz) - s.head + Math.PI, Math.PI * 2) - Math.PI);
         if (d < 17 && off < .5 && clear(s.x, s.z, o.x, o.z)) { s.cool = .32 + Math.random() * .2; const bsp = 30, lt = d / bsp, e = (Math.random() - .5) * 2.2, lx = o.x + o.vx * lt * .7 + e, lz = o.z + o.vz * lt * .7 - e, L = Math.hypot(lx - s.x, lz - s.z) || 1;   /* 조금씩 빗나감 — 다 맞으면 싸움이 너무 짧음 */
-          const mx = s.x - Math.sin(s.head) * 1.2, mz = s.z - Math.cos(s.head) * 1.2; if (!GI.gridAt(mx, mz)) ST.fire++; bolts.push({ x: mx, z: mz, vx: (lx - s.x) / L * bsp, vz: (lz - s.z) / L * bsp, life: 20 / bsp, own: s }); }
+          const mx = s.x - Math.sin(s.head) * 1.2, mz = s.z - Math.cos(s.head) * 1.2; if (!GI.gridAt(mx, mz)) { ST.fire++; s.reveal = .6; bolts.push({ x: mx, z: mz, vx: (lx - s.x) / L * bsp, vz: (lz - s.z) / L * bsp, life: 20 / bsp, own: s }); } }   /* 쏘면 잠깐 드러남 (나무 속에서도) */
         else s.cool = .08; }
+      s.inTree = GI.treeAt(s.x, s.z); s.reveal = Math.max(0, (s.reveal || 0) - dt);
       const bob = Math.sin(t * 2.1 + s.phase) * .12; s.y = HOVER + .25 + bob;
       s.root.position.set(s.x, s.y, s.z); s.root.rotation.set(0, s.head, 0); s.root.rotateZ(s.bank); s.root.updateMatrixWorld(true);
       const gy = GI.groundFast(s.x, s.z); if (gy == null) s.sh.visible = false; else { const h = s.y - gy; s.sh.visible = true; s.sh.position.set(s.x, gy + .06, s.z); s.sh.rotation.set(-Math.PI / 2, 0, s.head); s.sh.scale.setScalar(.7 + h * .05); s.sh.material.uniforms.uA.value = clamp(.6 - h * .02, .18, .55); }
@@ -161,7 +169,8 @@ export async function start(canvas, onProgress = () => {}) {
     GI.sea.position.x = cam.x; GI.sea.position.z = cam.z; GI.sea.material.uniforms.uT.value = t;
     /* 지형 뒤의 기체는 숨김 (한 장면에 3대씩 돌아가며 잼) */
     for (let k = 0; k < 3; k++) { const s = S[occI++ % S.length]; if (s.dead) continue; v3.set(s.x, s.y, s.z); const d = v3.clone().sub(camera.position), L = d.length(); rc.set(camera.position, d.normalize()); rc.far = L - .8; s.seen = rc.intersectObjects(meshes, false).length === 0; }
-    for (const s of S) { const show = !s.dead && (s.seen || s.i === cam.follow); s.root.visible = !s.dead && (s.seen || s.i === cam.follow); v3.set(s.x, s.y + .9, s.z).project(camera);
+    { const f = S[cam.follow]; if (f && f.inTree && !f.dead) GI.uSee.value.set(f.x, f.y, f.z, 1); else GI.uSee.value.w = 0; }   /* 따라가는 기체가 나무 속이면 둘레 잎을 비켜 보이게 */
+    for (const s of S) { const hid = s.inTree && s.reveal <= 0, me = s.i === cam.follow, show = !s.dead && ((s.seen && !hid) || me); s.root.visible = show; s.sh.visible = s.sh.visible && show; s.el.classList.toggle('hid', me && s.inTree); v3.set(s.x, s.y + .9, s.z).project(camera);
       const on = show && v3.z < 1 && Math.abs(v3.x) < 1.1 && Math.abs(v3.y) < 1.1; s.el.style.opacity = on ? 1 : 0;
       if (on) { s.el.style.transform = `translate(${(v3.x * .5 + .5) * cw}px,${(-v3.y * .5 + .5) * ch}px) translate(-50%,-100%)`; s.bar.style.width = (Math.max(0, s.hp) * 100) + '%'; } }
     /* ── 빛: 탄 · 번쩍임 · 엔진 ── */
