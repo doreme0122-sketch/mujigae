@@ -9,7 +9,8 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 export function makeGlbIsle(hover, onReady) {
   const grp = new THREE.Group(), meshes = [], blockers = [];
   const api = { mesh: grp, ready: false, blockers,
-    blocked: (x, z) => { if (Math.abs(x) > 34 || Math.abs(z) > 24) return true; for (const b of blockers) { const dx = x - b.x, dz = z - b.z; if (dx * dx + dz * dz < b.r * b.r) return true; } return false; },
+    lim: { x: 34, z: 24 },
+    blocked: (x, z) => { if (Math.abs(x) > api.lim.x || Math.abs(z) > api.lim.z) return true; for (const b of blockers) { const dx = x - b.x, dz = z - b.z; if (dx * dx + dz * dz < b.r * b.r) return true; } return false; },
     groundAt: null, occluded: null };
   /* 밝은 하늘 배경 + 저 아래 흰 구름 바다 */
   const sea = new THREE.Mesh(new THREE.PlaneGeometry(1200, 1200).rotateX(-Math.PI / 2), new THREE.ShaderMaterial({ uniforms: { uT: { value: 0 } },
@@ -48,6 +49,8 @@ export function makeGlbIsle(hover, onReady) {
     api.groundAt = (x, z) => { rc.set(new THREE.Vector3(x, hover + .5, z), dn); rc.far = 200; const h = rc.intersectObjects(meshes, false)[0]; return h ? h.point.y : null; };
     api.occluded = (camPos, x, y, z) => { const to = new THREE.Vector3(x, y, z), d = to.clone().sub(camPos), L = d.length(); rc.set(camPos, d.normalize()); rc.far = L - .6; return rc.intersectObjects(meshes, false).length > 0; };
     sea.position.y = new THREE.Box3().setFromObject(root).min.y - 25;
+    /* 날 수 있는 범위 = 구조물이 있는 곳까지만 (사용자 2026-11-06: 구조물에서 경계가 너무 멀어 제대로 확인 못 함) */
+    { const bb = new THREE.Box3(); for (const m of meshes) bb.union(new THREE.Box3().setFromObject(m)); api.lim.x = Math.max(Math.abs(bb.min.x), Math.abs(bb.max.x)) * .82; api.lim.z = Math.max(Math.abs(bb.min.z), Math.abs(bb.max.z)) * .85; }
     api.ready = true; onReady?.(api);
   });
   return api;
