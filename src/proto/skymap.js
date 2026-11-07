@@ -7,22 +7,23 @@
    · 태어나 출구로 튀어 나가면 바로 조이스틱 · 기지 고리(9m)를 벗어나는 순간 보호막 3초 + 가속 5초 */
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
-import { makeBloom } from '../core/hangar/bloom.js?v=11071834';
-import { makePad } from '../core/hangar/pad.js?v=11071834';
-import { makeMag } from '../core/hangar/mag.js?v=11071834';
+import { makeBloom } from '../core/hangar/bloom.js?v=11071916';
+import { makePad } from '../core/hangar/pad.js?v=11071916';
+import { makeMag } from '../core/hangar/mag.js?v=11071916';
 import { buildShip } from '../core/ships/build.js';
-import { makeGoldStar } from './goldstar.js?v=11071834';
-import { makeArena, SPEED, WAVE_R0 } from './arena.js?v=11071834';
-import { makeGuardians, GUARD } from './guardian.js?v=11071834';
-import { makeBirth, BIRTH } from './birth.js?v=11071834';
-import { makePerf } from './perf.js?v=11071834';
+import { makeGoldStar } from './goldstar.js?v=11071916';
+import { makeArena, SPEED, WAVE_R0 } from './arena.js?v=11071916';
+import { makeGuardians, GUARD } from './guardian.js?v=11071916';
+import { makeBirth, BIRTH } from './birth.js?v=11071916';
+import { makeHeightLine } from './hline.js?v=11071916';
+import { makePerf } from './perf.js?v=11071916';
 import { makeGlow } from '../preview/glow.js';
-import { makeFlight, FLY } from './flight.js?v=11071834';
-import { pedestal, gate4 } from './gates.js?v=11071834';
-import { makeMeadow, MEADOW } from './meadow.js?v=11071834';
-import { makeClouds } from './clouds.js?v=11071834';
-import { makeLife } from './life.js?v=11071834';
-import { makeJungle, jungleLayout } from './jungle.js?v=11071834';
+import { makeFlight, FLY } from './flight.js?v=11071916';
+import { pedestal, gate4 } from './gates.js?v=11071916';
+import { makeMeadow, MEADOW } from './meadow.js?v=11071916';
+import { makeClouds } from './clouds.js?v=11071916';
+import { makeLife } from './life.js?v=11071916';
+import { makeJungle, jungleLayout } from './jungle.js?v=11071916';
 
 const $ = s => document.querySelector(s), clamp = THREE.MathUtils.clamp, HOVER = FLY.HOVER;
 const R = 240, NB = 10, GAPH = 5.6, BASE_D = 0;     /* 맵 반지름 · 기지 수 · 벽 틈 반 폭(= 기지 반지름) · 기지 가운데는 벽 선 위 (앞 절반은 맵 안, 뒤 절반은 맵 밖 · 사용자 2026-11-06) */
@@ -149,7 +150,7 @@ export async function start(canvas, onProgress = () => {}) {
   onProgress(.4);
   /* ── 초원 고리 ── */
   const JL = jungleLayout({ TOP: MEADOW.TOP, UP: 20, DN: -30 });   /* 정글 배치 계획을 먼저 → 초원이 경계 너머로 섬을 놓을 때 피해 감 */
-  const meadow = await makeMeadow(scene, new URL('./assets/kit_meadow.glb?v=11071834', import.meta.url).href, p => onProgress(.4 + p * .4), new URL('./assets/kit_meadow_decor.glb?v=11071834', import.meta.url).href, new URL('./assets/kit_meadow_lo.glb?v=11071834', import.meta.url).href, { avoid: JL });
+  const meadow = await makeMeadow(scene, new URL('./assets/kit_meadow.glb?v=11071916', import.meta.url).href, p => onProgress(.4 + p * .4), new URL('./assets/kit_meadow_decor.glb?v=11071916', import.meta.url).href, new URL('./assets/kit_meadow_lo.glb?v=11071916', import.meta.url).href, { avoid: JL });
   const clouds = makeClouds(scene, { R0: MEADOW.R0, R1: MEADOW.R1 });   /* 층 사이 흘러가는 구름 · 기체 높이 숨는 구름 */
   const jungle = makeJungle(scene, { TOP: MEADOW.TOP, UP: MEADOW.UP, DN: MEADOW.DN, avoid: meadow.place.concat(meadow.CORR.map(c => ({ x: c[0], z: c[1], rr: c[2], layer: 'all' }))) });   /* 우주 정글 고리 (초원 안쪽) */
   /* ── 위아래 문 다섯: 흩어진 고리 문(0.8배) + 보물 던전 섬까지 뻗는 빛 띠 (위층 = 금빛 · 아래층 = 보랏빛) ── */
@@ -176,6 +177,7 @@ export async function start(canvas, onProgress = () => {}) {
     const road = new THREE.Mesh(ribbon(curve, 1.1), rm); road.renderOrder = 8; road.frustumCulled = false; scene.add(road);
     gates.push({ G, x: Gd.x, z: Gd.z, ax, az, col }); }
   const gateBlocked = (x, z) => { for (const g of gates) { const dx = x - g.x, dz = z - g.z, along = dx * g.ax + dz * g.az, lat = Math.abs(dx * -g.az + dz * g.ax); if (Math.abs(along) < .5 && lat > 1.9 && lat < 3.0) return true; } return false; };   /* 고리 돌 조각은 기체를 막음 */
+  const hline = makeHeightLine(scene, (x, z) => meadow.blocked(x, z) || jungle.blocked(x, z) || gateBlocked(x, z), HOVER);   /* 파란 높이선: 막히는 구조물만 (벽·기지 빼고) */
   const life = makeLife(scene, meadow, { R0: MEADOW.R0, R1: MEADOW.R1 });   /* 새 떼 · 나비 · 꽃가루 · 폭포 물보라 · 떨어지는 돌 */
   onProgress(.82);
   /* ── 조이스틱으로 모는 기체 ── */
@@ -256,6 +258,7 @@ export async function start(canvas, onProgress = () => {}) {
     for (const b of bolts) glow.add(b.x, HOVER + .3, b.z, -b.vx * .04, 0, -b.vz * .04, .18, 0, [.5, 1.2, .7], 1, b.x);
     for (let i = fx.length - 1; i >= 0; i--) { const f = fx[i]; f.t += dt; if (f.t > .3) { fx.splice(i, 1); continue; } glow.add(f.x, HOVER + .3, f.z, 0, 0, 0, .5 + f.t * 3, 3, [1.2, 1.1, 1.3], 1 - f.t / .3); }
     glow.end(); glow.uT.value = t;
+    hline.update(flying, FS.x, FS.z, FS.head, t, dt);
     /* 카메라 */
     let tx, tz; if (flying) { const sp = bship.position; tx = sp.x + FS.vx * .25; tz = sp.z + FS.vz * .25; } else { tx = B0.x; tz = B0.z; }
     const k = Math.min(1, dt * (flying ? 4 : 2)); cam.x += (tx - cam.x) * k; cam.z += (tz - cam.z) * k;

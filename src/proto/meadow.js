@@ -8,8 +8,8 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { deinterleaveGeometry } from 'three/addons/utils/BufferGeometryUtils.js';
-import { makeLand, makeChunk, makePillar, makeWall, paletteFrom } from './land.js?v=11071834';
-import { CLOUD_NOISE } from './clouds.js?v=11071834';
+import { makeLand, makeChunk, makePillar, makeWall, paletteFrom } from './land.js?v=11071916';
+import { CLOUD_NOISE } from './clouds.js?v=11071916';
 
 export const MEADOW = { R0: 187, R1: 240, UP: 20, DN: -30, TOP: -1.2, SC: 1 / 2, GATE_Y: -3 };   /* TOP: 가운데층 땅 — 기체가 땅에서 살짝(1.9m) 뜨게 (사용자 2026-11-07: 높이를 낮춤 · 식물은 그냥 지나침) · GATE_Y: 문 땅은 고리가 땅에 묻히지 않게 조금 낮게 */   /* TOP: 가운데층 땅 높이 — 기체(.7)보다 3.7m 아래 → 나무 꼭대기 위로 날게 (사용자 2026-11-06: 나무에 걸림) */   /* SC: 받은 섬 모델 크기의 2분의 1 (사용자 2026-11-06: 원래는 너무 크고 3분의 1은 너무 작음) */   /* 가운데층 섬 윗면 = 기체(높이 .7)보다 1.7m 아래 */
 const SECT = 10, CELL = 1;
@@ -243,17 +243,28 @@ export async function makeMeadow(scene, url, onProgress = () => {}, decorUrl = n
   /* ── 막힘: 가운데층 섬 · 기둥의 바위·땅이 기체 높이(.1~1.6m)를 지나는 곳을 1m 칸으로 찍음 ── */
   const N = Math.ceil(R1 * 2 / CELL) + 2, grid = new Uint8Array(N * N), cellOf = v => Math.floor((v + R1 + 1) / CELL);
   const Y0 = .1, Y1 = 1.6, a = new THREE.Vector3(), b = new THREE.Vector3(), c = new THREE.Vector3(), w = new THREE.Vector3();
-  /* 막는 것 (사용자 2026-11-07): 층을 뚫는 기둥 + 가운데층 섬에 우뚝 솟은 바위 + 돌 유적(돌기둥·돌담)
-     · 섬 땅(넓은 땅의 언덕 포함)·나무·덤불·풀꽃·뿌리는 그대로 통과 */
+  /* 막는 것 (사용자 2026-11-07): 층을 뚫는 기둥 + 돌 유적(돌기둥·돌담) + 가운데층 섬에 '우뚝 솟은' 바위
+     · 받은 섬 모델은 몸통·바위·작은 돌·나무가 한 덩어리 → 초록 면(잎)은 빼고, 땅에서 2m 넘게 솟은 돌(꼭대기가 TALL 넘는 곳)만 막음 · 나무도 섬 몸통과 같은 재질이라 색(초록=잎)으로 가름
+     · 작은 돌·나무줄기·낮은 바위·섬 땅·넓은 땅 언덕·풀꽃·뿌리는 통과 */
+  const TALL = TOP + 2, green = (C, i, j, k) => { const r = C.getX(i) + C.getX(j) + C.getX(k), g = C.getY(i) + C.getY(j) + C.getY(k), bl = C.getZ(i) + C.getZ(j) + C.getZ(k); return g > r * 1.12 && g > bl * 1.05; };
   const solid = p => p.layer === 'pillar' || (p.layer === 'mid' && !p.k.startsWith('land_')) || (p.layer === 'deco' && p.k.startsWith('ruin'));
+  const hit = new Map(), top = new Map();
   for (const p of place) { if (!solid(p)) continue;
     if (p.y + KIT[p.k].hi * p.sy < Y0 || p.y + KIT[p.k].bot * p.sy > Y1) continue;
-    for (const pr of KIT[p.k].prims) { if (pr.mat === 'Foliage' || pr.mat === 'Water') continue; const P = pr.geo.attributes.position, I = pr.geo.index, cnt = I ? I.count : P.count;
-      for (let i = 0; i < cnt; i += 3) { a.fromBufferAttribute(P, I ? I.getX(i) : i).applyMatrix4(p.m); b.fromBufferAttribute(P, I ? I.getX(i + 1) : i + 1).applyMatrix4(p.m); c.fromBufferAttribute(P, I ? I.getX(i + 2) : i + 2).applyMatrix4(p.m);
-        if (Math.max(a.y, b.y, c.y) < Y0 || Math.min(a.y, b.y, c.y) > Y1) continue;
+    const isle = p.layer === 'mid'; hit.clear(); top.clear();
+    for (const pr of KIT[p.k].prims) { if (pr.mat === 'Foliage' || pr.mat === 'Water') continue; const P = pr.geo.attributes.position, C = pr.geo.attributes.color, I = pr.geo.index, cnt = I ? I.count : P.count;
+      for (let i = 0; i < cnt; i += 3) { const i0 = I ? I.getX(i) : i, i1 = I ? I.getX(i + 1) : i + 1, i2 = I ? I.getX(i + 2) : i + 2;
+        a.fromBufferAttribute(P, i0).applyMatrix4(p.m); b.fromBufferAttribute(P, i1).applyMatrix4(p.m); c.fromBufferAttribute(P, i2).applyMatrix4(p.m);
+        if (Math.max(a.y, b.y, c.y) < Y0 || (!isle && Math.min(a.y, b.y, c.y) > Y1)) continue;
+        if (isle && C && green(C, i0, i1, i2)) continue;
         const e = Math.max(a.distanceTo(b), b.distanceTo(c), c.distanceTo(a)), n = Math.max(1, Math.ceil(e / .45));
         for (let u = 0; u <= n; u++) for (let v = 0; v <= n - u; v++) { const s1 = u / n, s2 = v / n; w.set(0, 0, 0).addScaledVector(a, 1 - s1 - s2).addScaledVector(b, s1).addScaledVector(c, s2);
-          if (w.y < Y0 || w.y > Y1) continue; const gx = cellOf(w.x), gz = cellOf(w.z); if (gx >= 0 && gz >= 0 && gx < N && gz < N) grid[gz * N + gx] = 1; } } } }
+          if (w.y < Y0) continue; const gx = cellOf(w.x), gz = cellOf(w.z); if (gx < 0 || gz < 0 || gx >= N || gz >= N) continue; const id = gz * N + gx;
+          if (!isle) { if (w.y <= Y1) grid[id] = 1; continue; }
+          if (w.y <= Y1) hit.set(id, 1); if (w.y > (top.get(id) ?? -1e9)) top.set(id, w.y); } } }
+    if (isle) for (const id of hit.keys()) { const gx = id % N, gz = (id - gx) / N; let t = -1e9;   /* 기운 바위도 잡게 주변 2칸까지 꼭대기를 봄 */
+      for (let dz = -2; dz <= 2; dz++) for (let dx = -2; dx <= 2; dx++) { const q = top.get((gz + dz) * N + gx + dx); if (q > t) t = q; }
+      if (t > TALL) grid[id] = 1; } }
   onProgress(1);
   const blocked = (x, z) => { const gx = cellOf(x), gz = cellOf(z); return gx >= 0 && gz >= 0 && gx < N && gz < N && grid[gz * N + gx] === 1; };
   /* 정글 쪽으로 들어가면 초원 섬도 햇빛이 줄고 보랏빛 하늘빛을 받음 */
