@@ -5,7 +5,7 @@
    · 도착한 섬: 그 섬 땅 위만 날 수 있음(땅 밖은 막힘) · 섬 가장자리에 돌아가는 문(받침 섬 위) — 같은 방법으로 돌아감
    · 돌아가는 문과 도착 섬의 땅 지도는 '갈 때만' 만들고 돌아오면 비움 (지금 쓰는 것만 올림 · 설계 원칙) */
 import * as THREE from 'three';
-import { gate4, pedestal } from './gates.js?v=11072203';
+import { gate4, pedestal } from './gates.js?v=11072253';
 
 const clamp = THREE.MathUtils.clamp, smooth = (a, b, x) => { const k = clamp((x - a) / (b - a), 0, 1); return k * k * (3 - 2 * k); };
 const AB = { transparent: true, depthWrite: false, blending: THREE.AdditiveBlending };
@@ -62,14 +62,18 @@ export function makeTravel({ scene, gates, meadow, jungle, fly, ship, FS, HOVER,
   /* 도착 섬 찾기: 초원 보물 섬(place) 또는 정글 던전 섬(pieces) */
   const destMeshes = g => { const Gd = g.Gd, out = [];
     if (Gd.jungle) { const p = jungle.pieces.find(q => Math.abs(q.x - Gd.tx) < .5 && Math.abs(q.z - Gd.tz) < .5); if (p) { p.G.updateMatrixWorld(true); p.G.traverse(m => { if (!m.isMesh || m.isInstancedMesh || !m.geometry?.attributes.position) return; const mt = m.material; if (mt && (mt.blending === THREE.AdditiveBlending || mt.depthWrite === false)) return; out.push({ geo: m.geometry, mat: m.matrixWorld }); }); } }
-    else { const p = meadow.place.find(q => q.layer === Gd.layer && Math.abs(q.x - Gd.tx) < .5 && Math.abs(q.z - Gd.tz) < .5); if (p) for (const pr of meadow.KIT[p.k].prims) if (pr.mat !== 'Foliage' && pr.mat !== 'Water') out.push({ geo: pr.geo, mat: p.m }); }
+    else for (const p of meadow.place) { if (p.layer !== Gd.layer || Math.hypot(p.x - Gd.tx, p.z - Gd.tz) > 2) continue;   /* 보물 섬 = 넓은 땅 + 가운데 보물 섬 (같은 자리) */
+      for (const pr of meadow.KIT[p.k].prims) if (pr.mat !== 'Foliage' && pr.mat !== 'Water') out.push({ geo: pr.geo, mat: p.m }); }
     return out; };
   /* 돌아가는 문: 빛의 길 끝(섬 가장자리 바로 밖) · 받침 섬 위 · 길 쪽을 바라봄 */
-  const openDest = g => { const G = gate4(GATE_H / .8); G.g.scale.setScalar(.8); const root = new THREE.Group(), ped = pedestal(91 + gates.indexOf(g) * 7); ped.scale.setScalar(.5); root.add(ped); root.add(G.g);
-    root.position.set(g.ex, g.y1 - GATE_H, g.ez); root.rotation.y = Math.atan2(-g.ax, -g.az); scene.add(root);
+  const openDest = g => {
     const isle = footprint(destMeshes(g), g.Gd.tx, g.Gd.tz, g.Gd.rad * 1.6 + 4);
+    /* 섬 가장자리는 들쭉날쭉 → 길 쪽 실제 가장자리를 재서, 받침 섬이 섬 가장자리에 닿게 크기를 맞춤 (사이 빈 하늘에 갇히지 않게) */
+    const D = Math.hypot(g.ex - g.Gd.tx, g.ez - g.Gd.tz); let edge = 0; for (let s = 0; s <= D + 6; s += .25) if (isle(g.Gd.tx + (g.ex - g.Gd.tx) / D * s, g.Gd.tz + (g.ez - g.Gd.tz) / D * s)) edge = s;
+    const pr = Math.max(3.6, D - edge + 1.8), G = gate4(GATE_H / .8); G.g.scale.setScalar(.8); const root = new THREE.Group(), ped = pedestal(91 + gates.indexOf(g) * 7); ped.scale.setScalar(pr / 7.2); root.add(ped); root.add(G.g);
+    root.position.set(g.ex, g.y1 - GATE_H, g.ez); root.rotation.y = Math.atan2(-g.ax, -g.az); scene.add(root);
     const exitG = { G, root, x: g.ex, z: g.ez, ax: g.ax, az: g.az, col: g.col, ch: 0, stay: 0, back: true, from: g };
-    dest = { g, exitG, isle, onPed: (x, z) => Math.hypot(x - g.ex, z - g.ez) < 3.4 }; };
+    dest = { g, exitG, isle, onPed: (x, z) => Math.hypot(x - g.ex, z - g.ez) < pr - .4 }; };
   const closeDest = () => { if (!dest) return; const r = dest.exitG.root; scene.remove(r); r.traverse(o => { if (o.geometry) o.geometry.dispose(); if (o.material) (Array.isArray(o.material) ? o.material : [o.material]).forEach(m => m.dispose()); }); dest = null; };
   const stones = (gg, x, z) => { const dx = x - gg.x, dz = z - gg.z; if (dx > 4 || dx < -4 || dz > 4 || dz < -4) return false; const along = dx * gg.ax + dz * gg.az, lat = Math.abs(dx * -gg.az + dz * gg.ax); return Math.abs(along) < .5 && lat > 1.9 && lat < 3.0; };
   /* 도착 섬에서 막힘: 고리 돌 조각 · 섬 땅 밖 */
@@ -116,5 +120,8 @@ export function makeTravel({ scene, gates, meadow, jungle, fly, ship, FS, HOVER,
     for (let i = 0; i < 6; i++) { const a = Math.random() * 6.28, r = 1.3 + Math.random() * 2; glow.add(sp.x + Math.cos(a) * r, HOVER + yOff + Math.sin(a) * r * .5, sp.z + Math.sin(a) * r * .4, -tan.x * 3 * k, -tan.y * 3 * k, -tan.z * 3 * k, .05, 0, ca, .8 * k, i); } };
   const status = () => mode === 'trip' ? (trip.back ? '돌아가는 중 · 공격받지 않음' : (trip.g.Gd.layer === 'up' ? '위층으로' : '아래층으로') + ' 가는 중 · 공격받지 않음')
     : charge ? `출발 준비 ${Math.ceil(3 - charge.u * 3)} · 움직이면 취소` : mode === 'dest' ? (dest.g.Gd.jungle ? '정글 던전' : '보물 섬') + ' · ' + (dest.g.Gd.layer === 'up' ? '위층' : '아래층') + ' · 돌아가는 문 한가운데서 멈추면 돌아감' : null;
-  return { update, blocked, pose, camera, glowTrail, status, get mode() { return mode; }, get yOff() { return yOff; }, get dest() { return dest; }, get charge() { return charge; }, startTrip };
+  /* 다시 태어날 때 (사용자 2026-11-07: 위층·아래층에서 다시 태어나면 그 층 높이에서 태어나던 버그): 문 타기 상태를 처음으로 */
+  const reset = () => { if (charge) SND.chargeStop(true); charge = null; trip = null; lock = null; closeDest(); mode = 'mid'; yOff = 0;
+    FS.aim = null; FS.chBank = 0; FS.chPitch = 0; FS.tripPitch = 0; FS.dashUntil = 0; for (const g of gates) { g.stay = 0; g.ch = 0; } shock.visible = false; SW.t = 9; };
+  return { reset, update, blocked, pose, camera, glowTrail, status, get mode() { return mode; }, get yOff() { return yOff; }, get dest() { return dest; }, get charge() { return charge; }, startTrip };
 }
