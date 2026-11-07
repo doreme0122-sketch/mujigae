@@ -8,8 +8,8 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { deinterleaveGeometry } from 'three/addons/utils/BufferGeometryUtils.js';
-import { makeLand, makeChunk, makePillar, makeWall, paletteFrom } from './land.js?v=11071657';
-import { CLOUD_NOISE } from './clouds.js?v=11071657';
+import { makeLand, makeChunk, makePillar, makeWall, paletteFrom } from './land.js?v=11071834';
+import { CLOUD_NOISE } from './clouds.js?v=11071834';
 
 export const MEADOW = { R0: 187, R1: 240, UP: 20, DN: -30, TOP: -1.2, SC: 1 / 2, GATE_Y: -3 };   /* TOP: 가운데층 땅 — 기체가 땅에서 살짝(1.9m) 뜨게 (사용자 2026-11-07: 높이를 낮춤 · 식물은 그냥 지나침) · GATE_Y: 문 땅은 고리가 땅에 묻히지 않게 조금 낮게 */   /* TOP: 가운데층 땅 높이 — 기체(.7)보다 3.7m 아래 → 나무 꼭대기 위로 날게 (사용자 2026-11-06: 나무에 걸림) */   /* SC: 받은 섬 모델 크기의 2분의 1 (사용자 2026-11-06: 원래는 너무 크고 3분의 1은 너무 작음) */   /* 가운데층 섬 윗면 = 기체(높이 .7)보다 1.7m 아래 */
 const SECT = 10, CELL = 1;
@@ -243,7 +243,10 @@ export async function makeMeadow(scene, url, onProgress = () => {}, decorUrl = n
   /* ── 막힘: 가운데층 섬 · 기둥의 바위·땅이 기체 높이(.1~1.6m)를 지나는 곳을 1m 칸으로 찍음 ── */
   const N = Math.ceil(R1 * 2 / CELL) + 2, grid = new Uint8Array(N * N), cellOf = v => Math.floor((v + R1 + 1) / CELL);
   const Y0 = .1, Y1 = 1.6, a = new THREE.Vector3(), b = new THREE.Vector3(), c = new THREE.Vector3(), w = new THREE.Vector3();
-  for (const p of place) { if (p.layer !== 'pillar') continue;   /* 가운데층에서 막는 것은 층을 뚫는 기둥뿐 */   /* 나무·덤불·풀꽃·뿌리는 안 막음 */
+  /* 막는 것 (사용자 2026-11-07): 층을 뚫는 기둥 + 가운데층 섬에 우뚝 솟은 바위 + 돌 유적(돌기둥·돌담)
+     · 섬 땅(넓은 땅의 언덕 포함)·나무·덤불·풀꽃·뿌리는 그대로 통과 */
+  const solid = p => p.layer === 'pillar' || (p.layer === 'mid' && !p.k.startsWith('land_')) || (p.layer === 'deco' && p.k.startsWith('ruin'));
+  for (const p of place) { if (!solid(p)) continue;
     if (p.y + KIT[p.k].hi * p.sy < Y0 || p.y + KIT[p.k].bot * p.sy > Y1) continue;
     for (const pr of KIT[p.k].prims) { if (pr.mat === 'Foliage' || pr.mat === 'Water') continue; const P = pr.geo.attributes.position, I = pr.geo.index, cnt = I ? I.count : P.count;
       for (let i = 0; i < cnt; i += 3) { a.fromBufferAttribute(P, I ? I.getX(i) : i).applyMatrix4(p.m); b.fromBufferAttribute(P, I ? I.getX(i + 1) : i + 1).applyMatrix4(p.m); c.fromBufferAttribute(P, I ? I.getX(i + 2) : i + 2).applyMatrix4(p.m);

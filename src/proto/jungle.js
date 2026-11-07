@@ -490,7 +490,8 @@ export function makeJungle(scene, { R0 = 136, R1 = 187, TOP = -3, UP = 20, DN = 
   const pieces = [], GATES = [], VINES = [], L = jungleLayout({ R0, R1, TOP, UP, DN, sect });
   const place = (built, x, y, z, s, yaw, sy = s) => { built.G.position.set(x, y, z); built.G.scale.set(s, sy, s); built.G.rotation.y = yaw; scene.add(built.G);
     built.G.traverse(o => { if (o.isPoints && o.material.size) o.material.size *= Math.max(s, sy); });   /* 포자 알갱이도 같은 비율로 */
-    pack(built.G); const p = { ...built, x, y, z, rad: built.size * Math.max(s, sy) * 1.3 }; pieces.push(p); return p; };
+    pack(built.G); const p = { ...built, x, y, z, rad: built.size * Math.max(s, sy) * 1.3 }; pieces.push(p); if (cur && (cur.t === 'hunt' || (cur.t === 'fill' && cur.kind === IDX.flower))) SOLID.push(p); return p; };
+  let cur = null; const SOLID = [];   /* 막는 정글: 사냥터 섬(돔·가시·뼈) · 거대 포식 꽃 (사용자 2026-11-07) */
   /* 낱개 조각이 초원 섬과 겹치면 뺌 (같은 높이대일 때만) */
   const band = l => l === 'all' ? 'all' : l === 'mid' ? 0 : l === 'upgap' ? 1 : l === 'gap' || l === 'rock' ? -1 : l === 'up' ? 2 : l === 'dn' ? -2 : 9;
   const free = (o) => { for (const q of avoid) { if (q.layer === 'deco') continue; if (band(q.layer) !== band(o.layer) && q.layer !== 'pillar' && q.layer !== 'all') continue; if (Math.hypot(q.x - o.x, q.z - o.z) < (q.rr || 3) + o.r + 1) return false; }
@@ -498,7 +499,7 @@ export function makeJungle(scene, { R0 = 136, R1 = 187, TOP = -3, UP = 20, DN = 
   /* 같은 모양 나눠 쓰기: 아래층 정글 섬과 작은 조각은 종류마다 몇 벌만 만들어 복사해 씀 (모양 데이터는 하나 · 크기·방향만 다르게) → 폰 메모리 절약 */
   const SHARE = new Map(), shared = (key, n, make) => { if (!SHARE.has(key)) SHARE.set(key, []); const arr = SHARE.get(key); if (arr.length < n) { const b = make(arr.length); arr.push(b); return b; }
     const src = arr[Math.floor(Math.random() * arr.length)]; return { G: src.G.clone(), anim: [], size: src.size }; };
-  for (const o of L) {
+  for (const o of L) { cur = o;
     if (o.t === 'hunt' && o.dungeon) place(shared('h', 3, v => buildPiece(IDX.hunt, o.seed + v * 11, .8)), o.x, o.y, o.z, o.s, o.yaw);   /* 위·아래층 던전은 멀리서 보는 곳 → 세 벌 나눠 씀 */
     else if (o.t === 'hunt') place(buildPiece(IDX.hunt, o.seed), o.x, o.y, o.z, o.s, o.yaw);
     else if (o.t === 'gate') { place(buildGateIsle(o.seed), o.x, o.y, o.z, o.s, o.yaw); GATES.push({ x: o.x, z: o.z, ...o.gate, jungle: true }); }
@@ -510,7 +511,19 @@ export function makeJungle(scene, { R0 = 136, R1 = 187, TOP = -3, UP = 20, DN = 
         for (let c = 0; c < 4; c++) { const a = c / 4 * 6.28 + .4, lx = Math.cos(a) * 9 * o.s, lz = Math.sin(a) * 9 * o.s, cy = Math.cos(-o.yaw), sy2 = Math.sin(-o.yaw); VINES.push([o.x + lx * cy - lz * sy2, o.z + lx * sy2 + lz * cy, 3.3 * o.s]); } }
     else if (o.t === 'single') { if (!free(o)) { o.skip = true; continue; } place(shared('s' + o.kind, 3, () => buildSingle(o.kind, o.seed)), o.x, o.y, o.z, o.s, o.yaw); }
   }
-  const blocked = (x, z) => { for (const v of VINES) if ((x - v[0]) ** 2 + (z - v[1]) ** 2 < v[2] * v[2]) return true; return false; };   /* 층을 뚫는 덩굴 기둥만 막음 */
+  cur = null;
+  /* 막힘 칸: 사냥터 섬·포식 꽃의 단단한 몸이 기체 높이(.1~1.6m)를 지나는 곳을 1m 칸으로 찍음 · 빛 무리·포자·선은 뺌 */
+  const N = Math.ceil(R1 * 2) + 2, grid = new Uint8Array(N * N), cellOf = v => Math.floor(v + R1 + 1), Y0 = .1, Y1 = 1.6;
+  { const a = new THREE.Vector3(), b = new THREE.Vector3(), c = new THREE.Vector3(), w = new THREE.Vector3();
+    for (const p of SOLID) { if (p.y - p.rad > Y1 || p.y + p.rad < Y0) continue; p.G.updateMatrixWorld(true);
+      p.G.traverse(m => { if (!m.isMesh || m.isInstancedMesh || !m.geometry || !m.geometry.attributes.position) return; const mt = m.material; if (mt && (mt.blending === THREE.AdditiveBlending || mt.depthWrite === false)) return;
+        const P = m.geometry.attributes.position, I = m.geometry.index, cnt = I ? I.count : P.count, M = m.matrixWorld;
+        for (let i = 0; i + 2 < cnt; i += 3) { a.fromBufferAttribute(P, I ? I.getX(i) : i).applyMatrix4(M); b.fromBufferAttribute(P, I ? I.getX(i + 1) : i + 1).applyMatrix4(M); c.fromBufferAttribute(P, I ? I.getX(i + 2) : i + 2).applyMatrix4(M);
+          if (Math.max(a.y, b.y, c.y) < Y0 || Math.min(a.y, b.y, c.y) > Y1) continue;
+          const e = Math.max(a.distanceTo(b), b.distanceTo(c), c.distanceTo(a)), n = Math.max(1, Math.ceil(e / .45));
+          for (let u = 0; u <= n; u++) for (let v = 0; v <= n - u; v++) { const s1 = u / n, s2 = v / n; w.set(0, 0, 0).addScaledVector(a, 1 - s1 - s2).addScaledVector(b, s1).addScaledVector(c, s2);
+            if (w.y < Y0 || w.y > Y1) continue; const gx = cellOf(w.x), gz = cellOf(w.z); if (gx >= 0 && gz >= 0 && gx < N && gz < N) grid[gz * N + gx] = 1; } } }); } }
+  const blocked = (x, z) => { for (const v of VINES) if ((x - v[0]) ** 2 + (z - v[1]) ** 2 < v[2] * v[2]) return true; const gx = cellOf(x), gz = cellOf(z); return gx >= 0 && gz >= 0 && gx < N && gz < N && grid[gz * N + gx] === 1; };   /* 층을 뚫는 덩굴 기둥 + 사냥터 섬·포식 꽃 */
   const sph = new THREE.Sphere(), fr = new THREE.Frustum(), pv = new THREE.Matrix4();
   const update = (t, dt, camera) => { CAM = camera; T.value = t; pv.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse); fr.setFromProjectionMatrix(pv);
     for (const p of pieces) { const d = Math.hypot(p.x - camera.position.x, p.z - camera.position.z); sph.center.set(p.x, p.y, p.z); sph.radius = p.rad;
