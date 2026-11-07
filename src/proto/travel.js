@@ -5,7 +5,7 @@
    · 도착한 섬: 그 섬 땅 위만 날 수 있음(땅 밖은 막힘) · 섬 가장자리에 돌아가는 문(받침 섬 위) — 같은 방법으로 돌아감
    · 돌아가는 문과 도착 섬의 땅 지도는 '갈 때만' 만들고 돌아오면 비움 (지금 쓰는 것만 올림 · 설계 원칙) */
 import * as THREE from 'three';
-import { gate4, pedestal } from './gates.js?v=11072253';
+import { gate4, pedestal } from './gates.js?v=11072323';
 
 const clamp = THREE.MathUtils.clamp, smooth = (a, b, x) => { const k = clamp((x - a) / (b - a), 0, 1); return k * k * (3 - 2 * k); };
 const AB = { transparent: true, depthWrite: false, blending: THREE.AdditiveBlending };
@@ -49,6 +49,35 @@ function footprint(meshes, cx, cz, rad) {
   return (x, z) => { const gx = Math.floor((x - x0) / H), gz = Math.floor((z - z0) / H); return gx >= 0 && gz >= 0 && gx < M && gz < M && grid[gz * M + gx] === 1; };
 }
 
+/* 도착 섬 위 막힘 (사용자 2026-11-07: 위층·아래층은 다 통과됨 → 가운데층과 같은 규칙):
+   기체 높이 단면(위아래 25cm)을 지나는 단단한 면을 25cm 칸으로 · 'all' = 정글 섬의 단단한 몸 전부 · 'stone' = 보물 섬: 초록 면(나무)만 빼고 닿는 돌 모두 · 'tall' = 초록 빼고 2m 넘게 솟은 돌만
+   속 빈 구조물(겉면만 잡힘)은 안쪽을 채움 */
+function solidMap(meshes, cx, cz, rad, Y, ground) {
+  const H = .25, half = rad + 6, M = Math.ceil(half * 2 / H) + 1, x0 = cx - half, z0 = cz - half, grid = new Uint8Array(M * M), hit = new Uint8Array(M * M), top = new Map();
+  const Y0 = Y - .25, Y1 = Y + .25, TALL = ground + 2, a = new THREE.Vector3(), b = new THREE.Vector3(), c = new THREE.Vector3(), w = new THREE.Vector3();
+  const green = (C, i, j, k) => { const r = C.getX(i) + C.getX(j) + C.getX(k), g = C.getY(i) + C.getY(j) + C.getY(k), bl = C.getZ(i) + C.getZ(j) + C.getZ(k); return g > r * 1.12 && g > bl * 1.05; };
+  for (const { geo, mat, solid } of meshes) { if (!solid) continue; const P = geo.attributes.position, C = geo.attributes.color, I = geo.index, cnt = I ? I.count : P.count, tall = solid === 'tall', stone = solid === 'stone';
+    for (let i = 0; i + 2 < cnt; i += 3) { const i0 = I ? I.getX(i) : i, i1 = I ? I.getX(i + 1) : i + 1, i2 = I ? I.getX(i + 2) : i + 2;
+      a.fromBufferAttribute(P, i0).applyMatrix4(mat); b.fromBufferAttribute(P, i1).applyMatrix4(mat); c.fromBufferAttribute(P, i2).applyMatrix4(mat);
+      if (Math.max(a.y, b.y, c.y) < Y0 || (!tall && Math.min(a.y, b.y, c.y) > Y1)) continue;
+      if (stone && C && green(C, i0, i1, i2)) continue;
+      const gr = tall && C && green(C, i0, i1, i2), e = Math.max(a.distanceTo(b), b.distanceTo(c), c.distanceTo(a)), n = Math.max(1, Math.ceil(e / .17));
+      for (let u = 0; u <= n; u++) for (let v = 0; v <= n - u; v++) { const s1 = u / n, s2 = v / n; w.set(0, 0, 0).addScaledVector(a, 1 - s1 - s2).addScaledVector(b, s1).addScaledVector(c, s2);
+        if (w.y < Y0) continue; const gx = Math.floor((w.x - x0) / H), gz = Math.floor((w.z - z0) / H); if (gx < 0 || gz < 0 || gx >= M || gz >= M) continue; const id = gz * M + gx;
+        if (!tall) { if (w.y <= Y1) grid[id] = 1; continue; }
+        if (w.y <= Y1) hit[id] = 1; if (!gr) { const cid = Math.floor(gz * H) * 1000 + Math.floor(gx * H); if (w.y > (top.get(cid) ?? -1e9)) top.set(cid, w.y); } } } }
+  for (let id = 0; id < M * M; id++) if (hit[id]) { const gx = id % M, gz = (id - gx) / M, ux = Math.floor(gx * H), uz = Math.floor(gz * H); let t = -1e9;   /* 기운 바위도 잡게 주변 2m 돌 꼭대기 */
+    for (let dz = -2; dz <= 2; dz++) for (let dx = -2; dx <= 2; dx++) { const q = top.get((uz + dz) * 1000 + ux + dx); if (q > t) t = q; } if (t > TALL) grid[id] = 1; }
+  /* 속 빈 것 안쪽 메우기: 한 칸 틈은 막힌 걸로 보고 바깥에서 흘려 봄 → 닿지 않은 빈 칸 중 바깥과 맞닿지 않은 칸만 채움 (둘레가 부풀지 않게) */
+  const seen = new Uint8Array(M * M), st = [], wall = k => { const x = k % M; return grid[k] || (x > 0 && grid[k - 1]) || (x < M - 1 && grid[k + 1]) || (k >= M && grid[k - M]) || (k < M * M - M && grid[k + M]); };
+  const push = k => { if (!seen[k] && !wall(k)) { seen[k] = 1; st.push(k); } };
+  for (let i = 0; i < M; i++) { push(i); push((M - 1) * M + i); push(i * M); push(i * M + M - 1); }
+  while (st.length) { const k = st.pop(), x = k % M; if (x > 0) push(k - 1); if (x < M - 1) push(k + 1); if (k >= M) push(k - M); if (k < M * M - M) push(k + M); }
+  const S = k => k >= 0 && k < M * M && seen[k], fill = [];
+  for (let k = 0; k < M * M; k++) { const x = k % M; if (!seen[k] && !grid[k] && !(x > 0 && S(k - 1)) && !(x < M - 1 && S(k + 1)) && !S(k - M) && !S(k + M)) fill.push(k); } for (const k of fill) grid[k] = 1;
+  return (x, z) => { const gx = Math.floor((x - x0) / H), gz = Math.floor((z - z0) / H); return gx >= 0 && gz >= 0 && gx < M && gz < M && grid[gz * M + gx] === 1; };
+}
+
 export function makeTravel({ scene, gates, meadow, jungle, fly, ship, FS, HOVER, GATE_H, say }) {
   const SND = makeSound();
   /* 출발 충격파: 기체 뒤로 얇은 빛 고리가 한 번 퍼지며 사라짐 (과하지 않게) */
@@ -61,23 +90,23 @@ export function makeTravel({ scene, gates, meadow, jungle, fly, ship, FS, HOVER,
   const v3 = new THREE.Vector3(), tan = new THREE.Vector3(), camT = { x: 0, y: 0, z: 0 };
   /* 도착 섬 찾기: 초원 보물 섬(place) 또는 정글 던전 섬(pieces) */
   const destMeshes = g => { const Gd = g.Gd, out = [];
-    if (Gd.jungle) { const p = jungle.pieces.find(q => Math.abs(q.x - Gd.tx) < .5 && Math.abs(q.z - Gd.tz) < .5); if (p) { p.G.updateMatrixWorld(true); p.G.traverse(m => { if (!m.isMesh || m.isInstancedMesh || !m.geometry?.attributes.position) return; const mt = m.material; if (mt && (mt.blending === THREE.AdditiveBlending || mt.depthWrite === false)) return; out.push({ geo: m.geometry, mat: m.matrixWorld }); }); } }
+    if (Gd.jungle) { const p = jungle.pieces.find(q => Math.abs(q.x - Gd.tx) < .5 && Math.abs(q.z - Gd.tz) < .5); if (p) { p.G.updateMatrixWorld(true); p.G.traverse(m => { if (!m.isMesh || m.isInstancedMesh || !m.geometry?.attributes.position) return; const mt = m.material; if (mt && (mt.blending === THREE.AdditiveBlending || mt.depthWrite === false)) return; out.push({ geo: m.geometry, mat: m.matrixWorld, solid: 'all' }); }); } }
     else for (const p of meadow.place) { if (p.layer !== Gd.layer || Math.hypot(p.x - Gd.tx, p.z - Gd.tz) > 2) continue;   /* 보물 섬 = 넓은 땅 + 가운데 보물 섬 (같은 자리) */
-      for (const pr of meadow.KIT[p.k].prims) if (pr.mat !== 'Foliage' && pr.mat !== 'Water') out.push({ geo: pr.geo, mat: p.m }); }
+      for (const pr of meadow.KIT[p.k].prims) if (pr.mat !== 'Foliage' && pr.mat !== 'Water') out.push({ geo: pr.geo, mat: p.m, solid: p.k.startsWith('land_') ? null : 'stone' }); }   /* 넓은 땅(언덕)은 통과 · 가운데 보물 섬은 기체 높이에 닿는 돌(유적·바위)을 막음 · 초록(나무)은 통과 */
     return out; };
   /* 돌아가는 문: 빛의 길 끝(섬 가장자리 바로 밖) · 받침 섬 위 · 길 쪽을 바라봄 */
   const openDest = g => {
-    const isle = footprint(destMeshes(g), g.Gd.tx, g.Gd.tz, g.Gd.rad * 1.6 + 4);
+    const ms = destMeshes(g), isle = footprint(ms, g.Gd.tx, g.Gd.tz, g.Gd.rad * 1.6 + 4), solid = solidMap(ms, g.Gd.tx, g.Gd.tz, g.Gd.rad * 1.6 + 4, g.y1, g.Gd.ty);
     /* 섬 가장자리는 들쭉날쭉 → 길 쪽 실제 가장자리를 재서, 받침 섬이 섬 가장자리에 닿게 크기를 맞춤 (사이 빈 하늘에 갇히지 않게) */
     const D = Math.hypot(g.ex - g.Gd.tx, g.ez - g.Gd.tz); let edge = 0; for (let s = 0; s <= D + 6; s += .25) if (isle(g.Gd.tx + (g.ex - g.Gd.tx) / D * s, g.Gd.tz + (g.ez - g.Gd.tz) / D * s)) edge = s;
     const pr = Math.max(3.6, D - edge + 1.8), G = gate4(GATE_H / .8); G.g.scale.setScalar(.8); const root = new THREE.Group(), ped = pedestal(91 + gates.indexOf(g) * 7); ped.scale.setScalar(pr / 7.2); root.add(ped); root.add(G.g);
     root.position.set(g.ex, g.y1 - GATE_H, g.ez); root.rotation.y = Math.atan2(-g.ax, -g.az); scene.add(root);
     const exitG = { G, root, x: g.ex, z: g.ez, ax: g.ax, az: g.az, col: g.col, ch: 0, stay: 0, back: true, from: g };
-    dest = { g, exitG, isle, onPed: (x, z) => Math.hypot(x - g.ex, z - g.ez) < pr - .4 }; };
+    dest = { g, exitG, isle, solid, onPed: (x, z) => Math.hypot(x - g.ex, z - g.ez) < pr - .4 }; };
   const closeDest = () => { if (!dest) return; const r = dest.exitG.root; scene.remove(r); r.traverse(o => { if (o.geometry) o.geometry.dispose(); if (o.material) (Array.isArray(o.material) ? o.material : [o.material]).forEach(m => m.dispose()); }); dest = null; };
   const stones = (gg, x, z) => { const dx = x - gg.x, dz = z - gg.z; if (dx > 4 || dx < -4 || dz > 4 || dz < -4) return false; const along = dx * gg.ax + dz * gg.az, lat = Math.abs(dx * -gg.az + dz * gg.ax); return Math.abs(along) < .5 && lat > 1.9 && lat < 3.0; };
   /* 도착 섬에서 막힘: 고리 돌 조각 · 섬 땅 밖 */
-  const blocked = (x, z) => { if (mode === 'trip') return false; if (mode !== 'dest' || !dest) return null; if (stones(dest.exitG, x, z)) return true; return !(dest.onPed(x, z) || dest.isle(x, z)); };
+  const blocked = (x, z) => { if (mode === 'trip') return false; if (mode !== 'dest' || !dest) return null; if (stones(dest.exitG, x, z) || dest.solid(x, z)) return true; return !(dest.onPed(x, z) || dest.isle(x, z)); };
   const startTrip = (g, back, t) => { const dir = g.curve.getTangentAt(back ? 1 : 0); if (back) dir.negate();
     trip = { g, back, u: 0, dur: clamp(g.len / 30, 1.1, 1.8), cam0: { ...camT } }; mode = 'trip'; FS.aim = null; SND.depart(trip.dur);
     if (!back) openDest(g);

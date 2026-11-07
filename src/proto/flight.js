@@ -10,9 +10,9 @@
    무게: 기체 한 대 + 불꽃 띠 몇 장 + 꼬리 띠 하나 + 불티 점 묶음 하나 + 그림자 판 하나 */
 import * as THREE from 'three';
 import { buildShip, engineSpots } from '../core/ships/build.js';
-import { flameMesh } from './sortie.js?v=11072253';
-import { MAP } from './mapfloor.js?v=11072253';
-import { applyShipHeat, heatVis } from './shipheat.js?v=11072253';
+import { flameMesh } from './sortie.js?v=11072323';
+import { MAP } from './mapfloor.js?v=11072323';
+import { applyShipHeat, heatVis } from './shipheat.js?v=11072323';
 
 export const FLY = { LEN: 2, HOVER: .7, R: .8, SPEEDS: [9, 12, 15, 18], TURN: 7, ACC: .22, TURNMAX: 9,
   BASE: 9, SHIELD: 3, BOOST: 5, BOOSTK: 1.5 };   /* 기지 고리(반지름 9m)를 벗어나는 순간: 보호막 3초 · 가속 5초(1.5배) — 기지 출구 앞 매복에 바로 당하지 않게 */
@@ -72,7 +72,7 @@ export async function makeFlight(renderer, B, start, face) {
   knob.style.cssText = 'position:absolute;left:50%;top:50%;width:46px;height:46px;margin:-23px 0 0 -23px;border-radius:50%;background:radial-gradient(circle at 40% 35%,rgba(230,255,190,.9),rgba(140,210,60,.55));box-shadow:0 0 16px rgba(185,255,74,.5)';
   pad.appendChild(knob); document.body.appendChild(pad);
   const inp = { x: 0, y: 0 }, keys = new Set(); let pid = null, ox = 0, oy = 0;
-  addEventListener('pointerdown', e => { if (pid !== null || e.target.closest('#ui') || e.clientX > innerWidth * .55) return; pid = e.pointerId; ox = e.clientX; oy = e.clientY;
+  addEventListener('pointerdown', e => { if (pid !== null || S.noPad || e.target.closest('#ui') || e.clientX > innerWidth * .55) return;   /* noPad: 죽어 있는 동안엔 조이스틱 대신 둘러보기 */ pid = e.pointerId; ox = e.clientX; oy = e.clientY;
     pad.style.left = ox + 'px'; pad.style.top = oy + 'px'; pad.style.display = 'block'; knob.style.transform = ''; });
   addEventListener('pointermove', e => { if (e.pointerId !== pid) return; let dx = e.clientX - ox, dy = e.clientY - oy; const l = Math.hypot(dx, dy), R = 52;
     if (l > R) { dx *= R / l; dy *= R / l; } knob.style.transform = `translate(${dx}px,${dy}px)`; inp.x = dx / R; inp.y = dy / R; });

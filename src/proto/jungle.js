@@ -297,11 +297,11 @@ PIECES.push({name:'포식자의 사냥터',tags:['몬스터 서식지','대형 �
   build(G){const B=newB(),I=isle(B,0,0,0,{r:38,h:3,depth:38,vein:GLOWS.mag,min:.8,amp:.2,bites:2,top:'#241f34'});
     // den on one side
     const denA=R()*6.28,[dx,dz]=I.edge(denA,.6),den=V(dx,0,dz),toC=V(-dx,0,-dz).normalize();
-    add(B,jitter(new THREE.SphereGeometry(9,14,8,0,Math.PI*2,0,Math.PI/2),1.1,.6,rint()),den,null,V(1.2,.85,1.2),'#2a2440',{grad:'#141020'});
+    jitter(new THREE.SphereGeometry(9,14,8,0,Math.PI*2,0,Math.PI/2),1.1,.6,rint()).dispose();   /* 굴 돔은 뺌 (사용자 2026-11-07: 안에 몬스터가 없으니 없는 게 나음) — 운 순서는 그대로 두어 나머지 모양은 같게 */
     for(let k=0;k<7;k++){const a=R()*6.28,d=rnd(9,13);add(B,new THREE.ConeGeometry(rnd(.8,1.4),rnd(3,7),5),den.clone().add(V(Math.cos(a)*d,1.5,Math.sin(a)*d)),E(rnd(-.4,.4),0,rnd(-.4,.4)),null,'#d6cfe8',{grad:'#4a4268'});}
     flush(B,G);
-    const mouth=new THREE.Mesh(new THREE.CircleGeometry(4.2,20),new THREE.MeshBasicMaterial({color:'#020104'}));mouth.scale.y=.75;mouth.position.copy(den).addScaledVector(toC,10.4).add(V(0,2.8,0));G.add(mouth);mouth.lookAt(G.position.clone().add(V(0,2.8,0)));
-    const eyePairs=[];for(let k=0;k<3;k++){const pr=new THREE.Group();pr.position.copy(mouth.position).addScaledVector(toC,.1).addScaledVector(V(-toC.z,0,toC.x),rnd(-2.2,2.2)).add(V(0,rnd(-.8,1),0));pr.quaternion.copy(mouth.quaternion);G.add(pr);
+    const mouth=new THREE.Mesh(new THREE.CircleGeometry(4.2,20),new THREE.MeshBasicMaterial({color:'#020104'}));mouth.scale.y=.75;mouth.position.copy(den).addScaledVector(toC,10.4).add(V(0,2.8,0));G.add(mouth);mouth.lookAt(G.position.clone().add(V(0,2.8,0))); G.remove(mouth);   /* 돔 입구(검은 굴)도 뺌 · 자리는 발자국 시작점으로만 씀 */
+    const eyePairs=[];for(let k=0;k<3;k++){const pr=new THREE.Group();pr.position.copy(mouth.position).addScaledVector(toC,.1).addScaledVector(V(-toC.z,0,toC.x),rnd(-2.2,2.2)).add(V(0,rnd(-.8,1),0));pr.quaternion.copy(mouth.quaternion);
       [-.45,.45].forEach(o=>{const e=new THREE.Mesh(new THREE.SphereGeometry(.22,8,6),new THREE.MeshBasicMaterial({color:k?'#ff3a6a':'#ffe23a'}));e.position.x=o;pr.add(e);});eyePairs.push({pr,ph:R()*7});}
     anim.push(t=>{eyePairs.forEach(o=>{const c=(t+o.ph)%7;o.pr.visible=!(c<.15||(c>3&&c<3.12));});});
     const B2=newB();
