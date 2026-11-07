@@ -65,7 +65,7 @@ export function makeHeightLine(scene, blocked, Y) {
       for (let gd = 0; gd < 20000; gd++) { used[cur] = 1; P.push(EP[cur * 2], EP[cur * 2 + 1]); const a = link[cur * 2], b = link[cur * 2 + 1]; const nx = a !== pv ? a : b; if (nx < 0 || (nx === pv && b < 0)) break; if (nx === start) { closed = true; break; } if (used[nx]) break; pv = cur; cur = nx; }
       emit(P, closed); }
     g.attributes.position.needsUpdate = true; g.attributes.aN.needsUpdate = true; g.index.needsUpdate = true; g.setDrawRange(0, ni); };
-  const update = (on, sx, sz, head, t, dt) => { mesh.visible = on; if (!on) return; U.uShip.value.set(sx, Y, sz); U.uHead.value.set(-Math.sin(head), -Math.cos(head));
+  const update = (on, sx, sz, head, t, dt, y = Y) => { mesh.visible = on; if (!on) { lx = 1e9; return; } if (y !== Y) { Y = y; lx = 1e9; } U.uShip.value.set(sx, Y, sz);   /* 층이 바뀌면(문 타고 도착) 그 높이에서 다시 그림 */ U.uHead.value.set(-Math.sin(head), -Math.cos(head));
     acc += dt; let dh = Math.abs(head - lh) % 6.2832; if (dh > 3.1416) dh = 6.2832 - dh;
     if (Math.hypot(sx - lx, sz - lz) > 2 || dh > .35 || acc > 1) { acc = 0; rebuild(sx, sz, head); } };   /* 2m 움직이거나 방향이 꺾일 때만 다시 그림 → 폰 부담 적음 */
   return { update, mesh };
