@@ -8,11 +8,21 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { deinterleaveGeometry } from 'three/addons/utils/BufferGeometryUtils.js';
-import { makeLand, makeChunk, makePillar, makeWall, paletteFrom } from './land.js?v=11071916';
-import { CLOUD_NOISE } from './clouds.js?v=11071916';
+import { makeLand, makeChunk, makePillar, makeWall, paletteFrom } from './land.js?v=11072013';
+import { CLOUD_NOISE } from './clouds.js?v=11072013';
 
 export const MEADOW = { R0: 187, R1: 240, UP: 20, DN: -30, TOP: -1.2, SC: 1 / 2, GATE_Y: -3 };   /* TOP: 가운데층 땅 — 기체가 땅에서 살짝(1.9m) 뜨게 (사용자 2026-11-07: 높이를 낮춤 · 식물은 그냥 지나침) · GATE_Y: 문 땅은 고리가 땅에 묻히지 않게 조금 낮게 */   /* TOP: 가운데층 땅 높이 — 기체(.7)보다 3.7m 아래 → 나무 꼭대기 위로 날게 (사용자 2026-11-06: 나무에 걸림) */   /* SC: 받은 섬 모델 크기의 2분의 1 (사용자 2026-11-06: 원래는 너무 크고 3분의 1은 너무 작음) */   /* 가운데층 섬 윗면 = 기체(높이 .7)보다 1.7m 아래 */
-const SECT = 10, CELL = 1;
+const fillHoles = (grid, N, x0, z0, x1, z1) => {   /* 속 빈 구조물(겉면만 칸에 찍힘)의 안쪽을 채움: 상자 테두리에서 닿지 않는 빈 칸 = 안쪽 */
+  x0 = Math.max(0, x0); z0 = Math.max(0, z0); x1 = Math.min(N - 1, x1); z1 = Math.min(N - 1, z1); const W = x1 - x0 + 1, Hh = z1 - z0 + 1; if (W < 3 || Hh < 3) return;
+  const seen = new Uint8Array(W * Hh), st = [], at = (x, z) => grid[(z + z0) * N + x + x0];
+  const wall = (x, z) => at(x, z) || (x > 0 && at(x - 1, z)) || (x < W - 1 && at(x + 1, z)) || (z > 0 && at(x, z - 1)) || (z < Hh - 1 && at(x, z + 1));   /* 한 칸 틈은 막힌 걸로 보고 흘려 봄 → 겉면 사이 작은 틈으로 새지 않음 */
+  const push = (x, z) => { const k = z * W + x; if (seen[k] || wall(x, z)) return; seen[k] = 1; st.push(k); };
+  for (let x = 0; x < W; x++) { push(x, 0); push(x, Hh - 1); } for (let z = 0; z < Hh; z++) { push(0, z); push(W - 1, z); }
+  while (st.length) { const k = st.pop(), x = k % W, z = (k - x) / W; if (x > 0) push(x - 1, z); if (x < W - 1) push(x + 1, z); if (z > 0) push(x, z - 1); if (z < Hh - 1) push(x, z + 1); }
+  const S = (x, z) => x >= 0 && z >= 0 && x < W && z < Hh && seen[z * W + x];
+  const fill = []; for (let z = 0; z < Hh; z++) for (let x = 0; x < W; x++) if (!seen[z * W + x] && !at(x, z) && !S(x - 1, z) && !S(x + 1, z) && !S(x, z - 1) && !S(x, z + 1)) fill.push((z + z0) * N + x + x0);   /* 바깥과 맞닿은 칸은 그대로 → 둘레가 부풀지 않음 */
+  for (const k of fill) grid[k] = 1; };
+const SECT = 10, CELL = .25;   /* 막힘 칸 25cm (사용자 2026-11-07: 선이 지형 테두리에 붙게) */
 
 const rnd = seed => { let s = seed >>> 0; return () => ((s = (s * 1664525 + 1013904223) >>> 0) / 4294967296); };
 
@@ -240,9 +250,9 @@ export async function makeMeadow(scene, url, onProgress = () => {}, decorUrl = n
   };
   onProgress(.8);
 
-  /* ── 막힘: 가운데층 섬 · 기둥의 바위·땅이 기체 높이(.1~1.6m)를 지나는 곳을 1m 칸으로 찍음 ── */
+  /* ── 막힘: 막는 구조물이 기체 높이 단면(.7m 위아래 25cm)을 지나는 곳을 25cm 칸으로 찍음 ── */
   const N = Math.ceil(R1 * 2 / CELL) + 2, grid = new Uint8Array(N * N), cellOf = v => Math.floor((v + R1 + 1) / CELL);
-  const Y0 = .1, Y1 = 1.6, a = new THREE.Vector3(), b = new THREE.Vector3(), c = new THREE.Vector3(), w = new THREE.Vector3();
+  const Y0 = .45, Y1 = .95, a = new THREE.Vector3(), b = new THREE.Vector3(), c = new THREE.Vector3(), w = new THREE.Vector3();
   /* 막는 것 (사용자 2026-11-07): 층을 뚫는 기둥 + 돌 유적(돌기둥·돌담) + 가운데층 섬에 '우뚝 솟은' 바위
      · 받은 섬 모델은 몸통·바위·작은 돌·나무가 한 덩어리 → 초록 면(잎)은 빼고, 땅에서 2m 넘게 솟은 돌(꼭대기가 TALL 넘는 곳)만 막음 · 나무도 섬 몸통과 같은 재질이라 색(초록=잎)으로 가름
      · 작은 돌·나무줄기·낮은 바위·섬 땅·넓은 땅 언덕·풀꽃·뿌리는 통과 */
@@ -256,15 +266,16 @@ export async function makeMeadow(scene, url, onProgress = () => {}, decorUrl = n
       for (let i = 0; i < cnt; i += 3) { const i0 = I ? I.getX(i) : i, i1 = I ? I.getX(i + 1) : i + 1, i2 = I ? I.getX(i + 2) : i + 2;
         a.fromBufferAttribute(P, i0).applyMatrix4(p.m); b.fromBufferAttribute(P, i1).applyMatrix4(p.m); c.fromBufferAttribute(P, i2).applyMatrix4(p.m);
         if (Math.max(a.y, b.y, c.y) < Y0 || (!isle && Math.min(a.y, b.y, c.y) > Y1)) continue;
-        if (isle && C && green(C, i0, i1, i2)) continue;
-        const e = Math.max(a.distanceTo(b), b.distanceTo(c), c.distanceTo(a)), n = Math.max(1, Math.ceil(e / .45));
+        const gr = isle && C && green(C, i0, i1, i2);   /* 초록 면도 '닿는 자리'엔 넣되, '솟은 돌인가'는 돌(초록 아닌 면) 꼭대기로만 판단 → 이끼 낀 바위 탑도 잡고 나무는 안 잡음 */
+        const e = Math.max(a.distanceTo(b), b.distanceTo(c), c.distanceTo(a)), n = Math.max(1, Math.ceil(e / .17));
         for (let u = 0; u <= n; u++) for (let v = 0; v <= n - u; v++) { const s1 = u / n, s2 = v / n; w.set(0, 0, 0).addScaledVector(a, 1 - s1 - s2).addScaledVector(b, s1).addScaledVector(c, s2);
           if (w.y < Y0) continue; const gx = cellOf(w.x), gz = cellOf(w.z); if (gx < 0 || gz < 0 || gx >= N || gz >= N) continue; const id = gz * N + gx;
           if (!isle) { if (w.y <= Y1) grid[id] = 1; continue; }
-          if (w.y <= Y1) hit.set(id, 1); if (w.y > (top.get(id) ?? -1e9)) top.set(id, w.y); } } }
-    if (isle) for (const id of hit.keys()) { const gx = id % N, gz = (id - gx) / N; let t = -1e9;   /* 기운 바위도 잡게 주변 2칸까지 꼭대기를 봄 */
-      for (let dz = -2; dz <= 2; dz++) for (let dx = -2; dx <= 2; dx++) { const q = top.get((gz + dz) * N + gx + dx); if (q > t) t = q; }
-      if (t > TALL) grid[id] = 1; } }
+          if (w.y <= Y1) hit.set(id, 1); if (!gr) { const cid = Math.floor(w.z + R1 + 1) * 1000 + Math.floor(w.x + R1 + 1); if (w.y > (top.get(cid) ?? -1e9)) top.set(cid, w.y); } } } }
+    if (isle) for (const id of hit.keys()) { const gx = id % N, gz = (id - gx) / N, ux = Math.floor(gx * CELL), uz = Math.floor(gz * CELL); let t = -1e9;   /* 기운 바위·탑 위 나무줄기도 잡게 주변 2m(1m 칸)까지 돌 꼭대기를 봄 */
+      for (let dz = -2; dz <= 2; dz++) for (let dx = -2; dx <= 2; dx++) { const q = top.get((uz + dz) * 1000 + ux + dx); if (q > t) t = q; }
+      if (t > TALL) grid[id] = 1; }
+    { const rr = (KIT[p.k].rad || 3) * Math.max(p.s || 1, p.sy || 1) + 1; fillHoles(grid, N, cellOf(p.x - rr), cellOf(p.z - rr), cellOf(p.x + rr), cellOf(p.z + rr)); } }
   onProgress(1);
   const blocked = (x, z) => { const gx = cellOf(x), gz = cellOf(z); return gx >= 0 && gz >= 0 && gx < N && gz < N && grid[gz * N + gx] === 1; };
   /* 정글 쪽으로 들어가면 초원 섬도 햇빛이 줄고 보랏빛 하늘빛을 받음 */

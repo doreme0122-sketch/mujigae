@@ -486,6 +486,16 @@ export function jungleLayout({ R0 = 136, R1 = 187, TOP = -3, UP = 20, DN = -30, 
   return L.filter(o => !o.skip);
 }
 
+const fillHoles = (grid, N, x0, z0, x1, z1) => {   /* 속 빈 구조물(겉면만 칸에 찍힘)의 안쪽을 채움: 상자 테두리에서 닿지 않는 빈 칸 = 안쪽 */
+  x0 = Math.max(0, x0); z0 = Math.max(0, z0); x1 = Math.min(N - 1, x1); z1 = Math.min(N - 1, z1); const W = x1 - x0 + 1, Hh = z1 - z0 + 1; if (W < 3 || Hh < 3) return;
+  const seen = new Uint8Array(W * Hh), st = [], at = (x, z) => grid[(z + z0) * N + x + x0];
+  const wall = (x, z) => at(x, z) || (x > 0 && at(x - 1, z)) || (x < W - 1 && at(x + 1, z)) || (z > 0 && at(x, z - 1)) || (z < Hh - 1 && at(x, z + 1));   /* 한 칸 틈은 막힌 걸로 보고 흘려 봄 → 겉면 사이 작은 틈으로 새지 않음 */
+  const push = (x, z) => { const k = z * W + x; if (seen[k] || wall(x, z)) return; seen[k] = 1; st.push(k); };
+  for (let x = 0; x < W; x++) { push(x, 0); push(x, Hh - 1); } for (let z = 0; z < Hh; z++) { push(0, z); push(W - 1, z); }
+  while (st.length) { const k = st.pop(), x = k % W, z = (k - x) / W; if (x > 0) push(x - 1, z); if (x < W - 1) push(x + 1, z); if (z > 0) push(x, z - 1); if (z < Hh - 1) push(x, z + 1); }
+  const S = (x, z) => x >= 0 && z >= 0 && x < W && z < Hh && seen[z * W + x];
+  const fill = []; for (let z = 0; z < Hh; z++) for (let x = 0; x < W; x++) if (!seen[z * W + x] && !at(x, z) && !S(x - 1, z) && !S(x + 1, z) && !S(x, z - 1) && !S(x, z + 1)) fill.push((z + z0) * N + x + x0);   /* 바깥과 맞닿은 칸은 그대로 → 둘레가 부풀지 않음 */
+  for (const k of fill) grid[k] = 1; };
 export function makeJungle(scene, { R0 = 136, R1 = 187, TOP = -3, UP = 20, DN = -30, sect = 10, avoid = [] } = {}) {
   const pieces = [], GATES = [], VINES = [], L = jungleLayout({ R0, R1, TOP, UP, DN, sect });
   const place = (built, x, y, z, s, yaw, sy = s) => { built.G.position.set(x, y, z); built.G.scale.set(s, sy, s); built.G.rotation.y = yaw; scene.add(built.G);
@@ -512,18 +522,20 @@ export function makeJungle(scene, { R0 = 136, R1 = 187, TOP = -3, UP = 20, DN = 
     else if (o.t === 'single') { if (!free(o)) { o.skip = true; continue; } place(shared('s' + o.kind, 3, () => buildSingle(o.kind, o.seed)), o.x, o.y, o.z, o.s, o.yaw); }
   }
   cur = null;
-  /* 막힘 칸: 사냥터 섬·포식 꽃의 단단한 몸이 기체 높이(.1~1.6m)를 지나는 곳을 1m 칸으로 찍음 · 빛 무리·포자·선은 뺌 */
-  const N = Math.ceil(R1 * 2) + 2, grid = new Uint8Array(N * N), cellOf = v => Math.floor(v + R1 + 1), Y0 = .1, Y1 = 1.6;
+  /* 막힘 칸: 사냥터 섬·포식 꽃의 단단한 몸이 기체 높이 단면을 지나는 곳 + 덩굴 기둥 줄기를 25cm 칸으로 찍음 · 빛 무리·포자·선은 뺌 */
+  const CL = .25, N = Math.ceil(R1 * 2 / CL) + 2, grid = new Uint8Array(N * N), cellOf = v => Math.floor((v + R1 + 1) / CL), Y0 = .45, Y1 = .95;   /* 25cm 칸 · 기체 높이 단면 */
   { const a = new THREE.Vector3(), b = new THREE.Vector3(), c = new THREE.Vector3(), w = new THREE.Vector3();
     for (const p of SOLID) { if (p.y - p.rad > Y1 || p.y + p.rad < Y0) continue; p.G.updateMatrixWorld(true);
       p.G.traverse(m => { if (!m.isMesh || m.isInstancedMesh || !m.geometry || !m.geometry.attributes.position) return; const mt = m.material; if (mt && (mt.blending === THREE.AdditiveBlending || mt.depthWrite === false)) return;
         const P = m.geometry.attributes.position, I = m.geometry.index, cnt = I ? I.count : P.count, M = m.matrixWorld;
         for (let i = 0; i + 2 < cnt; i += 3) { a.fromBufferAttribute(P, I ? I.getX(i) : i).applyMatrix4(M); b.fromBufferAttribute(P, I ? I.getX(i + 1) : i + 1).applyMatrix4(M); c.fromBufferAttribute(P, I ? I.getX(i + 2) : i + 2).applyMatrix4(M);
           if (Math.max(a.y, b.y, c.y) < Y0 || Math.min(a.y, b.y, c.y) > Y1) continue;
-          const e = Math.max(a.distanceTo(b), b.distanceTo(c), c.distanceTo(a)), n = Math.max(1, Math.ceil(e / .45));
+          const e = Math.max(a.distanceTo(b), b.distanceTo(c), c.distanceTo(a)), n = Math.max(1, Math.ceil(e / .17));
           for (let u = 0; u <= n; u++) for (let v = 0; v <= n - u; v++) { const s1 = u / n, s2 = v / n; w.set(0, 0, 0).addScaledVector(a, 1 - s1 - s2).addScaledVector(b, s1).addScaledVector(c, s2);
-            if (w.y < Y0 || w.y > Y1) continue; const gx = cellOf(w.x), gz = cellOf(w.z); if (gx >= 0 && gz >= 0 && gx < N && gz < N) grid[gz * N + gx] = 1; } } }); } }
-  const blocked = (x, z) => { for (const v of VINES) if ((x - v[0]) ** 2 + (z - v[1]) ** 2 < v[2] * v[2]) return true; const gx = cellOf(x), gz = cellOf(z); return gx >= 0 && gz >= 0 && gx < N && gz < N && grid[gz * N + gx] === 1; };   /* 층을 뚫는 덩굴 기둥 + 사냥터 섬·포식 꽃 */
+            if (w.y < Y0 || w.y > Y1) continue; const gx = cellOf(w.x), gz = cellOf(w.z); if (gx >= 0 && gz >= 0 && gx < N && gz < N) grid[gz * N + gx] = 1; } } });
+      fillHoles(grid, N, cellOf(p.x - p.rad), cellOf(p.z - p.rad), cellOf(p.x + p.rad), cellOf(p.z + p.rad)); } }
+  for (const v of VINES) { const r = v[2]; for (let z = v[1] - r; z <= v[1] + r; z += CL) for (let x = v[0] - r; x <= v[0] + r; x += CL) if ((x - v[0]) ** 2 + (z - v[1]) ** 2 < r * r) { const gx = cellOf(x), gz = cellOf(z); if (gx >= 0 && gz >= 0 && gx < N && gz < N) grid[gz * N + gx] = 1; } }   /* 덩굴 줄기도 칸 지도에 → 한 번에 찾음 */
+  const blocked = (x, z) => { const gx = cellOf(x), gz = cellOf(z); return gx >= 0 && gz >= 0 && gx < N && gz < N && grid[gz * N + gx] === 1; };   /* 층을 뚫는 덩굴 기둥 + 사냥터 섬·포식 꽃 */
   const sph = new THREE.Sphere(), fr = new THREE.Frustum(), pv = new THREE.Matrix4();
   const update = (t, dt, camera) => { CAM = camera; T.value = t; pv.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse); fr.setFromProjectionMatrix(pv);
     for (const p of pieces) { const d = Math.hypot(p.x - camera.position.x, p.z - camera.position.z); sph.center.set(p.x, p.y, p.z); sph.radius = p.rad;
