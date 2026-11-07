@@ -5,7 +5,7 @@
    · 도착한 섬: 그 섬 땅 위만 날 수 있음(땅 밖은 막힘) · 섬 가장자리에 돌아가는 문(받침 섬 위) — 같은 방법으로 돌아감
    · 돌아가는 문과 도착 섬의 땅 지도는 '갈 때만' 만들고 돌아오면 비움 (지금 쓰는 것만 올림 · 설계 원칙) */
 import * as THREE from 'three';
-import { gate4, pedestal } from './gates.js?v=11072354';
+import { gate4, pedestal } from './gates.js?v=11080144';
 
 const clamp = THREE.MathUtils.clamp, smooth = (a, b, x) => { const k = clamp((x - a) / (b - a), 0, 1); return k * k * (3 - 2 * k); };
 const AB = { transparent: true, depthWrite: false, blending: THREE.AdditiveBlending };
@@ -90,7 +90,7 @@ export function makeTravel({ scene, gates, meadow, jungle, fly, ship, FS, HOVER,
   const v3 = new THREE.Vector3(), tan = new THREE.Vector3(), camT = { x: 0, y: 0, z: 0 };
   /* 도착 섬 찾기: 초원 보물 섬(place) 또는 정글 던전 섬(pieces) */
   const destMeshes = g => { const Gd = g.Gd, out = [];
-    if (Gd.jungle) { const p = jungle.pieces.find(q => Math.abs(q.x - Gd.tx) < .5 && Math.abs(q.z - Gd.tz) < .5); if (p) { p.G.updateMatrixWorld(true); p.G.traverse(m => { if (!m.isMesh || m.isInstancedMesh || !m.geometry?.attributes.position) return; const mt = m.material; if (mt && (mt.blending === THREE.AdditiveBlending || mt.depthWrite === false)) return; out.push({ geo: m.geometry, mat: m.matrixWorld, solid: 'all' }); }); } }
+    if (Gd.jungle) { const p = jungle.pieces.find(q => Math.abs(q.x - Gd.tx) < .5 && Math.abs(q.z - Gd.tz) < .5); if (p) { p.G.updateMatrixWorld(true); p.G.traverse(m => { if (!m.isMesh || m.isInstancedMesh || !m.geometry?.attributes.position) return; const mt = m.material; if (mt && (mt.blending === THREE.AdditiveBlending || mt.depthWrite === false)) return; out.push({ geo: m.geometry, mat: m.matrixWorld, solid: 'all' }); }); for (const m of p.extra || []) { m.updateMatrixWorld(true); out.push({ geo: m.geometry, mat: m.matrixWorld, solid: 'all' }); } } }   /* 화석(jdress)도 막음 */
     else for (const p of meadow.place) { if (p.layer !== Gd.layer || Math.hypot(p.x - Gd.tx, p.z - Gd.tz) > 2) continue;   /* 보물 섬 = 넓은 땅 + 가운데 보물 섬 (같은 자리) */
       for (const pr of meadow.KIT[p.k].prims) if (pr.mat !== 'Foliage' && pr.mat !== 'Water') out.push({ geo: pr.geo, mat: p.m, solid: p.k.startsWith('land_') ? null : 'stone' }); }   /* 넓은 땅(언덕)은 통과 · 가운데 보물 섬은 기체 높이에 닿는 돌(유적·바위)을 막음 · 초록(나무)은 통과 */
     return out; };

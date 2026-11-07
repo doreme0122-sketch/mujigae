@@ -8,7 +8,8 @@
      알 둥지는 이번엔 안 씀 · 포식 꽃·촉수 나무·해파리는 장식(기체를 막거나 잡지 않음)
    · 초원 → 정글은 점점: 경계 둘레에 작은 부유체가 섞이고, 기체가 안쪽으로 들어갈수록 하늘이 어두운 보랏빛으로 (skymap에서) */
 import * as THREE from 'three';
-import { spiralPath } from './path.js?v=11072354';
+import { spiralPath } from './path.js?v=11080144';
+import { makeDresser } from './jdress.js?v=11080144';
 let CAM = { position: new THREE.Vector3() };
 let LOD_T = .5, LOD_N = 30;   /* 섬 둘레 · 덩굴 마디 수 (키트 원래 44 · 1배) */
 /* ===================== 우주 정글 지형 키트 (사용자 제작 · 생성 코드 그대로) ===================== */
@@ -295,7 +296,7 @@ PIECES.push({name:'덩굴 기둥 쌍섬',tags:['수직 구조','연결 지형'],
 // 8) 포식자의 사냥터 (몬스터 서식지)
 PIECES.push({name:'포식자의 사냥터',tags:['몬스터 서식지','대형 평지'],fy:4,size:40,
   desc:'몬스터가 사는 넓은 땅. 가운데는 싸울 수 있게 평평하게 비워두고, 바닥 곳곳에 거대한 발톱 자국과 빛나는 발자국이 굴까지 이어짐. 굴 안에서 눈이 깜빡이고, 먹잇감의 거대한 뼈와 고치가 매달린 아치가 둘레를 감쌈.',
-  build(G){const B=newB(),I=isle(B,0,0,0,{r:38,h:3,depth:38,vein:GLOWS.mag,min:.8,amp:.2,bites:2,top:'#241f34'});
+  build(G){const B=newB(),I=isle(B,0,0,0,{r:38,h:3,depth:38,vein:GLOWS.mag,min:.8,amp:.2,bites:2,top:'#241f34'});G.userData.outline=I.fn;   /* 꾸미기(jdress)가 섬 바깥선을 씀 */
     // den on one side
     const denA=R()*6.28,[dx,dz]=I.edge(denA,.6),den=V(dx,0,dz),toC=V(-dx,0,-dz).normalize();
     jitter(new THREE.SphereGeometry(9,14,8,0,Math.PI*2,0,Math.PI/2),1.1,.6,rint()).dispose();   /* 굴 돔은 뺌 (사용자 2026-11-07: 안에 몬스터가 없으니 없는 게 나음) — 운 순서는 그대로 두어 나머지 모양은 같게 */
@@ -306,24 +307,7 @@ PIECES.push({name:'포식자의 사냥터',tags:['몬스터 서식지','대형 �
       [-.45,.45].forEach(o=>{const e=new THREE.Mesh(new THREE.SphereGeometry(.22,8,6),new THREE.MeshBasicMaterial({color:k?'#ff3a6a':'#ffe23a'}));e.position.x=o;pr.add(e);});eyePairs.push({pr,ph:R()*7});}
     anim.push(t=>{eyePairs.forEach(o=>{const c=(t+o.ph)%7;o.pr.visible=!(c<.15||(c>3&&c<3.12));});});
     const B2=newB();
-    // glowing footprint trail from the den across the field
-    const start=mouth.position.clone().setY(0),endP=start.clone().addScaledVector(toC,48),side=V(-toC.z,0,toC.x);let walked=0,step=0;
-    while(walked<46){const t=walked/48,p=start.clone().lerp(endP,t).addScaledVector(side,Math.sin(t*6.28*1.2)*5+(step%2?1.3:-1.3));const[dxx,dzz]=[p.x,p.z];
-      if(Math.hypot(dxx,dzz)>I.fn(Math.atan2(dzz,dxx))*.9)break;const ang=Math.atan2(toC.z,toC.x);
-      add(B2,new THREE.IcosahedronGeometry(1,0),V(p.x,.05,p.z),E(0,-ang,0),V(1.4,.06,1.1),'#a83cff',{to:'glow',vary:.1});
-      for(let k=-1;k<=1;k++){const ta=ang+k*.45;add(B2,new THREE.IcosahedronGeometry(1,0),V(p.x+Math.cos(ta)*2,.05,p.z+Math.sin(ta)*2),E(0,-ta,0),V(.9,.06,.4),'#a83cff',{to:'glow',vary:.1});}
-      walked+=3.4;step++;}
-    // claw marks: three parallel gashes
-    for(let k=0;k<9;k++){const[p,q]=I.pt(.15,.7),a=R()*6.28,L=rnd(5,9),nx=Math.cos(a+1.57),nz=Math.sin(a+1.57);
-      for(let j=-1;j<=1;j++){const cx=p+nx*j*1.2,cz=q+nz*j*1.2;add(B2,new THREE.BoxGeometry(.8,.1,L),V(cx,.02,cz),E(0,1.57-a,0),null,'#0b0912',{vary:0});
-        add(B2,new THREE.BoxGeometry(.18,.12,L*.9),V(cx,.05,cz),E(0,1.57-a,0),null,GLOWS.mag,{to:'glow',vary:0});}}
-    // giant prey skeleton
-    {const[a0,b0]=I.pt(.35,.55),ang=R()*6.28,dir=V(Math.cos(ang),0,Math.sin(ang)),s0=V(a0,0,b0),spine=[];for(let k=0;k<=8;k++)spine.push(s0.clone().addScaledVector(dir,k*2.2-8.8).add(V(0,1.2+Math.sin(k*.5)*.8,0)));
-      addRaw(B2,tube(spine,.7,30),(f,y,c)=>{c.set('#cfc8e8');});const sd=V(-dir.z,0,dir.x);
-      for(let k=1;k<8;k++){const b=spine[k];[1,-1].forEach(sg=>{const pts=[b.clone(),b.clone().addScaledVector(sd,sg*3).add(V(0,2,0)),b.clone().addScaledVector(sd,sg*4.6).add(V(0,-.2,0)),b.clone().addScaledVector(sd,sg*4).add(V(0,-1.6,0))];addRaw(B2,tube(pts,.35,12),(f,y,c)=>{c.set('#bdb5d8');});});}
-      const head=spine[8].clone().addScaledVector(dir,3);add(B2,new THREE.SphereGeometry(2.4,10,8),head,E(0,-ang,0),V(1.6,.9,1),'#d6cfe8');
-      [1,-1].forEach(sg=>{add(B2,new THREE.SphereGeometry(.6,8,6),head.clone().addScaledVector(sd,sg*1.1).addScaledVector(dir,1.6).add(V(0,.6,0)),null,null,'#0a0810');
-        add(B2,new THREE.ConeGeometry(.6,4.5,6),head.clone().addScaledVector(sd,sg*1.6).add(V(0,2.6,0)),E(0,0,-sg*.5),null,'#d6cfe8',{grad:'#6a6290'});});}
+    /* 발자국 · 할퀸 자국 세 줄 · 엉성한 뼈대는 뺌 (사용자 2026-11-08: 조잡하고 뜻이 없음) — 화석은 jdress.js에서 제대로 다시 만듦 */
     // arches with hanging cocoons near the rim
     const cocoons=[];for(let k=0;k<3;k++){const a=denA+2.1+k*1.15+rnd(-.2,.2),[cx,cz]=I.edge(a,.72),tg=V(-Math.sin(a),0,Math.cos(a)),c=V(cx,0,cz),p0=c.clone().addScaledVector(tg,-7),p1=c.clone().addScaledVector(tg,7);
       const pts=[p0,p0.clone().lerp(p1,.25).add(V(0,9,0)),p0.clone().lerp(p1,.5).add(V(0,12,0)),p0.clone().lerp(p1,.75).add(V(0,9,0)),p1];addRaw(B2,tube(pts,.9,30),(f,y,cc)=>{cc.set('#2e2a4a');});
@@ -512,7 +496,7 @@ export function makeJungle(scene, { R0 = 136, R1 = 187, TOP = -3, UP = 20, DN = 
   const pieces = [], GATES = [], VINES = [], L = jungleLayout({ R0, R1, TOP, UP, DN, sect });
   const place = (built, x, y, z, s, yaw, sy = s) => { built.G.position.set(x, y, z); built.G.scale.set(s, sy, s); built.G.rotation.y = yaw; scene.add(built.G);
     built.G.traverse(o => { if (o.isPoints && o.material.size) o.material.size *= Math.max(s, sy); });   /* 포자 알갱이도 같은 비율로 */
-    pack(built.G); const p = { ...built, x, y, z, rad: built.size * Math.max(s, sy) * 1.3 }; pieces.push(p); if (cur && (cur.t === 'hunt' || (cur.t === 'fill' && cur.kind === IDX.flower))) SOLID.push(p); return p; };
+    pack(built.G); const p = { ...built, x, y, z, rad: built.size * Math.max(s, sy) * 1.3 }; p.o = cur; p.outline = built.outline || built.G.userData.outline; pieces.push(p); if (cur && (cur.t === 'hunt' || (cur.t === 'fill' && cur.kind === IDX.flower))) SOLID.push(p); return p; };
   let cur = null; const SOLID = [];   /* 막는 정글: 사냥터 섬(돔·가시·뼈) · 거대 포식 꽃 (사용자 2026-11-07) */
   /* 낱개 조각이 초원 섬과 겹치면 뺌 (같은 높이대일 때만) */
   const band = l => l === 'all' ? 'all' : l === 'mid' ? 0 : l === 'upgap' ? 1 : l === 'gap' || l === 'rock' ? -1 : l === 'up' ? 2 : l === 'dn' ? -2 : 9;
@@ -520,7 +504,7 @@ export function makeJungle(scene, { R0 = 136, R1 = 187, TOP = -3, UP = 20, DN = 
     for (const q of L) { if (q === o || q.t === 'single' && L.indexOf(q) > L.indexOf(o)) continue; if (band(q.layer) !== band(o.layer) && q.layer !== 'all') continue; if (Math.hypot(q.x - o.x, q.z - o.z) < q.r + o.r + 1) return false; } return true; };
   /* 같은 모양 나눠 쓰기: 아래층 정글 섬과 작은 조각은 종류마다 몇 벌만 만들어 복사해 씀 (모양 데이터는 하나 · 크기·방향만 다르게) → 폰 메모리 절약 */
   const SHARE = new Map(), shared = (key, n, make) => { if (!SHARE.has(key)) SHARE.set(key, []); const arr = SHARE.get(key); if (arr.length < n) { const b = make(arr.length); arr.push(b); return b; }
-    const src = arr[Math.floor(Math.random() * arr.length)]; return { G: src.G.clone(), anim: [], size: src.size }; };
+    const src = arr[Math.floor(Math.random() * arr.length)]; return { G: src.G.clone(), anim: [], size: src.size, outline: src.G.userData.outline }; };
   for (const o of L) { cur = o;
     if (o.t === 'hunt' && o.dungeon) { const upL = o.layer === 'up';   /* 위층 던전: 아래로 늘어진 몸통을 눌러 줌 (밑을 지날 때 카메라와 기체 사이를 막지 않게 · 사용자 2026-11-07) */
       place(shared(upL ? 'hu' : 'h', 3, v => { const b = buildPiece(IDX.hunt, o.seed + v * 11, 1); if (upL) squashPiece(b.G, -1.5, 6 / o.s); return b; }), o.x, o.y, o.z, o.s, o.yaw); }   /* 위·아래층 던전은 멀리서 보는 곳 → 세 벌 나눠 씀 */
@@ -535,6 +519,10 @@ export function makeJungle(scene, { R0 = 136, R1 = 187, TOP = -3, UP = 20, DN = 
     else if (o.t === 'single') { if (!free(o)) { o.skip = true; continue; } place(shared('s' + o.kind, 3, () => buildSingle(o.kind, o.seed)), o.x, o.y, o.z, o.s, o.yaw); }
   }
   cur = null;
+  /* 정글 꾸미기 (사용자 2026-11-08): 사냥터 섬(가운데층 · 위아래 던전)부터 — 땅 덮개 · 바닥 식물 · 가장자리 숲 · 화석(막힘) */
+  const dress = makeDresser(scene, KL);
+  for (const p of pieces) if (p.o && p.o.t === 'hunt' && p.outline) { const n0 = dress.solids.length; dress.hunt({ x: p.x, y: p.y, z: p.z, yaw: p.o.yaw, extra: null }, p.outline, p.o.s, p.o.seed);
+    p.extra = dress.solids.slice(n0); for (const m of p.extra) SOLID.push({ G: m, y: p.y, rad: 20 }); }
   /* 막힘 칸: 사냥터 섬·포식 꽃의 단단한 몸이 기체 높이 단면을 지나는 곳 + 덩굴 기둥 줄기를 25cm 칸으로 찍음 · 빛 무리·포자·선은 뺌 */
   const CL = .25, N = Math.ceil(R1 * 2 / CL) + 2, grid = new Uint8Array(N * N), cellOf = v => Math.floor((v + R1 + 1) / CL), Y0 = .45, Y1 = .95;   /* 25cm 칸 · 기체 높이 단면 */
   { const a = new THREE.Vector3(), b = new THREE.Vector3(), c = new THREE.Vector3(), w = new THREE.Vector3();
@@ -550,7 +538,7 @@ export function makeJungle(scene, { R0 = 136, R1 = 187, TOP = -3, UP = 20, DN = 
   for (const v of VINES) { const r = v[2]; for (let z = v[1] - r; z <= v[1] + r; z += CL) for (let x = v[0] - r; x <= v[0] + r; x += CL) if ((x - v[0]) ** 2 + (z - v[1]) ** 2 < r * r) { const gx = cellOf(x), gz = cellOf(z); if (gx >= 0 && gz >= 0 && gx < N && gz < N) grid[gz * N + gx] = 1; } }   /* 덩굴 줄기도 칸 지도에 → 한 번에 찾음 */
   const blocked = (x, z) => { const gx = cellOf(x), gz = cellOf(z); return gx >= 0 && gz >= 0 && gx < N && gz < N && grid[gz * N + gx] === 1; };   /* 층을 뚫는 덩굴 기둥 + 사냥터 섬·포식 꽃 */
   const sph = new THREE.Sphere(), fr = new THREE.Frustum(), pv = new THREE.Matrix4();
-  const update = (t, dt, camera) => { CAM = camera; T.value = t; pv.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse); fr.setFromProjectionMatrix(pv);
+  const update = (t, dt, camera) => { CAM = camera; T.value = t; dress.update(t, camera.position); pv.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse); fr.setFromProjectionMatrix(pv);
     for (const p of pieces) { const d = Math.hypot(p.x - camera.position.x, p.z - camera.position.z); sph.center.set(p.x, p.y, p.z); sph.radius = p.rad;
       const vis = d < 170 && fr.intersectsSphere(sph); p.G.visible = vis; if (vis && d < 95) for (const f of p.anim) f(t, dt); } };   /* 먼 것은 움직임을 멈춤 */
   const setLight = k => { KL.uLift.value = k; };
