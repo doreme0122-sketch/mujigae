@@ -8,6 +8,7 @@
      알 둥지는 이번엔 안 씀 · 포식 꽃·촉수 나무·해파리는 장식(기체를 막거나 잡지 않음)
    · 초원 → 정글은 점점: 경계 둘레에 작은 부유체가 섞이고, 기체가 안쪽으로 들어갈수록 하늘이 어두운 보랏빛으로 (skymap에서) */
 import * as THREE from 'three';
+import { spiralPath } from './path.js?v=11072354';
 let CAM = { position: new THREE.Vector3() };
 let LOD_T = .5, LOD_N = 30;   /* 섬 둘레 · 덩굴 마디 수 (키트 원래 44 · 1배) */
 /* ===================== 우주 정글 지형 키트 (사용자 제작 · 생성 코드 그대로) ===================== */
@@ -449,13 +450,14 @@ export function jungleLayout({ R0 = 136, R1 = 187, TOP = -3, UP = 20, DN = -30, 
        던전(위·아래 번갈아) thg+9°·160m 반지름 25m · 문 thg−1°·183m · 가운데층 사냥터 thg−9°·166m · 큰 정글 섬 기지 쪽 경계 · 덩굴 기둥 기지 쪽 경계 · 와드 자리 thg·136m는 비워 둠 */
     const DS = .78, DR = 38 * DS * .82;
     { const [x, z] = at(thg + 9 * deg, 160), Y = up ? UP : DN; push({ t: 'hunt', seed: seed + 1, x, y: Y, z, s: DS, yaw: thg * 3.1, layer: up ? 'up' : 'dn', r: DR + 1, dungeon: true });
-      const [gx, gz] = at(thg - 1 * deg, 183); push({ t: 'gate', seed: seed + 2, x: gx, y: TOP - 1.8, z: gz, s: .42, yaw: thg, layer: 'mid', r: 7, gate: { tx: x, tz: z, layer: up ? 'up' : 'dn', ty: Y, rad: DR, gr: 6.3 } });
+      const [gx, gz] = at(thg - 1 * deg, 183); push({ t: 'gate', seed: seed + 2, x: gx, y: TOP - 1.8, z: gz, s: .42, yaw: thg, layer: 'mid', r: 7, gate: { tx: x, tz: z, layer: up ? 'up' : 'dn', ty: Y, rad: DR, gr: 6.3, dir: 1 } });
       /* 빛의 길이 지나는 하늘은 비워 둠 (사용자 2026-11-07) — 어느 층이든 이 원들 안엔 아무것도 안 놓음 */
-      const dx = x - gx, dz = z - gz, Lg = Math.hypot(dx, dz); for (let d = 6.3 + 1.5; d < Lg - DR - .5; d += 2.2) push({ t: 'corr', x: gx + dx / Lg * d, z: gz + dz / Lg * d, r: 2.6, layer: 'all' }); }
+      { const { pts } = spiralPath({ gx, gz, tx: x, tz: z, rad: DR, gr: 6.3, dir: 1 }); let d = 0, last = -9;   /* 감아 도는 빛의 길 하늘 비우기 */
+        for (let k = 1; k < pts.length; k++) { d += Math.hypot(pts[k][0] - pts[k - 1][0], pts[k][2] - pts[k - 1][2]); if (d > 6.3 + 1.5 && d - last > 2.2) { push({ t: 'corr', x: pts[k][0], z: pts[k][2], r: 2.6, layer: 'all' }); last = d; } } } }
     { const [x, z] = at(thg - 9 * deg, 166); push({ t: 'hunt', seed: seed + 3, x, y: TOP, z, s: .4, yaw: thg * 1.7 + 1, layer: 'mid', r: 16 }); }
-    { const [x, z] = at(th0 + 2 * deg, 140); push({ t: 'fill', kind: FILL[(i * 2) % 6], seed: seed + 4, x, y: TOP, z, s: .36, yaw: th0 * 2.3, layer: 'mid', r: 11 }); }   /* 큰 것 하나 */
+    { const [x, z] = at(th0 + 5 * deg, 138); push({ t: 'fill', kind: FILL[(i * 2) % 6], seed: seed + 4, x, y: TOP, z, s: .36, yaw: th0 * 2.3, layer: 'mid', r: 11 }); }   /* 큰 것 하나 */
     /* 탑·기둥 (사용자 2026-11-07: 가운데→위로만 잇지 말 것 · 아래층에서 솟거나 · 사이에 뜨거나 · 크기도 여러 가지) */
-    { const mode = ['full', 'low', 'full', 'float', 'small'][i % 5], [x, z] = at(th0 + 1 * deg + (Rn() - .5) * 2 * deg, 173 + Rn() * 4), yaw = th0 * 2.9;   /* 기지 쪽 경계 · 넓어진 던전·사냥터를 피함 */
+    { const mode = ['full', 'low', 'full', 'float', 'small'][i % 5], [x, z] = at(th0 + 3 * deg + (Rn() - .5) * 2 * deg, 181 + Rn() * 2), yaw = th0 * 2.9;   /* 기지 쪽 경계 · 넓어진 던전·사냥터를 피함 */
       const V0 = { full: [DN, (UP - DN) / 66.5, .38], low: [DN, (TOP - 7 - DN) / 66.5, .3], float: [4 + Rn() * 3, (8 + Rn() * 4) / 66.5, .15], small: [DN, (TOP + 5 - DN) / 66.5, .24] }[mode];
       push({ t: 'vine', mode, seed: seed + 7, x, y: V0[0], z, s: V0[2], sy: V0[1], yaw, layer: mode === 'float' ? 'upgap' : 'pillar', r: 18 * V0[2] }); }
     /* 경계 넘어 초원 쪽으로: 정글 조각이 초원 가장자리로 번져 나감 */
@@ -499,6 +501,13 @@ const fillHoles = (grid, N, x0, z0, x1, z1) => {   /* 속 빈 구조물(겉면�
   const S = (x, z) => x >= 0 && z >= 0 && x < W && z < Hh && seen[z * W + x];
   const fill = []; for (let z = 0; z < Hh; z++) for (let x = 0; x < W; x++) if (!seen[z * W + x] && !at(x, z) && !S(x - 1, z) && !S(x + 1, z) && !S(x, z - 1) && !S(x, z + 1)) fill.push((z + z0) * N + x + x0);   /* 바깥과 맞닿은 칸은 그대로 → 둘레가 부풀지 않음 */
   for (const k of fill) grid[k] = 1; };
+function squashPiece(G, y0, maxD) {   /* 섬 몸통(땅 아래)만 깊이 maxD로 · 윗면과 그 위는 그대로 */
+  G.updateMatrixWorld(true); let lo = 1e9; const v = new THREE.Vector3(), ms = []; G.traverse(m => { if (m.isMesh && m.geometry?.attributes.position) ms.push(m); });
+  for (const m of ms) { const P = m.geometry.attributes.position; for (let i = 0; i < P.count; i++) { v.fromBufferAttribute(P, i).applyMatrix4(m.matrixWorld); lo = Math.min(lo, v.y); } }
+  const k = Math.min(1, maxD / Math.max(1e-3, y0 - lo)); if (k >= 1) return; const inv = new THREE.Matrix4(), seen = new Set();
+  for (const m of ms) { if (seen.has(m.geometry)) continue; seen.add(m.geometry); const g = m.geometry, P = g.attributes.position, N = g.attributes.normal; inv.copy(m.matrixWorld).invert();
+    for (let i = 0; i < P.count; i++) { v.fromBufferAttribute(P, i).applyMatrix4(m.matrixWorld); if (v.y >= y0) continue; v.y = y0 + (v.y - y0) * k; v.applyMatrix4(inv); P.setXYZ(i, v.x, v.y, v.z); if (N) { const nx = N.getX(i), ny = N.getY(i) / k, nz = N.getZ(i), l = Math.hypot(nx, ny, nz) || 1; N.setXYZ(i, nx / l, ny / l, nz / l); } }   /* 눌린 만큼 빛 받는 방향도 */
+    P.needsUpdate = true; if (N) N.needsUpdate = true; g.computeBoundingBox(); g.computeBoundingSphere(); } }
 export function makeJungle(scene, { R0 = 136, R1 = 187, TOP = -3, UP = 20, DN = -30, sect = 10, avoid = [] } = {}) {
   const pieces = [], GATES = [], VINES = [], L = jungleLayout({ R0, R1, TOP, UP, DN, sect });
   const place = (built, x, y, z, s, yaw, sy = s) => { built.G.position.set(x, y, z); built.G.scale.set(s, sy, s); built.G.rotation.y = yaw; scene.add(built.G);
@@ -513,7 +522,8 @@ export function makeJungle(scene, { R0 = 136, R1 = 187, TOP = -3, UP = 20, DN = 
   const SHARE = new Map(), shared = (key, n, make) => { if (!SHARE.has(key)) SHARE.set(key, []); const arr = SHARE.get(key); if (arr.length < n) { const b = make(arr.length); arr.push(b); return b; }
     const src = arr[Math.floor(Math.random() * arr.length)]; return { G: src.G.clone(), anim: [], size: src.size }; };
   for (const o of L) { cur = o;
-    if (o.t === 'hunt' && o.dungeon) place(shared('h', 3, v => buildPiece(IDX.hunt, o.seed + v * 11, 1)), o.x, o.y, o.z, o.s, o.yaw);   /* 위·아래층 던전은 멀리서 보는 곳 → 세 벌 나눠 씀 */
+    if (o.t === 'hunt' && o.dungeon) { const upL = o.layer === 'up';   /* 위층 던전: 아래로 늘어진 몸통을 눌러 줌 (밑을 지날 때 카메라와 기체 사이를 막지 않게 · 사용자 2026-11-07) */
+      place(shared(upL ? 'hu' : 'h', 3, v => { const b = buildPiece(IDX.hunt, o.seed + v * 11, 1); if (upL) squashPiece(b.G, -1.5, 6 / o.s); return b; }), o.x, o.y, o.z, o.s, o.yaw); }   /* 위·아래층 던전은 멀리서 보는 곳 → 세 벌 나눠 씀 */
     else if (o.t === 'hunt') place(buildPiece(IDX.hunt, o.seed), o.x, o.y, o.z, o.s, o.yaw);
     else if (o.t === 'gate') { place(buildGateIsle(o.seed), o.x, o.y, o.z, o.s, o.yaw); GATES.push({ x: o.x, z: o.z, ...o.gate, jungle: true }); }
     else if (o.t === 'fill' && o.lite) { const b = shared('d' + o.kind, 2, v => { const b = buildPiece(o.kind, o.seed + v * 7, .55); const rm = []; b.G.traverse(c => { if (c.isPoints || c.isSprite || c.isLine) rm.push(c); }); rm.forEach(c => c.parent.remove(c)); b.anim = []; return b; }); place(b, o.x, o.y, o.z, o.s, o.yaw); }

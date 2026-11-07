@@ -1,11 +1,11 @@
 /* 문 타고 오르내리기 (사용자 2026-11-07 · 빛의 길(skypath)의 준비·출발·이동을 그대로 옮김)
    · 문 한가운데서 0.5초 멈추면 → 3초 준비(낮은 울림이 점점 높아짐 · 고리 조각이 점점 빨리 돎 · 기체가 갈 쪽으로 천천히 틂) · 움직이면 취소
    · 출발: 쿵 + 슉 · 뒤로 얇은 빛 고리가 한 번 퍼짐 · 길을 탐: 처음엔 확 빠르게 → 점점 느려지며 도착 문 앞에서 수평으로 미끄러져 멈춤 · 가는 동안 공격받지 않음
-   · 카메라: 처음엔 제자리 → 길의 절반쯤부터 빠르게 따라붙어 함께 도착 (어디로 가는지 먼저 보이게)
+   · 카메라: 처음부터 기체를 따라감 (사용자 2026-11-07)
    · 도착한 섬: 그 섬 땅 위만 날 수 있음(땅 밖은 막힘) · 섬 가장자리에 돌아가는 문(받침 섬 위) — 같은 방법으로 돌아감
    · 돌아가는 문과 도착 섬의 땅 지도는 '갈 때만' 만들고 돌아오면 비움 (지금 쓰는 것만 올림 · 설계 원칙) */
 import * as THREE from 'three';
-import { gate4, pedestal } from './gates.js?v=11072323';
+import { gate4, pedestal } from './gates.js?v=11072354';
 
 const clamp = THREE.MathUtils.clamp, smooth = (a, b, x) => { const k = clamp((x - a) / (b - a), 0, 1); return k * k * (3 - 2 * k); };
 const AB = { transparent: true, depthWrite: false, blending: THREE.AdditiveBlending };
@@ -100,15 +100,15 @@ export function makeTravel({ scene, gates, meadow, jungle, fly, ship, FS, HOVER,
     /* 섬 가장자리는 들쭉날쭉 → 길 쪽 실제 가장자리를 재서, 받침 섬이 섬 가장자리에 닿게 크기를 맞춤 (사이 빈 하늘에 갇히지 않게) */
     const D = Math.hypot(g.ex - g.Gd.tx, g.ez - g.Gd.tz); let edge = 0; for (let s = 0; s <= D + 6; s += .25) if (isle(g.Gd.tx + (g.ex - g.Gd.tx) / D * s, g.Gd.tz + (g.ez - g.Gd.tz) / D * s)) edge = s;
     const pr = Math.max(3.6, D - edge + 1.8), G = gate4(GATE_H / .8); G.g.scale.setScalar(.8); const root = new THREE.Group(), ped = pedestal(91 + gates.indexOf(g) * 7); ped.scale.setScalar(pr / 7.2); root.add(ped); root.add(G.g);
-    root.position.set(g.ex, g.y1 - GATE_H, g.ez); root.rotation.y = Math.atan2(-g.ax, -g.az); scene.add(root);
-    const exitG = { G, root, x: g.ex, z: g.ez, ax: g.ax, az: g.az, col: g.col, ch: 0, stay: 0, back: true, from: g };
+    root.position.set(g.ex, g.y1 - GATE_H, g.ez); root.rotation.y = Math.atan2(-g.eax, -g.eaz); scene.add(root);   /* 길이 들어오는 쪽을 바라봄 */
+    const exitG = { G, root, x: g.ex, z: g.ez, ax: g.eax, az: g.eaz, col: g.col, ch: 0, stay: 0, back: true, from: g };
     dest = { g, exitG, isle, solid, onPed: (x, z) => Math.hypot(x - g.ex, z - g.ez) < pr - .4 }; };
   const closeDest = () => { if (!dest) return; const r = dest.exitG.root; scene.remove(r); r.traverse(o => { if (o.geometry) o.geometry.dispose(); if (o.material) (Array.isArray(o.material) ? o.material : [o.material]).forEach(m => m.dispose()); }); dest = null; };
   const stones = (gg, x, z) => { const dx = x - gg.x, dz = z - gg.z; if (dx > 4 || dx < -4 || dz > 4 || dz < -4) return false; const along = dx * gg.ax + dz * gg.az, lat = Math.abs(dx * -gg.az + dz * gg.ax); return Math.abs(along) < .5 && lat > 1.9 && lat < 3.0; };
   /* 도착 섬에서 막힘: 고리 돌 조각 · 섬 땅 밖 */
   const blocked = (x, z) => { if (mode === 'trip') return false; if (mode !== 'dest' || !dest) return null; if (stones(dest.exitG, x, z) || dest.solid(x, z)) return true; return !(dest.onPed(x, z) || dest.isle(x, z)); };
   const startTrip = (g, back, t) => { const dir = g.curve.getTangentAt(back ? 1 : 0); if (back) dir.negate();
-    trip = { g, back, u: 0, dur: clamp(g.len / 30, 1.1, 1.8), cam0: { ...camT } }; mode = 'trip'; FS.aim = null; SND.depart(trip.dur);
+    trip = { g, back, u: 0, dur: clamp(g.len / 40, 2.6, 3.4), cam0: { ...camT } };   /* 감아 도는 긴 길 → 약 3초 (사용자 2026-11-07) */ mode = 'trip'; FS.aim = null; SND.depart(trip.dur);
     if (!back) openDest(g);
     shock.position.set(FS.x, HOVER + yOff, FS.z).addScaledVector(dir, -.7); shock.quaternion.setFromUnitVectors(v3.set(0, 0, 1), dir); SW.t = 0; SW.c.copy(g.col); };
   /* 지금 다룰 문: 가운데층이면 들어가는 문들 · 도착 섬이면 돌아가는 문 하나 */
@@ -140,9 +140,9 @@ export function makeTravel({ scene, gates, meadow, jungle, fly, ship, FS, HOVER,
   };
   /* 기체 자세: 길 기울기만큼 고개 · 준비 중 기울며 틂 (flight 갱신 뒤에 얹음) */
   const pose = () => { if (FS.tripPitch) ship.rotateX(FS.tripPitch * .7); if (FS.chPitch) ship.rotateX(FS.chPitch); if (FS.chBank) ship.rotateZ(FS.chBank); };
-  /* 카메라: 길을 탈 땐 처음엔 제자리 → 길의 절반쯤부터 빠르게 따라붙어 함께 도착 */
+  /* 카메라: 길을 탈 땐 처음부터 기체를 따라감 */
   const camera = (cam, sp, dt) => { const ty = HOVER + yOff;
-    if (mode === 'trip') { const f = smooth(.45, .9, trip.s); cam.x = THREE.MathUtils.lerp(trip.cam0.x, sp.x, f); cam.y = THREE.MathUtils.lerp(trip.cam0.y, ty, f); cam.z = THREE.MathUtils.lerp(trip.cam0.z, sp.z, f); return true; }
+    if (mode === 'trip') { const k = Math.min(1, dt * 7); cam.x += (sp.x - cam.x) * k; cam.z += (sp.z - cam.z) * k; cam.y += (ty - cam.y) * k; return true; }   /* 처음부터 기체를 따라감 (사용자 2026-11-07: 멈춰 있다 나중에 따라붙는 건 별로) */
     cam.y += (ty - cam.y) * Math.min(1, dt * 4); return false; };
   /* 길 타는 동안 기체 둘레로 흩어지는 빛 알갱이 */
   const glowTrail = (glow, sp) => { if (mode !== 'trip') return; const ca = trip.g.col.toArray(), k = 1 - trip.u;

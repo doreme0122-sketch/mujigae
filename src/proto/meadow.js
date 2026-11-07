@@ -8,10 +8,16 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { deinterleaveGeometry } from 'three/addons/utils/BufferGeometryUtils.js';
-import { makeLand, makeChunk, makePillar, makeWall, paletteFrom } from './land.js?v=11072323';
-import { CLOUD_NOISE } from './clouds.js?v=11072323';
+import { makeLand, makeChunk, makePillar, makeWall, paletteFrom } from './land.js?v=11072354';
+import { CLOUD_NOISE } from './clouds.js?v=11072354';
+import { spiralPath } from './path.js?v=11072354';
 
-export const MEADOW = { R0: 187, R1: 240, UP: 20, DN: -30, TOP: -1.2, SC: 1 / 2, GATE_Y: -3 };   /* TOP: 가운데층 땅 — 기체가 땅에서 살짝(1.9m) 뜨게 (사용자 2026-11-07: 높이를 낮춤 · 식물은 그냥 지나침) · GATE_Y: 문 땅은 고리가 땅에 묻히지 않게 조금 낮게 */   /* TOP: 가운데층 땅 높이 — 기체(.7)보다 3.7m 아래 → 나무 꼭대기 위로 날게 (사용자 2026-11-06: 나무에 걸림) */   /* SC: 받은 섬 모델 크기의 2분의 1 (사용자 2026-11-06: 원래는 너무 크고 3분의 1은 너무 작음) */   /* 가운데층 섬 윗면 = 기체(높이 .7)보다 1.7m 아래 */
+/* 아래로 늘어진 섬 몸통 줄이기 (사용자 2026-11-07: 위층 섬 밑을 지나갈 때 몸통이 카메라와 기체 사이를 꽉 막음) — 윗면은 그대로, y0 아래만 깊이 maxD로 눌러 줌 · 빛 받는 방향도 같이 고침 */
+export function squashBelow(geo, y0, maxD) { const P = geo.attributes.position, N = geo.attributes.normal; let lo = 1e9; for (let i = 0; i < P.count; i++) lo = Math.min(lo, P.getY(i));
+  const k = Math.min(1, maxD / Math.max(1e-3, y0 - lo)); if (k >= 1) return geo;
+  for (let i = 0; i < P.count; i++) { const y = P.getY(i); if (y >= y0) continue; P.setY(i, y0 + (y - y0) * k); if (N) { const nx = N.getX(i), ny = N.getY(i) / k, nz = N.getZ(i), l = Math.hypot(nx, ny, nz) || 1; N.setXYZ(i, nx / l, ny / l, nz / l); } }
+  P.needsUpdate = true; if (N) N.needsUpdate = true; geo.computeBoundingBox(); geo.computeBoundingSphere(); return geo; }
+export const MEADOW = { R0: 187, R1: 240, UP: 36, DN: -30, TOP: -1.2, SC: 1 / 2, GATE_Y: -3 };   /* TOP: 가운데층 땅 — 기체가 땅에서 살짝(1.9m) 뜨게 (사용자 2026-11-07: 높이를 낮춤 · 식물은 그냥 지나침) · GATE_Y: 문 땅은 고리가 땅에 묻히지 않게 조금 낮게 */   /* TOP: 가운데층 땅 높이 — 기체(.7)보다 3.7m 아래 → 나무 꼭대기 위로 날게 (사용자 2026-11-06: 나무에 걸림) */   /* SC: 받은 섬 모델 크기의 2분의 1 (사용자 2026-11-06: 원래는 너무 크고 3분의 1은 너무 작음) */   /* 가운데층 섬 윗면 = 기체(높이 .7)보다 1.7m 아래 */
 const fillHoles = (grid, N, x0, z0, x1, z1) => {   /* 속 빈 구조물(겉면만 칸에 찍힘)의 안쪽을 채움: 상자 테두리에서 닿지 않는 빈 칸 = 안쪽 */
   x0 = Math.max(0, x0); z0 = Math.max(0, z0); x1 = Math.min(N - 1, x1); z1 = Math.min(N - 1, z1); const W = x1 - x0 + 1, Hh = z1 - z0 + 1; if (W < 3 || Hh < 3) return;
   const seen = new Uint8Array(W * Hh), st = [], at = (x, z) => grid[(z + z0) * N + x + x0];
@@ -72,7 +78,7 @@ export async function makeMeadow(scene, url, onProgress = () => {}, decorUrl = n
   const RUIN = [], WALL = [];
   for (let i = 0; i < 6; i++) { const g = makePillar(700 + i * 17, PAL, 1.9 + (i % 3) * .45); g.computeBoundingBox(); const k = 'ruinP_' + i; KIT[k] = { prims: [{ geo: g, mat: 'Terrain', src: MATS.Terrain }], top: 0, bot: g.boundingBox.min.y, hi: g.boundingBox.max.y, rad: 1 }; RUIN.push(k); }
   for (let i = 0; i < 4; i++) { const g = makeWall(800 + i * 23, PAL, 4.5 + i); g.computeBoundingBox(); const k = 'ruinW_' + i; KIT[k] = { prims: [{ geo: g, mat: 'Terrain', src: MATS.Terrain }], top: 0, bot: g.boundingBox.min.y, hi: g.boundingBox.max.y, rad: 3 }; WALL.push(k); }
-  const addLand = (x, z, radius, seed, opt = {}) => { const L = makeLand(seed, radius, PAL, opt), k = 'land_' + (landN++), R = rnd(seed * 31 + 7);
+  const addLand = (x, z, radius, seed, opt = {}) => { const L = makeLand(seed, radius, PAL, opt), k = 'land_' + (landN++), R = rnd(seed * 31 + 7); if (opt.squash) { if (!L.geo.attributes.normal) L.geo.computeVertexNormals(); squashBelow(L.geo, -1.5, opt.squash); }
     const bb = new THREE.Box3().setFromBufferAttribute(L.geo.attributes.position);
     KIT[k] = { prims: [{ geo: L.geo, mat: 'Terrain', src: MATS.Terrain }], top: 0, bot: bb.min.y, hi: bb.max.y, rad: radius * 1.12 };
     const LY = opt.layer || 'mid', BY = LY === 'dn' ? DN : opt.by != null ? opt.by : TOP, rl = LY === 'dn' ? 'dn' : LY === 'up' ? 'up' : undefined, dens = opt.dens || 1;
@@ -127,15 +133,17 @@ export async function makeMeadow(scene, url, onProgress = () => {}, decorUrl = n
      자리(사이 한가운데 φ 기준, 모든 사이 같은 쪽): 보물 섬 φ+7°·212m · 문 φ−4°·227m · 둥지 φ−10°·205m */
   const TR = 25;
   for (let j = 0; j < SECT; j++) { const ph = (j + .5) * SA, sd = 1, up = j % 2 === 1, R = rnd(3000 + j * 59);   /* 쪽은 모든 사이에서 같게 → 기지마다 둘레가 똑같음 (번갈면 둥지가 둘씩 붙음) */
-    { const th = ph + sd * 7 * deg, [x, z] = at(th, 212), k = up ? 'Island_Treasure_Ruins' : 'Island_Treasure_Vault', layer = up ? 'up' : 'dn';
-      addLand(x, z, TR, 6000 + j * 41, { layer, by: up ? UP : DN, clear: 9, dens: .6 });
-      put(k, x, z, layer, th + Math.PI / 2, { treasure: true }); TREASURE.push({ x, z, layer, y: up ? UP : DN, k, rad: TR }); }
+    { const th = ph + sd * 7 * deg, [x, z] = at(th, 207), k0 = up ? 'Island_Treasure_Ruins' : 'Island_Treasure_Vault', layer = up ? 'up' : 'dn';   /* 207m: 감아 도는 빛의 길이 무지개 벽 안에 들게 */
+      let k = k0; if (up) { k = 'sq:' + k0; if (!KIT[k]) { const K = KIT[k0]; KIT[k] = { ...K, prims: K.prims.map(pr => ({ ...pr, geo: squashBelow(pr.geo.clone(), K.top - 1.5 / SC, 4.5 / SC) })) }; KIT[k].bot = Math.min(...KIT[k].prims.map(pr => pr.geo.boundingBox.min.y)); } }   /* 위층 보물 섬: 몸통 눌러 줌 */
+      addLand(x, z, TR, 6000 + j * 41, { layer, by: up ? UP : DN, clear: 9, dens: .6, squash: up ? 6 : 0 });
+      put(k, x, z, layer, th + Math.PI / 2, { treasure: true }); TREASURE.push({ x, z, layer, y: up ? UP : DN, k: k0, rad: TR }); }
     { const T = TREASURE[j], th = ph - sd * 4 * deg, [gx, gz] = at(th, 227);
       addLand(gx, gz, 7.5, 4000 + j * 37, { clear: 5.2, by: MEADOW.GATE_Y, lane: Math.atan2(T.z - gz, T.x - gx), laneO: [gx, gz], laneW: 3 });
-      GATES.push({ gr: 7.5, x: gx, z: gz, tx: T.x, tz: T.z, layer: T.layer, ty: T.y, rad: TR }); }
+      GATES.push({ gr: 7.5, x: gx, z: gz, tx: T.x, tz: T.z, layer: T.layer, ty: T.y, rad: TR, dir: 1 }); }
     { const th = ph - sd * 10 * deg, [x, z] = at(th, 205);   /* 몬스터 둥지: 넓은 땅 한가운데 · 가운데는 싸울 자리로 평평하게 비움 */
       addLand(x, z, 15 + R() * 2, 500 + j * 13, { clear: 6.5 }); put(j % 2 ? 'Island_Lair_Arena' : 'Island_Lair_Nest', x, z, 'mid', th + R() * 6.28, { camp: true }); NESTS.push({ x, z }); } }
-  for (const G0 of GATES) { const dx = G0.tx - G0.x, dz = G0.tz - G0.z, L = Math.hypot(dx, dz); for (let d = 7.5 + 1.5; d < L - G0.rad - .5; d += 2.2) CORR.push([G0.x + dx / L * d, G0.z + dz / L * d, 2.6]); }   /* 빛의 길 하늘 비우기 */
+  for (const G0 of GATES) { const { pts } = spiralPath({ gx: G0.x, gz: G0.z, tx: G0.tx, tz: G0.tz, rad: G0.rad, gr: G0.gr, dir: G0.dir }); let d = 0, last = -9;   /* 빛의 길(감아 도는 길) 하늘 비우기 */
+    for (let i = 1; i < pts.length; i++) { d += Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][2] - pts[i - 1][2]); if (d > G0.gr + 1.5 && d - last > 2.2) { CORR.push([pts[i][0], pts[i][2], 2.6]); last = d; } } }
   for (let i = 0; i < SECT; i++) { const th0 = i * SA, R = rnd(1000 + i * 77), sd = i % 2 ? 1 : -1;
     /* 태어나는 곳 출구 앞: 기체 아래로 깔리는 넓은 풀밭 · 길 양옆만 꾸밈 (사용자 2026-11-06: 앞이 너무 썰렁함) */
     { const [x, z] = at(th0, R1 - 20); addLand(x, z, 12.5, 300 + i * 11, { lane: th0 }); }
