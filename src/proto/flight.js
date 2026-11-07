@@ -10,9 +10,9 @@
    무게: 기체 한 대 + 불꽃 띠 몇 장 + 꼬리 띠 하나 + 불티 점 묶음 하나 + 그림자 판 하나 */
 import * as THREE from 'three';
 import { buildShip, engineSpots } from '../core/ships/build.js';
-import { flameMesh } from './sortie.js?v=11072115';
-import { MAP } from './mapfloor.js?v=11072115';
-import { applyShipHeat, heatVis } from './shipheat.js?v=11072115';
+import { flameMesh } from './sortie.js?v=11072140';
+import { MAP } from './mapfloor.js?v=11072140';
+import { applyShipHeat, heatVis } from './shipheat.js?v=11072140';
 
 export const FLY = { LEN: 2, HOVER: .7, R: .8, SPEEDS: [9, 12, 15, 18], TURN: 7, ACC: .22, TURNMAX: 9,
   BASE: 9, SHIELD: 3, BOOST: 5, BOOSTK: 1.5 };   /* 기지 고리(반지름 9m)를 벗어나는 순간: 보호막 3초 · 가속 5초(1.5배) — 기지 출구 앞 매복에 바로 당하지 않게 */
@@ -81,10 +81,12 @@ export async function makeFlight(renderer, B, start, face) {
 
   const S = { turnLimit: true, x: start[0], z: start[1], vx: 0, vz: 0, head: face, mh: face, aim: null, aimK: 0, bank: 0, speed: FLY.SPEEDS[1], thr: 0, hit: 0, armed: true, shield: 0, boost: 0, pop: 0 };
   const fw = new THREE.Vector3(), v = new THREE.Vector3(), c = new THREE.Vector3();
-  const free = (x, z) => { if (B.blocked(x, z)) return false; for (let k = 0; k < 8; k++) { const a = k * Math.PI / 4; if (B.blocked(x + Math.cos(a) * FLY.R, z + Math.sin(a) * FLY.R)) return false; } return true; };
+  /* 기체 몸 검사점: 바깥 둘레 24곳 + 안쪽 둘레 12곳 + 가운데 (사용자 2026-11-07: 8곳만 보던 때는 가는 돌기가 점 사이 틈으로 기체 안까지 들어와, 뒤로 빼면 걸려서 못 나왔음) */
+  const BODY = [[0, 0]]; for (let k = 0; k < 24; k++) { const a = k * Math.PI / 12; BODY.push([Math.cos(a) * FLY.R, Math.sin(a) * FLY.R]); } for (let k = 0; k < 12; k++) { const a = (k + .5) * Math.PI / 6; BODY.push([Math.cos(a) * FLY.R * .55, Math.sin(a) * FLY.R * .55]); }
+  const free = (x, z) => { for (const o of BODY) if (B.blocked(x + o[0], z + o[1])) return false; return true; };
   /* 닿은 벽이 보는 쪽: 기체 둘레 16곳 중 막힌 곳들의 반대쪽 평균 */
-  const wallN = (x, z) => { let nx = 0, nz = 0, h = 0; const r = FLY.R + .2;
-    for (let k = 0; k < 16; k++) { const a = k * Math.PI / 8, c = Math.cos(a), sn = Math.sin(a); if (B.blocked(x + c * r, z + sn * r)) { nx -= c; nz -= sn; h++; } }
+  const wallN = (x, z) => { let nx = 0, nz = 0, h = 0;   /* 기체 안쪽·몸 둘레·바로 바깥까지 같이 봄 → 안에 들어온 돌기도 방향을 찾음 */
+    for (const r of [FLY.R * .55, FLY.R, FLY.R + .2]) for (let k = 0; k < 24; k++) { const a = k * Math.PI / 12, c = Math.cos(a), sn = Math.sin(a); if (B.blocked(x + c * r, z + sn * r)) { const w = 1.6 - r; nx -= c * w; nz -= sn * w; h++; } }
     const l = Math.hypot(nx, nz); return h && l > 1e-3 ? [nx / l, nz / l] : null; };
   const shieldM = new THREE.ShaderMaterial({ ...AB, side: THREE.DoubleSide, uniforms: { uA: { value: 1 }, uT: { value: 0 } },
     vertexShader: 'varying vec3 vN, vV, vP; void main(){ vec4 w=modelMatrix*vec4(position,1.); vP=position; vN=normalize(mat3(modelMatrix)*normal); vV=normalize(cameraPosition-w.xyz); gl_Position=projectionMatrix*viewMatrix*w; }',
@@ -156,6 +158,7 @@ void main() {
       let lo = 0, hi = 1; for (let k = 0; k < 7; k++) { const m = (lo + hi) / 2; if (free(S.x + S.vx * rem * m, S.z + S.vz * rem * m)) lo = m; else hi = m; }
       S.x += S.vx * rem * lo; S.z += S.vz * rem * lo; rem *= 1 - lo;
       const n = wallN(S.x, S.z); if (!n) { S.vx = S.vz = 0; break; }
+      if (lo === 0 && it === 2) { out2: for (let r = .1; r <= 1.6; r += .1) for (let k = 0; k < 24; k++) { const a = k * Math.PI / 12, x = S.x + Math.cos(a) * r, z = S.z + Math.sin(a) * r; if (free(x, z) && (Math.cos(a) * S.vx + Math.sin(a) * S.vz) >= 0) { S.x = x; S.z = z; break out2; } } }   /* 세 번 다 한 걸음도 못 가면(끼임) 가려는 쪽으로 가장 가까운 빈 곳으로 살짝 빼 줌 */
       const vn = S.vx * n[0] + S.vz * n[1];
       if (vn < 0) { hitV += -vn; S.vx -= vn * n[0]; S.vz -= vn * n[1]; }
       /* 벽에서 아주 조금(3cm) 떼어 놓음: 울퉁불퉁한 벽에 걸려 미끄러지다 멈추지 않게 */
