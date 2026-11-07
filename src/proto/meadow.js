@@ -8,8 +8,8 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { deinterleaveGeometry } from 'three/addons/utils/BufferGeometryUtils.js';
-import { makeLand, makeChunk, makePillar, makeWall, paletteFrom } from './land.js?v=11071338';
-import { CLOUD_NOISE } from './clouds.js?v=11071338';
+import { makeLand, makeChunk, makePillar, makeWall, paletteFrom } from './land.js?v=11071418';
+import { CLOUD_NOISE } from './clouds.js?v=11071418';
 
 export const MEADOW = { R0: 187, R1: 240, UP: 20, DN: -30, TOP: -3.0, SC: 1 / 2 };   /* TOP: 가운데층 땅 높이 — 기체(.7)보다 3.7m 아래 → 나무 꼭대기 위로 날게 (사용자 2026-11-06: 나무에 걸림) */   /* SC: 받은 섬 모델 크기의 2분의 1 (사용자 2026-11-06: 원래는 너무 크고 3분의 1은 너무 작음) */   /* 가운데층 섬 윗면 = 기체(높이 .7)보다 1.7m 아래 */
 const SECT = 10, CELL = 1;
@@ -26,7 +26,8 @@ function topOf(prims) {
   const ys = [...bins.keys()].sort((p, q) => q - p); let acc = 0; for (const y of ys) { acc += bins.get(y); if (acc >= tot * .4) return y; } return 0;
 }
 
-export async function makeMeadow(scene, url, onProgress = () => {}, decorUrl = null, loUrl = null) {
+export async function makeMeadow(scene, url, onProgress = () => {}, decorUrl = null, loUrl = null, opt = {}) {
+  const AVOID = opt.avoid || [];   /* 정글 배치 계획 — 경계를 넘나드는 섬이 정글 지형과 겹치지 않게 */
   const LD = new GLTFLoader(), [gl, gd, glo] = await Promise.all([LD.loadAsync(url), decorUrl ? LD.loadAsync(decorUrl) : null, loUrl ? LD.loadAsync(loUrl) : null]); onProgress(.5);
   /* 섬 종류별: 재질별 조각 · 윗면 높이 · 바닥 높이 · 둘레 반지름 */
   const KIT = {};
@@ -51,8 +52,8 @@ export async function makeMeadow(scene, url, onProgress = () => {}, decorUrl = n
   const fits = (x, z, rr, layer) => { const r = Math.hypot(x, z); if (r - rr < R0 + 2 || r + rr > R1 - 6) return false;
     for (const q of place) { if (!clash(q.layer, layer)) continue; if (Math.hypot(q.x - x, q.z - z) < q.rr + rr + 1.2) return false; } return true; };
   const clearOfBase = (x, z, rr, th0) => { const th = Math.atan2(z, x), d = Math.atan2(Math.sin(th - th0), Math.cos(th - th0)) * Math.hypot(x, z); return !(Math.abs(d) < 15 + rr && Math.hypot(x, z) > rf(.4) - rr); };   /* 기지 출구 앞 길은 비워 둠 */
-  const put = (k, x, z, layer, yaw, extra = {}) => { const K = KIT[k], s = extra.gs || (extra.abs ? 1 : (extra.s || 1) * SC), sy = layer === 'pillar' ? .9 : s;   /* 기둥만 높이는 거의 그대로 → 가늘고 높게 세 층을 뚫음 */
-    const y = layer === 'up' ? UP - K.top * sy : layer === 'dn' ? DN - K.top * sy : layer === 'pillar' ? UP + 6 - K.hi * sy : layer === 'rock' || layer === 'deco' || layer === 'gap' || layer === 'upgap' ? extra.y : TOP - K.top * sy;
+  const put = (k, x, z, layer, yaw, extra = {}) => { const K = KIT[k], s = extra.gs || (extra.abs ? 1 : layer === 'pillar' && extra.ps ? extra.ps : (extra.s || 1) * SC), sy = layer === 'pillar' ? (extra.psy || .9) : s;   /* 기둥만 높이는 거의 그대로 → 가늘고 높게 세 층을 뚫음 */
+    const y = layer === 'up' ? UP - K.top * sy : layer === 'dn' ? DN - K.top * sy : layer === 'pillar' ? (extra.ptop != null ? extra.ptop : UP + 6) - K.hi * sy : layer === 'rock' || layer === 'deco' || layer === 'gap' || layer === 'upgap' ? extra.y : TOP - K.top * sy;
     place.push({ ...extra, k, x, z, y, yaw, layer, s, sy, rr: extra.land ? K.rad : K.rad * s * .78, pillar: layer === 'pillar' }); };
   /* ── 넓은 땅: 새 땅 판 + 받은 섬에서 떼어 낸 나무·덤불·바위·풀꽃·뿌리 ── */
   let landN = 0; const LANDS = [];
@@ -143,10 +144,25 @@ export async function makeMeadow(scene, url, onProgress = () => {}, decorUrl = n
         put(best.k, best.x, best.z, layer, R() * 6.28, { s: best.s0, y: best.y, tilt: vary ? [(R() - .5) * .1, (R() - .5) * .1] : null }); } };
     tryPut(BIG, 'mid', 2, rf(.15), rf(.85));
     tryPut(MID, 'mid', 26, rf(.04), rf(.94));
-    tryPut([PIL[i % PIL.length], PIL[(i + 2) % PIL.length]], 'pillar', 2, rf(.12), rf(.8));
+    /* 탑·기둥 (사용자 2026-11-07: 늘 가운데→위로만 솟을 필요 없음 · 아래층에서 솟거나 · 층 사이에 뜨거나 · 크기도 여러 가지) */
+    for (let n = 0, t = 0; n < 4 && t < 120; t++) { const mode = ['full', 'low', 'float', 'small', 'floatHi'][(i + n) % 5], k = PIL[Math.floor(R() * PIL.length)], K = KIT[k], th = th0 + (R() - .5) * SA * .96, r = rf(.06) + R() * (rf(.9) - rf(.06)), [x, z] = at(th, r);
+      const h = K.hi - K.bot, P = { full: [SC, .9, UP + 6], low: [SC * .8, (TOP + 4 - DN + 8) / h, TOP + 4], small: [SC * (.45 + R() * .2), (TOP + 3 - DN) / h * (.7 + R() * .3), TOP + 3 + R() * 2],
+        float: [SC * (.4 + R() * .25), (7 + R() * 6) / h, -9 - R() * 3], floatHi: [SC * (.35 + R() * .2), (5 + R() * 5) / h, 0] }[mode];
+      if (mode === 'floatHi') P[2] = 3 + R() * 4 + (K.hi - K.bot) * P[1];   /* 위쪽 사이에 뜬 것: 바닥이 기체 높이보다 위 */
+      const rr = K.rad * P[0] * .78; if (!clearOfBase(x, z, rr, th0) || !fits(x, z, rr, 'pillar')) continue;
+      put(k, x, z, 'pillar', R() * 6.28, { ps: P[0], psy: P[1], ptop: P[2], pmode: mode, rl: mode === 'float' ? 'dn' : undefined }); n++; }
     tryPut(ROCK, 'rock', 16, rf(.04), rf(.96), { y: () => -6 - R() * 9, s: () => 1 + R() * .8 });   /* 기체 발아래 떠 있는 바위 */
     tryPut(UPS, 'up', 2, rf(.06), rf(.9), { s: () => .55 + R() * .3 });   /* 위층: 지금 시점에선 잘 안 보임 → 작게 몇 개만 (보물 던전 섬은 그대로) */
-    tryPut(DNS, 'dn', 22, rf(.0), rf(.98));   /* 아래층을 꽉 차 보이게 (실제로 내려가는 곳은 보물 던전 몇 곳뿐) */
+    tryPut(DNS, 'dn', 22, rf(.0), rf(.98));
+    /* 경계 넘어 정글 쪽으로: 초원의 작은 섬들이 정글 가장자리 안으로 번져 들어감 (사용자 2026-11-07: 땅을 섞지 말고 작은 구조물이 경계 앞뒤로 넘어가게) */
+    for (let n = 0, t = 0; n < 8 && t < 160; t++) { const layer = ['mid', 'mid', 'upgap', 'dn', 'mid', 'upgap', 'dn', 'mid'][n], list = ['Island_Small', 'Island_Chunk_Round', 'Island_Flat_Low', 'Island_Tilted_A', 'Island_Mushroom'];
+      const k = list[Math.floor(R() * list.length)], th = th0 + (R() - .5) * SA, r = R0 - 3 - Math.pow(R(), 1.5) * 24, [x, z] = at(th, r), s0 = .5 + R() * .45, s = s0 * SC, rr = KIT[k].rad * s * .78;
+      if (layer === 'mid' && tooTall(k, s)) continue;
+      let ok = true; for (const q of place) { if (!clash(q.layer, layer)) continue; if (Math.hypot(q.x - x, q.z - z) < q.rr + rr + 1.5) { ok = false; break; } }
+      if (ok) for (const o of AVOID) { const same = o.layer === layer || o.layer === 'pillar' || (layer === 'upgap' && o.layer === 'up'); if (same && Math.hypot(o.x - x, o.z - z) < o.r + rr + 2) { ok = false; break; } }
+      if (!ok) continue;
+      const y = layer === 'upgap' ? Math.max(6 + R() * 8, 1.8 - KIT[k].bot * s) - KIT[k].top * s : undefined;
+      put(k, x, z, layer, R() * 6.28, { s: s0, y, rl: layer === 'upgap' ? 'upgap' : undefined, tilt: [(R() - .5) * .1, (R() - .5) * .1], cross: true }); n++; }   /* 아래층을 꽉 차 보이게 (실제로 내려가는 곳은 보물 던전 몇 곳뿐) */
     for (let n = 0, t = 0; n < 2 && t < 60; t++) { const th = th0 + (R() - .5) * SA * .9, rr = 9 + R() * 5, r = rf(.1) + R() * (rf(.9) - rf(.1)), [x, z] = at(th, r);
       if (!fits(x, z, rr * 1.12, 'dn')) continue; addLand(x, z, rr, 2000 + i * 29 + t, { layer: 'dn', dens: .55 }); n++; }   /* 아래층 넓은 땅 */
     for (let n = 0; n < 45; n++) { const th = th0 + (R() - .5) * SA, r = R0 - 6 + R() * (R1 - R0 + 2), [x, z] = at(th, r), sc = .7 + Math.pow(R(), 2.4) * 3.3, y = -9 - R() * 17;
