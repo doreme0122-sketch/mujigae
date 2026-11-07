@@ -8,8 +8,8 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { deinterleaveGeometry } from 'three/addons/utils/BufferGeometryUtils.js';
-import { makeLand, makeChunk, makePillar, makeWall, paletteFrom } from './land.js?v=11070021';
-import { CLOUD_NOISE } from './clouds.js?v=11070021';
+import { makeLand, makeChunk, makePillar, makeWall, paletteFrom } from './land.js?v=11071338';
+import { CLOUD_NOISE } from './clouds.js?v=11071338';
 
 export const MEADOW = { R0: 187, R1: 240, UP: 20, DN: -30, TOP: -3.0, SC: 1 / 2 };   /* TOP: 가운데층 땅 높이 — 기체(.7)보다 3.7m 아래 → 나무 꼭대기 위로 날게 (사용자 2026-11-06: 나무에 걸림) */   /* SC: 받은 섬 모델 크기의 2분의 1 (사용자 2026-11-06: 원래는 너무 크고 3분의 1은 너무 작음) */   /* 가운데층 섬 윗면 = 기체(높이 .7)보다 1.7m 아래 */
 const SECT = 10, CELL = 1;
@@ -233,6 +233,9 @@ export async function makeMeadow(scene, url, onProgress = () => {}, decorUrl = n
           if (w.y < Y0 || w.y > Y1) continue; const gx = cellOf(w.x), gz = cellOf(w.z); if (gx >= 0 && gz >= 0 && gx < N && gz < N) grid[gz * N + gx] = 1; } } } }
   onProgress(1);
   const blocked = (x, z) => { const gx = cellOf(x), gz = cellOf(z); return gx >= 0 && gz >= 0 && gx < N && gz < N && grid[gz * N + gx] === 1; };
+  /* 정글 쪽으로 들어가면 초원 섬도 햇빛이 줄고 보랏빛 하늘빛을 받음 */
+  const SUN0 = LIT.uSunC.value.clone(), SKY0 = LIT.uSky.value.clone(), GND0 = LIT.uGnd.value.clone(), SKYJ = new THREE.Color(0x7a6cff).multiplyScalar(.5), GNDJ = new THREE.Color(0x3a0a4a).multiplyScalar(.5);
+  const setMood = k => { LIT.uSunC.value.copy(SUN0).multiplyScalar(1 - k * .6); LIT.uSky.value.copy(SKY0).lerp(SKYJ, k); LIT.uGnd.value.copy(GND0).lerp(GNDJ, k); };
   const update = (ship, camera, t = 0) => { uCam.value.copy(ship); LIT.uT.value = t; if (camera) cull(camera); };
   const info = () => ({ shown, calls, tris: Math.round(tris), total: place.length });
   /* 폭포 끝(물 조각의 가장 낮은 곳)마다 물보라 자리 */
@@ -241,5 +244,5 @@ export async function makeMeadow(scene, url, onProgress = () => {}, decorUrl = n
     const P = wp.geo.attributes.position; let lo = 1e9; for (let i = 0; i < P.count; i++) lo = Math.min(lo, P.getY(i)); const v = new THREE.Vector3(), acc = new THREE.Vector3(); let n = 0;
     for (let i = 0; i < P.count; i++) if (P.getY(i) < lo + .6) { acc.add(v.fromBufferAttribute(P, i)); n++; }
     if (n) { acc.divideScalar(n).applyMatrix4(p.m); if (acc.y < -4) MIST.push(acc.clone()); } }
-  return { root, blocked, update, info, place, TREASURE, GATES, KIT, LANDS, MIST, PAL, CHUNK };
+  return { root, blocked, update, setMood, info, place, TREASURE, GATES, KIT, LANDS, MIST, PAL, CHUNK };
 }

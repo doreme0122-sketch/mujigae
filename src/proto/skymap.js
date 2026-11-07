@@ -7,21 +7,22 @@
    · 태어나 출구로 튀어 나가면 바로 조이스틱 · 기지 고리(9m)를 벗어나는 순간 보호막 3초 + 가속 5초 */
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
-import { makeBloom } from '../core/hangar/bloom.js?v=11070021';
-import { makePad } from '../core/hangar/pad.js?v=11070021';
-import { makeMag } from '../core/hangar/mag.js?v=11070021';
+import { makeBloom } from '../core/hangar/bloom.js?v=11071338';
+import { makePad } from '../core/hangar/pad.js?v=11071338';
+import { makeMag } from '../core/hangar/mag.js?v=11071338';
 import { buildShip } from '../core/ships/build.js';
-import { makeGoldStar } from './goldstar.js?v=11070021';
-import { makeArena, SPEED, WAVE_R0 } from './arena.js?v=11070021';
-import { makeGuardians, GUARD } from './guardian.js?v=11070021';
-import { makeBirth, BIRTH } from './birth.js?v=11070021';
-import { makePerf } from './perf.js?v=11070021';
+import { makeGoldStar } from './goldstar.js?v=11071338';
+import { makeArena, SPEED, WAVE_R0 } from './arena.js?v=11071338';
+import { makeGuardians, GUARD } from './guardian.js?v=11071338';
+import { makeBirth, BIRTH } from './birth.js?v=11071338';
+import { makePerf } from './perf.js?v=11071338';
 import { makeGlow } from '../preview/glow.js';
-import { makeFlight, FLY } from './flight.js?v=11070021';
-import { pedestal, gate4 } from './gates.js?v=11070021';
-import { makeMeadow, MEADOW } from './meadow.js?v=11070021';
-import { makeClouds } from './clouds.js?v=11070021';
-import { makeLife } from './life.js?v=11070021';
+import { makeFlight, FLY } from './flight.js?v=11071338';
+import { pedestal, gate4 } from './gates.js?v=11071338';
+import { makeMeadow, MEADOW } from './meadow.js?v=11071338';
+import { makeClouds } from './clouds.js?v=11071338';
+import { makeLife } from './life.js?v=11071338';
+import { makeJungle } from './jungle.js?v=11071338';
 
 const $ = s => document.querySelector(s), clamp = THREE.MathUtils.clamp, HOVER = FLY.HOVER;
 const R = 240, NB = 10, GAPH = 5.6, BASE_D = 0;     /* 맵 반지름 · 기지 수 · 벽 틈 반 폭(= 기지 반지름) · 기지 가운데는 벽 선 위 (앞 절반은 맵 안, 뒤 절반은 맵 밖 · 사용자 2026-11-06) */
@@ -44,7 +45,8 @@ export async function start(canvas, onProgress = () => {}) {
   const scene = new THREE.Scene(), camera = new THREE.PerspectiveCamera(40, 1, .3, 1600), bloom = makeBloom(renderer, { samples: 0 });
   { const pm = new THREE.PMREMGenerator(renderer); scene.environment = pm.fromScene(new RoomEnvironment(), .04).texture; scene.environmentIntensity = .7; pm.dispose(); }
   const sun = new THREE.DirectionalLight(0xfff0dc, 2.8); sun.position.set(-9, 14, -8); scene.add(sun);
-  scene.add(new THREE.HemisphereLight(0xb7c8e8, 0x3a3020, .85));
+  const hemi = new THREE.HemisphereLight(0xb7c8e8, 0x3a3020, .85); scene.add(hemi);
+  const HEMI0 = new THREE.Color(0xb7c8e8), GND0 = new THREE.Color(0x3a3020), HEMI_J = new THREE.Color(0x7a6cff), GND_J = new THREE.Color(0x3a0a4a), CLR0 = new THREE.Color(0xbcd2ea), CLR_J = new THREE.Color(0x1a1238); let mood = 0;   /* 정글 분위기 */
   const glow = makeGlow(); scene.add(glow.mesh);
   /* 아래 구름 바다 */
   const sea = new THREE.Mesh(new THREE.PlaneGeometry(2400, 2400).rotateX(-Math.PI / 2), new THREE.ShaderMaterial({ uniforms: { uT: { value: 0 } },
@@ -72,7 +74,11 @@ export async function start(canvas, onProgress = () => {}) {
         vec3 stars=vec3(.85,.9,1.)*st*tw*sd*(.5+h(g+7.)*.8)*smoothstep(.35,1.,k);
         vec3 col=mix(sky*mix(1.,.35,k),space,smoothstep(.2,1.,k))+stars;
         col+=vec3(.35,.6,1.15)*exp(-pow((k-.32)/.16,2.))*.32;                               /* 대기 빛 띠: 은은하게 */
-        gl_FragColor=vec4(col+cl*k*vec3(.15,.18,.25),1.); }` }));
+        /* 우주 정글 아래 (반지름 약 190m 안쪽): 구름 바다가 어두운 성운빛으로 바뀜 · 구름 결 따라 빛줄기 (사용자 2026-11-07: 점점 바뀌게) */
+        float jz=smoothstep(204.,150.,rr+(n(vW.xz*.018)-.5)*46.+(n(vW.xz*.06)-.5)*14.)*(1.-k);   /* 경계는 구름 결 따라 들쭉날쭉 · 넓게 번지며 바뀜 */
+        vec3 neb=mix(vec3(.05,.03,.12),vec3(.32,.12,.48),cl)+vec3(.1,.55,.7)*pow(smoothstep(.55,.95,c),3.)*.6+vec3(.6,.2,.8)*pow(smoothstep(.62,.98,wv.x*c*1.6),2.)*.35;
+        col=mix(col,neb,jz);
+        gl_FragColor=vec4(col+cl*k*vec3(.15,.18,.25)*(1.-jz),1.); }` }));
   sea.position.y = -150; scene.add(sea);   /* 아래층(−30m) 섬 밑으로 구름 바다가 깔리게 */
   onProgress(.1);
 
@@ -142,8 +148,9 @@ export async function start(canvas, onProgress = () => {}) {
   const stand = new THREE.Group(); B0.w.add(stand);
   onProgress(.4);
   /* ── 초원 고리 ── */
-  const meadow = await makeMeadow(scene, new URL('./assets/kit_meadow.glb?v=11070021', import.meta.url).href, p => onProgress(.4 + p * .4), new URL('./assets/kit_meadow_decor.glb?v=11070021', import.meta.url).href, new URL('./assets/kit_meadow_lo.glb?v=11070021', import.meta.url).href);
+  const meadow = await makeMeadow(scene, new URL('./assets/kit_meadow.glb?v=11071338', import.meta.url).href, p => onProgress(.4 + p * .4), new URL('./assets/kit_meadow_decor.glb?v=11071338', import.meta.url).href, new URL('./assets/kit_meadow_lo.glb?v=11071338', import.meta.url).href);
   const clouds = makeClouds(scene, { R0: MEADOW.R0, R1: MEADOW.R1 });   /* 층 사이 흘러가는 구름 · 기체 높이 숨는 구름 */
+  const jungle = makeJungle(scene, { TOP: MEADOW.TOP, UP: MEADOW.UP, DN: MEADOW.DN });   /* 우주 정글 고리 (초원 안쪽) */
   /* ── 위아래 문 다섯: 흩어진 고리 문(0.8배) + 보물 던전 섬까지 뻗는 빛 띠 (위층 = 금빛 · 아래층 = 보랏빛) ── */
   const GATE_H = HOVER - MEADOW.TOP, gates = [], roadMs = [];
   const roadM = () => new THREE.ShaderMaterial({ ...AB, side: THREE.DoubleSide, uniforms: { uC: { value: new THREE.Color() }, uA: { value: 1 }, uT: { value: 0 }, uL: { value: 60 } },
@@ -156,7 +163,7 @@ export async function start(canvas, onProgress = () => {}) {
     for (let i = 0; i <= n; i++) { const u = i / n; curve.getPointAt(u, p); curve.getTangentAt(u, T); Bn.crossVectors(T, up0); if (Bn.lengthSq() < 1e-6) Bn.set(1, 0, 0); Bn.normalize();
       pos.push(p.x - Bn.x * w, p.y - .25, p.z - Bn.z * w, p.x + Bn.x * w, p.y - .25, p.z + Bn.z * w); uv.push(0, u, 1, u); if (i < n) { const k = i * 2; idx.push(k, k + 1, k + 2, k + 1, k + 3, k + 2); } }
     const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2)); g.setIndex(idx); return g; };
-  for (const Gd of meadow.GATES) { const G = gate4(GATE_H / .8); G.g.scale.setScalar(.8); const root = new THREE.Group(); root.add(G.g); scene.add(root);
+  for (const Gd of meadow.GATES.concat(jungle.GATES)) { const G = gate4(GATE_H / .8); G.g.scale.setScalar(.8); const root = new THREE.Group(); root.add(G.g); scene.add(root);
     const dx = Gd.tx - Gd.x, dz = Gd.tz - Gd.z, l = Math.hypot(dx, dz), ax = dx / l, az = dz / l;
     root.position.set(Gd.x, MEADOW.TOP, Gd.z); root.rotation.y = Math.atan2(-ax, -az);   /* 고리가 빛의 길 쪽을 바라봄 */
     /* 빛의 길: 문에서 수평으로 나가 → 오르거나 내려가며(되돌아 출렁이지 않게) → 던전 섬 가장자리 앞에서 다시 수평 */
@@ -175,7 +182,7 @@ export async function start(canvas, onProgress = () => {}) {
   const baseAt = (x, z) => BASES.find(b => Math.hypot(x - b.x, z - b.z) < 6.2);
   const B = { blocked: (x, z) => { const b = baseAt(x, z);
       if (b) { const lx = (x - b.x) * b.dx + (z - b.z) * b.dz, lz = -(x - b.x) * b.dz + (z - b.z) * b.dx; return !(Math.hypot(lx, lz) < FL || (lx > 0 && Math.abs(lz) < EXH)); }   /* 계단 단에 묻히지 않게 */
-      return Math.hypot(x, z) > R - .9 || meadow.blocked(x, z) || gateBlocked(x, z); }, region: () => 0 };   /* 초원 섬: 기체 높이를 지나는 바위·땅만 막음 (풀·나무는 통과) */
+      return Math.hypot(x, z) > R - .9 || meadow.blocked(x, z) || jungle.blocked(x, z) || gateBlocked(x, z); }, region: () => 0 };   /* 초원 섬: 기체 높이를 지나는 바위·땅만 막음 (풀·나무는 통과) */
   const fly = await makeFlight(renderer, B, [B0.x, B0.z], 0); scene.add(fly); const FS = fly.userData.S; fly.visible = false;
   const oldSh = []; fly.traverse(o => { if (o.isMesh && o.renderOrder === 1 && o.geometry.type === 'PlaneGeometry') oldSh.push(o); });
   /* 기체는 한 대만 (사용자 2026-11-06): 조이스틱으로 모는 그 기체가 태어나는 동안엔 기지 판 위(기지 안)에 앉아 있다가, 태어나면 그대로 이어서 몬다 */
@@ -252,7 +259,10 @@ export async function start(canvas, onProgress = () => {}) {
     const k = Math.min(1, dt * (flying ? 4 : 2)); cam.x += (tx - cam.x) * k; cam.z += (tz - cam.z) * k;
     camD += (cfg.dist * (flying ? 1 : .7) - camD) * Math.min(1, dt * 1.2);   /* 태어나는 동안 가까이 → 몰기 시작하면 천천히 물러남 */
     const a = cfg.ang * Math.PI / 180, D = camD; camera.position.set(cam.x, cam.y + D * Math.sin(a), cam.z + D * Math.cos(a)); camera.lookAt(cam.x, cam.y, cam.z); camera.updateMatrixWorld();
-    sea.position.x = cam.x; sea.position.z = cam.z; sea.material.uniforms.uT.value = t; meadow.update(v3.set(cam.x, HOVER, cam.z), camera, t); clouds.update(t, v3.set(flying ? FS.x : cam.x, HOVER, flying ? FS.z : cam.z), camera.position); life.update(t, dt, v3, camera.position);
+    { const sr = Math.hypot(flying ? FS.x : cam.x, flying ? FS.z : cam.z), jk = THREE.MathUtils.smoothstep(196 - sr, 0, 26);   /* 정글 안쪽으로 들어갈수록 */
+      mood += (jk - mood) * Math.min(1, dt * 1.5); sun.intensity = 2.8 * (1 - mood * .6); hemi.color.copy(HEMI0).lerp(HEMI_J, mood); hemi.groundColor.copy(GND0).lerp(GND_J, mood);
+      renderer.setClearColor(CLR0.clone().lerp(CLR_J, mood), 1); meadow.setMood?.(mood); }
+    sea.position.x = cam.x; sea.position.z = cam.z; sea.material.uniforms.uT.value = t; meadow.update(v3.set(cam.x, HOVER, cam.z), camera, t); clouds.update(t, v3.set(flying ? FS.x : cam.x, HOVER, flying ? FS.z : cam.z), camera.position); jungle.update(t, dt, camera); life.update(t, dt, v3, camera.position);
     { const r = Math.hypot(FS.x, FS.z); say.textContent = !flying ? '태어나는 중' : baseAt(FS.x, FS.z) ? '태어나는 곳 · 출구로 나가면 맵 안' : r > R - 25 ? '초원 · 무지개 벽 가까이 · 쏘면 무지개빛이 번져요' : (r > MEADOW.R0 ? '초원' : '맵 안') + (clouds.inCloud(FS.x, FS.z) ? ' · 구름 속에 숨음' : '') + ' · 한가운데까지 ' + Math.round(r) + 'm'; }
     /* 별똥별이 꽂힐 때 공간 일그러짐 충격파 (시작 기지와 같은 효과) */
     if (WARP.s > 0) { B0.w.localToWorld(v3.set(0, .2, 0)); v3.project(camera); bloom.warp(v3.x * .5 + .5, v3.y * .5 + .5, WARP.r, WARP.s, Wd / Hd); } else bloom.warp(.5, .5, 0, 0, Wd / Hd);
@@ -260,5 +270,5 @@ export async function start(canvas, onProgress = () => {}) {
     bloom.render(Wd, Hd, !perf.st.bloom); perf.tick(dt);
   } catch (e) { console.error('[전체 맵]', e); } });
   onProgress(1);
-  window.__sm = { meadow, clouds, life, info: () => ({ ...meadow.info(), drawCalls: renderer.info.render.calls, gpuTris: renderer.info.render.triangles }), FS, fly, BASES, cam, cfg, HITS, get t() { return t; }, get flying() { return flying; }, wake };
+  window.__sm = { meadow, clouds, life, jungle, info: () => ({ ...meadow.info(), drawCalls: renderer.info.render.calls, gpuTris: renderer.info.render.triangles }), FS, fly, BASES, cam, cfg, HITS, get t() { return t; }, get flying() { return flying; }, wake };
 }

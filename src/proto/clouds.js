@@ -30,16 +30,16 @@ export function makeClouds(scene, { R0, R1, sect = 10, seed = 7 } = {}) {
   geo.setAttribute('aP', new THREE.InstancedBufferAttribute(A, 4)); geo.setAttribute('aS', new THREE.InstancedBufferAttribute(B, 2)); geo.instanceCount = n;
   const U = { uT: { value: 0 }, uShip: { value: new THREE.Vector3() }, uCam: { value: new THREE.Vector3() } };
   const mat = new THREE.ShaderMaterial({ uniforms: U, transparent: true, depthWrite: false,
-    vertexShader: `attribute vec4 aP; attribute vec2 aS; uniform float uT; uniform vec3 uShip, uCam; varying vec2 vUv; varying float vSeed, vA, vY, vLow;
+    vertexShader: `attribute vec4 aP; attribute vec2 aS; uniform float uT; uniform vec3 uShip, uCam; varying vec2 vUv; varying float vSeed, vA, vY, vLow, vR;
       void main(){ vec3 c = aP.xyz; float kind = aS.y; vLow = kind; vSeed = aS.x; float bank = kind == 1. ? 1. : 0.;
         { float an = uT * (.0016 + fract(aS.x * 7.3) * .0012) * (1. - bank) + uT * .0003 * bank, ca = cos(an), sa = sin(an); c.xz = mat2(ca, sa, -sa, ca) * c.xz; c.y += sin(uT * .07 + aS.x) * .6; }   /* 맵 가운데를 축으로 아주 천천히 흘러감 (맵 밖으로 안 나감) */
         /* 기체가 지나가도 구름은 비켜 가지 않음 (사용자 2026-11-06) — 기체가 그냥 뚫고 지나감 */
-        vA = 1.; float sz = aP.w; vY = c.y;
+        vA = 1.; float sz = aP.w; vY = c.y; vR = length(c.xz);
         vec3 R = vec3(viewMatrix[0][0], viewMatrix[1][0], viewMatrix[2][0]), Up = vec3(viewMatrix[0][1], viewMatrix[1][1], viewMatrix[2][1]);
         vec3 w = c + (R * position.x + Up * position.y * .62) * sz; vUv = position.xy + .5;
         float camD = distance(w, uCam); vA *= smoothstep(4., 14., camD);   /* 카메라 바로 앞은 비켜 줌 */
         gl_Position = projectionMatrix * viewMatrix * vec4(w, 1.); }`,
-    fragmentShader: `uniform float uT; varying vec2 vUv; varying float vSeed, vA, vY, vLow; ${NOISE}
+    fragmentShader: `uniform float uT; varying vec2 vUv; varying float vSeed, vA, vY, vLow, vR; ${NOISE}
       void main(){ vec2 p = vUv * 2. - 1.; p.y *= 1.15;
         float n = sn(p * 1.6 + vSeed) * .5 + sn(p * 3.4 - vSeed * 1.7 + uT * .02) * .25;
         float body = smoothstep(1., .25, length(p) - n * .45);
@@ -48,6 +48,7 @@ export function makeClouds(scene, { R0, R1, sect = 10, seed = 7 } = {}) {
         vec3 col = mix(vec3(.62, .7, .86), vec3(.97, .98, 1.), shade);
         float deep = clamp((-vY - 6.) / 22., 0., 1.); col = mix(col, vec3(.66, .74, .88), deep * .45);
         if (vLow > 1.5 && vLow < 2.5) col = mix(col, vec3(.92, .95, 1.), .35);   /* 위 구름: 하늘빛 */
+        { float jz = smoothstep(200., 155., vR); col = mix(col, vec3(.42, .3, .62) * (.7 + shade * .5), jz * .75); }   /* 우주 정글 위 구름은 보랏빛 */
         float a = body * (vLow < .5 ? .66 - deep * .12 : vLow < 1.5 ? .85 : vLow < 2.5 ? .5 : .72) * vA;
         gl_FragColor = linearToOutputTexel(vec4(col, a)); }` });
   const mesh = new THREE.Mesh(geo, mat); mesh.frustumCulled = false; mesh.renderOrder = 30; scene.add(mesh);
