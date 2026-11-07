@@ -9,6 +9,7 @@
    · 초원 → 정글은 점점: 경계 둘레에 작은 부유체가 섞이고, 기체가 안쪽으로 들어갈수록 하늘이 어두운 보랏빛으로 (skymap에서) */
 import * as THREE from 'three';
 let CAM = { position: new THREE.Vector3() };
+let LOD_T = .5, LOD_N = 30;   /* 섬 둘레 · 덩굴 마디 수 (키트 원래 44 · 1배) */
 /* ===================== 우주 정글 지형 키트 (사용자 제작 · 생성 코드 그대로) ===================== */
 // ---------- utils ----------
 function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;}}
@@ -94,7 +95,7 @@ function makeOutline(r,o){const lobes=o.lobes||pick([2,3,3,4,5]),amp=o.amp==null
     bites.forEach(([ba,w,d])=>{const da=Math.abs(((a-ba+Math.PI)%(Math.PI*2)+Math.PI*2)%(Math.PI*2)-Math.PI);if(da<w)k-=d*Math.cos(da/w*Math.PI/2);});
     const c=Math.cos(a-rot),s=Math.sin(a-rot),e=1/Math.sqrt(c*c/(ex*ex)+s*s*ex*ex);return Math.max(r*(o.min||.45),r*k*e);};}
 // tapered ring band between two outlines (yTop > yBot), with optional caps
-function loft(B,x,z,fT,yT,cT,fB,yB,cB,capT,capB,col,grad){const N=44,P=[];
+function loft(B,x,z,fT,yT,cT,fB,yB,cB,capT,capB,col,grad){const N=LOD_N,P=[];
   const pt=(f,yv,c,a)=>{const r=f(a);return[c[0]+Math.cos(a)*r,yv,c[1]+Math.sin(a)*r];};
   for(let i=0;i<N;i++){const a0=i/N*6.2832,a1=(i+1)/N*6.2832,t0=pt(fT,yT,cT,a0),t1=pt(fT,yT,cT,a1),b0=pt(fB,yB,cB,a0),b1=pt(fB,yB,cB,a1);
     P.push(...t0,...t1,...b1,...t0,...b1,...b0);
@@ -153,7 +154,7 @@ function pagoda(B,p,s,col,down){const dirY=down?-1:1,h=rnd(5,13)*s,tiers=2+Math.
     for(let g2=0;g2<6;g2++){const a=g2/6*6.28+k;add(B,new THREE.BoxGeometry(.12*s,.06,r*.75),V(p.x+Math.cos(a)*r*.45,cy-dirY*.27*s,p.z+Math.sin(a)*r*.45),E(0,-a+1.57,0),null,col,{to:'glow',vary:0});}}}
 function shelf(B,x,y,z,a,r,col){add(B,new THREE.CylinderGeometry(r,r,.35,10,1,false,0,Math.PI),V(x,y,z),E(0,-a-Math.PI/2,0),null,'#2a2348',{vary:.1});
   add(B,new THREE.TorusGeometry(r,.1,3,12,Math.PI),V(x,y-.2,z),E(Math.PI/2,0,-a+Math.PI/2),null,col,{to:'glow',vary:0});}
-function tube(pts,rad,seg){return new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts),seg||24,rad,5,false);}
+function tube(pts,rad,seg){return new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts),Math.max(5,Math.round((seg||24)*LOD_T)),rad,5,false);}   /* 게임 속 크기(키트의 0.2~0.4배)에선 마디를 반으로 줄여도 같아 보임 */
 function eyeStalk(G,B,p,s,eyes){const h=rnd(2.5,5)*s,lean=V(rnd(-.4,.4),1,rnd(-.4,.4)).normalize();
   const top=p.clone().addScaledVector(lean,h);
   add(B,tube([p.clone(),p.clone().addScaledVector(lean,h*.5).add(V(rnd(-.6,.6),0,rnd(-.6,.6))),top],.22*s,10),V(0,0,0),null,null,'#3a2c5a',{grad:'#1e1834'});
@@ -399,8 +400,15 @@ function litMat(src) { const vc = !!src.vertexColors, key = vc ? 'vc' : 'c' + sr
     fragmentShader: 'varying vec3 vC; void main(){ gl_FragColor = linearToOutputTexel(vec4(vC, 1.)); }' });
   litCache.set(key, m); return m; }
 
+/* 폰 메모리 줄이기: 색은 0~255, 법선은 -127~127 정수로 (보기엔 같음 · 꼭짓점 하나 36바이트 → 20바이트) */
+const packed = new WeakSet();
+function pack(G) { G.traverse(o => { const g = o.geometry; if (!o.isMesh || !g || packed.has(g)) return; packed.add(g);
+  const C = g.attributes.color, N = g.attributes.normal;
+  if (C && C.array instanceof Float32Array) { const a = new Uint8Array(C.count * C.itemSize); for (let i = 0; i < a.length; i++) a[i] = Math.max(0, Math.min(255, Math.round(C.array[i] * 255))); g.setAttribute('color', new THREE.BufferAttribute(a, C.itemSize, true)); }
+  if (N && N.array instanceof Float32Array && N.itemSize === 3) { const a = new Int8Array(N.count * 4); for (let i = 0; i < N.count; i++) { a[i * 4] = Math.round(N.array[i * 3] * 127); a[i * 4 + 1] = Math.round(N.array[i * 3 + 1] * 127); a[i * 4 + 2] = Math.round(N.array[i * 3 + 2] * 127); }
+    const ib = new THREE.InterleavedBuffer(a, 4); g.setAttribute('normal', new THREE.InterleavedBufferAttribute(ib, 3, 0, true)); } }); }
 const IDX = { root: 0, coral: 1, tentacle: 2, swamp: 3, flower: 4, jelly: 5, vine: 6, hunt: 7, egg: 8, floaters: 9 };
-function buildPiece(kind, seed) { R = mulberry32(seed); anim = []; const G = new THREE.Group(); PIECES[kind].build(G);
+function buildPiece(kind, seed, lod = 1) { LOD_T = .5 * lod; LOD_N = Math.round(30 * Math.max(.6, lod)); R = mulberry32(seed); anim = []; const G = new THREE.Group(); PIECES[kind].build(G);
   G.traverse(o => { if (o.isMesh && o.material && o.material.isMeshPhongMaterial) o.material = litMat(o.material); });
   return { G, anim: anim.slice(), size: PIECES[kind].size }; }
 /* 문을 놓을 작은 정글 땅 */
@@ -427,7 +435,7 @@ const SINGLES = [
   (G, B) => { const P = isle(B, 0, 0, 0, { r: 4, h: 1.2, depth: 8, layers: 3, amp: rnd(.2, .32), min: .5, vein: GLOWS.cyan }); return () => { for (let k = 0; k < 6; k++) { const [a, b] = P.pt(0, .6), r = rnd(.8, 1.5);   /* 거품 알 무더기 */
       const m = new THREE.Mesh(new THREE.SphereGeometry(r, 16, 12), fresnelMat(pick([GLOWS.mag, GLOWS.cyan]), 2, 1)); m.position.set(a, r * .7, b); m.scale.y = 1.25; G.add(m);
       const core = new THREE.Mesh(new THREE.SphereGeometry(r * .3, 8, 6), new THREE.MeshBasicMaterial({ color: '#ffd6ff' })); core.position.copy(m.position); G.add(core); } }; } ];
-function buildSingle(kind, seed) { R = mulberry32(seed); anim = []; const G = new THREE.Group(), B = newB(), eyes = [], after = SINGLES[kind](G, B, eyes); flush(B, G); if (after) after();
+function buildSingle(kind, seed) { LOD_T = .3; LOD_N = 18; R = mulberry32(seed); anim = []; const G = new THREE.Group(), B = newB(), eyes = [], after = SINGLES[kind](G, B, eyes); flush(B, G); if (after) after();
   if (eyes.length) anim.push(t => { eyes.forEach(o => { o.e.lookAt(CAM.position); o.e.rotateY(Math.sin(t * .8 + o.ph) * .35); o.e.scale.y = ((t + o.blink) % 5) < .12 ? .1 : 1; }); });
   G.traverse(o => { if (o.isMesh && o.material && o.material.isMeshPhongMaterial) o.material = litMat(o.material); }); return { G, anim: anim.slice(), size: 7 }; }
 
@@ -440,18 +448,31 @@ export function jungleLayout({ R0 = 136, R1 = 187, TOP = -3, UP = 20, DN = -30, 
     { const [x, z] = at(thg + 7 * deg, 152), Y = up ? UP : DN; push({ t: 'hunt', seed: seed + 1, x, y: Y, z, s: .38, yaw: thg * 3.1, layer: up ? 'up' : 'dn', r: 15, dungeon: true });
       const [gx, gz] = at(thg + 9 * deg, 181); push({ t: 'gate', seed: seed + 2, x: gx, y: TOP, z: gz, s: .42, yaw: thg, layer: 'mid', r: 7, gate: { tx: x, tz: z, layer: up ? 'up' : 'dn', ty: Y, rad: 38 * .38 * .82 } }); }
     { const [x, z] = at(thg - 7 * deg, 166); push({ t: 'hunt', seed: seed + 3, x, y: TOP, z, s: .4, yaw: thg * 1.7 + 1, layer: 'mid', r: 16 }); }
-    { const [x, z] = at(th0 - 5 * deg, 147); push({ t: 'fill', kind: FILL[(i * 2) % 6], seed: seed + 4, x, y: TOP, z, s: .36, yaw: th0 * 2.3, layer: 'mid', r: 10 }); }
-    { const [x, z] = at(th0 + 6 * deg, 174); push({ t: 'fill', kind: FILL[(i * 2 + 1) % 6], seed: seed + 5, x, y: TOP, z, s: .36, yaw: th0 * 1.3 + 2, layer: 'mid', r: 10 }); }
+    { const [x, z] = at(th0 - 5 * deg, 147); push({ t: 'fill', kind: FILL[(i * 2) % 6], seed: seed + 4, x, y: TOP, z, s: .36, yaw: th0 * 2.3, layer: 'mid', r: 11 }); }   /* 큰 것 하나 */
     /* 탑·기둥 (사용자 2026-11-07: 가운데→위로만 잇지 말 것 · 아래층에서 솟거나 · 사이에 뜨거나 · 크기도 여러 가지) */
     { const mode = ['full', 'low', 'full', 'float', 'small'][i % 5], [x, z] = at(th0 - 15 * deg + (Rn() - .5) * 4 * deg, 150 + Rn() * 22), yaw = th0 * 2.9;
       const V0 = { full: [DN, (UP - DN) / 66.5, .38], low: [DN, (TOP - 7 - DN) / 66.5, .3], float: [4 + Rn() * 3, (8 + Rn() * 4) / 66.5, .15], small: [DN, (TOP + 5 - DN) / 66.5, .24] }[mode];
       push({ t: 'vine', mode, seed: seed + 7, x, y: V0[0], z, s: V0[2], sy: V0[1], yaw, layer: mode === 'float' ? 'upgap' : 'pillar', r: 18 * V0[2] }); }
-    /* 낱개 작은 조각: 정글 안 여러 높이 · 깊이 */
-    for (let n = 0; n < 9; n++) { const band = n % 3, th = th0 + (Rn() - .5) * SA, r = R0 + 2 + Rn() * (R1 - R0 - 4), [x, z] = at(th, r), s = .2 + Rn() * .22;
-      const y = band === 0 ? -9 - Rn() * 16 : band === 1 ? 5 + Rn() * 11 : TOP + .2; push({ t: 'single', kind: Math.floor(Rn() * SINGLES.length), seed: seed + 20 + n, x, y, z, s, yaw: Rn() * 6.28, layer: band === 0 ? 'gap' : band === 1 ? 'upgap' : 'mid', r: 5.5 * s + 1 }); }
     /* 경계 넘어 초원 쪽으로: 정글 조각이 초원 가장자리로 번져 나감 */
     for (let n = 0; n < 6; n++) { const band = n % 3, th = th0 + (Rn() - .5) * SA, r = R1 + 1 + Math.pow(Rn(), 1.6) * 22, [x, z] = at(th, r), s = .18 + Rn() * .18;
       const y = band === 0 ? -8 - Rn() * 14 : band === 1 ? 5 + Rn() * 10 : TOP + .2; push({ t: 'single', kind: Math.floor(Rn() * SINGLES.length), seed: seed + 40 + n, x, y, z, s, yaw: Rn() * 6.28, layer: band === 0 ? 'gap' : band === 1 ? 'upgap' : 'mid', r: 5.5 * s + 1, cross: true }); }
+  }
+  /* 채우기 (사용자 2026-11-07: 정글 밀도가 너무 없음 · 큰 것만 있음 → 중간 것도) — 후보를 여럿 뽑아 빈 곳부터 · 같은 높이대끼리만 안 겹치게 */
+  const BAND = l => l === 'mid' ? 0 : l === 'upgap' ? 1 : l === 'gap' ? -1 : l === 'up' ? 2 : l === 'dn' ? -2 : 9;
+  const gap = (x, z, r, l) => { let m = 1e9; for (const q of L) { if (BAND(q.layer) !== BAND(l) && q.layer !== 'pillar' && !(q.dungeon && BAND(l) === BAND(q.layer))) continue; const d = Math.hypot(q.x - x, q.z - z) - q.r - r; if (d < m) m = d; } return m; };
+  const add = (sector, o, rMin, rMax, rOf, tries = 24) => { const th0 = sector * SA; let best = null;
+    for (let c = 0; c < tries; c++) { const th = th0 + (Rn() - .5) * SA, r = rMin + Rn() * (rMax - rMin), [x, z] = at(th, r), rr = rOf(); const g = gap(x, z, rr, o.layer); if (g < .8) continue; if (!best || g > best.g) best = { x, z, rr, g }; }
+    if (!best) return; push({ ...o, x: best.x, z: best.z, r: best.rr }); };
+  for (let i = 0; i < sect; i++) { const seed = 9000 + i * 131;
+    /* 가운데층: 중간 크기 정글 섬 넷 + 작은 것 하나 (크기 섞기) */
+    for (let n = 0; n < 4; n++) { const s = n < 3 ? .2 + Rn() * .07 : .14 + Rn() * .05, kind = FILL[(i + n * 2) % 6];
+      add(i, { t: 'fill', kind, seed: seed + n, y: TOP, s, yaw: Rn() * 6.28, layer: 'mid' }, R0 + 4, R1 - 2, () => 27 * s * .62); }
+    /* 아래층 정글 섬: 내려다볼 때 꽉 차게 (흐린 거리라 움직임·알갱이는 뺌) */
+    for (let n = 0; n < 5; n++) { const s = .16 + Rn() * .14, kind = FILL[(i * 3 + n) % 6];
+      add(i, { t: 'fill', kind, seed: seed + 20 + n, y: DN - Rn() * 4, s, yaw: Rn() * 6.28, layer: 'dn', lite: true }, R0 - 2, R1 + 4, () => 27 * s * .62); }
+    /* 낱개 작은 조각 20: 아래 사이 · 가운데 · 위 사이 */
+    for (let n = 0; n < 16; n++) { const b = n % 4 === 3 ? 1 : n % 2, s = .16 + Rn() * .22, y = b === 0 ? -9 - Rn() * 17 : b === 1 && n % 4 === 3 ? 5 + Rn() * 10 : TOP + .2, layer = b === 0 ? 'gap' : n % 4 === 3 ? 'upgap' : 'mid';
+      add(i, { t: 'single', kind: Math.floor(Rn() * SINGLES.length), seed: seed + 40 + n, y, s, yaw: Rn() * 6.28, layer }, R0 + 1, R1 - 1, () => 5.5 * s + .8, 12); }
   }
   return L;
 }
@@ -460,25 +481,30 @@ export function makeJungle(scene, { R0 = 136, R1 = 187, TOP = -3, UP = 20, DN = 
   const pieces = [], GATES = [], VINES = [], L = jungleLayout({ R0, R1, TOP, UP, DN, sect });
   const place = (built, x, y, z, s, yaw, sy = s) => { built.G.position.set(x, y, z); built.G.scale.set(s, sy, s); built.G.rotation.y = yaw; scene.add(built.G);
     built.G.traverse(o => { if (o.isPoints && o.material.size) o.material.size *= Math.max(s, sy); });   /* 포자 알갱이도 같은 비율로 */
-    const p = { ...built, x, y, z, rad: built.size * Math.max(s, sy) * 1.3 }; pieces.push(p); return p; };
+    pack(built.G); const p = { ...built, x, y, z, rad: built.size * Math.max(s, sy) * 1.3 }; pieces.push(p); return p; };
   /* 낱개 조각이 초원 섬과 겹치면 뺌 (같은 높이대일 때만) */
   const band = l => l === 'mid' ? 0 : l === 'upgap' ? 1 : l === 'gap' || l === 'rock' ? -1 : l === 'up' ? 2 : l === 'dn' ? -2 : 9;
   const free = (o) => { for (const q of avoid) { if (q.layer === 'deco') continue; if (band(q.layer) !== band(o.layer) && q.layer !== 'pillar') continue; if (Math.hypot(q.x - o.x, q.z - o.z) < (q.rr || 3) + o.r + 1) return false; }
     for (const q of L) { if (q === o || q.t === 'single' && L.indexOf(q) > L.indexOf(o)) continue; if (band(q.layer) !== band(o.layer)) continue; if (Math.hypot(q.x - o.x, q.z - o.z) < q.r + o.r + 1) return false; } return true; };
+  /* 같은 모양 나눠 쓰기: 아래층 정글 섬과 작은 조각은 종류마다 몇 벌만 만들어 복사해 씀 (모양 데이터는 하나 · 크기·방향만 다르게) → 폰 메모리 절약 */
+  const SHARE = new Map(), shared = (key, n, make) => { if (!SHARE.has(key)) SHARE.set(key, []); const arr = SHARE.get(key); if (arr.length < n) { const b = make(arr.length); arr.push(b); return b; }
+    const src = arr[Math.floor(Math.random() * arr.length)]; return { G: src.G.clone(), anim: [], size: src.size }; };
   for (const o of L) {
-    if (o.t === 'hunt') place(buildPiece(IDX.hunt, o.seed), o.x, o.y, o.z, o.s, o.yaw);
+    if (o.t === 'hunt' && o.dungeon) place(shared('h', 3, v => buildPiece(IDX.hunt, o.seed + v * 11, .8)), o.x, o.y, o.z, o.s, o.yaw);   /* 위·아래층 던전은 멀리서 보는 곳 → 세 벌 나눠 씀 */
+    else if (o.t === 'hunt') place(buildPiece(IDX.hunt, o.seed), o.x, o.y, o.z, o.s, o.yaw);
     else if (o.t === 'gate') { place(buildGateIsle(o.seed), o.x, o.y, o.z, o.s, o.yaw); GATES.push({ x: o.x, z: o.z, ...o.gate, jungle: true }); }
-    else if (o.t === 'fill') place(buildPiece(o.kind, o.seed), o.x, o.y, o.z, o.s, o.yaw);
+    else if (o.t === 'fill' && o.lite) { const b = shared('d' + o.kind, 2, v => { const b = buildPiece(o.kind, o.seed + v * 7, .55); const rm = []; b.G.traverse(c => { if (c.isPoints || c.isSprite || c.isLine) rm.push(c); }); rm.forEach(c => c.parent.remove(c)); b.anim = []; return b; }); place(b, o.x, o.y, o.z, o.s, o.yaw); }
+    else if (o.t === 'fill') { const b = buildPiece(o.kind, o.seed, Math.min(1, o.s / .36)); if (o.lite) { const rm = []; b.G.traverse(c => { if (c.isPoints || c.isSprite || c.isLine) rm.push(c); }); rm.forEach(c => c.parent.remove(c)); b.anim = []; } place(b, o.x, o.y, o.z, o.s, o.yaw); }
     else if (o.t === 'vine') { place(buildPiece(IDX.vine, o.seed), o.x, o.y, o.z, o.s, o.yaw, o.sy);
       const top = o.y + 66.5 * o.sy; if (o.y < .7 && top > .7)   /* 기체 높이를 지나가는 기둥만 막음 */
         for (let c = 0; c < 4; c++) { const a = c / 4 * 6.28 + .4, lx = Math.cos(a) * 9 * o.s, lz = Math.sin(a) * 9 * o.s, cy = Math.cos(-o.yaw), sy2 = Math.sin(-o.yaw); VINES.push([o.x + lx * cy - lz * sy2, o.z + lx * sy2 + lz * cy, 3.3 * o.s]); } }
-    else if (o.t === 'single') { if (!free(o)) { o.skip = true; continue; } place(buildSingle(o.kind, o.seed), o.x, o.y, o.z, o.s, o.yaw); }
+    else if (o.t === 'single') { if (!free(o)) { o.skip = true; continue; } place(shared('s' + o.kind, 3, () => buildSingle(o.kind, o.seed)), o.x, o.y, o.z, o.s, o.yaw); }
   }
   const blocked = (x, z) => { for (const v of VINES) if ((x - v[0]) ** 2 + (z - v[1]) ** 2 < v[2] * v[2]) return true; return false; };   /* 층을 뚫는 덩굴 기둥만 막음 */
   const sph = new THREE.Sphere(), fr = new THREE.Frustum(), pv = new THREE.Matrix4();
   const update = (t, dt, camera) => { CAM = camera; T.value = t; pv.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse); fr.setFromProjectionMatrix(pv);
     for (const p of pieces) { const d = Math.hypot(p.x - camera.position.x, p.z - camera.position.z); sph.center.set(p.x, p.y, p.z); sph.radius = p.rad;
-      const vis = d < 170 && fr.intersectsSphere(sph); p.G.visible = vis; if (vis) for (const f of p.anim) f(t, dt); } };
+      const vis = d < 170 && fr.intersectsSphere(sph); p.G.visible = vis; if (vis && d < 95) for (const f of p.anim) f(t, dt); } };   /* 먼 것은 움직임을 멈춤 */
   const setLight = k => { KL.uLift.value = k; };
   return { update, blocked, GATES, pieces, setLight };
 }
