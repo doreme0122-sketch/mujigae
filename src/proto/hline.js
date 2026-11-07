@@ -37,9 +37,7 @@ export function makeHeightLine(scene, blocked, Y) {
   const rebuild = (sx, sz, head) => { lx = sx; lz = sz; lh = head;
     const cx = Math.round((sx - Math.sin(head) * AHEAD) / H) * H, cz = Math.round((sz - Math.cos(head) * AHEAD) / H) * H, x0 = cx - RAD, z0 = cz - RAD;
     for (let j = 0; j < M; j++) for (let i = 0; i < M; i++) raw[j * M + i] = blocked(x0 + i * H, z0 + j * H) ? 1 : 0;
-    /* 1-2-1 흐리기를 가로·세로 두 번에 나눠서 (빠름) */
-    for (let j = 0; j < M; j++) { const o = j * M; for (let i = 0; i < M; i++) tmp[o + i] = (raw[o + Math.max(0, i - 1)] + 2 * raw[o + i] + raw[o + Math.min(M - 1, i + 1)]) * .25; }
-    for (let j = 0; j < M; j++) { const a = Math.max(0, j - 1) * M, c = Math.min(M - 1, j + 1) * M, o = j * M; for (let i = 0; i < M; i++) f[o + i] = (tmp[a + i] + 2 * tmp[o + i] + tmp[c + i]) * .25; }
+    for (let k = 0; k < M * M; k++) f[k] = raw[k];   /* 흐리기 없음: 작은 돌기 하나도 선이 생기게 (막히는 칸 = 선 안쪽, 정확히 같음) · 각진 계단 모양은 아래 다듬기 두 번으로 둥글게 */
     /* 경계선(0.5)이 지나는 칸 변마다 점 하나 · 선분 = 두 변을 잇는 것 → 이어 붙여 한 줄로 */
     link.fill(-1); segs.length = 0;
     const eid = (i, j, v) => ((j * M + i) << 1) | v, put = (e, va, vb, xa, za, xb, zb) => { const t = (.5 - va) / (vb - va); EP[e * 2] = xa + (xb - xa) * t; EP[e * 2 + 1] = za + (zb - za) * t; return e; };
@@ -52,8 +50,8 @@ export function makeHeightLine(scene, blocked, Y) {
       if (E.length === 2) join(E[0], E[1]); else if (E.length === 4) { join(E[0], E[1]); join(E[2], E[3]); } }
     /* 이어 붙이기 → 한 번 다듬기(모서리를 둥글게) → 띠 만들기 */
     used.fill(0); let np = 0, ni = 0;
-    const emit = (P, closed) => { if (P.length < 4) return; let Q = P;   /* 다듬기 한 번 */
-      { const R = [], n = Q.length / 2, m = closed ? n : n - 1; if (!closed) R.push(Q[0], Q[1]); for (let k = 0; k < m; k++) { const ax = Q[k * 2], az = Q[k * 2 + 1], bx = Q[((k + 1) % n) * 2], bz = Q[((k + 1) % n) * 2 + 1]; R.push(ax * .75 + bx * .25, az * .75 + bz * .25, ax * .25 + bx * .75, az * .25 + bz * .75); } if (!closed) R.push(Q[(n - 1) * 2], Q[(n - 1) * 2 + 1]); Q = R; }
+    const emit = (P, closed) => { if (P.length < 4) return; let Q = P;   /* 다듬기 두 번 (25cm 칸 계단 → 매끈한 곡선) */
+      for (let pass = 0; pass < 2; pass++) { const R = [], n = Q.length / 2, m = closed ? n : n - 1; if (!closed) R.push(Q[0], Q[1]); for (let k = 0; k < m; k++) { const ax = Q[k * 2], az = Q[k * 2 + 1], bx = Q[((k + 1) % n) * 2], bz = Q[((k + 1) % n) * 2 + 1]; R.push(ax * .75 + bx * .25, az * .75 + bz * .25, ax * .25 + bx * .75, az * .25 + bz * .75); } if (!closed) R.push(Q[(n - 1) * 2], Q[(n - 1) * 2 + 1]); Q = R; }
       const n = Q.length / 2; if (np + n + 1 > MAXP) return; const base = np, cnt = closed ? n + 1 : n;
       for (let k = 0; k < cnt; k++) { const kk = k % n, pk = closed ? (kk - 1 + n) % n : Math.max(0, kk - 1), nk = closed ? (kk + 1) % n : Math.min(n - 1, kk + 1);
         let tx = Q[nk * 2] - Q[pk * 2], tz = Q[nk * 2 + 1] - Q[pk * 2 + 1]; const l = Math.hypot(tx, tz) || 1; tx /= l; tz /= l;
