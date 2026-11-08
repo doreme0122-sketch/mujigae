@@ -8,8 +8,8 @@
      알 둥지는 이번엔 안 씀 · 포식 꽃·촉수 나무·해파리는 장식(기체를 막거나 잡지 않음)
    · 초원 → 정글은 점점: 경계 둘레에 작은 부유체가 섞이고, 기체가 안쪽으로 들어갈수록 하늘이 어두운 보랏빛으로 (skymap에서) */
 import * as THREE from 'three';
-import { spiralPath } from './path.js?v=11080144';
-import { makeDresser } from './jdress.js?v=11080144';
+import { spiralPath } from './path.js?v=11081119';
+import { makeDresser } from './jdress.js?v=11081119';
 let CAM = { position: new THREE.Vector3() };
 let LOD_T = .5, LOD_N = 30;   /* 섬 둘레 · 덩굴 마디 수 (키트 원래 44 · 1배) */
 /* ===================== 우주 정글 지형 키트 (사용자 제작 · 생성 코드 그대로) ===================== */
@@ -80,6 +80,7 @@ function flush(B,group){[['rock',rockMat],['gloss',glossMat],['glow',glowMat]].f
 const STONE=['#1d2232','#262a3e','#1a1d2b','#2d2a44','#171a26'];
 const GLOWS={cyan:'#3cf6ff',mag:'#ff3cf0',lime:'#9dff3c',vio:'#9a6cff',teal:'#3cffc0'};
 let anim=[];
+let ISL=null;   /* 조각을 만들 때 맨 처음 세운 섬의 윗면 (바깥선·높이) — 정글 꾸미기가 씀 */
 
 // layered alien rock underside; returns bottom y
 function strata(B,x,y,z,r,depth,layers,vein){let yy=y,rr=r;layers=layers||5;
@@ -104,7 +105,7 @@ function loft(B,x,z,fT,yT,cT,fB,yB,cB,capT,capB,col,grad){const N=LOD_N,P=[];
     if(capT)P.push(cT[0],yT,cT[1],...t1,...t0);if(capB)P.push(cB[0],yB,cB[1],...b0,...b1);}
   const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(P,3));jitter(g,.3,.1,rint());g.computeVertexNormals();
   add(B,g,V(x,0,z),null,null,col,{grad,vary:.09});}
-function isle(B,x,y,z,o){o=o||{};const r=o.r,fn=makeOutline(r,o),h=o.h||3,depth=o.depth||r*1.3,L=o.layers||5,flip=!!o.flip,vein=o.vein||GLOWS.vio,topCol=o.top||'#22283a';
+function isle(B,x,y,z,o){o=o||{};const r=o.r,fn=makeOutline(r,o);if(!ISL&&!o.flip&&!x&&!z)ISL={fn,y,r};const h=o.h||3,depth=o.depth||r*1.3,L=o.layers||5,flip=!!o.flip,vein=o.vein||GLOWS.vio,topCol=o.top||'#22283a';
   const f96=a=>fn(a)*.96;
   if(!flip)loft(B,x,z,fn,y,[0,0],f96,y-h,[0,0],true,false,topCol,'#141826');
   else loft(B,x,z,f96,y+h,[0,0],fn,y,[0,0],false,true,topCol,'#141826');
@@ -229,6 +230,7 @@ PIECES.push({name:'포자 거품 늪',tags:['습지','시야 방해'],fy:3,size:
   desc:'바위 테두리 안에 보랏빛 우주 액체가 고인 늪. 반투명 거품 주머니가 숨 쉬듯 부풀고, 바닥에서 포자 방울이 끊임없이 올라옴. 액체 끝은 테두리 바위 밑으로 숨김.',
   build(G){const B=newB(),I=isle(B,0,-.6,0,{r:24,depth:30,vein:GLOWS.teal,min:.92,amp:.1,bites:0,ex:rnd(.9,1.1)});
     const rimR=a=>16+1.6*Math.sin(a*3+.7)+.8*Math.sin(a*7);
+    ISL.hole=a=>rimR(-a)+2.2;ISL.pool=.35;ISL.poolR=a=>rimR(-a)-1;   /* 꾸미기: 늪 물 위엔 땅을 덮지 않고 물풀만 */
     for(let k=0;k<44;k++){const a=k/44*6.28,rr=rimR(-a)+rnd(-.4,1.2),s=rnd(1.4,2.8);add(B,jitter(new THREE.IcosahedronGeometry(s,0),s*.3,s*.25,rint()),V(Math.cos(a)*rr,s*.15,Math.sin(a)*rr),E(R()*3,R()*3,0),V(1.3,.7,1.3),pick(STONE),{vary:.12});}
     const pool=new THREE.Mesh(outlineGeo(a=>rimR(a)-.3),liquidMat({ramp:'void'}));pool.position.y=.35;G.add(pool);
     for(let k=0;k<26;k++){const a=R()*6.28,rr=Math.min(rnd(17.5,21),I.fn(a)*.95),h=rnd(2.5,6);const x=Math.cos(a)*rr,z=Math.sin(a)*rr;
@@ -300,25 +302,16 @@ PIECES.push({name:'포식자의 사냥터',tags:['몬스터 서식지','대형 �
     // den on one side
     const denA=R()*6.28,[dx,dz]=I.edge(denA,.6),den=V(dx,0,dz),toC=V(-dx,0,-dz).normalize();
     jitter(new THREE.SphereGeometry(9,14,8,0,Math.PI*2,0,Math.PI/2),1.1,.6,rint()).dispose();   /* 굴 돔은 뺌 (사용자 2026-11-07: 안에 몬스터가 없으니 없는 게 나음) — 운 순서는 그대로 두어 나머지 모양은 같게 */
-    for(let k=0;k<7;k++){const a=R()*6.28,d=rnd(9,13);add(B,new THREE.ConeGeometry(rnd(.8,1.4),rnd(3,7),5),den.clone().add(V(Math.cos(a)*d,1.5,Math.sin(a)*d)),E(rnd(-.4,.4),0,rnd(-.4,.4)),null,'#d6cfe8',{grad:'#4a4268'});}
+    const block=[];G.userData.block=block;   /* 화석 놓을 때 피할 막히는 것들 [x,z,반지름] (키트 단위) */
+    for(let k=0;k<7;k++){const a=R()*6.28,d=rnd(9,13),cr=rnd(.8,1.4),ch=rnd(3,7),p=den.clone().add(V(Math.cos(a)*d,1.5,Math.sin(a)*d));add(B,new THREE.ConeGeometry(cr,ch,5),p,E(rnd(-.4,.4),0,rnd(-.4,.4)),null,'#d6cfe8',{grad:'#4a4268'});block.push([p.x,p.z,cr+ch*.4]);}
     flush(B,G);
     const mouth=new THREE.Mesh(new THREE.CircleGeometry(4.2,20),new THREE.MeshBasicMaterial({color:'#020104'}));mouth.scale.y=.75;mouth.position.copy(den).addScaledVector(toC,10.4).add(V(0,2.8,0));G.add(mouth);mouth.lookAt(G.position.clone().add(V(0,2.8,0))); G.remove(mouth);   /* 돔 입구(검은 굴)도 뺌 · 자리는 발자국 시작점으로만 씀 */
     const eyePairs=[];for(let k=0;k<3;k++){const pr=new THREE.Group();pr.position.copy(mouth.position).addScaledVector(toC,.1).addScaledVector(V(-toC.z,0,toC.x),rnd(-2.2,2.2)).add(V(0,rnd(-.8,1),0));pr.quaternion.copy(mouth.quaternion);
       [-.45,.45].forEach(o=>{const e=new THREE.Mesh(new THREE.SphereGeometry(.22,8,6),new THREE.MeshBasicMaterial({color:k?'#ff3a6a':'#ffe23a'}));e.position.x=o;pr.add(e);});eyePairs.push({pr,ph:R()*7});}
     anim.push(t=>{eyePairs.forEach(o=>{const c=(t+o.ph)%7;o.pr.visible=!(c<.15||(c>3&&c<3.12));});});
-    const B2=newB();
-    /* 발자국 · 할퀸 자국 세 줄 · 엉성한 뼈대는 뺌 (사용자 2026-11-08: 조잡하고 뜻이 없음) — 화석은 jdress.js에서 제대로 다시 만듦 */
-    // arches with hanging cocoons near the rim
-    const cocoons=[];for(let k=0;k<3;k++){const a=denA+2.1+k*1.15+rnd(-.2,.2),[cx,cz]=I.edge(a,.72),tg=V(-Math.sin(a),0,Math.cos(a)),c=V(cx,0,cz),p0=c.clone().addScaledVector(tg,-7),p1=c.clone().addScaledVector(tg,7);
-      const pts=[p0,p0.clone().lerp(p1,.25).add(V(0,9,0)),p0.clone().lerp(p1,.5).add(V(0,12,0)),p0.clone().lerp(p1,.75).add(V(0,9,0)),p1];addRaw(B2,tube(pts,.9,30),(f,y,cc)=>{cc.set('#2e2a4a');});
-      for(let j=0;j<3;j++){const tp=new THREE.CatmullRomCurve3(pts).getPoint(.3+j*.2),L=rnd(2,4);cocoons.push({p:tp.clone(),L});
-        add(B2,new THREE.CylinderGeometry(.05,.05,L,3),tp.clone().add(V(0,-L/2,0)),null,null,'#9a8ac0',{vary:0});}}
-    flush(B2,G);
-    const cmat=fresnelMat('#ff6ad0',1.7,.95),sil=new THREE.MeshBasicMaterial({color:'#2a0a24'});
-    cocoons.forEach((o,i)=>{const g=new THREE.Group();g.position.copy(o.p).add(V(0,-o.L-2.2,0));G.add(g);const m=new THREE.Mesh(new THREE.SphereGeometry(1.4,14,10),cmat);m.scale.y=1.7;g.add(m);
-      const s=new THREE.Mesh(new THREE.SphereGeometry(.7,8,6),sil);s.scale.y=1.8;g.add(s);anim.push(t=>{g.rotation.z=Math.sin(t*.8+i)*.08;const k=1+Math.sin(t*3+i*2)*.04;m.scale.set(k,1.7*k,k);});});
+    /* 발자국 · 할퀸 자국 세 줄 · 엉성한 뼈대 · 고치 매단 반원 아치는 뺌 (사용자 2026-11-08: 조잡하고 뜻이 없음) — 화석은 jdress.js에서 제대로 다시 만듦 */
     // cover rocks and broken coral stumps around the rim
-    for(let k=0;k<8;k++){const a=R()*6.28,[x,z]=I.edge(a,rnd(.68,.82)),s=rnd(1.8,3.2),B3=newB();add(B3,jitter(new THREE.IcosahedronGeometry(s,0),s*.3,s*.3,rint()),V(x,s*.4,z),null,V(1,.8,1),pick(STONE));flush(B3,G);}
+    for(let k=0;k<8;k++){const a=R()*6.28,[x,z]=I.edge(a,rnd(.68,.82)),s=rnd(1.8,3.2),B3=newB();add(B3,jitter(new THREE.IcosahedronGeometry(s,0),s*.3,s*.3,rint()),V(x,s*.4,z),null,V(1,.8,1),pick(STONE));flush(B3,G);block.push([x,z,s*1.3]);}
     spores(G,140,36,0,4,'#ff4ab0',.7,.5);spores(G,60,36,0,20,GLOWS.vio,.6,.8);}});
 
 // 9) 외계 알 둥지 (보물 아레나)
@@ -393,13 +386,13 @@ function pack(G) { G.traverse(o => { const g = o.geometry; if (!o.isMesh || !g |
   if (N && N.array instanceof Float32Array && N.itemSize === 3) { const a = new Int8Array(N.count * 4); for (let i = 0; i < N.count; i++) { a[i * 4] = Math.round(N.array[i * 3] * 127); a[i * 4 + 1] = Math.round(N.array[i * 3 + 1] * 127); a[i * 4 + 2] = Math.round(N.array[i * 3 + 2] * 127); }
     const ib = new THREE.InterleavedBuffer(a, 4); g.setAttribute('normal', new THREE.InterleavedBufferAttribute(ib, 3, 0, true)); } }); }
 const IDX = { root: 0, coral: 1, tentacle: 2, swamp: 3, flower: 4, jelly: 5, vine: 6, hunt: 7, egg: 8, floaters: 9 };
-function buildPiece(kind, seed, lod = 1) { LOD_T = .5 * lod; LOD_N = Math.round(30 * Math.max(.6, lod)); R = mulberry32(seed); anim = []; const G = new THREE.Group(); PIECES[kind].build(G);
+function buildPiece(kind, seed, lod = 1) { LOD_T = .5 * lod; LOD_N = Math.round(30 * Math.max(.6, lod)); R = mulberry32(seed); anim = []; ISL = null; const G = new THREE.Group(); PIECES[kind].build(G); G.userData.top = ISL;
   G.traverse(o => { if (o.isMesh && o.material && o.material.isMeshPhongMaterial) o.material = litMat(o.material); });
   return { G, anim: anim.slice(), size: PIECES[kind].size }; }
 /* 문을 놓을 작은 정글 땅 */
-function buildGateIsle(seed) { R = mulberry32(seed); anim = []; const G = new THREE.Group(), B = newB(), I = isle(B, 0, 0, 0, { r: 15, h: 2.5, depth: 13, layers: 3, amp: .1, min: .88, bites: 0, vein: GLOWS.cyan, top: '#241f34' });
+function buildGateIsle(seed) { R = mulberry32(seed); anim = []; ISL = null; const G = new THREE.Group(), B = newB(), I = isle(B, 0, 0, 0, { r: 15, h: 2.5, depth: 13, layers: 3, amp: .1, min: .88, bites: 0, vein: GLOWS.cyan, top: '#241f34' });
   for (let k = 0; k < 18; k++) { const a = R() * 6.28, [ex, ez] = I.edge(a, .9); add(B, new THREE.IcosahedronGeometry(rnd(.25, .5), 0), V(ex, .15, ez), null, null, pick([GLOWS.cyan, GLOWS.vio]), { to: 'glow', vary: 0 }); }
-  flush(B, G); G.traverse(o => { if (o.isMesh && o.material && o.material.isMeshPhongMaterial) o.material = litMat(o.material); }); return { G, anim: [], size: 16 }; }
+  flush(B, G); G.userData.top = ISL; G.traverse(o => { if (o.isMesh && o.material && o.material.isMeshPhongMaterial) o.material = litMat(o.material); }); return { G, anim: [], size: 16 }; }
 
 /* 작은 부유체를 하나씩 (사용자 2026-11-07: 무리로만 두지 말고 높이·깊이감을 위해 따로따로) — 키트 "작은 부유체 모음"의 일곱 가지를 원점에 하나씩 세움 */
 const SINGLES = [
@@ -420,7 +413,7 @@ const SINGLES = [
   (G, B) => { const P = isle(B, 0, 0, 0, { r: 4, h: 1.2, depth: 8, layers: 3, amp: rnd(.2, .32), min: .5, vein: GLOWS.cyan }); return () => { for (let k = 0; k < 6; k++) { const [a, b] = P.pt(0, .6), r = rnd(.8, 1.5);   /* 거품 알 무더기 */
       const m = new THREE.Mesh(new THREE.SphereGeometry(r, 16, 12), fresnelMat(pick([GLOWS.mag, GLOWS.cyan]), 2, 1)); m.position.set(a, r * .7, b); m.scale.y = 1.25; G.add(m);
       const core = new THREE.Mesh(new THREE.SphereGeometry(r * .3, 8, 6), new THREE.MeshBasicMaterial({ color: '#ffd6ff' })); core.position.copy(m.position); G.add(core); } }; } ];
-function buildSingle(kind, seed) { LOD_T = .3; LOD_N = 18; R = mulberry32(seed); anim = []; const G = new THREE.Group(), B = newB(), eyes = [], after = SINGLES[kind](G, B, eyes); flush(B, G); if (after) after();
+function buildSingle(kind, seed) { LOD_T = .3; LOD_N = 18; R = mulberry32(seed); anim = []; ISL = null; const G = new THREE.Group(), B = newB(), eyes = [], after = SINGLES[kind](G, B, eyes); G.userData.top = ISL; flush(B, G); if (after) after();
   if (eyes.length) anim.push(t => { eyes.forEach(o => { o.e.lookAt(CAM.position); o.e.rotateY(Math.sin(t * .8 + o.ph) * .35); o.e.scale.y = ((t + o.blink) % 5) < .12 ? .1 : 1; }); });
   G.traverse(o => { if (o.isMesh && o.material && o.material.isMeshPhongMaterial) o.material = litMat(o.material); }); return { G, anim: anim.slice(), size: 7 }; }
 
@@ -496,7 +489,7 @@ export function makeJungle(scene, { R0 = 136, R1 = 187, TOP = -3, UP = 20, DN = 
   const pieces = [], GATES = [], VINES = [], L = jungleLayout({ R0, R1, TOP, UP, DN, sect });
   const place = (built, x, y, z, s, yaw, sy = s) => { built.G.position.set(x, y, z); built.G.scale.set(s, sy, s); built.G.rotation.y = yaw; scene.add(built.G);
     built.G.traverse(o => { if (o.isPoints && o.material.size) o.material.size *= Math.max(s, sy); });   /* 포자 알갱이도 같은 비율로 */
-    pack(built.G); const p = { ...built, x, y, z, rad: built.size * Math.max(s, sy) * 1.3 }; p.o = cur; p.outline = built.outline || built.G.userData.outline; pieces.push(p); if (cur && (cur.t === 'hunt' || (cur.t === 'fill' && cur.kind === IDX.flower))) SOLID.push(p); return p; };
+    pack(built.G); const p = { ...built, x, y, z, rad: built.size * Math.max(s, sy) * 1.3 }; p.o = cur; p.outline = built.outline || built.G.userData.outline; p.block = built.block || built.G.userData.block; p.top = built.top || built.G.userData.top; pieces.push(p); if (cur && (cur.t === 'hunt' || (cur.t === 'fill' && cur.kind === IDX.flower))) SOLID.push(p); return p; };
   let cur = null; const SOLID = [];   /* 막는 정글: 사냥터 섬(돔·가시·뼈) · 거대 포식 꽃 (사용자 2026-11-07) */
   /* 낱개 조각이 초원 섬과 겹치면 뺌 (같은 높이대일 때만) */
   const band = l => l === 'all' ? 'all' : l === 'mid' ? 0 : l === 'upgap' ? 1 : l === 'gap' || l === 'rock' ? -1 : l === 'up' ? 2 : l === 'dn' ? -2 : 9;
@@ -504,7 +497,7 @@ export function makeJungle(scene, { R0 = 136, R1 = 187, TOP = -3, UP = 20, DN = 
     for (const q of L) { if (q === o || q.t === 'single' && L.indexOf(q) > L.indexOf(o)) continue; if (band(q.layer) !== band(o.layer) && q.layer !== 'all') continue; if (Math.hypot(q.x - o.x, q.z - o.z) < q.r + o.r + 1) return false; } return true; };
   /* 같은 모양 나눠 쓰기: 아래층 정글 섬과 작은 조각은 종류마다 몇 벌만 만들어 복사해 씀 (모양 데이터는 하나 · 크기·방향만 다르게) → 폰 메모리 절약 */
   const SHARE = new Map(), shared = (key, n, make) => { if (!SHARE.has(key)) SHARE.set(key, []); const arr = SHARE.get(key); if (arr.length < n) { const b = make(arr.length); arr.push(b); return b; }
-    const src = arr[Math.floor(Math.random() * arr.length)]; return { G: src.G.clone(), anim: [], size: src.size, outline: src.G.userData.outline }; };
+    const src = arr[Math.floor(Math.random() * arr.length)]; return { G: src.G.clone(), anim: [], size: src.size, outline: src.G.userData.outline, block: src.G.userData.block, top: src.G.userData.top }; };
   for (const o of L) { cur = o;
     if (o.t === 'hunt' && o.dungeon) { const upL = o.layer === 'up';   /* 위층 던전: 아래로 늘어진 몸통을 눌러 줌 (밑을 지날 때 카메라와 기체 사이를 막지 않게 · 사용자 2026-11-07) */
       place(shared(upL ? 'hu' : 'h', 3, v => { const b = buildPiece(IDX.hunt, o.seed + v * 11, 1); if (upL) squashPiece(b.G, -1.5, 6 / o.s); return b; }), o.x, o.y, o.z, o.s, o.yaw); }   /* 위·아래층 던전은 멀리서 보는 곳 → 세 벌 나눠 씀 */
@@ -521,8 +514,12 @@ export function makeJungle(scene, { R0 = 136, R1 = 187, TOP = -3, UP = 20, DN = 
   cur = null;
   /* 정글 꾸미기 (사용자 2026-11-08): 사냥터 섬(가운데층 · 위아래 던전)부터 — 땅 덮개 · 바닥 식물 · 가장자리 숲 · 화석(막힘) */
   const dress = makeDresser(scene, KL);
-  for (const p of pieces) if (p.o && p.o.t === 'hunt' && p.outline) { const n0 = dress.solids.length; dress.hunt({ x: p.x, y: p.y, z: p.z, yaw: p.o.yaw, extra: null }, p.outline, p.o.s, p.o.seed);
+  for (const p of pieces) if (p.o && p.o.t === 'hunt' && p.outline) { const n0 = dress.solids.length; dress.hunt({ x: p.x, y: p.y, z: p.z, yaw: p.o.yaw, extra: null }, p.outline, p.o.s, p.o.seed, { block: p.block });
     p.extra = dress.solids.slice(n0); for (const m of p.extra) SOLID.push({ G: m, y: p.y, rad: 20 }); }
+  /* 나머지 정글 섬 전부 꾸미기 (사용자 2026-11-08: 정글 섬 전체를 퀄리티 있게) — 섬 종류마다 다른 식물 · 가까운 섬끼리 덩굴 · 그 밑 안개 (빛의 길 근처는 비움) */
+  for (const p of pieces) { const o = p.o; if (!o || o.t === 'hunt' || !p.top) continue;
+    dress.isle({ x: p.x, y: p.y, z: p.z, yaw: o.yaw, s: o.s, sy: o.sy, kind: o.t === 'vine' ? 6 : o.kind, top: p.top, seed: o.seed, layer: o.layer, lite: !!o.lite || o.layer === 'dn', gate: o.t === 'gate', single: o.t === 'single' }); }
+  dress.link(L.filter(q => q.t === 'corr')); dress.finish();
   /* 막힘 칸: 사냥터 섬·포식 꽃의 단단한 몸이 기체 높이 단면을 지나는 곳 + 덩굴 기둥 줄기를 25cm 칸으로 찍음 · 빛 무리·포자·선은 뺌 */
   const CL = .25, N = Math.ceil(R1 * 2 / CL) + 2, grid = new Uint8Array(N * N), cellOf = v => Math.floor((v + R1 + 1) / CL), Y0 = .45, Y1 = .95;   /* 25cm 칸 · 기체 높이 단면 */
   { const a = new THREE.Vector3(), b = new THREE.Vector3(), c = new THREE.Vector3(), w = new THREE.Vector3();
