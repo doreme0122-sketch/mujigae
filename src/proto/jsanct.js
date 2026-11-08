@@ -63,6 +63,14 @@ function litOf(m) {   /* 원본 Phong/Standard 칠 → 같은 계산의 이 섬 
   const s = new THREE.ShaderMaterial({ uniforms: u, vertexShader: LIT_V, fragmentShader: LIT_F, side: m.side, vertexColors: !!m.vertexColors, defines: { ...(map ? { S_MAP: 1 } : {}), ...(emap ? { S_EMAP: 1 } : {}) } });
   s.userData.src = m; LIT.add(s); LITM.push(s); return s; }
 
+
+/* 빛기둥·빛 폭포 무늬: 원본은 화면 칸마다 잡음을 네 겹씩 계산(폰에서 가장 무거운 곳) → 같은 성격의 잡음을 미리 그림 한 장으로 구워 흘려 씀 (2026-11-08 최적화)
+   이어 붙여도 이음매가 없게(바둑판처럼 반복되는 격자 잡음) · 겹 수·세기는 원본과 같음 */
+function tileNoise(W, H, PX, PY, oct = 4) { const d = new Uint8Array(W * H * 4), hh = (x, y, s) => { const n = Math.sin((((x % s[0]) + s[0]) % s[0]) * 127.1 + (((y % s[1]) + s[1]) % s[1]) * 311.7 + s[2] * 74.7) * 43758.5453; return n - Math.floor(n); };
+  const vn = (x, y, s) => { const ix = Math.floor(x), iy = Math.floor(y), fx = x - ix, fy = y - iy, u = fx * fx * (3 - 2 * fx), v = fy * fy * (3 - 2 * fy); const a = hh(ix, iy, s), b = hh(ix + 1, iy, s), c = hh(ix, iy + 1, s), e = hh(ix + 1, iy + 1, s); return a + (b - a) * u + (c - a) * v + (a - b - c + e) * u * v; };
+  for (let j = 0; j < H; j++) for (let i = 0; i < W; i++) { let v = 0, a = .5; for (let o = 0; o < oct; o++) { const f = 1 << o; v += a * vn(i / W * PX * f, j / H * PY * f, [PX * f, PY * f, o]); a *= .5; } const b = Math.round(Math.min(1, v) * 255), k = (j * W + i) * 4; d[k] = d[k + 1] = d[k + 2] = b; d[k + 3] = 255; }
+  const t = new THREE.DataTexture(d, W, H); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.magFilter = THREE.LinearFilter; t.minFilter = THREE.LinearMipmapLinearFilter; t.generateMipmaps = true; t.needsUpdate = true; return t; }
+let NS = null, NF = null; const noiseTex = () => { if (!NS) { NS = tileNoise(128, 512, 10, 8); NF = tileNoise(256, 256, 16, 16); } return [NS, NF]; };
 let TPL = null;
 function template() { if (TPL) return TPL;
   const CMp = THREE.ColorManagement.enabled; THREE.ColorManagement.enabled = false;   /* 원본(three r128)과 같은 색 다루기: 색 글자를 그대로 씀 */
@@ -238,12 +246,12 @@ const NOISE3=`float h(float n){return fract(sin(n)*43758.5453);}
  float n3(vec3 p){vec3 i=floor(p),f=fract(p);f=f*f*(3.-2.*f);float n=dot(i,vec3(1.,57.,113.));return mix(mix(mix(h(n),h(n+1.),f.x),mix(h(n+57.),h(n+58.),f.x),f.y),mix(mix(h(n+113.),h(n+114.),f.x),mix(h(n+170.),h(n+171.),f.x),f.y),f.z);}
  float fb(vec3 p){float v=0.,a=.5;for(int i=0;i<4;i++){v+=a*n3(p);p*=2.05;a*=.5;}return v;}`;
 const SHAFT_V='varying vec2 vUv;varying vec3 vN;varying vec3 vV;void main(){vUv=uv;vec4 mv=modelViewMatrix*vec4(position,1.);vN=normalize(normalMatrix*normal);vV=normalize(-mv.xyz);gl_Position=projectionMatrix*mv;}';
-const SHAFT_F=`uniform float time;uniform vec3 c1;uniform vec3 c2;uniform float op;uniform float sp;uniform float tl;varying vec2 vUv;varying vec3 vN;varying vec3 vV;${NOISE3}
+const SHAFT_F=`uniform sampler2D nS;uniform float time;uniform vec3 c1;uniform vec3 c2;uniform float op;uniform float sp;uniform float tl;varying vec2 vUv;varying vec3 vN;varying vec3 vV;${NOISE3}
  void main(){float f=abs(dot(normalize(vN),normalize(vV)));float core=pow(f,2.2);
-  float a0=vUv.x*6.2832;vec3 q=vec3(cos(a0)*1.6,sin(a0)*1.6,vUv.y*tl-time*sp);float n=fb(q);float st=smoothstep(.42,.82,n);
+  float n=texture2D(nS,vec2(vUv.x,(vUv.y*tl-time*sp)/8.)).r;float st=smoothstep(.42,.82,n);
   float fade=smoothstep(0.,.06,vUv.y)*pow(1.-vUv.y,1.4);
   vec3 col=mix(c1,c2,st);float a=core*fade*(.22+st*.9)*op;gl_FragColor=vec4(col*a,a);}`;
-function shaft(rb,rt,H,y,c1,c2,op,sp,tl){const m=new THREE.ShaderMaterial({uniforms:{time:{value:0},c1:{value:new THREE.Color(c1)},c2:{value:new THREE.Color(c2)},op:{value:op},sp:{value:sp},tl:{value:tl}},
+function shaft(rb,rt,H,y,c1,c2,op,sp,tl){const m=new THREE.ShaderMaterial({uniforms:{nS:{value:noiseTex()[0]},time:{value:0},c1:{value:new THREE.Color(c1)},c2:{value:new THREE.Color(c2)},op:{value:op},sp:{value:sp},tl:{value:tl}},
   vertexShader:SHAFT_V,fragmentShader:SHAFT_F,transparent:true,depthWrite:false,blending:THREE.AdditiveBlending,side:THREE.DoubleSide,fog:false});
   const me=new THREE.Mesh(new THREE.CylinderGeometry(rt,rb,H,48,24,true),m);me.position.y=y+H/2;root.add(me);anim.push(t=>{m.uniforms.time.value=t;});return me;}
 shaft(1.4,2.2,150,EGG_Y,'#bfe8ff','#fff1c8',1.1,1.2,9);
@@ -268,15 +276,15 @@ for(let k=0;k<26;k++){const a=R()*Math.PI*2,d=rnd(14,44),s=glow(k%3?'#3a4a8a':'#
   anim.push(t=>{frag.rotation.y=t*.015;});}
 
 // ---------------- light cascades pouring off the island edge (curved, layered, with falling sparks) ----------------
-const FALL_F=`uniform float time;uniform float op;uniform vec3 c1;uniform vec3 c2;varying vec2 vUv;${NOISE3}
- void main(){float e=pow(sin(vUv.x*3.14159),1.6);vec3 q=vec3(vUv.x*5.,vUv.y*10.+time*1.3,0.);float s=fb(q),s2=fb(q*2.3+3.);
+const FALL_F=`uniform sampler2D nF;uniform float time;uniform float op;uniform vec3 c1;uniform vec3 c2;varying vec2 vUv;${NOISE3}
+ void main(){float e=pow(sin(vUv.x*3.14159),1.6);vec3 q=vec3(vUv.x*5.,vUv.y*10.+time*1.3,0.);float s=texture2D(nF,q.xy/16.).r,s2=texture2D(nF,(q.xy*2.3+3.)/16.).r;
   float st=smoothstep(.42,.8,s)*.8+smoothstep(.55,.85,s2)*.5;float fade=smoothstep(0.,.55,vUv.y)*smoothstep(1.,.96,vUv.y);
   vec3 col=mix(c1,c2,clamp(st,0.,1.));float a=e*fade*(.12+st*.6)*op;gl_FragColor=vec4(col*a,a);}`;
 function fallSheet(W,L,curl,op,c1,c2){const nu=10,nv=60,pos=[],uv=[],idx=[];
   for(let j=0;j<=nv;j++){const v=j/nv;for(let i=0;i<=nu;i++){const u=i/nu,spread=1+v*1.4;pos.push((u-.5)*W*spread,-L*Math.pow(v,1.15),curl*Math.sqrt(v)+1.6);uv.push(u,1-v);}}
   for(let j=0;j<nv;j++)for(let i=0;i<nu;i++){const a=j*(nu+1)+i,b=a+1,c=a+nu+1,d=c+1;idx.push(a,c,b,b,c,d);}
   const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(pos,3));g.setAttribute('uv',new THREE.Float32BufferAttribute(uv,2));g.setIndex(idx);
-  const m=new THREE.ShaderMaterial({uniforms:{time:{value:0},op:{value:op},c1:{value:new THREE.Color(c1)},c2:{value:new THREE.Color(c2)}},vertexShader:'varying vec2 vUv;void main(){vUv=uv;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);}',fragmentShader:FALL_F,transparent:true,depthWrite:false,blending:THREE.AdditiveBlending,side:THREE.DoubleSide});
+  const m=new THREE.ShaderMaterial({uniforms:{nF:{value:noiseTex()[1]},time:{value:0},op:{value:op},c1:{value:new THREE.Color(c1)},c2:{value:new THREE.Color(c2)}},vertexShader:'varying vec2 vUv;void main(){vUv=uv;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);}',fragmentShader:FALL_F,transparent:true,depthWrite:false,blending:THREE.AdditiveBlending,side:THREE.DoubleSide});
   anim.push(t=>{m.uniforms.time.value=t;});return new THREE.Mesh(g,m);}
 for(let k=0;k<4;k++){const a=k/4*Math.PI*2+.35,r=outline(a)+.4,g=new THREE.Group();g.position.set(Math.cos(a)*r,-.2,Math.sin(a)*r);g.rotation.y=Math.atan2(Math.cos(a),Math.sin(a));root.add(g);
   g.add(fallSheet(5,72,5,1.2,'#5aa8ff','#fff0c8'));const wide=fallSheet(11,64,7,.45,'#2a5aaf','#c8a0ff');wide.position.z=.4;g.add(wide);
@@ -359,7 +367,7 @@ function flushFoliage(){const fA=frondTex('#0f3d40','#2c8a90','#7affe0','#ff8ae8
   const spec={frondA:[frondGeo(),leafMat(fA)],frondB:[frondGeo(),leafMat(fB)],fern:[frondGeo(),leafMat(fern)],broad:[broadGeo(),leafMat(br)],broadS:[broadGeo(),leafMat(br)],blade:[bladeGeo(),leafMat(bl)],
     pod:[podGeo(),new THREE.MeshBasicMaterial({color:'#7affd0'})],pod2:[podGeo(),new THREE.MeshBasicMaterial({color:'#ffa8ee'})]};
   Object.keys(FOL).forEach(k=>{const L=FOL[k];if(!L.length)return;const[g,m]=spec[k];const im=new THREE.InstancedMesh(g,m,L.length);
-    L.forEach((o,i)=>{im.setMatrixAt(i,o.m);im.setColorAt(i,o.c||new THREE.Color(1,1,1));});im.frustumCulled=false;im.instanceMatrix.needsUpdate=true;if(im.instanceColor)im.instanceColor.needsUpdate=true;root.add(im);});}
+    L.forEach((o,i)=>{im.setMatrixAt(i,o.m);im.setColorAt(i,o.c||new THREE.Color(1,1,1));});im.frustumCulled=false;im.userData.kind=k;im.instanceMatrix.needsUpdate=true;if(im.instanceColor)im.instanceColor.needsUpdate=true;root.add(im);});}
 const BARK=barkTex();
 const barkTexM=new THREE.MeshPhongMaterial({map:BARK.map,emissiveMap:BARK.em,emissive:new THREE.Color(1,1,1),emissiveIntensity:.7,specular:C('#2a2a3a'),shininess:14});
 function mergeUV(list){let n=0;const arr=list.map(g=>{const q=g.index?g.toNonIndexed():g;n+=q.attributes.position.count;return q;});const P=new Float32Array(n*3),N=new Float32Array(n*3),U=new Float32Array(n*2);let o=0,u=0;
@@ -497,5 +505,8 @@ export function buildSanctum({ clearA = null } = {}) {
   root.traverse(o => { if (o.isMesh && LIT.has(o.material)) o.onBeforeRender = (r, s, c, g, m) => { egg.getWorldPosition(ep); if (!m.uniforms.uEP.value.equals(ep)) { m.uniforms.uEP.value.copy(ep); m.uniformsNeedUpdate = true; } else m.uniformsNeedUpdate = true; }; });   /* 알 빛 자리는 성소마다 다름 */
   const anim = [(t, dt) => { T.tick(t, dt); for (const [a, b] of pairs) { b.position.copy(a.position); b.quaternion.copy(a.quaternion); b.scale.copy(a.scale); } }];
   const outline = a => T.outline(a + psi) * K;
+  /* 멀리서(75m 밖) 안 보이는 잔것은 그리지 않음: 풀잎 · 작은 고사리 · 덩굴 잎 · 꼬투리 · 작은 빛 · 빛 알갱이 · 낮은 안개 (나무 지붕·돌·금·빛기둥·폭포는 그대로) */
+  const small = []; root.traverse(o => { if ((o.isInstancedMesh && ['blade', 'fern', 'broadS', 'pod', 'pod2'].includes(o.userData.kind)) || o.isSprite || o.isPoints) small.push(o); }); let farS = false;
+  G.userData.lod = d => { const f = d > 75; if (f === farS) return; farS = f; for (const o of small) o.visible = !f; };
   G.userData.outline = outline; G.userData.top = { fn: a => T.outline(a + psi) * K, y: 0, r: 140 * K };
   return { G, anim, size: 26, outline, block: [], hole: 0 }; }

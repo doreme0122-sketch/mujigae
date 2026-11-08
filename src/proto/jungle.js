@@ -8,9 +8,10 @@
      알 둥지는 이번엔 안 씀 · 포식 꽃·촉수 나무·해파리는 장식(기체를 막거나 잡지 않음)
    · 초원 → 정글은 점점: 경계 둘레에 작은 부유체가 섞이고, 기체가 안쪽으로 들어갈수록 하늘이 어두운 보랏빛으로 (skymap에서) */
 import * as THREE from 'three';
-import { spiralPath, SWEEP } from './path.js?v=11081333';
-import { buildSanctum } from './jsanct.js?v=11081333';
-import { makeDresser } from './jdress.js?v=11081333';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+import { spiralPath, SWEEP } from './path.js?v=11081617';
+import { buildSanctum } from './jsanct.js?v=11081617';
+import { makeDresser } from './jdress.js?v=11081617';
 let CAM = { position: new THREE.Vector3() };
 let LOD_T = .5, LOD_N = 30;   /* 섬 둘레 · 덩굴 마디 수 (키트 원래 44 · 1배) */
 /* ===================== 우주 정글 지형 키트 (사용자 제작 · 생성 코드 그대로) ===================== */
@@ -386,14 +387,44 @@ function pack(G) { G.traverse(o => { const g = o.geometry; if (!o.isMesh || !g |
   if (C && C.array instanceof Float32Array) { const a = new Uint8Array(C.count * C.itemSize); for (let i = 0; i < a.length; i++) a[i] = Math.max(0, Math.min(255, Math.round(C.array[i] * 255))); g.setAttribute('color', new THREE.BufferAttribute(a, C.itemSize, true)); }
   if (N && N.array instanceof Float32Array && N.itemSize === 3) { const a = new Int8Array(N.count * 4); for (let i = 0; i < N.count; i++) { a[i * 4] = Math.round(N.array[i * 3] * 127); a[i * 4 + 1] = Math.round(N.array[i * 3 + 1] * 127); a[i * 4 + 2] = Math.round(N.array[i * 3 + 2] * 127); }
     const ib = new THREE.InterleavedBuffer(a, 4); g.setAttribute('normal', new THREE.InterleavedBufferAttribute(ib, 3, 0, true)); } }); }
+
+/* 조각 안 부품 합치기 (2026-11-08 최적화): 조각 하나가 부품 약 20개로 따로 그려져 정글만 한 장면 1000번 넘게 그렸음.
+   움직이지 않는 부품을 칠마다 하나로 합침 → 모양·칠 그대로, 그리는 횟수만 줄어듦. 복사본(shared)은 원본 모양을 나눠 쓰므로 메모리도 그대로.
+   움직이는 것(촉수·해파리·눈 등)은 원본 움직임을 두 번 돌려 보아 자리·방향·크기·보임이 바뀌는 것과 그 아래는 그대로 둠 */
+
+const CANON = new Map(), uid = new WeakMap(); let uidN = 0; const idOf = o => { if (!uid.has(o)) uid.set(o, ++uidN); return uid.get(o); };
+const valSig = v => v == null ? 'n' : typeof v === 'number' || typeof v === 'boolean' ? String(+v.toFixed ? +v.toFixed(5) : v) : v.isColor ? 'c' + v.getHexString() : (v.isVector2 || v.isVector3 || v.isVector4) ? 'v' + v.toArray().map(x => +x.toFixed(5)).join(',') : 'o' + idOf(v);
+function canonMat(m) {   /* 같은 종류 · 같은 값의 칠이면 같은 칠로 */
+  let k; if (m.isMeshBasicMaterial) k = ['B', m.color.getHexString(), m.transparent, +m.opacity.toFixed(4), m.blending, m.vertexColors, m.depthWrite, m.depthTest, m.side, m.map ? idOf(m.map) : 0, m.fog, m.toneMapped].join('|');
+  else if (m.isShaderMaterial) { k = ['S', m.vertexShader, m.fragmentShader, m.transparent, m.blending, m.vertexColors, m.depthWrite, m.depthTest, m.side, JSON.stringify(m.defines || {})].join('|');
+    for (const u of Object.keys(m.uniforms).sort()) k += '|' + u + '=' + valSig(m.uniforms[u].value) + '#' + (m.uniforms[u].value && typeof m.uniforms[u].value === 'object' && !m.uniforms[u].value.isColor && !m.uniforms[u].value.isVector3 && !m.uniforms[u].value.isVector2 && !m.uniforms[u].value.isVector4 ? '' : ''); }
+  else return m;
+  if (!CANON.has(k)) CANON.set(k, m); return CANON.get(k); }
+function mergeStatic(G, anim) {
+  const all = []; G.traverse(o => all.push(o)); const snap = () => all.map(o => o.position.toArray().concat(o.quaternion.toArray(), o.scale.toArray(), [o.visible ? 1 : 0]).join(','));
+  const s0 = snap(); try { anim.forEach(f => f(1.3, .016)); } catch (e) {} const s1 = snap(); try { anim.forEach(f => f(2.9, .016)); } catch (e) {} const s2 = snap();
+  const moving = new Set(); all.forEach((o, i) => { if (s0[i] !== s1[i] || s1[i] !== s2[i]) o.traverse(c => moving.add(c)); });
+  if (!anim.length) G.traverse(o => { if (o.isMesh && !Array.isArray(o.material)) o.material = canonMat(o.material); });   /* 안 움직이는 복사본: 값이 똑같은 칠은 하나로 (합칠 수 있게) */
+  G.updateMatrixWorld(true); const inv = new THREE.Matrix4().copy(G.matrixWorld).invert(), groups = new Map();
+  G.traverse(o => { if (!o.isMesh || o.isInstancedMesh || o.isSkinnedMesh || Array.isArray(o.material) || moving.has(o) || o.morphTargetInfluences || o.onBeforeRender !== THREE.Object3D.prototype.onBeforeRender) return;
+    const g = o.geometry, key = o.material.uuid + '|' + Object.keys(g.attributes).sort().map(k => k + g.attributes[k].itemSize + g.attributes[k].array.constructor.name + (g.attributes[k].normalized ? 'n' : '')).join(',') + (g.index ? 'i' : '') + '|' + o.renderOrder + (o.frustumCulled ? '' : 'f') + (o.layers.mask);
+    let p = o.parent, hid = !o.visible; while (p && p !== G) { if (!p.visible) hid = true; p = p.parent; } if (hid) return;
+    if (!groups.has(key)) groups.set(key, []); groups.get(key).push(o); });
+  G.userData.moving = [...moving].filter(o => o.isMesh && !o.isInstancedMesh);
+  for (const list of groups.values()) { if (list.length < 2) continue;
+    const parts = list.map(o => { const g = o.geometry.clone(); for (const k of Object.keys(g.attributes)) if (g.attributes[k].isInterleavedBufferAttribute) g.setAttribute(k, g.attributes[k].clone()); g.applyMatrix4(new THREE.Matrix4().multiplyMatrices(inv, o.matrixWorld)); return g; });
+    const mg = mergeGeometries(parts, false); parts.forEach(g => g.dispose()); if (!mg) continue;
+    const me = new THREE.Mesh(mg, list[0].material); me.renderOrder = list[0].renderOrder; me.frustumCulled = list[0].frustumCulled; me.userData.merged = true; G.add(me);
+    list.forEach(o => o.parent.remove(o)); }
+  return G; }
 const IDX = { root: 0, coral: 1, tentacle: 2, swamp: 3, flower: 4, jelly: 5, vine: 6, hunt: 7, egg: 8, floaters: 9 };
 function buildPiece(kind, seed, lod = 1) { LOD_T = .5 * lod; LOD_N = Math.round(30 * Math.max(.6, lod)); R = mulberry32(seed); anim = []; ISL = null; const G = new THREE.Group(); PIECES[kind].build(G); G.userData.top = ISL;
   G.traverse(o => { if (o.isMesh && o.material && o.material.isMeshPhongMaterial) o.material = litMat(o.material); });
-  return { G, anim: anim.slice(), size: PIECES[kind].size }; }
+  const an = anim.slice(); mergeStatic(G, an); return { G, anim: an, size: PIECES[kind].size }; }
 /* 문을 놓을 작은 정글 땅 */
 function buildGateIsle(seed) { R = mulberry32(seed); anim = []; ISL = null; const G = new THREE.Group(), B = newB(), I = isle(B, 0, 0, 0, { r: 15, h: 2.5, depth: 13, layers: 3, amp: .1, min: .88, bites: 0, vein: GLOWS.cyan, top: '#241f34' });
   for (let k = 0; k < 18; k++) { const a = R() * 6.28, [ex, ez] = I.edge(a, .9); add(B, new THREE.IcosahedronGeometry(rnd(.25, .5), 0), V(ex, .15, ez), null, null, pick([GLOWS.cyan, GLOWS.vio]), { to: 'glow', vary: 0 }); }
-  flush(B, G); G.userData.top = ISL; G.traverse(o => { if (o.isMesh && o.material && o.material.isMeshPhongMaterial) o.material = litMat(o.material); }); return { G, anim: [], size: 16 }; }
+  flush(B, G); G.userData.top = ISL; G.traverse(o => { if (o.isMesh && o.material && o.material.isMeshPhongMaterial) o.material = litMat(o.material); }); mergeStatic(G, []); return { G, anim: [], size: 16 }; }
 
 /* 작은 부유체를 하나씩 (사용자 2026-11-07: 무리로만 두지 말고 높이·깊이감을 위해 따로따로) — 키트 "작은 부유체 모음"의 일곱 가지를 원점에 하나씩 세움 */
 const SINGLES = [
@@ -416,7 +447,7 @@ const SINGLES = [
       const core = new THREE.Mesh(new THREE.SphereGeometry(r * .3, 8, 6), new THREE.MeshBasicMaterial({ color: '#ffd6ff' })); core.position.copy(m.position); G.add(core); } }; } ];
 function buildSingle(kind, seed) { LOD_T = .3; LOD_N = 18; R = mulberry32(seed); anim = []; ISL = null; const G = new THREE.Group(), B = newB(), eyes = [], after = SINGLES[kind](G, B, eyes); G.userData.top = ISL; flush(B, G); if (after) after();
   if (eyes.length) anim.push(t => { eyes.forEach(o => { o.e.lookAt(CAM.position); o.e.rotateY(Math.sin(t * .8 + o.ph) * .35); o.e.scale.y = ((t + o.blink) % 5) < .12 ? .1 : 1; }); });
-  G.traverse(o => { if (o.isMesh && o.material && o.material.isMeshPhongMaterial) o.material = litMat(o.material); }); return { G, anim: anim.slice(), size: 7 }; }
+  G.traverse(o => { if (o.isMesh && o.material && o.material.isMeshPhongMaterial) o.material = litMat(o.material); }); const an = anim.slice(); mergeStatic(G, an); return { G, anim: an, size: 7 }; }
 
 /* 정글 배치 계획 (먼저 계산해 초원 쪽에 넘겨서, 경계를 넘나드는 작은 섬들이 서로 겹치지 않게) */
 export function jungleLayout({ R0 = 136, R1 = 187, TOP = -3, UP = 20, DN = -30, sect = 10 } = {}) {
@@ -501,14 +532,15 @@ export function makeJungle(scene, { R0 = 136, R1 = 187, TOP = -3, UP = 20, DN = 
     for (const q of L) { if (q === o || q.t === 'single' && L.indexOf(q) > L.indexOf(o)) continue; if (band(q.layer) !== band(o.layer) && q.layer !== 'all') continue; if (Math.hypot(q.x - o.x, q.z - o.z) < q.r + o.r + 1) return false; } return true; };
   /* 같은 모양 나눠 쓰기: 아래층 정글 섬과 작은 조각은 종류마다 몇 벌만 만들어 복사해 씀 (모양 데이터는 하나 · 크기·방향만 다르게) → 폰 메모리 절약 */
   const SHARE = new Map(), shared = (key, n, make) => { if (!SHARE.has(key)) SHARE.set(key, []); const arr = SHARE.get(key); if (arr.length < n) { const b = make(arr.length); arr.push(b); return b; }
-    const src = arr[Math.floor(Math.random() * arr.length)]; return { G: src.G.clone(), anim: [], size: src.size, outline: src.G.userData.outline, block: src.G.userData.block, top: src.G.userData.top }; };
+    const src = arr[Math.floor(Math.random() * arr.length)]; if (!src.frozen) src.frozen = mergeStatic(src.G.clone(), []);   /* 복사본은 움직이지 않으므로 움직이던 부품까지 칠마다 합친 판을 한 번 만들어 나눠 씀 */
+    return { G: src.frozen.clone(), anim: [], size: src.size, outline: src.G.userData.outline, block: src.G.userData.block, top: src.G.userData.top }; };
   for (const o of L) { cur = o;
     if (o.t === 'hunt' && o.dungeon) { const upL = o.layer === 'up';   /* 위층 던전: 아래로 늘어진 몸통을 눌러 줌 (밑을 지날 때 카메라와 기체 사이를 막지 않게 · 사용자 2026-11-07) */
       place(shared(upL ? 'hu' : 'h', 3, v => { const b = buildPiece(IDX.hunt, o.seed + v * 11, 1); if (upL) squashPiece(b.G, -1.5, 6 / o.s); return b; }), o.x, o.y, o.z, o.s, o.yaw); }   /* 위·아래층 던전은 멀리서 보는 곳 → 세 벌 나눠 씀 */
     else if (o.t === 'hunt') place(buildPiece(IDX.hunt, o.seed), o.x, o.y, o.z, o.s, o.yaw);
     else if (o.t === 'sanct') place(buildSanctum({ seed: o.seed, KL, clearA: o.clearA }), o.x, o.y, o.z, 1, o.yaw);
     else if (o.t === 'gate') { place(buildGateIsle(o.seed), o.x, o.y, o.z, o.s, o.yaw); GATES.push({ x: o.x, z: o.z, ...o.gate, jungle: true }); }
-    else if (o.t === 'fill' && o.lite) { const b = shared('d' + o.kind, 2, v => { const b = buildPiece(o.kind, o.seed + v * 7, .55); const rm = []; b.G.traverse(c => { if (c.isPoints || c.isSprite || c.isLine) rm.push(c); }); rm.forEach(c => c.parent.remove(c)); b.anim = []; return b; }); place(b, o.x, o.y, o.z, o.s, o.yaw); }
+    else if (o.t === 'fill' && o.lite) { const b = shared('d' + o.kind, 2, v => { const b = buildPiece(o.kind, o.seed + v * 7, .55); const rm = []; b.G.traverse(c => { if (c.isPoints || c.isSprite || c.isLine) rm.push(c); }); rm.forEach(c => c.parent.remove(c)); b.anim = []; mergeStatic(b.G, []); return b; }); place(b, o.x, o.y, o.z, o.s, o.yaw); }   /* 아래층 먼 섬: 움직임 없음 → 모두 칠마다 합침 */
     else if (o.t === 'fill' && o.share) place(shared('m' + o.kind, 2, v => buildPiece(o.kind, o.seed + v * 13, .6)), o.x, o.y, o.z, o.s, o.yaw);
     else if (o.t === 'fill') { const b = buildPiece(o.kind, o.seed, Math.min(1, o.s / .36)); if (o.lite) { const rm = []; b.G.traverse(c => { if (c.isPoints || c.isSprite || c.isLine) rm.push(c); }); rm.forEach(c => c.parent.remove(c)); b.anim = []; } place(b, o.x, o.y, o.z, o.s, o.yaw); }
     else if (o.t === 'vine') { place(buildPiece(IDX.vine, o.seed), o.x, o.y, o.z, o.s, o.yaw, o.sy);
@@ -541,9 +573,20 @@ export function makeJungle(scene, { R0 = 136, R1 = 187, TOP = -3, UP = 20, DN = 
   for (const v of VINES) { const r = v[2]; for (let z = v[1] - r; z <= v[1] + r; z += CL) for (let x = v[0] - r; x <= v[0] + r; x += CL) if ((x - v[0]) ** 2 + (z - v[1]) ** 2 < r * r) { const gx = cellOf(x), gz = cellOf(z); if (gx >= 0 && gz >= 0 && gx < N && gz < N) grid[gz * N + gx] = 1; } }   /* 덩굴 줄기도 칸 지도에 → 한 번에 찾음 */
   const blocked = (x, z) => { const gx = cellOf(x), gz = cellOf(z); return gx >= 0 && gz >= 0 && gx < N && gz < N && grid[gz * N + gx] === 1; };   /* 층을 뚫는 덩굴 기둥 + 사냥터 섬·포식 꽃 */
   const sph = new THREE.Sphere(), fr = new THREE.Frustum(), pv = new THREE.Matrix4();
+  /* 멀리서는 움직임이 안 보임 → 움직이는 부품을 칠마다 합친 '멈춘 판'을 미리 만들어 두고 65m 밖에선 그것만 그림 (2026-11-08 최적화)
+     움직이는 부품만 따로 복사(이미 합친 부품은 나눠 씀) · 가까이 오면 원래 움직이는 부품으로 돌아옴 */
+  for (const p of pieces) { const mv = p.G.userData.moving; if (!p.anim || !p.anim.length || !mv || mv.length < 3) continue;
+    p.G.updateMatrixWorld(true); const inv = new THREE.Matrix4().copy(p.G.matrixWorld).invert(), groups = new Map();
+    for (const o of mv) { if (!o.parent) continue; let hid = !o.visible, q = o.parent; while (q && q !== p.G) { if (!q.visible) hid = true; q = q.parent; } if (hid) continue; const m = canonMat(o.material), g = o.geometry, key = m.uuid + '|' + Object.keys(g.attributes).sort().join(',') + (g.index ? 'i' : '') + o.renderOrder; if (!groups.has(key)) groups.set(key, [m, []]); groups.get(key)[1].push(o); }
+    const fz = new THREE.Group(); fz.visible = false;
+    for (const [m, list] of groups.values()) { const parts = list.map(o => { const g = o.geometry.clone(); for (const k of Object.keys(g.attributes)) if (g.attributes[k].isInterleavedBufferAttribute) g.setAttribute(k, g.attributes[k].clone()); g.applyMatrix4(new THREE.Matrix4().multiplyMatrices(inv, o.matrixWorld)); return g; });
+      const mg = parts.length > 1 ? mergeGeometries(parts, false) : parts[0]; if (!mg) continue; const me = new THREE.Mesh(mg, m); me.renderOrder = list[0].renderOrder; fz.add(me); }
+    pack(fz); p.G.add(fz); p.frozen = fz; p.mov = mv; p.fz = false; }
   const update = (t, dt, camera) => { CAM = camera; T.value = t; dress.update(t, camera.position); pv.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse); fr.setFromProjectionMatrix(pv);
     for (const p of pieces) { const d = Math.hypot(p.x - camera.position.x, p.z - camera.position.z); sph.center.set(p.x, p.y, p.z); sph.radius = p.rad;
-      const vis = d < 170 && fr.intersectsSphere(sph); p.G.visible = vis; if (vis && d < 95) for (const f of p.anim) f(t, dt); } };   /* 먼 것은 움직임을 멈춤 */
+      const vis = d < 170 && fr.intersectsSphere(sph); p.G.visible = vis; if (!vis) continue; const d3 = Math.hypot(d, p.y - camera.position.y), near = d3 < 65; if (p.G.userData.lod) p.G.userData.lod(d3);   /* 높이 차이도 (위층에서 내려다보면 먼 것) */
+      if (p.frozen && p.fz === near) { p.fz = !near; for (const o of p.mov) o.visible = near; p.frozen.visible = !near; }   /* 65m 밖: 멈춘 판 */
+      if (near || (!p.frozen && d < 95)) for (const f of p.anim) f(t, dt); } };   /* 먼 것은 움직임을 멈춤 */
   const setLight = k => { KL.uLift.value = k; };
   return { update, blocked, GATES, pieces, setLight };
 }

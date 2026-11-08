@@ -48,7 +48,7 @@ input[type=range]{flex:1;min-width:0;accent-color:#b9ff4a;height:18px;margin:0}
 </style>
 <script>
 window.__ver = fetch('ver.json?t=' + Date.now(), { cache: 'no-store' }).then(r => r.json()).then(j => {
-  const f = location.pathname.split('/').pop() || 'index.html', want = j[f], mine = window.__mine = '11081333';
+  const f = location.pathname.split('/').pop() || 'index.html', want = j[f], mine = window.__mine = '11081617';
   if (want && +want > +mine) { location.replace(f + '?v=' + want + '&r=' + Date.now() + location.hash); return new Promise(() => {}); } }).catch(() => {});
 </script>
 <script type="importmap">{"imports":{"three":"./vendor/three.module.js","three/addons/":"./vendor/addons/"}}</script>
@@ -73,7 +73,7 @@ window.__ver = fetch('ver.json?t=' + Date.now(), { cache: 'no-store' }).then(r =
 <div id="rot">기기를 가로로 돌려 주세요</div>
 <script type="module">
 await window.__ver;
-const { start } = await import('./src/proto/skypath.js?v=11081333');
+const { start } = await import('./src/proto/skypath.js?v=11081617');
 const bar = document.querySelector('#load i');
 document.querySelector('#tog').onclick = () => { const v = document.querySelector('#view'); v.classList.toggle('shut'); document.querySelector('#tog').textContent = v.classList.contains('shut') ? '설정 펴기 ▾' : '설정 접기 ▴'; };
 start(document.querySelector('#cv'), p => { bar.style.transform = `scaleX(${p})`; })

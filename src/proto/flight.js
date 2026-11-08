@@ -10,9 +10,10 @@
    무게: 기체 한 대 + 불꽃 띠 몇 장 + 꼬리 띠 하나 + 불티 점 묶음 하나 + 그림자 판 하나 */
 import * as THREE from 'three';
 import { buildShip, engineSpots } from '../core/ships/build.js';
-import { flameMesh } from './sortie.js?v=11081333';
-import { MAP } from './mapfloor.js?v=11081333';
-import { applyShipHeat, heatVis } from './shipheat.js?v=11081333';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+import { flameMesh } from './sortie.js?v=11081617';
+import { MAP } from './mapfloor.js?v=11081617';
+import { applyShipHeat, heatVis } from './shipheat.js?v=11081617';
 
 export const FLY = { LEN: 2, HOVER: .7, R: .8, SPEEDS: [9, 12, 15, 18], TURN: 7, ACC: .22, TURNMAX: 9,
   BASE: 9, SHIELD: 3, BOOST: 5, BOOSTK: 1.5 };   /* 기지 고리(반지름 9m)를 벗어나는 순간: 보호막 3초 · 가속 5초(1.5배) — 기지 출구 앞 매복에 바로 당하지 않게 */
@@ -45,6 +46,7 @@ export async function makeFlight(renderer, B, start, face) {
   const G = new THREE.Group();
   const b = await buildShip(1, 1, 'ruby', { renderer, size: FLY.LEN }); const ship = b.root, sm = ship.children[0]; G.add(ship);
   const sz = new THREE.Box3().setFromObject(sm).getSize(new THREE.Vector3()); const ENG = engineSpots(b.ship, sm, sz), K = FLY.LEN / 2.9;
+  mergeShip(sm);   /* 기체 부품 145개를 칠마다 하나로 (모양·칠 그대로 · 그리는 횟수 145번 → 몇 번) */
   const flames = ENG.map(() => { const f = flameMesh(); G.add(f); return f; });
   /* 그림자: 떠 있는 높이가 높을수록 넓고 옅게 */
   const shM = new THREE.ShaderMaterial({ transparent: true, depthWrite: false, uniforms: { uA: { value: .5 } },
@@ -198,3 +200,16 @@ void main() {
   };
   return G;
 }
+
+/* 기체 부품 합치기 (2026-11-08 최적화): 원본 모델은 부품마다 따로 그려 한 장면에 기체만 145번(+ 벽 너머 비침 145번) 그렸음.
+   같은 칠 · 같은 정보(자리·빛 방향·그림 좌표)를 쓰는 부품끼리 한 덩어리로 합침 → 모양·칠은 그대로, 그리는 횟수만 줄어듦 (부품은 따로 움직이지 않음) */
+export function mergeShip(root) {
+  root.updateMatrixWorld(true); const inv = new THREE.Matrix4().copy(root.matrixWorld).invert(), groups = new Map(), drop = [];
+  root.traverse(o => { if (!o.isMesh || Array.isArray(o.material) || o.isSkinnedMesh || o.morphTargetInfluences) return; const g = o.geometry;
+    const key = o.material.uuid + '|' + Object.keys(g.attributes).sort().map(k => k + g.attributes[k].itemSize + (g.attributes[k].normalized ? 'n' : '') + g.attributes[k].array.constructor.name).join(',') + (g.index ? 'i' : '') + '|' + o.renderOrder + (o.castShadow ? 's' : '');
+    if (!groups.has(key)) groups.set(key, []); groups.get(key).push(o); });
+  for (const list of groups.values()) { if (list.length < 2) continue;
+    const parts = list.map(o => { const g = o.geometry.clone(); for (const k of Object.keys(g.attributes)) if (g.attributes[k].isInterleavedBufferAttribute) g.setAttribute(k, g.attributes[k].clone()); g.applyMatrix4(new THREE.Matrix4().multiplyMatrices(inv, o.matrixWorld)); return g; });
+    const mg = mergeGeometries(parts, false); if (!mg) continue; parts.forEach(g => g.dispose());
+    const me = new THREE.Mesh(mg, list[0].material); me.renderOrder = list[0].renderOrder; me.castShadow = list[0].castShadow; me.receiveShadow = list[0].receiveShadow; me.name = 'merged'; root.add(me); drop.push(...list); }
+  drop.forEach(o => o.parent && o.parent.remove(o)); }
