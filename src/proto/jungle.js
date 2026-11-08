@@ -9,10 +9,10 @@
    · 초원 → 정글은 점점: 경계 둘레에 작은 부유체가 섞이고, 기체가 안쪽으로 들어갈수록 하늘이 어두운 보랏빛으로 (skymap에서) */
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { spiralPath, SWEEP } from './path.js?v=11081746';
-import { buildSanctum } from './jsanct.js?v=11081746';
-export { SANCT_TEST } from './jsanct.js?v=11081746';
-import { makeDresser } from './jdress.js?v=11081746';
+import { spiralPath, SWEEP } from './path.js?v=11081833';
+import { buildSanctum } from './jsanct.js?v=11081833';
+export { SANCT_TEST } from './jsanct.js?v=11081833';
+import { makeDresser } from './jdress.js?v=11081833';
 let CAM = { position: new THREE.Vector3() };
 let LOD_T = .5, LOD_N = 30;   /* 섬 둘레 · 덩굴 마디 수 (키트 원래 44 · 1배) */
 /* ===================== 우주 정글 지형 키트 (사용자 제작 · 생성 코드 그대로) ===================== */
@@ -262,11 +262,30 @@ PIECES.push({name:'거대 포식 꽃',tags:['위험 지형','주기 공격'],fy:
       const pet=new THREE.Mesh(new THREE.SphereGeometry(1,10,8),pmat);pet.scale.set(2.2,.35,4.8);pet.position.z=4.4;piv.add(pet);
       const vein=new THREE.Mesh(new THREE.BoxGeometry(.35,.08,7.5),inMat);vein.position.set(0,.33,4.2);piv.add(vein);
       for(let j=0;j<6;j++){for(const sx of[-1,1]){const tz=1.6+j*1.25,w=2.15*Math.sqrt(Math.max(0,1-Math.pow((tz-4.4)/4.8,2)));const th=new THREE.Mesh(new THREE.ConeGeometry(.22,1,4),tooth);th.position.set(sx*w*.92,.45,tz);th.rotation.z=-sx*.25;piv.add(th);}}}
+    pivots.forEach(piv=>{const by=new Map();piv.updateMatrix();for(const c of[...piv.children]){c.updateMatrix();const g=c.geometry.clone().applyMatrix4(c.matrix);if(!by.has(c.material))by.set(c.material,[]);by.get(c.material).push(g);piv.remove(c);}
+      for(const[m,gs]of by)piv.add(new THREE.Mesh(mergeGeometries(gs,false),m));});   /* 꽃잎 하나(잎·잎맥·이빨 12개)를 칠마다 한 덩이로 → 그리기 84번 → 18번 (모든 꽃이 움직여도 가볍게) */
     const lure=new THREE.Mesh(new THREE.SphereGeometry(1.1,14,10),new THREE.MeshBasicMaterial({color:'#ffd6ff'}));lure.position.y=1.4;head.add(lure);const lg=glowSprite(GLOWS.mag,10,.8);lure.add(lg);
     const N=80,mg=new THREE.BufferGeometry(),mp=new Float32Array(N*3),mo=[];for(let i=0;i<N;i++)mo.push([R()*6.28,rnd(2,7),rnd(-1,5),rnd(.3,1)]);mg.setAttribute('position',new THREE.BufferAttribute(mp,3));
     const motes=new THREE.Points(mg,new THREE.PointsMaterial({size:.9,map:dot,color:'#ff9cf4',transparent:true,blending:THREE.AdditiveBlending,depthWrite:false}));motes.frustumCulled=false;head.add(motes);
     G.userData.flower=1;   /* 기믹: 가까이 오면 삼키고 · 씹고 · 뱉음 (gimmick.js가 bite·near를 줌) */
-    anim.push(t=>{const P=7,ph=t%P;let ang;const bt=G.userData.bite,nr=G.userData.near||0;
+    /* 늘어나는 목: 덮칠 때만 보임 — 줄기 꼭대기에서 머리까지 휘어진 관 (마디 10개를 매 순간 다시 휨) */
+    const NS=10,NR=8,neckG=new THREE.CylinderGeometry(.62,.8,1,NR,NS,true),neckP=neckG.attributes.position,nA=[],nJ=[];
+    for(let i=0;i<neckP.count;i++){nA.push(Math.atan2(neckP.getZ(i),neckP.getX(i)));nJ.push(Math.round((neckP.getY(i)+.5)*NS));}
+    const neckR=[];for(let i=0;i<neckP.count;i++)neckR.push(Math.hypot(neckP.getX(i),neckP.getZ(i)));
+    const neck=new THREE.Mesh(neckG,new THREE.MeshPhongMaterial({color:'#2d4a3e',flatShading:true,shininess:20,specular:'#4a7a5e'}));neck.visible=false;neck.frustumCulled=false;G.add(neck);
+    const REST=V(0,10.6,0),P0=V(0,9.4,0),Q0=new THREE.Quaternion(),qT=new THREE.Quaternion(),UPV=V(0,1,0),bz=new THREE.Vector3(),tg=new THREE.Vector3(),nx=new THREE.Vector3(),ny=new THREE.Vector3(),c1=new THREE.Vector3();
+    G.userData.headW=out=>{head.getWorldPosition(out);return out;};
+    const bend=(ext,tp,t)=>{const tgt=V(tp[0],tp[1],tp[2]);head.position.lerpVectors(REST,tgt,ext);
+      if(ext<.01){neck.visible=false;head.quaternion.identity();head.position.y+=Math.sin(t*1.3)*.08;return;}   /* 가만히 있을 땐 머리가 숨 쉬듯 살짝 오르내림 */
+      neck.visible=true;const H=head.position;c1.set(0,9.4+Math.max(3,H.y-9.4)*.6+3*ext,0);   /* 목은 위로 솟았다가 기체 쪽으로 휘어 내려옴 (뱀이 고개를 드는 것처럼) */
+      for(let i=0;i<neckP.count;i++){const u=nJ[i]/NS,a=1-u;bz.set(0,0,0).addScaledVector(P0,a*a).addScaledVector(c1,2*a*u).addScaledVector(H,u*u);
+        tg.set(0,0,0).addScaledVector(c1.clone().sub(P0),2*a).addScaledVector(H.clone().sub(c1),2*u).normalize();
+        nx.set(1,0,0);if(Math.abs(tg.x)>.9)nx.set(0,0,1);ny.crossVectors(tg,nx).normalize();nx.crossVectors(ny,tg).normalize();
+        const r=neckR[i]*(1-.35*Math.sin(u*Math.PI)*ext)*(1+.06*Math.sin(t*20-u*9));   /* 늘어날수록 가늘어지고 · 꿀꺽 넘기듯 물결 */
+        neckP.setXYZ(i,bz.x+(nx.x*Math.cos(nA[i])+ny.x*Math.sin(nA[i]))*r,bz.y+(nx.y*Math.cos(nA[i])+ny.y*Math.sin(nA[i]))*r,bz.z+(nx.z*Math.cos(nA[i])+ny.z*Math.sin(nA[i]))*r);}
+      neckP.needsUpdate=true;neckG.computeVertexNormals();
+      tg.copy(H).sub(c1).normalize();qT.setFromUnitVectors(UPV,tg);head.quaternion.copy(Q0).slerp(qT,Math.min(1,ext*1.4));};   /* 입이 기체 쪽을 향함 */
+    anim.push(t=>{const P=7,ph=t%P;let ang;const bt=G.userData.bite,nr=G.userData.near||0;bend(bt&&bt.ext?bt.ext:0,bt&&bt.tp?bt.tp:[0,10.6,0],t);
       if(bt)ang=-.22-1.18*bt.k+(bt.chew?Math.sin(t*11)*.07:0);   /* 삼킨 동안: 꽉 닫고 우물우물 씹음 */
       else if(ph<4)ang=-.22-Math.sin(t*1.5)*.04+nr*(.2+Math.sin(t*17)*.05);   /* 기체가 다가오면 꽃잎이 더 벌어지며 떨림 (군침) */
       else if(ph<4.25)ang=-.22-(ph-4)/.25*1.18;else if(ph<5.5)ang=-1.4+Math.sin((ph-4.25)*30)*.02;else ang=-1.4+(ph-5.5)/1.5*1.18;
@@ -548,6 +567,7 @@ export function makeJungle(scene, { R0 = 136, R1 = 187, TOP = -3, UP = 20, DN = 
     else if (o.t === 'sanct') place(buildSanctum({ seed: o.seed, KL, clearA: o.clearA }), o.x, o.y, o.z, 1, o.yaw);
     else if (o.t === 'gate') { place(buildGateIsle(o.seed), o.x, o.y, o.z, o.s, o.yaw); GATES.push({ x: o.x, z: o.z, ...o.gate, jungle: true }); }
     else if (o.t === 'fill' && o.lite) { const b = shared('d' + o.kind, 2, v => { const b = buildPiece(o.kind, o.seed + v * 7, .55); const rm = []; b.G.traverse(c => { if (c.isPoints || c.isSprite || c.isLine) rm.push(c); }); rm.forEach(c => c.parent.remove(c)); b.anim = []; mergeStatic(b.G, []); return b; }); place(b, o.x, o.y, o.z, o.s, o.yaw); }   /* 아래층 먼 섬: 움직임 없음 → 모두 칠마다 합침 */
+    else if (o.t === 'fill' && o.share && o.kind === IDX.flower && o.layer === 'mid') place(buildPiece(o.kind, o.seed, .6), o.x, o.y, o.z, o.s, o.yaw);   /* 기체 높이의 포식 꽃은 하나하나 살아 있어야 덮칠 수 있음 → 나눠 쓰지 않음 */
     else if (o.t === 'fill' && o.share) place(shared('m' + o.kind, 2, v => buildPiece(o.kind, o.seed + v * 13, .6)), o.x, o.y, o.z, o.s, o.yaw);
     else if (o.t === 'fill') { const b = buildPiece(o.kind, o.seed, Math.min(1, o.s / .36)); if (o.lite) { const rm = []; b.G.traverse(c => { if (c.isPoints || c.isSprite || c.isLine) rm.push(c); }); rm.forEach(c => c.parent.remove(c)); b.anim = []; } place(b, o.x, o.y, o.z, o.s, o.yaw); }
     else if (o.t === 'vine') { place(buildPiece(IDX.vine, o.seed), o.x, o.y, o.z, o.s, o.yaw, o.sy);
