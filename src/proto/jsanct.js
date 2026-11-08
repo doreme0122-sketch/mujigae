@@ -12,7 +12,13 @@ const LU = {   /* 원본 조명 (원본 C(): sRGB→선형) — 아래에서 채
   uHS: { value: new THREE.Color() }, uHG: { value: new THREE.Color() }, uAmb: { value: new THREE.Color() },
   uMD: { value: new THREE.Vector3(-90, 140, 60).normalize() }, uMC: { value: new THREE.Color() }, uWD: { value: new THREE.Vector3(70, 30, -50).normalize() }, uWC: { value: new THREE.Color() },
   uEP: { value: new THREE.Vector3() }, uEC: { value: new THREE.Color() }, uEB: { value: new THREE.Color() }, uED: { value: 90 * K } };
-const LIT_V = `varying vec3 vW, vN, vCol; varying vec2 vUv; uniform mat3 uvT;
+const LIT_COMMON = `uniform vec3 uSpec, uHS, uHG, uAmb, uMD, uMC, uWD, uWC, uEP, uEC; uniform float uShin, uED;
+  vec3 dirL(vec3 n, vec3 V, vec3 L, vec3 C, inout vec3 sp){ float d = max(dot(n, L), 0.); vec3 H = normalize(L + V); float lh = max(dot(L, H), 0.);
+    vec3 F = uSpec + (1. - uSpec) * pow(1. - lh, 5.); sp += C * d * F * .25 * (uShin * .5 + 1.) * pow(max(dot(n, H), 0.), uShin); return C * d; }
+  vec3 litAt(vec3 n, vec3 W, inout vec3 sp){ vec3 V = normalize(cameraPosition - W); vec3 irr = mix(uHG, uHS, n.y * .5 + .5) + uAmb + dirL(n, V, uMD, uMC, sp) + dirL(n, V, uWD, uWC, sp);
+    vec3 lv = uEP - W; float dist = length(lv); float att = pow(clamp(1. - dist / uED, 0., 1.), 1.6); return irr + dirL(n, V, lv / max(dist, 1e-4), uEC * att, sp); }`;
+const LIT_V = `varying vec3 vW, vN, vCol, vIrr, vSp; varying vec2 vUv; uniform mat3 uvT;
+  ${LIT_COMMON}
   void main(){
     #ifdef USE_INSTANCING
       mat4 M = modelMatrix * instanceMatrix;
@@ -26,9 +32,13 @@ const LIT_V = `varying vec3 vW, vN, vCol; varying vec2 vUv; uniform mat3 uvT;
     #ifdef USE_INSTANCING_COLOR
       vCol *= instanceColor;
     #endif
+    #ifdef VLIT
+      vec3 n = vN; if (dot(n, cameraPosition - vW) < 0.) n = -n; vSp = vec3(0.); vIrr = litAt(n, vW, vSp);   /* 빛을 점마다 한 번 (화면 칸마다가 아니라) */
+    #endif
     gl_Position = projectionMatrix * viewMatrix * w; }`;
-const LIT_F = `varying vec3 vW, vN, vCol; varying vec2 vUv;
-  uniform vec3 uDif, uSpec, uEm, uHS, uHG, uAmb, uMD, uMC, uWD, uWC, uEP, uEC; uniform float uShin, uEmI, uAT, uED;
+const LIT_F = `varying vec3 vW, vN, vCol, vIrr, vSp; varying vec2 vUv;
+  uniform vec3 uDif, uEm; uniform float uEmI, uAT;
+  ${LIT_COMMON}
   #ifdef S_MAP
     uniform sampler2D map;
   #endif
@@ -38,17 +48,17 @@ const LIT_F = `varying vec3 vW, vN, vCol; varying vec2 vUv;
   vec3 rrt(vec3 v){ vec3 a = v * (v + .0245786) - .000090537; vec3 b = v * (.983729 * v + .4329510) + .238081; return a / b; }
   vec3 aces(vec3 c){ const mat3 I = mat3(vec3(.59719, .07600, .02840), vec3(.35458, .90834, .13383), vec3(.04823, .01566, .83777)); const mat3 O = mat3(vec3(1.60475, -.10208, -.00327), vec3(-.53108, 1.10813, -.07276), vec3(-.07367, -.00605, 1.07602));
     c *= 1.45 / .6; c = I * c; c = rrt(c); c = O * c; return clamp(c, 0., 1.); }
-  vec3 dirL(vec3 n, vec3 V, vec3 L, vec3 C, inout vec3 sp){ float d = max(dot(n, L), 0.); vec3 H = normalize(L + V); float lh = max(dot(L, H), 0.);
-    vec3 F = uSpec + (1. - uSpec) * pow(1. - lh, 5.); sp += C * d * F * .25 * (uShin * .5 + 1.) * pow(max(dot(n, H), 0.), uShin); return C * d; }
   void main(){
     vec4 dc = vec4(uDif * vCol, 1.);
     #ifdef S_MAP
       dc *= texture2D(map, vUv);
     #endif
     if (dc.a < uAT) discard;
-    vec3 n = normalize(vN); if (!gl_FrontFacing) n = -n; vec3 V = normalize(cameraPosition - vW), sp = vec3(0.);
-    vec3 irr = mix(uHG, uHS, n.y * .5 + .5) + uAmb + dirL(n, V, uMD, uMC, sp) + dirL(n, V, uWD, uWC, sp);
-    vec3 lv = uEP - vW; float dist = length(lv); float att = pow(clamp(1. - dist / uED, 0., 1.), 1.6); irr += dirL(n, V, lv / max(dist, 1e-4), uEC * att, sp);
+    #ifdef VLIT
+      vec3 irr = vIrr, sp = vSp;
+    #else
+      vec3 n = normalize(vN); if (!gl_FrontFacing) n = -n; vec3 sp = vec3(0.), irr = litAt(n, vW, sp);
+    #endif
     vec3 em = uEm * uEmI;
     #ifdef S_EMAP
       em *= texture2D(emap, vUv).rgb;
@@ -71,6 +81,10 @@ function tileNoise(W, H, PX, PY, oct = 4) { const d = new Uint8Array(W * H * 4),
   for (let j = 0; j < H; j++) for (let i = 0; i < W; i++) { let v = 0, a = .5; for (let o = 0; o < oct; o++) { const f = 1 << o; v += a * vn(i / W * PX * f, j / H * PY * f, [PX * f, PY * f, o]); a *= .5; } const b = Math.round(Math.min(1, v) * 255), k = (j * W + i) * 4; d[k] = d[k + 1] = d[k + 2] = b; d[k + 3] = 255; }
   const t = new THREE.DataTexture(d, W, H); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.magFilter = THREE.LinearFilter; t.minFilter = THREE.LinearMipmapLinearFilter; t.generateMipmaps = true; t.needsUpdate = true; return t; }
 let NS = null, NF = null; const noiseTex = () => { if (!NS) { NS = tileNoise(128, 512, 10, 8); NF = tileNoise(256, 256, 16, 16); } return [NS, NF]; };
+/* 폰에서 무게 재기 (사용자 2026-11-08: 성소에서 48프레임) — 화면 시험 버튼이 켜고 끔. 모든 성소에 같이 적용 */
+const CLONES = [];
+export const SANCT_TEST = { all: true, shaft: true, fall: true, glow: true, leaf: true, vlit: false,
+  set(k, v) { this[k] = v; if (k === 'vlit') { for (const m of LITM) { if (v) m.defines.VLIT = 1; else delete m.defines.VLIT; m.needsUpdate = true; } } CLONES.forEach(c => c.apply()); } };
 let TPL = null;
 function template() { if (TPL) return TPL;
   const CMp = THREE.ColorManagement.enabled; THREE.ColorManagement.enabled = false;   /* 원본(three r128)과 같은 색 다루기: 색 글자를 그대로 씀 */
@@ -506,7 +520,10 @@ export function buildSanctum({ clearA = null } = {}) {
   const anim = [(t, dt) => { T.tick(t, dt); for (const [a, b] of pairs) { b.position.copy(a.position); b.quaternion.copy(a.quaternion); b.scale.copy(a.scale); } }];
   const outline = a => T.outline(a + psi) * K;
   /* 멀리서(75m 밖) 안 보이는 잔것은 그리지 않음: 풀잎 · 작은 고사리 · 덩굴 잎 · 꼬투리 · 작은 빛 · 빛 알갱이 · 낮은 안개 (나무 지붕·돌·금·빛기둥·폭포는 그대로) */
-  const small = []; root.traverse(o => { if ((o.isInstancedMesh && ['blade', 'fern', 'broadS', 'pod', 'pod2'].includes(o.userData.kind)) || o.isSprite || o.isPoints) small.push(o); }); let farS = false;
-  G.userData.lod = d => { const f = d > 75; if (f === farS) return; farS = f; for (const o of small) o.visible = !f; };
+  const SM = ['blade', 'fern', 'broadS', 'pod', 'pod2'], cat = { shaft: [], fall: [], glow: [], leafS: [], leaf: [] };
+  root.traverse(o => { const u = o.material && o.material.uniforms; if (u && u.nS) cat.shaft.push(o); else if (u && u.nF) cat.fall.push(o); else if (o.isSprite || o.isPoints) cat.glow.push(o); else if (o.isInstancedMesh) (SM.includes(o.userData.kind) ? cat.leafS : cat.leaf).push(o); });
+  let farS = false; const T2 = SANCT_TEST, apply = () => { root.visible = T2.all; cat.shaft.forEach(o => o.visible = T2.shaft); cat.fall.forEach(o => o.visible = T2.fall); cat.glow.forEach(o => o.visible = T2.glow && !farS); cat.leaf.forEach(o => o.visible = T2.leaf); cat.leafS.forEach(o => o.visible = T2.leaf && !farS); };
+  CLONES.push({ apply });
+  G.userData.lod = d => { const f = d > 75; if (f === farS) return; farS = f; apply(); };   /* 멀리서(75m 밖) 잔것 안 그림 */
   G.userData.outline = outline; G.userData.top = { fn: a => T.outline(a + psi) * K, y: 0, r: 140 * K };
   return { G, anim, size: 26, outline, block: [], hole: 0 }; }

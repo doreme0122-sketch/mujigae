@@ -8,25 +8,25 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
-import { makeBloom } from '../core/hangar/bloom.js?v=11081617';
-import { makePad } from '../core/hangar/pad.js?v=11081617';
-import { makeMag } from '../core/hangar/mag.js?v=11081617';
+import { makeBloom } from '../core/hangar/bloom.js?v=11081645';
+import { makePad } from '../core/hangar/pad.js?v=11081645';
+import { makeMag } from '../core/hangar/mag.js?v=11081645';
 import { buildShip } from '../core/ships/build.js';
-import { makeGoldStar } from './goldstar.js?v=11081617';
-import { makeArena, SPEED, WAVE_R0 } from './arena.js?v=11081617';
-import { makeGuardians, GUARD } from './guardian.js?v=11081617';
-import { makeBirth, BIRTH } from './birth.js?v=11081617';
-import { makeHeightLine } from './hline.js?v=11081617';
-import { makeTravel } from './travel.js?v=11081617';
-import { spiralPath } from './path.js?v=11081617';
-import { makePerf } from './perf.js?v=11081617';
+import { makeGoldStar } from './goldstar.js?v=11081645';
+import { makeArena, SPEED, WAVE_R0 } from './arena.js?v=11081645';
+import { makeGuardians, GUARD } from './guardian.js?v=11081645';
+import { makeBirth, BIRTH } from './birth.js?v=11081645';
+import { makeHeightLine } from './hline.js?v=11081645';
+import { makeTravel } from './travel.js?v=11081645';
+import { spiralPath } from './path.js?v=11081645';
+import { makePerf } from './perf.js?v=11081645';
 import { makeGlow } from '../preview/glow.js';
-import { makeFlight, FLY } from './flight.js?v=11081617';
-import { pedestal, gate4 } from './gates.js?v=11081617';
-import { makeMeadow, MEADOW } from './meadow.js?v=11081617';
-import { makeClouds } from './clouds.js?v=11081617';
-import { makeLife } from './life.js?v=11081617';
-import { makeJungle, jungleLayout } from './jungle.js?v=11081617';
+import { makeFlight, FLY } from './flight.js?v=11081645';
+import { pedestal, gate4 } from './gates.js?v=11081645';
+import { makeMeadow, MEADOW } from './meadow.js?v=11081645';
+import { makeClouds } from './clouds.js?v=11081645';
+import { makeLife } from './life.js?v=11081645';
+import { makeJungle, jungleLayout, SANCT_TEST } from './jungle.js?v=11081645';
 
 const $ = s => document.querySelector(s), clamp = THREE.MathUtils.clamp, HOVER = FLY.HOVER;
 const R = 240, NB = 10, GAPH = 5.6, BASE_D = 0;     /* 맵 반지름 · 기지 수 · 벽 틈 반 폭(= 기지 반지름) · 기지 가운데는 벽 선 위 (앞 절반은 맵 안, 뒤 절반은 맵 밖 · 사용자 2026-11-06) */
@@ -153,7 +153,7 @@ export async function start(canvas, onProgress = () => {}) {
   onProgress(.4);
   /* ── 초원 고리 ── */
   const JL = jungleLayout({ TOP: MEADOW.TOP, UP: MEADOW.UP, DN: MEADOW.DN });   /* 정글 배치 계획을 먼저 → 초원이 경계 너머로 섬을 놓을 때 피해 감 */
-  const meadow = await makeMeadow(scene, new URL('./assets/kit_meadow.glb?v=11081617', import.meta.url).href, p => onProgress(.4 + p * .4), new URL('./assets/kit_meadow_decor.glb?v=11081617', import.meta.url).href, new URL('./assets/kit_meadow_lo.glb?v=11081617', import.meta.url).href, { avoid: JL });
+  const meadow = await makeMeadow(scene, new URL('./assets/kit_meadow.glb?v=11081645', import.meta.url).href, p => onProgress(.4 + p * .4), new URL('./assets/kit_meadow_decor.glb?v=11081645', import.meta.url).href, new URL('./assets/kit_meadow_lo.glb?v=11081645', import.meta.url).href, { avoid: JL });
   const clouds = makeClouds(scene, { R0: MEADOW.R0, R1: MEADOW.R1 });   /* 층 사이 흘러가는 구름 · 기체 높이 숨는 구름 */
   const jungle = makeJungle(scene, { TOP: MEADOW.TOP, UP: MEADOW.UP, DN: MEADOW.DN, avoid: meadow.place.concat(meadow.CORR.map(c => ({ x: c[0], z: c[1], rr: c[2], layer: 'all' }))) });   /* 우주 정글 고리 (초원 안쪽) */
   /* ── 위아래 문 다섯: 흩어진 고리 문(0.8배) + 보물 던전 섬까지 뻗는 빛 띠 (위층 = 금빛 · 아래층 = 보랏빛) ── */
@@ -254,6 +254,16 @@ export async function start(canvas, onProgress = () => {}) {
   const cam = { x: B0.x, y: HOVER, z: B0.z };
   let Wd = 2, Hd = 2;
   const perf = makePerf(st => { bloom.setSamples(st.aa ? 4 : 0); size(); });
+  /* 폰에서 무게 재기 (사용자 2026-11-08: 보물 성소에서 48프레임) — 하나씩 끄면서 오른쪽 위 프레임 숫자를 봄. 실제 게임에선 뺄 시험용 */
+  { const box = document.querySelector('#view'); if (box) { const row = document.createElement('div'); row.style.cssText = 'display:flex;margin-top:4px';
+      const BS = 'font-size:11px;padding:5px 7px;border:1px solid rgba(185,255,74,.4);border-radius:9px;color:#e8ffd0;background:rgba(20,40,10,.45)', head = document.createElement('button'); head.type = 'button'; head.style.cssText = BS + ';width:100%'; head.textContent = '무게 재기 ▾'; const inner = document.createElement('div'); inner.style.cssText = 'display:flex;flex-wrap:wrap;gap:5px'; inner.hidden = true;
+      head.onclick = () => { inner.hidden = !inner.hidden; head.textContent = inner.hidden ? '무게 재기 ▾' : '무게 재기 ▴'; };
+      const xr = () => { const o = []; bsm.traverse(q => { if (q.name === 'xray') o.push(q); }); return o; }, seaV = { on: true };
+      const T = [['성소', () => SANCT_TEST.all, v => SANCT_TEST.set('all', v)], ['빛기둥', () => SANCT_TEST.shaft, v => SANCT_TEST.set('shaft', v)], ['빛 폭포', () => SANCT_TEST.fall, v => SANCT_TEST.set('fall', v)],
+        ['작은 빛·안개', () => SANCT_TEST.glow, v => SANCT_TEST.set('glow', v)], ['잎·풀', () => SANCT_TEST.leaf, v => SANCT_TEST.set('leaf', v)], ['빛 계산 칸마다', () => !SANCT_TEST.vlit, v => SANCT_TEST.set('vlit', !v)],
+        ['다른 섬', () => !globalThis.__HIDE_OTHER, v => { globalThis.__HIDE_OTHER = !v; }], ['기체 비침', () => xr().every(o => o.visible), v => xr().forEach(o => o.visible = v)], ['구름 바다', () => seaV.on, v => { seaV.on = v; sea.visible = v; }]];
+      for (const [label, get, set] of T) { const b = document.createElement('button'); b.type = 'button'; b.style.cssText = BS; const draw = () => { b.textContent = `${label} ${get() ? '켬' : '끔'}`; b.style.opacity = get() ? 1 : .5; }; b.onclick = () => { set(!get()); draw(); }; draw(); inner.append(b); }
+      row.append(head); box.append(row, inner); } }
   function size() { const r = canvas.getBoundingClientRect(); [Wd, Hd] = perf.size(r.width, r.height); renderer.setSize(Wd, Hd, false); bloom.size(Wd, Hd); camera.aspect = Wd / Hd; camera.updateProjectionMatrix(); glow.uRes.value.set(Wd, Hd);
     B0.mag.userData.setPixel(Hd / 20); birth.userData.setPx(Hd); fly.userData.setPx?.(Hd / (2 * Math.tan(camera.fov * Math.PI / 360))); life.setPx(Hd / (2 * Math.tan(camera.fov * Math.PI / 360))); }
   addEventListener('resize', size); size(); bloom.setSamples(perf.st.aa ? 4 : 0);

@@ -5,7 +5,7 @@
    ④ 화석(막힘): 엎드려 죽은 큰 짐승 — 척추가 기체보다 높게 아치를 이루고 갈비가 양옆 땅에 박힘 → 갈비 사이(약 3m)로 들락날락 · 벌어진 입으로 들어가 목 아래를 지나 갈비 굴로
    모든 크기는 실제 미터 (섬 크기와 상관없이 기체 기준으로 맞춤) */
 import * as THREE from 'three';
-import { HC, RIBP, TEETH, boneGeo } from './jbones.js?v=11081617';
+import { HC, RIBP, TEETH, boneGeo } from './jbones.js?v=11081645';
 
 export const V = (x, y, z) => new THREE.Vector3(x, y, z);
 export const rng = seed => { let s = seed >>> 0 || 1; return () => (s = (s * 1664525 + 1013904223) >>> 0) / 4294967296; };
@@ -331,7 +331,7 @@ export function makeDresser(scene, KL) {
       if (C.mist.length) { const m = new THREE.InstancedMesh(new THREE.PlaneGeometry(1, 1), mistMat, C.mist.length); C.mist.forEach((q, i) => { m.setMatrixAt(i, _m.makeScale(q[3], q[3], q[3]).setPosition(q[0], q[1], q[2])); m.setColorAt(i, MISTC[q[4]]); }); m.computeBoundingSphere(); m.renderOrder = 2; all.add(m); }
       CELLS.push({ x: C.x / C.n, z: C.z / C.n, all, near, far }); } cells.clear(); };
   /* 먼 섬(130m 밖)은 통째로 안 그림 · 화면 밖은 묶음마다 알아서 빠짐 */
-  const update = (t, cam) => { T.value = t; if (!cam) return; for (const o of isles) o.grp.visible = Math.hypot(o.x - cam.x, o.z - cam.z) < 130 + o.r;
+  const update = (t, cam) => { T.value = t; if (!cam) return; if (globalThis.__HIDE_OTHER) { for (const o of isles) o.grp.visible = false; for (const c of CELLS) c.all.visible = false; return; }   /* 폰 무게 재기: 성소 말고 다 끔 */ for (const o of isles) o.grp.visible = Math.hypot(o.x - cam.x, o.z - cam.z) < 130 + o.r;
     for (const c of CELLS) { const d = Math.hypot(c.x - cam.x, c.z - cam.z); c.all.visible = d < 200; c.near.visible = d < 104; c.far.visible = d < 150; } };
   return { hunt, isle, link, finish, solids, update };
 }
