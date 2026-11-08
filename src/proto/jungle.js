@@ -8,8 +8,9 @@
      알 둥지는 이번엔 안 씀 · 포식 꽃·촉수 나무·해파리는 장식(기체를 막거나 잡지 않음)
    · 초원 → 정글은 점점: 경계 둘레에 작은 부유체가 섞이고, 기체가 안쪽으로 들어갈수록 하늘이 어두운 보랏빛으로 (skymap에서) */
 import * as THREE from 'three';
-import { spiralPath } from './path.js?v=11081119';
-import { makeDresser } from './jdress.js?v=11081119';
+import { spiralPath, SWEEP } from './path.js?v=11081253';
+import { buildSanctum } from './jsanct.js?v=11081253';
+import { makeDresser } from './jdress.js?v=11081253';
 let CAM = { position: new THREE.Vector3() };
 let LOD_T = .5, LOD_N = 30;   /* 섬 둘레 · 덩굴 마디 수 (키트 원래 44 · 1배) */
 /* ===================== 우주 정글 지형 키트 (사용자 제작 · 생성 코드 그대로) ===================== */
@@ -426,10 +427,13 @@ export function jungleLayout({ R0 = 136, R1 = 187, TOP = -3, UP = 20, DN = -30, 
     /* 기지 사이 한 곳의 자리 (사이 한가운데 thg 기준 · 사용자 2026-11-07: 던전은 싸우려면 넓게 → 지름 약 50m):
        던전(위·아래 번갈아) thg+9°·160m 반지름 25m · 문 thg−1°·183m · 가운데층 사냥터 thg−9°·166m · 큰 정글 섬 기지 쪽 경계 · 덩굴 기둥 기지 쪽 경계 · 와드 자리 thg·136m는 비워 둠 */
     const DS = .78, DR = 38 * DS * .82;
-    { const [x, z] = at(thg + 9 * deg, 160), Y = up ? UP : DN; push({ t: 'hunt', seed: seed + 1, x, y: Y, z, s: DS, yaw: thg * 3.1, layer: up ? 'up' : 'dn', r: DR + 1, dungeon: true });
-      const [gx, gz] = at(thg - 1 * deg, 183); push({ t: 'gate', seed: seed + 2, x: gx, y: TOP - 1.8, z: gz, s: .42, yaw: thg, layer: 'mid', r: 7, gate: { tx: x, tz: z, layer: up ? 'up' : 'dn', ty: Y, rad: DR, gr: 6.3, dir: 1 } });
+    { const [x, z] = at(thg + 9 * deg, 160), Y = up ? UP : DN, [gx, gz] = at(thg - 1 * deg, 183), SR = 25.4, rad = up ? SR : DR, yaw = thg * 3.1;
+      /* 위층 = 정글 보물 성소 (사용자 2026-11-08: 근원의 알 성소 디자인 · 크기는 맵에 맞춰) · 아래층 = 몬스터 사냥 던전 (화석) */
+      if (up) push({ t: 'sanct', seed: seed + 1, x, y: Y, z, s: 1, yaw, layer: 'up', r: SR + 1, dungeon: true, clearA: Math.atan2(gz - z, gx - x) + SWEEP + yaw });   /* clearA: 빛의 길이 닿는 쪽(섬 안 각도) — 큰 것을 비켜 놓음 */
+      else push({ t: 'hunt', seed: seed + 1, x, y: Y, z, s: DS, yaw, layer: 'dn', r: DR + 1, dungeon: true });
+      push({ t: 'gate', seed: seed + 2, x: gx, y: TOP - 1.8, z: gz, s: .42, yaw: thg, layer: 'mid', r: 7, gate: { tx: x, tz: z, layer: up ? 'up' : 'dn', ty: Y, rad, gr: 6.3, dir: 1, sanct: up } });
       /* 빛의 길이 지나는 하늘은 비워 둠 (사용자 2026-11-07) — 어느 층이든 이 원들 안엔 아무것도 안 놓음 */
-      { const { pts } = spiralPath({ gx, gz, tx: x, tz: z, rad: DR, gr: 6.3, dir: 1 }); let d = 0, last = -9;   /* 감아 도는 빛의 길 하늘 비우기 */
+      { const { pts } = spiralPath({ gx, gz, tx: x, tz: z, rad, gr: 6.3, dir: 1 }); let d = 0, last = -9;   /* 감아 도는 빛의 길 하늘 비우기 */
         for (let k = 1; k < pts.length; k++) { d += Math.hypot(pts[k][0] - pts[k - 1][0], pts[k][2] - pts[k - 1][2]); if (d > 6.3 + 1.5 && d - last > 2.2) { push({ t: 'corr', x: pts[k][0], z: pts[k][2], r: 2.6, layer: 'all' }); last = d; } } } }
     { const [x, z] = at(thg - 9 * deg, 166); push({ t: 'hunt', seed: seed + 3, x, y: TOP, z, s: .4, yaw: thg * 1.7 + 1, layer: 'mid', r: 16 }); }
     { const [x, z] = at(th0 + 5 * deg, 138); push({ t: 'fill', kind: FILL[(i * 2) % 6], seed: seed + 4, x, y: TOP, z, s: .36, yaw: th0 * 2.3, layer: 'mid', r: 11 }); }   /* 큰 것 하나 */
@@ -489,7 +493,7 @@ export function makeJungle(scene, { R0 = 136, R1 = 187, TOP = -3, UP = 20, DN = 
   const pieces = [], GATES = [], VINES = [], L = jungleLayout({ R0, R1, TOP, UP, DN, sect });
   const place = (built, x, y, z, s, yaw, sy = s) => { built.G.position.set(x, y, z); built.G.scale.set(s, sy, s); built.G.rotation.y = yaw; scene.add(built.G);
     built.G.traverse(o => { if (o.isPoints && o.material.size) o.material.size *= Math.max(s, sy); });   /* 포자 알갱이도 같은 비율로 */
-    pack(built.G); const p = { ...built, x, y, z, rad: built.size * Math.max(s, sy) * 1.3 }; p.o = cur; p.outline = built.outline || built.G.userData.outline; p.block = built.block || built.G.userData.block; p.top = built.top || built.G.userData.top; pieces.push(p); if (cur && (cur.t === 'hunt' || (cur.t === 'fill' && cur.kind === IDX.flower))) SOLID.push(p); return p; };
+    pack(built.G); const p = { ...built, x, y, z, rad: built.size * Math.max(s, sy) * 1.3 }; p.o = cur; p.outline = built.outline || built.G.userData.outline; p.block = built.block || built.G.userData.block; p.hole = built.hole; p.top = built.top || built.G.userData.top; pieces.push(p); if (cur && (cur.t === 'hunt' || (cur.t === 'fill' && cur.kind === IDX.flower))) SOLID.push(p); return p; };
   let cur = null; const SOLID = [];   /* 막는 정글: 사냥터 섬(돔·가시·뼈) · 거대 포식 꽃 (사용자 2026-11-07) */
   /* 낱개 조각이 초원 섬과 겹치면 뺌 (같은 높이대일 때만) */
   const band = l => l === 'all' ? 'all' : l === 'mid' ? 0 : l === 'upgap' ? 1 : l === 'gap' || l === 'rock' ? -1 : l === 'up' ? 2 : l === 'dn' ? -2 : 9;
@@ -502,6 +506,7 @@ export function makeJungle(scene, { R0 = 136, R1 = 187, TOP = -3, UP = 20, DN = 
     if (o.t === 'hunt' && o.dungeon) { const upL = o.layer === 'up';   /* 위층 던전: 아래로 늘어진 몸통을 눌러 줌 (밑을 지날 때 카메라와 기체 사이를 막지 않게 · 사용자 2026-11-07) */
       place(shared(upL ? 'hu' : 'h', 3, v => { const b = buildPiece(IDX.hunt, o.seed + v * 11, 1); if (upL) squashPiece(b.G, -1.5, 6 / o.s); return b; }), o.x, o.y, o.z, o.s, o.yaw); }   /* 위·아래층 던전은 멀리서 보는 곳 → 세 벌 나눠 씀 */
     else if (o.t === 'hunt') place(buildPiece(IDX.hunt, o.seed), o.x, o.y, o.z, o.s, o.yaw);
+    else if (o.t === 'sanct') place(buildSanctum({ seed: o.seed, KL, clearA: o.clearA }), o.x, o.y, o.z, 1, o.yaw);
     else if (o.t === 'gate') { place(buildGateIsle(o.seed), o.x, o.y, o.z, o.s, o.yaw); GATES.push({ x: o.x, z: o.z, ...o.gate, jungle: true }); }
     else if (o.t === 'fill' && o.lite) { const b = shared('d' + o.kind, 2, v => { const b = buildPiece(o.kind, o.seed + v * 7, .55); const rm = []; b.G.traverse(c => { if (c.isPoints || c.isSprite || c.isLine) rm.push(c); }); rm.forEach(c => c.parent.remove(c)); b.anim = []; return b; }); place(b, o.x, o.y, o.z, o.s, o.yaw); }
     else if (o.t === 'fill' && o.share) place(shared('m' + o.kind, 2, v => buildPiece(o.kind, o.seed + v * 13, .6)), o.x, o.y, o.z, o.s, o.yaw);
@@ -516,8 +521,10 @@ export function makeJungle(scene, { R0 = 136, R1 = 187, TOP = -3, UP = 20, DN = 
   const dress = makeDresser(scene, KL);
   for (const p of pieces) if (p.o && p.o.t === 'hunt' && p.outline) { const n0 = dress.solids.length; dress.hunt({ x: p.x, y: p.y, z: p.z, yaw: p.o.yaw, extra: null }, p.outline, p.o.s, p.o.seed, { block: p.block });
     p.extra = dress.solids.slice(n0); for (const m of p.extra) SOLID.push({ G: m, y: p.y, rad: 20 }); }
+  /* 보물 성소: 바깥 땅에 정글 (가운데 바닥은 비움 · 오벨리스크·기둥·아치 둘레는 피함) */
+  for (const p of pieces) if (p.o && p.o.t === 'sanct') dress.hunt({ x: p.x, y: p.y, z: p.z, yaw: p.o.yaw }, p.outline, 1, p.o.seed, { fossil: false, Rm: 22.8, hole: p.hole, block: p.block });
   /* 나머지 정글 섬 전부 꾸미기 (사용자 2026-11-08: 정글 섬 전체를 퀄리티 있게) — 섬 종류마다 다른 식물 · 가까운 섬끼리 덩굴 · 그 밑 안개 (빛의 길 근처는 비움) */
-  for (const p of pieces) { const o = p.o; if (!o || o.t === 'hunt' || !p.top) continue;
+  for (const p of pieces) { const o = p.o; if (!o || o.t === 'hunt' || o.t === 'sanct' || !p.top) continue;
     dress.isle({ x: p.x, y: p.y, z: p.z, yaw: o.yaw, s: o.s, sy: o.sy, kind: o.t === 'vine' ? 6 : o.kind, top: p.top, seed: o.seed, layer: o.layer, lite: !!o.lite || o.layer === 'dn', gate: o.t === 'gate', single: o.t === 'single' }); }
   dress.link(L.filter(q => q.t === 'corr')); dress.finish();
   /* 막힘 칸: 사냥터 섬·포식 꽃의 단단한 몸이 기체 높이 단면을 지나는 곳 + 덩굴 기둥 줄기를 25cm 칸으로 찍음 · 빛 무리·포자·선은 뺌 */

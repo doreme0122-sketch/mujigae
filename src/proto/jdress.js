@@ -5,18 +5,19 @@
    ④ 화석(막힘): 엎드려 죽은 큰 짐승 — 척추가 기체보다 높게 아치를 이루고 갈비가 양옆 땅에 박힘 → 갈비 사이(약 3m)로 들락날락 · 벌어진 입으로 들어가 목 아래를 지나 갈비 굴로
    모든 크기는 실제 미터 (섬 크기와 상관없이 기체 기준으로 맞춤) */
 import * as THREE from 'three';
+import { HC, RIBP, TEETH, boneGeo } from './jbones.js?v=11081253';
 
-const V = (x, y, z) => new THREE.Vector3(x, y, z);
-const rng = seed => { let s = seed >>> 0 || 1; return () => (s = (s * 1664525 + 1013904223) >>> 0) / 4294967296; };
+export const V = (x, y, z) => new THREE.Vector3(x, y, z);
+export const rng = seed => { let s = seed >>> 0 || 1; return () => (s = (s * 1664525 + 1013904223) >>> 0) / 4294967296; };
 const hash = (x, z) => { const s = Math.sin(x * 127.1 + z * 311.7) * 43758.5453; return s - Math.floor(s); };
 const vnoise = (x, z) => { const ix = Math.floor(x), iz = Math.floor(z), fx = x - ix, fz = z - iz, u = fx * fx * (3 - 2 * fx), w = fz * fz * (3 - 2 * fz);
   const a = hash(ix, iz), b = hash(ix + 1, iz), c = hash(ix, iz + 1), d = hash(ix + 1, iz + 1); return a + (b - a) * u + (c - a) * w + (a - b - c + d) * u * w; };
-const fbm = (x, z) => vnoise(x, z) * .55 + vnoise(x * 2.1 + 7, z * 2.1 - 3) * .3 + vnoise(x * 4.3 - 5, z * 4.3 + 11) * .15;
+export const fbm = (x, z) => vnoise(x, z) * .55 + vnoise(x * 2.1 + 7, z * 2.1 - 3) * .3 + vnoise(x * 4.3 - 5, z * 4.3 + 11) * .15;
 
 /* ── 칠: 정글 조명(KL)을 꼭짓점에서 + 꼭짓점마다 '빛남' 정도(aGlow) · 풀·잎은 위쪽일수록 바람에 흔들림(aSway) ── */
-function dressMat(KL, T, sway) {
-  return new THREE.ShaderMaterial({ vertexColors: true, side: THREE.DoubleSide, uniforms: { ...KL, uT: T },
-    vertexShader: `attribute float aGlow; attribute float aSway; uniform vec3 uKey, uKeyC, uRim, uRimC, uSky, uGnd, uAmb; uniform float uLift, uT; varying vec3 vC;
+export function dressMat(KL, T, sway, rimK = 1) {   /* rimK: 분홍 가장자리 빛 세기 (뼈는 줄여서 뼈 색이 보이게) */
+  return new THREE.ShaderMaterial({ vertexColors: true, side: THREE.DoubleSide, uniforms: { ...KL, uT: T, uRimK: { value: rimK } },
+    vertexShader: `attribute float aGlow; attribute float aSway; uniform vec3 uKey, uKeyC, uRim, uRimC, uSky, uGnd, uAmb; uniform float uLift, uT, uRimK; varying vec3 vC;
       void main(){
         #ifdef USE_INSTANCING
           mat4 M = modelMatrix * instanceMatrix;
@@ -25,7 +26,7 @@ function dressMat(KL, T, sway) {
         #endif
         vec4 w = M * vec4(position, 1.); vec3 n = normalize(mat3(M) * normal);
         ${sway ? 'float ph = w.x * .37 + w.z * .29; w.xz += vec2(sin(uT * 1.3 + ph), cos(uT * 1.1 + ph * 1.3)) * aSway * .12;' : ''}
-        vec3 lit = uKeyC * max(dot(n, uKey), 0.) + uRimC * max(dot(n, uRim), 0.) + mix(uGnd, uSky, n.y * .5 + .5) + uAmb;
+        vec3 lit = uKeyC * max(dot(n, uKey), 0.) + uRimC * uRimK * max(dot(n, uRim), 0.) + mix(uGnd, uSky, n.y * .5 + .5) + uAmb;
         float pulse = .8 + .2 * sin(uT * .9 + w.x * .21 + w.z * .17);   /* 빛나는 것은 숨 쉬듯 천천히 (살아 있는 숲) */
         vC = color * lit * uLift + color * aGlow * 1.15 * pulse;
         gl_Position = projectionMatrix * viewMatrix * w; }`,
@@ -33,19 +34,19 @@ function dressMat(KL, T, sway) {
 }
 
 /* ── 모양 쌓기 도우미: 꼭짓점 색·빛남·흔들림을 같이 담아 하나로 합침 ── */
-function Builder() { const P = [], N = [], C = [], G = [], S = [], I = []; let n0 = 0;
-  const put = (geo, mat4, colFn, glowFn = () => 0, swayFn = () => 0) => { const g = geo.index ? geo : geo; g.computeVertexNormals(); const p = g.attributes.position, nn = g.attributes.normal, v = new THREE.Vector3(), nv = new THREE.Vector3(), nm = new THREE.Matrix3().getNormalMatrix(mat4), c = new THREE.Color();
-    for (let i = 0; i < p.count; i++) { v.fromBufferAttribute(p, i); const lv = v.clone(); v.applyMatrix4(mat4); nv.fromBufferAttribute(nn, i).applyMatrix3(nm).normalize(); P.push(v.x, v.y, v.z); N.push(nv.x, nv.y, nv.z); colFn(c, v, nv, lv); C.push(c.r, c.g, c.b); G.push(glowFn(v, nv, lv)); S.push(swayFn(v, nv, lv)); }
-    if (g.index) for (let i = 0; i < g.index.count; i++) I.push(g.index.getX(i) + n0); else for (let i = 0; i < p.count; i++) I.push(i + n0); n0 += p.count; g.dispose(); };
+export function Builder() { const P = [], N = [], C = [], G = [], S = [], I = []; let n0 = 0;
+  const put = (geo, mat4, colFn, glowFn = () => 0, swayFn = () => 0) => { const g = geo, keep = colFn === 'keep', gc = keep ? g.attributes.color : null; if (!keep) g.computeVertexNormals();   /* keep: 미리 만든 뼈 (빛 방향·색을 그대로) */ const p = g.attributes.position, nn = g.attributes.normal, v = new THREE.Vector3(), nv = new THREE.Vector3(), nm = new THREE.Matrix3().getNormalMatrix(mat4), c = new THREE.Color();
+    for (let i = 0; i < p.count; i++) { v.fromBufferAttribute(p, i); const lv = v.clone(); v.applyMatrix4(mat4); nv.fromBufferAttribute(nn, i).applyMatrix3(nm).normalize(); P.push(v.x, v.y, v.z); N.push(nv.x, nv.y, nv.z); if (keep) c.fromBufferAttribute(gc, i); else colFn(c, v, nv, lv); C.push(c.r, c.g, c.b); G.push(glowFn(v, nv, lv)); S.push(swayFn(v, nv, lv)); }
+    if (g.index) for (let i = 0; i < g.index.count; i++) I.push(g.index.getX(i) + n0); else for (let i = 0; i < p.count; i++) I.push(i + n0); n0 += p.count; if (!keep) g.dispose(); };
   const done = () => { const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(P, 3)); g.setAttribute('normal', new THREE.Float32BufferAttribute(N, 3)); g.setAttribute('color', new THREE.Float32BufferAttribute(C, 3));
     g.setAttribute('aGlow', new THREE.Float32BufferAttribute(G, 1)); g.setAttribute('aSway', new THREE.Float32BufferAttribute(S, 1)); g.setIndex(I); g.computeBoundingSphere(); return g; };
   return { put, done }; }
-const M4 = (pos, rot, scl) => new THREE.Matrix4().compose(pos || V(0, 0, 0), new THREE.Quaternion().setFromEuler(rot || new THREE.Euler()), scl || V(1, 1, 1));
-const hex = h => new THREE.Color(h);
-const lerpC = (c, a, b, t) => c.copy(a).lerp(b, Math.min(1, Math.max(0, t)));
+export const M4 = (pos, rot, scl) => new THREE.Matrix4().compose(pos || V(0, 0, 0), new THREE.Quaternion().setFromEuler(rot || new THREE.Euler()), scl || V(1, 1, 1));
+export const hex = h => new THREE.Color(h);
+export const lerpC = (c, a, b, t) => c.copy(a).lerp(b, Math.min(1, Math.max(0, t)));
 
 /* 가늘어지는 관 (모양 곡선 + 굵기 함수) — 갈비·줄기·덩굴·풀잎 공통 */
-function taperTube(pts, r0, r1, seg = 16, rad = 6, flat = 1) { const curve = new THREE.CatmullRomCurve3(pts), g = new THREE.TubeGeometry(curve, seg, 1, rad, false), p = g.attributes.position;
+export function taperTube(pts, r0, r1, seg = 16, rad = 6, flat = 1) { const curve = new THREE.CatmullRomCurve3(pts), g = new THREE.TubeGeometry(curve, seg, 1, rad, false), p = g.attributes.position;
   const fr = curve.computeFrenetFrames(seg, false), v = new THREE.Vector3(), c = new THREE.Vector3();
   for (let i = 0; i <= seg; i++) { const u = i / seg, r = r0 + (r1 - r0) * u; curve.getPointAt(u, c);
     for (let j = 0; j <= rad; j++) { const k = i * (rad + 1) + j; v.fromBufferAttribute(p, k).sub(c); const nx = v.dot(fr.normals[i]), bx = v.dot(fr.binormals[i]);
@@ -53,7 +54,7 @@ function taperTube(pts, r0, r1, seg = 16, rad = 6, flat = 1) { const curve = new
   return g; }
 
 /* ─────────────── ② 바닥 식물 · ③ 나무: 종류마다 모양 한 벌 ─────────────── */
-const SOIL = hex('#1a1428'), MOSS = hex('#163638'), MOSS2 = hex('#24564e'), LICH = hex('#2e2348'), GLOWC = hex('#46ffd6'), GLOWM = hex('#ff5ad8'), GLOWV = hex('#a77bff');
+export const SOIL = hex('#1a1428'), MOSS = hex('#163638'), MOSS2 = hex('#24564e'), LICH = hex('#2e2348'), GLOWC = hex('#46ffd6'), GLOWM = hex('#ff5ad8'), GLOWV = hex('#a77bff');
 function makeTuft(seed) {   /* 풀포기: 굽은 잎 7장 · 밑동 짙은 청록 → 끝 빛나는 청록/보라 */
   const R = rng(seed), b = Builder(), tip = R() < .5 ? GLOWC : GLOWV;
   for (let k = 0; k < 5; k++) { const a = k / 5 * 6.28 + R() * .5, h = .35 + R() * .3, lean = .12 + R() * .2, pts = [V(0, 0, 0), V(Math.cos(a) * lean * .3, h * .45, Math.sin(a) * lean * .3), V(Math.cos(a) * lean, h * .85, Math.sin(a) * lean), V(Math.cos(a) * lean * 1.5, h, Math.sin(a) * lean * 1.5)];
@@ -140,71 +141,49 @@ function makeShards(seed) {   /* 수정 조각(해파리 섬): 밑동에서 바�
     b.put(g, M4(V(Math.cos(a) * .06, -.03, Math.sin(a) * .06), new THREE.Euler(Math.sin(a) * tilt, R(), -Math.cos(a) * tilt)), (c, v, nn, lv) => lerpC(c, hex('#1c1a3a'), col, lv.y / h * 1.1), (v, nn, lv) => Math.pow(Math.max(0, lv.y) / h, 2) * 1.2); }
   return b.done(); }
 
-/* ─────────────── ④ 화석: 엎드려 죽은 큰 짐승 (실제 미터 · 땅 높이 0) ─────────────── */
-export const FOSSIL = { SPINE: 4.6, RIBX: 3.9, GAP: 3.4 };   /* 갈비 굴 꼭대기 높이 · 기체 높이(1.9m)에서 갈비 벌어진 폭 · 갈비 간격 */
-function boneCol(c, v, n) { const crack = fbm(v.x * 3.1, v.y * 3.1 + v.z * 2.3); lerpC(c, hex('#e4dccb'), hex('#8a8098'), (crack - .45) * 2.2 + (n.y < -.2 ? .35 : 0));
-  if (n.y > .55 && fbm(v.x * 1.7 + 4, v.z * 1.7) > .5) c.lerp(MOSS2, .55); }   /* 위로 향한 면에 이끼 */
-function makeFossil(seed, NR = 4) {   /* NR: 갈비 쌍 수 (작은 섬엔 3쌍 · 꼬리도 짧게) */
+/* ─────────────── ④ 화석: 엎드려 죽은 외계 짐승 (실제 미터 · 땅 높이 0) ───────────────
+   뼈 모양은 jbones.js (깎아 만든 진짜 뼈 구조) · 여기선 맞춰 세움:
+   꼬리(땅) → 엉덩이 → 갈비 굴(척추 몸통 4.6m · 등 칼날 판이 그 위로) → 목이 내려와 → 머리뼈(가운데 HC m)를 갈라진 턱 두 판이 받쳐 듦 · 입을 한껏 벌린 채
+   긴 갈비 NR쌍(기체 높이에서 양옆 3.9m · 사이 3.4m로 드나듦) · 그 사이 짧게 부러진 갈비(기체 위에서 끝남) · 왼쪽 몇 개는 무릎 아래가 부러져 토막이 옆에 */
+export const FOSSIL = { SPINE: 4.6, RIBX: 3.9, GAP: 3.4 };
+function makeFossil(seed, NR = 4) {
   const R = rng(seed), b = Builder(), S = FOSSIL.SPINE, X = FOSSIL.RIBX, D = FOSSIL.GAP, h = D * (NR - 1) / 2, tl = NR < 4 ? 3.6 : 4.9;
-  /* 척추 곡선: 꼬리(땅) → 엉덩이 → 갈비 굴(가장 높음) → 목(내려옴) → 머리 (z축 방향, 살짝 굽음) */
-  const zc = [-(h + tl), -(h + tl - 2), -(h + 1.5), -h, -h / 3, h / 3, h, h + 1.8, h + 3.5], yc = [.15, 1.5, 3.7, S, S + .25, S + .2, S, 4.0, 3.4];
-  const sp = zc.map((z, i) => V(Math.sin(z * .09) * 1.4, yc[i], z)), curve = new THREE.CatmullRomCurve3(sp);
-  const at = z => { let lo = 0, hi = 1; for (let k = 0; k < 24; k++) { const m = (lo + hi) / 2; if (curve.getPointAt(m).z < z) lo = m; else hi = m; } return lo; };
-  /* 척추뼈 마디: 몸통(납작한 원통) + 위로 솟은 가시 + 양옆 가로 돌기 — 꼬리·목 쪽은 작게 */
-  for (let i = 0, nv = NR < 4 ? 25 : 30; i <= nv; i++) { const u = i / nv, p = curve.getPointAt(u), t = curve.getTangentAt(u), sz = .55 + .45 * Math.sin(Math.min(1, u * 1.25) * Math.PI) - (u < .2 ? (.2 - u) * 1.2 : 0), q = new THREE.Quaternion().setFromUnitVectors(V(0, 1, 0), t);
-    const cen = new THREE.CylinderGeometry(.55 * sz, .6 * sz, .55, 8); b.put(cen, new THREE.Matrix4().compose(p, q, V(1, 1, .8)), boneCol);
-    const spn = new THREE.ConeGeometry(.16 * sz, 1.1 * sz, 5); const up = V(0, 1, 0).sub(t.clone().multiplyScalar(t.y)).normalize(); b.put(spn, new THREE.Matrix4().compose(p.clone().addScaledVector(up, .65 * sz), new THREE.Quaternion().setFromUnitVectors(V(0, 1, 0), up.clone().addScaledVector(t, -.35).normalize()), V(1, 1, 1)), boneCol);
-    const side = V(-t.z, 0, t.x).normalize(); [1, -1].forEach(sg => { const tp = new THREE.ConeGeometry(.1 * sz, .7 * sz, 4); tp.rotateZ(-sg * Math.PI / 2); b.put(tp, M4(p.clone().addScaledVector(side, sg * .5 * sz)), boneCol); }); }
-  /* 갈비: 척추 꼭대기에서 바깥으로 휘어 내려와 땅에 박힘 (기체 높이에서 양옆으로 RIBX만큼 벌어짐) · 한쪽 몇 개는 부러져 끝이 짧음 */
+  const zc = [-(h + tl), -(h + tl - 2), -(h + 1.5), -h, -h / 3, h / 3, h, h + 1.9, h + 3.4], yc = [.12, 1.4, 3.6, S, S + .22, S + .18, S, 4.15, HC - .18];
+  const curve = new THREE.CatmullRomCurve3(zc.map((z, i) => V(Math.sin(z * .09) * 1.2, yc[i], z)));
+  const at = z => { let lo = 0, hi = 1; for (let k = 0; k < 30; k++) { const m = (lo + hi) / 2; if (curve.getPointAt(m).z < z) lo = m; else hi = m; } return lo; };
+  const frame = (p, t, sc) => { const z = t.clone().normalize(), x = V(0, 1, 0).cross(z).normalize(), y = z.clone().cross(x); return new THREE.Matrix4().makeBasis(x.multiplyScalar(sc), y.multiplyScalar(sc), z.multiplyScalar(sc)).setPosition(p); };
+  const put = (k, m) => b.put(boneGeo(k), m, 'keep');
+  /* 척추뼈: 꼬리 끝은 작게(가벼운 모양) → 등은 크게 → 목은 목뼈 · 마디마다 조금씩 비틀림(죽어서 흐트러진) */
+  const L = curve.getLength(); let s = .15;
+  while (s < L - .3) { const u = s / L, p = curve.getPointAt(u), t = curve.getTangentAt(u), zz = p.z, neck = zz > h + .3;
+    const sc = zz < -(h + 1.5) ? .38 + .62 * Math.min(1, Math.max(0, (zz + (h + tl)) / (tl - 1.5))) : neck ? 1 - .3 * Math.min(1, (zz - h) / 3.4) : 1.08;
+    put(neck ? 'vc' : sc < .62 ? 'vt' : 'vd', frame(p, t, sc).multiply(new THREE.Matrix4().makeRotationZ((R() - .5) * .12))); s += .6 * sc + .06; }
+  /* 긴 갈비 · 사이 짧은 갈비 · 부러진 갈비와 토막 */
   const ribs = [];
-  for (let k = 0; k < NR; k++) { const z = -h + k * D, u = at(z), base = curve.getPointAt(u);
-    [1, -1].forEach(sg => { const broke = sg < 0 && (k === 1 || (k === 3 && R() < .5)), x0 = base.x, pts = [V(x0 + sg * .3, base.y - .05, z), V(x0 + sg * 2.3, base.y + .2, z - .25), V(x0 + sg * (X - .1), 3.1, z - .45), V(x0 + sg * (X + .05), 1.2, z - .5), V(x0 + sg * (X - .45), -.6, z - .4)];
-      const use = broke ? pts.slice(0, 4).map((p, i) => i === 3 ? pts[2].clone().lerp(pts[3], .45) : p) : pts;
-      b.put(taperTube(use, .4, broke ? .26 : .22, 18, 7, .65), M4(), boneCol); ribs.push({ z, sg, broke });
-      if (broke) { const piece = taperTube([V(x0 + sg * (X + .6), .15, z + .3), V(x0 + sg * (X + 1.5), .3, z + .9), V(x0 + sg * (X + 2.3), .1, z + 1.4)], .17, .13, 6, 6, .7); b.put(piece, M4(), boneCol); } }); }   /* 부러진 조각은 옆에 떨어져 있음 */
-  /* 머리뼈 (긴 주둥이의 사냥꾼) — 입을 크게 벌리고 죽은 모습 (사용자 2026-11-08: 입으로 들어갈 수 있게)
-     · 윗머리는 높이 들림: 입천장·윗니 끝 ≥ 2.6m (기체 높이 1.9m 위로 넉넉히)  · 아래턱은 땅에 벌어져 놓임: 아랫니 끝 ≤ 0.8m
-     · 이빨은 입 양쪽 가장자리에만 줄지어 남 → 가운데는 기체가 지나는 통로 · 입 양 끝 턱관절 기둥이 입 모서리 (그 사이 약 2.6m) */
-  const hd = curve.getPointAt(1), H0 = 3.3, cz0 = hd.z + 1.2, SZ = 4.6, sz0 = hd.z + 2.2, sz1 = sz0 + SZ;   /* 주둥이 뒤끝·앞끝 */
-  const brain = new THREE.SphereGeometry(1, 18, 12, 0, 6.2832, 0, Math.PI * .58); { const p = brain.attributes.position; for (let i = 0; i < p.count; i++) { const x = p.getX(i), y = p.getY(i), z = p.getZ(i); p.setXYZ(i, x * (1.4 - Math.max(0, z) * .25), y * (1.05 - Math.max(0, -z) * .15), z * 1.75); } }
-  b.put(brain, M4(V(hd.x, H0 - .2, cz0)), boneCol);   /* 뇌머리: 뒤는 넓고 앞으로 좁아짐 */
-  b.put(taperTube([V(hd.x, H0 + 1.0, cz0 - 1.8), V(hd.x, H0 + 1.35, cz0 - .4), V(hd.x, H0 + 1.1, cz0 + 1.0)], .09, .05, 10, 4, 3.5), M4(), boneCol);   /* 정수리 볏 (얇은 지느러미) */
-  const RB = 1.25, RF = .5, rAt = z => RB + (RF - RB) * Math.min(1, Math.max(0, (z - sz0) / SZ)), palY = z => H0 + .05 - rAt(z) * .38;   /* 주둥이 굵기 · 입천장 높이 */
-  const snoutG = new THREE.CylinderGeometry(RF, RB, SZ, 10, 5, true); snoutG.rotateX(Math.PI / 2); { const p = snoutG.attributes.position; for (let i = 0; i < p.count; i++) { const y = p.getY(i); p.setY(i, y > 0 ? y * .62 : y * .38); } }   /* 위는 둥근 콧등 · 아래는 납작한 입천장 */
-  b.put(snoutG, M4(V(hd.x, H0 + .05, sz0 + SZ / 2)), boneCol);
-  const nose = new THREE.SphereGeometry(RF, 10, 6, 0, 6.2832, 0, Math.PI / 2); nose.rotateX(Math.PI / 2); { const p = nose.attributes.position; for (let i = 0; i < p.count; i++) { const y = p.getY(i); p.setXYZ(i, p.getX(i), y > 0 ? y * .62 : y * .38, p.getZ(i) * 1.5); } }
-  b.put(nose, M4(V(hd.x, H0 + .05, sz1)), boneCol);   /* 주둥이 끝: 둥글게 닫힘 (앞에서 보면 빈 관이 아니게) */
-  const palate = new THREE.CircleGeometry(1, 16); palate.rotateX(Math.PI / 2); { const p = palate.attributes.position; for (let i = 0; i < p.count; i++) { const x = p.getX(i), z = p.getZ(i), zz = sz0 + (z + 1) / 2 * SZ; p.setXYZ(i, x * rAt(zz) * .98, palY(zz) - H0 - .05 + .02, zz - sz0 - SZ / 2); } }
-  b.put(palate, M4(V(hd.x, H0 + .05, sz0 + SZ / 2)), (c, v) => lerpC(c, hex('#3a3046'), hex('#6a5e74'), fbm(v.x * 3, v.z * 3)));   /* 입천장: 아래에서 올려다보면 어둑한 뼈 */
-  [1, -1].forEach(sg => {
-    b.put(taperTube([V(hd.x + sg * .55, H0 + .55, cz0 + .2), V(hd.x + sg * 1.3, H0 + .72, cz0 + .8), V(hd.x + sg * 1.4, H0 + .45, cz0 + 1.5)], .22, .12, 10, 6, .6), M4(), boneCol);   /* 눈두덩 */
-    const sock = new THREE.SphereGeometry(.42, 12, 8); sock.scale(.5, .75, .95); b.put(sock, M4(V(hd.x + sg * .95, H0 + .1, cz0 + 1.05)), c => c.set('#140c1e'));   /* 눈구멍: 깊고 어두운 오목 */
-    b.put(new THREE.IcosahedronGeometry(.06, 0), M4(V(hd.x + sg * 1.1, H0 + .08, cz0 + 1.05)), c => c.copy(GLOWM), () => 2.2);   /* 눈구멍 속 희미한 불씨 */
-    b.put(taperTube([V(hd.x + sg * 1.25, H0 - .1, cz0 - .1), V(hd.x + sg * 1.75, H0 - .5, cz0 + 1.2), V(hd.x + sg * 1.4, H0 - .25, cz0 + 2.8)], .2, .15, 12, 6, .7), M4(), boneCol);   /* 광대 아치 (기체 위) */
-    b.put(taperTube([V(hd.x + sg * 1.62, H0 - .35, cz0 + .5), V(hd.x + sg * 1.72, H0 - 1.4, cz0 + .1), V(hd.x + sg * 1.62, 1.4, hd.z + .9), V(hd.x + sg * 1.55, .5, hd.z + .8)], .3, .26, 14, 7, .75), M4(), boneCol);   /* 턱관절 기둥: 윗머리와 땅의 아래턱을 잇는 입 모서리 (막힘) */
-    const fen = new THREE.SphereGeometry(.34, 10, 6); fen.scale(.3, .55, 1.4); b.put(fen, M4(V(hd.x + sg * .72, H0 + .02, sz0 + 1.4)), c => c.set('#2a2036'));   /* 콧등 옆구멍 */
-    b.put(new THREE.SphereGeometry(.12, 8, 6), M4(V(hd.x + sg * .2, H0 + .2, sz1 - .2), null, V(1, .6, 1.3)), c => c.set('#2a2036'));   /* 콧구멍 */
-    const horn = taperTube([V(hd.x + sg * .85, H0 + .75, cz0 - .9), V(hd.x + sg * 1.35, H0 + 1.7, cz0 - 1.9), V(hd.x + sg * 1.15, H0 + 2.3, cz0 - 3.4), V(hd.x + sg * .75, H0 + 2.25, cz0 - 4.3)], .3, .04, 16, 7); b.put(horn, M4(), boneCol);   /* 뒤로 휜 뿔 */
-    for (let k = 0; k < 4; k++) { const sp = taperTube([V(hd.x + sg * (.4 + k * .3), H0 + .2 + k * .12, cz0 - 1.6), V(hd.x + sg * (.6 + k * .42), H0 + .45 + k * .2, cz0 - 2.5 - k * .1)], .1, .02, 4, 4); b.put(sp, M4(), boneCol); }   /* 목 장식 가시 */
-    /* 윗니: 입천장 가장자리를 따라 한 줄 · 뒤쪽은 짧고 앞쪽은 길게 · 끝은 모두 2.6m 위 · 몇 개는 빠져 있음 */
-    for (let i = 0; i < 10; i++) { if ((i === 3 && sg > 0) || (i === 6 && sg < 0)) continue; const zz = sz0 + .35 + i * .43, ex = rAt(zz) * .86, top = palY(zz) + .03, L = Math.min(.62, top - 2.62) * (.85 + R() * .15);
-      const tooth = new THREE.ConeGeometry(.075 + L * .08, L, 5); tooth.rotateX(Math.PI); b.put(tooth, M4(V(hd.x + sg * ex, top - L / 2, zz), new THREE.Euler(-.12, 0, -sg * .08)), (c, v) => lerpC(c, hex('#f2ecff'), hex('#a89cb6'), (top - v.y) < .08 ? .7 : 0)); }
-  });
-  /* 아래턱: 땅에 벌어져 놓인 U자 (뒤끝은 턱관절 기둥 밑) · 아랫니는 턱 가장자리에만 (끝 약 0.75m) */
-  const jawC = new THREE.CatmullRomCurve3([V(hd.x - 1.55, .45, hd.z + .8), V(hd.x - 1.15, .38, sz0 + 2.2), V(hd.x - .45, .4, sz1 - .3), V(hd.x, .42, sz1 + .1), V(hd.x + .45, .4, sz1 - .3), V(hd.x + 1.15, .38, sz0 + 2.2), V(hd.x + 1.55, .45, hd.z + .8)]);
-  b.put(taperTube(jawC.getPoints(6), .28, .28, 30, 7, .6), M4(), boneCol);
-  for (let i = 0; i < 18; i++) { const u = .06 + i / 17 * .88; if (Math.abs(u - .5) < .07) continue; const p = jawC.getPointAt(u), L = .24 + R() * .06;   /* 앞니 자리 몇 개는 비움 */
-    b.put(new THREE.ConeGeometry(.07, L, 5), M4(V(p.x, .52 + L / 2, p.z), new THREE.Euler(.1, 0, (p.x - hd.x) * .06)), c => c.set('#f2ecff')); }
-  /* 덩굴: 갈비 몇 개를 감아 오름 + 작은 빛 잎 */
-  for (const r of ribs.filter((r, i) => !r.broke && i % 3 === 0)) { const pts = []; for (let i = 0; i <= 26; i++) { const u = i / 26, x = r.sg * (X + .05) + Math.cos(u * 18) * .38 * r.sg, y = .05 + u * 3.6, z = r.z - .45 + Math.sin(u * 18) * .38; pts.push(V(x, y, z)); }
-    b.put(taperTube(pts, .05, .03, 40, 4), M4(), c => c.set('#1f5a3a'), () => 0, () => .3);
-    for (let i = 3; i < 26; i += 3) { const p = pts[i]; b.put(new THREE.IcosahedronGeometry(.08, 0), M4(p.clone().add(V(0, .05, 0)), null, V(1.4, .4, 1)), c => c.copy(GLOWC), () => .9); } }
-  const g = b.done(); g.userData.head = V(hd.x, 1.9, sz1);   /* 입 앞 (기체가 들어가는 자리) */
+  for (let k = 0; k < NR; k++) { const z = -h + k * D, bp = curve.getPointAt(at(z));
+    for (const sg of [1, -1]) { const broke = sg < 0 && (k === 1 || (k === 3 && R() < .7)); put(broke ? 'ribb' : 'rib', new THREE.Matrix4().makeScale(sg, 1, 1).setPosition(bp.x, bp.y, z)); ribs.push({ z, sg, broke, x0: bp.x, y0: bp.y });
+      if (broke) put('ribp', new THREE.Matrix4().makeRotationY(sg > 0 ? 0 : Math.PI).setPosition(bp.x + sg * 4.4, .02, z + .2)); } }
+  for (let k = 0; k < NR - 1; k++) for (const f of [.33, .67]) { const z = -h + (k + f) * D, bp = curve.getPointAt(at(z)); for (const sg of [1, -1]) put('ribs', new THREE.Matrix4().makeScale(sg * (.94 + R() * .06), 1, 1).setPosition(bp.x, bp.y, z)); }
+  /* 머리뼈 + 갈라진 턱(양쪽) + 이빨 */
+  const hp = curve.getPointAt(1), hz = hp.z + 1.45, hm = new THREE.Matrix4().setPosition(hp.x, HC, hz);
+  put('skull', hm); put('jaw', hm); put('jaw', hm.clone().multiply(new THREE.Matrix4().makeScale(-1, 1, 1)));
+  for (const [x, y, z, Lt, dir] of TEETH) for (const sg of [1, -1]) { const r = new THREE.Matrix4();
+    if (dir < 0) r.makeRotationY(sg > 0 ? Math.PI : 0); else r.makeRotationX(Math.PI).premultiply(new THREE.Matrix4().makeRotationY(sg > 0 ? Math.PI : 0));
+    r.scale(V(Lt * 1.15, Lt, Lt * 1.15)).setPosition(hp.x + sg * x, HC + y, hz + z); put('tooth', r); }
+  /* 위 눈구멍 깊은 곳에 희미한 불씨 (아직 꺼지지 않은 눈) */
+  for (const sg of [1, -1]) b.put(new THREE.IcosahedronGeometry(.07, 0), M4(V(hp.x + sg * .72, HC + .36, hz + 1.0)), c => c.copy(GLOWM), () => 2.2);
+  /* 덩굴: 긴 갈비 몇 개를 감아 오름 + 작은 빛 잎 */
+  for (const r of ribs.filter((r, i) => !r.broke && i % 3 === 0)) { const pts = []; for (let i = 0; i <= 26; i++) { const u = i / 26, f = 8 - u * 4, k = Math.floor(f), w = f - k, a = RIBP[Math.min(8, k)], c2 = RIBP[Math.min(8, k + 1)], px = a[0] + (c2[0] - a[0]) * w, py = a[1] + (c2[1] - a[1]) * w, pz = a[2] + (c2[2] - a[2]) * w;
+      pts.push(V(r.x0 + r.sg * (px + Math.cos(u * 18) * .2), Math.max(.05, r.y0 + py), r.z + pz + Math.sin(u * 18) * .24)); }
+    b.put(taperTube(pts, .045, .028, 40, 4), M4(), c => c.set('#1f5a3a'), () => 0, () => .3);
+    for (let i = 3; i < 26; i += 3) b.put(new THREE.IcosahedronGeometry(.08, 0), M4(pts[i].clone().add(V(0, .05, 0)), null, V(1.4, .4, 1)), c => c.copy(GLOWC), () => .9); }
+  const g = b.done(); g.userData.head = V(hp.x, 1.9, hz + 5.2);   /* 입 앞 (기체가 들어가는 자리) */
+  const sz1 = hz + 5.2, hd = { x: hp.x };
   /* 바닥 자취: 뼈가 땅에 드리운 자리를 50cm 칸으로 (놓을 자리 찾기 · 풀 안 나게) + 들어가는 입구 자리 */
   const P = g.attributes.position, cells = new Map(); for (let i = 0; i < P.count; i++) { const kx = Math.round(P.getX(i) * 2), kz = Math.round(P.getZ(i) * 2); cells.set(kx + ',' + kz, [kx / 2, kz / 2]); }
   g.userData.cells = [...cells.values()];
   g.userData.hull = hull(g.userData.cells);
-  g.userData.mouth = [[hd.x, sz1 + 2.5], [hd.x - 1, sz1 + 1.5], [hd.x + 1, sz1 + 1.5], [hd.x, sz1 + 4]];   /* 입 앞 비워 둘 곳 (섬 안 · 막힘 없음) */
+  g.userData.mouth = [[hd.x, sz1 + 1.5], [hd.x - 1, sz1 + .8], [hd.x + 1, sz1 + .8], [hd.x, sz1 + 3]];   /* 입 앞 비워 둘 곳 (섬 안 · 막힘 없음) */
   g.userData.sides = []; for (let k = 0; k < NR - 1; k++) { const z = -h + (k + .5) * D; g.userData.sides.push([X + 2.2, z], [-X - 2.2, z]); }   /* 갈비 사이로 드나드는 옆 입구 */
   return g; }
 function hull(pts) { const p = pts.slice().sort((a, b) => a[0] - b[0] || a[1] - b[1]), cr = (o, a, b) => (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0]), lo = [], up = [];
@@ -254,27 +233,27 @@ function groundCap(outline, Rm, seed, clear, hole) {
 
 /* 사냥터 섬 꾸미기: 땅 덮개 + 바닥 식물 + 가장자리 숲 + 화석 · 돌려주는 solid = 막힘 계산에 넣을 화석 */
 export function makeDresser(scene, KL) {
-  const T = { value: 0 }, mat = dressMat(KL, T, false), matS = dressMat(KL, T, true), solids = [];
+  const T = { value: 0 }, mat = dressMat(KL, T, false), matS = dressMat(KL, T, true), matB = dressMat(KL, T, false, .35), solids = [];
   const P = { tuft: [0, 1, 2].map(i => makeTuft(11 + i * 7)), shroom: [0, 1, 2].map(i => makeShrooms(31 + i * 5)), fern: [0, 1].map(i => makeFern(51 + i * 9)), pebble: [0, 1, 2].map(i => makePebble(71 + i * 3)), glint: [0, 1].map(i => makeGlints(81 + i)) };
   const TREES = [0, 1, 2].map(i => makeTree(91 + i * 13).geo), SWAY = new Set([...P.tuft, ...P.fern, ...TREES]), matOf = g => SWAY.has(g) ? matS : mat, isles = [];
   const fossilGeo = makeFossil(7), fossilS = makeFossil(13, 3);   /* 큰 것(갈비 4쌍) · 작은 섬용(3쌍) */
   /* piece: 놓인 정글 조각 (x,y,z 땅 높이 · yaw) · outlineK: 조각 바깥선(키트 단위 함수) · s: 조각 배율 · opt.block: 조각 위 막히는 것 [x,z,반지름](키트 단위) */
   const hunt = (piece, outlineK, s, seed, opt = {}) => {
-    const R = rng(seed), Rm = 38 * s, cy = Math.cos(piece.yaw || 0), sy = Math.sin(piece.yaw || 0), grp = new THREE.Group(), bag = Bag(); scene.add(grp); isles.push({ grp, x: piece.x, z: piece.z, r: Rm });
+    const R = rng(seed), Rm = opt.Rm || 38 * s, cy = Math.cos(piece.yaw || 0), sy = Math.sin(piece.yaw || 0), grp = new THREE.Group(), bag = Bag(); scene.add(grp); isles.push({ grp, x: piece.x, z: piece.z, r: Rm });
     const toW = (lx, lz) => [piece.x + lx * cy + lz * sy, piece.z - lx * sy + lz * cy];
-    const OL = a => outlineK(a) * s, clear = Rm * .3, cap = groundCap(OL, Rm, seed % 97, clear), capMesh = new THREE.Mesh(cap.geo, mat);
+    const OL = a => outlineK(a) * s, HO = opt.hole || 0, clear = Rm * .3, cap = groundCap(OL, Rm, seed % 97, HO ? 0 : clear, HO ? () => HO : null), capMesh = new THREE.Mesh(cap.geo, mat);
     capMesh.position.set(piece.x, piece.y, piece.z); capMesh.rotation.y = piece.yaw || 0; grp.add(capMesh);
     const ground = (lx, lz) => piece.y + cap.hAt(lx, lz);
     const blocks = (opt.block || []).map(b => [b[0] * s, b[1] * s, b[2] * s]);
     /* 화석: 맞는 자리를 찾아서 (큰 것 → 안 되면 작은 것 → 그래도 안 되면 안 놓음) */
     const occ = new Set(), ok = (x, z) => occ.has(Math.round(x) + ',' + Math.round(z));   /* 뼈가 차지한 1m 칸 (풀·나무 안 나게) */
     if (opt.fossil !== false) for (const geo of [fossilGeo, fossilS]) { const f = fitFossil(geo, OL, Rm, blocks, clear, R); if (!f) continue;
-      const fm = new THREE.Mesh(geo, mat), [wx, wz] = toW(f.x, f.z); fm.position.set(wx, piece.y + Math.min(cap.hAt(f.x, f.z), .1) - .12, wz); fm.rotation.y = (piece.yaw || 0) + f.rot; grp.add(fm); fm.updateMatrixWorld(true);
+      const fm = new THREE.Mesh(geo, matB), [wx, wz] = toW(f.x, f.z); fm.position.set(wx, piece.y + Math.min(cap.hAt(f.x, f.z), .1) - .12, wz); fm.rotation.y = (piece.yaw || 0) + f.rot; grp.add(fm); fm.updateMatrixWorld(true);
       solids.push(fm); fm.userData.head = geo.userData.head.clone().applyMatrix4(fm.matrixWorld); fm.userData.fit = f;
       const c = Math.cos(f.rot), s2 = Math.sin(f.rot); for (const p of geo.userData.cells) { const x = f.x + p[0] * c + p[1] * s2, z = f.z - p[0] * s2 + p[1] * c; for (let dx = -1; dx <= 1; dx++) for (let dz = -1; dz <= 1; dz++) occ.add((Math.round(x) + dx) + ',' + (Math.round(z) + dz)); }
       break; }
     const inFossil = ok;
-    const spot = (fMin, fMax) => { const a = R() * 6.2832, f = Math.sqrt(fMin * fMin + R() * (fMax * fMax - fMin * fMin)), r = outlineK(a) * s * f; return [Math.cos(a) * r, Math.sin(a) * r, f]; };
+    const spot = (fMin, fMax) => { const a = R() * 6.2832, f = Math.sqrt(fMin * fMin + R() * (fMax * fMax - fMin * fMin)), r = HO ? HO + .6 + (outlineK(a) * s - HO - .6) * f : outlineK(a) * s * f; return [Math.cos(a) * r, Math.sin(a) * r, f]; };   /* hole: 가운데 바닥(성소)은 비움 */
     const nearB = (x, z, m) => blocks.some(b => (x - b[0]) ** 2 + (z - b[1]) ** 2 < (b[2] + m) ** 2);
     const plant = (pl, lx, lz, sc, tilt = 0) => { if (inFossil(lx, lz) || nearB(lx, lz, 0)) return; const [wx, wz] = toW(lx, lz); bag.add(pl[Math.floor(R() * pl.length)], wx, ground(lx, lz) - .03, wz, R() * 6.28, sc, tilt); };
     const area = Math.PI * Rm * Rm;

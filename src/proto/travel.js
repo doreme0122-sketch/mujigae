@@ -5,7 +5,7 @@
    · 도착한 섬: 그 섬 땅 위만 날 수 있음(땅 밖은 막힘) · 섬 가장자리에 돌아가는 문(받침 섬 위) — 같은 방법으로 돌아감
    · 돌아가는 문과 도착 섬의 땅 지도는 '갈 때만' 만들고 돌아오면 비움 (지금 쓰는 것만 올림 · 설계 원칙) */
 import * as THREE from 'three';
-import { gate4, pedestal } from './gates.js?v=11081119';
+import { gate4, pedestal } from './gates.js?v=11081253';
 
 const clamp = THREE.MathUtils.clamp, smooth = (a, b, x) => { const k = clamp((x - a) / (b - a), 0, 1); return k * k * (3 - 2 * k); };
 const AB = { transparent: true, depthWrite: false, blending: THREE.AdditiveBlending };
@@ -148,7 +148,7 @@ export function makeTravel({ scene, gates, meadow, jungle, fly, ship, FS, HOVER,
   const glowTrail = (glow, sp) => { if (mode !== 'trip') return; const ca = trip.g.col.toArray(), k = 1 - trip.u;
     for (let i = 0; i < 6; i++) { const a = Math.random() * 6.28, r = 1.3 + Math.random() * 2; glow.add(sp.x + Math.cos(a) * r, HOVER + yOff + Math.sin(a) * r * .5, sp.z + Math.sin(a) * r * .4, -tan.x * 3 * k, -tan.y * 3 * k, -tan.z * 3 * k, .05, 0, ca, .8 * k, i); } };
   const status = () => mode === 'trip' ? (trip.back ? '돌아가는 중 · 공격받지 않음' : (trip.g.Gd.layer === 'up' ? '위층으로' : '아래층으로') + ' 가는 중 · 공격받지 않음')
-    : charge ? `출발 준비 ${Math.ceil(3 - charge.u * 3)} · 움직이면 취소` : mode === 'dest' ? (dest.g.Gd.jungle ? '정글 던전' : '보물 섬') + ' · ' + (dest.g.Gd.layer === 'up' ? '위층' : '아래층') + ' · 돌아가는 문 한가운데서 멈추면 돌아감' : null;
+    : charge ? `출발 준비 ${Math.ceil(3 - charge.u * 3)} · 움직이면 취소` : mode === 'dest' ? (dest.g.Gd.jungle ? (dest.g.Gd.sanct ? '정글 보물 성소' : '정글 던전') : '보물 섬') + ' · ' + (dest.g.Gd.layer === 'up' ? '위층' : '아래층') + ' · 돌아가는 문 한가운데서 멈추면 돌아감' : null;
   /* 다시 태어날 때 (사용자 2026-11-07: 위층·아래층에서 다시 태어나면 그 층 높이에서 태어나던 버그): 문 타기 상태를 처음으로 */
   const reset = () => { if (charge) SND.chargeStop(true); charge = null; trip = null; lock = null; closeDest(); mode = 'mid'; yOff = 0;
     FS.aim = null; FS.chBank = 0; FS.chPitch = 0; FS.tripPitch = 0; FS.dashUntil = 0; for (const g of gates) { g.stay = 0; g.ch = 0; } shock.visible = false; SW.t = 9; };
