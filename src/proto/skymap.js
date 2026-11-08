@@ -8,25 +8,25 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
-import { makeBloom } from '../core/hangar/bloom.js?v=11081850';
-import { makePad } from '../core/hangar/pad.js?v=11081850';
-import { makeMag } from '../core/hangar/mag.js?v=11081850';
+import { makeBloom } from '../core/hangar/bloom.js?v=11082248';
+import { makePad } from '../core/hangar/pad.js?v=11082248';
+import { makeMag } from '../core/hangar/mag.js?v=11082248';
 import { buildShip } from '../core/ships/build.js';
-import { makeGoldStar } from './goldstar.js?v=11081850';
-import { makeArena, SPEED, WAVE_R0 } from './arena.js?v=11081850';
-import { makeGuardians, GUARD } from './guardian.js?v=11081850';
-import { makeBirth, BIRTH } from './birth.js?v=11081850';
-import { makeTravel } from './travel.js?v=11081850';
-import { spiralPath } from './path.js?v=11081850';
-import { makePerf } from './perf.js?v=11081850';
+import { makeGoldStar } from './goldstar.js?v=11082248';
+import { makeArena, SPEED, WAVE_R0 } from './arena.js?v=11082248';
+import { makeGuardians, GUARD } from './guardian.js?v=11082248';
+import { makeBirth, BIRTH } from './birth.js?v=11082248';
+import { makeTravel } from './travel.js?v=11082248';
+import { spiralPath } from './path.js?v=11082248';
+import { makePerf } from './perf.js?v=11082248';
 import { makeGlow } from '../preview/glow.js';
-import { makeFlight, FLY } from './flight.js?v=11081850';
-import { pedestal, gate4 } from './gates.js?v=11081850';
-import { makeMeadow, MEADOW } from './meadow.js?v=11081850';
-import { makeClouds } from './clouds.js?v=11081850';
-import { makeLife } from './life.js?v=11081850';
-import { makeJungle, jungleLayout, SANCT_TEST } from './jungle.js?v=11081850';
-import { makeGimmicks } from './gimmick.js?v=11081850';
+import { makeFlight, FLY, PADZ, padZone } from './flight.js?v=11082248';
+import { pedestal, gate4 } from './gates.js?v=11082248';
+import { makeMeadow, MEADOW } from './meadow.js?v=11082248';
+import { makeClouds } from './clouds.js?v=11082248';
+import { makeLife } from './life.js?v=11082248';
+import { makeJungle, jungleLayout, SANCT_TEST } from './jungle.js?v=11082248';
+import { makeGimmicks } from './gimmick.js?v=11082248';
 
 const $ = s => document.querySelector(s), clamp = THREE.MathUtils.clamp, HOVER = FLY.HOVER;
 const R = 240, NB = 10, GAPH = 5.6, BASE_D = 0;     /* 맵 반지름 · 기지 수 · 벽 틈 반 폭(= 기지 반지름) · 기지 가운데는 벽 선 위 (앞 절반은 맵 안, 뒤 절반은 맵 밖 · 사용자 2026-11-06) */
@@ -160,7 +160,7 @@ export async function start(canvas, onProgress = () => {}) {
   onProgress(.4);
   /* ── 초원 고리 ── */
   const JL = jungleLayout({ TOP: MEADOW.TOP, UP: MEADOW.UP, DN: MEADOW.DN });   /* 정글 배치 계획을 먼저 → 초원이 경계 너머로 섬을 놓을 때 피해 감 */
-  const meadow = await makeMeadow(scene, new URL('./assets/kit_meadow.glb?v=11081850', import.meta.url).href, p => onProgress(.4 + p * .4), new URL('./assets/kit_meadow_decor.glb?v=11081850', import.meta.url).href, new URL('./assets/kit_meadow_lo.glb?v=11081850', import.meta.url).href, { avoid: JL });
+  const meadow = await makeMeadow(scene, new URL('./assets/kit_meadow.glb?v=11082248', import.meta.url).href, p => onProgress(.4 + p * .4), new URL('./assets/kit_meadow_decor.glb?v=11082248', import.meta.url).href, new URL('./assets/kit_meadow_lo.glb?v=11082248', import.meta.url).href, { avoid: JL });
   const clouds = makeClouds(scene, { R0: MEADOW.R0, R1: MEADOW.R1 });   /* 층 사이 흘러가는 구름 · 기체 높이 숨는 구름 */
   const jungle = makeJungle(scene, { TOP: MEADOW.TOP, UP: MEADOW.UP, DN: MEADOW.DN, avoid: meadow.place.concat(meadow.CORR.map(c => ({ x: c[0], z: c[1], rr: c[2], layer: 'all' }))) });   /* 우주 정글 고리 (초원 안쪽) */
   /* ── 위아래 문 다섯: 흩어진 고리 문(0.8배) + 보물 던전 섬까지 뻗는 빛 띠 (위층 = 금빛 · 아래층 = 보랏빛) ── */
@@ -254,13 +254,31 @@ export async function start(canvas, onProgress = () => {}) {
   /* ── 둘러보기 (이미 정한 방식 · 플레이 중에도 늘 됨): 버튼 없는 빈 화면(오른쪽)에서 끌면 지도를 밀듯이(오른쪽으로 밀면 카메라는 왼쪽으로) ·
         끄는 빠르기에 따라 움직이는 속도가 다름 · 손 떼면 내 기체(죽어 있을 땐 죽은 자리) 화면으로 저절로 돌아옴 · 죽어 있을 땐 화면 어디서 끌어도 됨 */
   const look = { x: 0, z: 0, id: null, px: 0, py: 0, pt: 0 };
-  addEventListener('pointerdown', e => { if (look.id !== null || e.target.closest('#ui') || e.target.closest('#fire')) return; if (!dead && e.clientX <= innerWidth * .55) return;
+  /* 칸 경계 표시: 조이스틱 칸(왼쪽 아래 네모)과 맵 둘러보기 칸(나머지 ㄱ자)을 옅은 점선으로 · 누른 칸만 잠깐 밝아짐 · 가만히 두면 거의 안 보임 */
+  const zsv = document.createElementNS('http://www.w3.org/2000/svg', 'svg'); zsv.id = 'zones';
+  zsv.style.cssText = 'position:fixed;inset:0;width:100%;height:100%;pointer-events:none;z-index:3;font:600 11px system-ui,sans-serif';
+  zsv.innerHTML = '<path id="zMap" fill="rgba(140,200,255,0)" stroke="rgba(160,215,255,.55)" stroke-width="1.5" stroke-dasharray="7 6"/><rect id="zPad" rx="14" fill="rgba(185,255,74,0)" stroke="rgba(185,255,74,.6)" stroke-width="1.5" stroke-dasharray="7 6"/><text id="tPad" fill="rgba(200,255,120,.85)">이동 (조이스틱)</text><text id="tMap" fill="rgba(180,225,255,.85)">맵 둘러보기 (끌기)</text>';
+  document.body.appendChild(zsv);
+  const zP = zsv.querySelector('#zPad'), zM = zsv.querySelector('#zMap'), tP = zsv.querySelector('#tPad'), tM = zsv.querySelector('#tMap');
+  const layZones = () => { const W = innerWidth, H = innerHeight, g = 6, pw = W * PADZ.w, ph = H * PADZ.h, y0 = H - ph;
+    zP.setAttribute('x', g); zP.setAttribute('y', y0 + g); zP.setAttribute('width', pw - g * 2); zP.setAttribute('height', ph - g * 2);
+    zM.setAttribute('d', `M${g},${g} H${W - g} V${H - g} H${pw + g} V${y0 - g} H${g} Z`);
+    tP.setAttribute('x', g + 12); tP.setAttribute('y', y0 + g + 20); tM.setAttribute('x', pw + g + 12); tM.setAttribute('y', y0 - g - 8); };
+  layZones(); addEventListener('resize', layZones);
+  let zoneT = 0, zoneOn = null; const zoneHit = (k, on) => { if (on) { zoneOn = k; zoneT = performance.now(); } else zoneOn = null; };
+  const zoneTick = () => { const idle = (performance.now() - zoneT) / 1000, show = zoneOn ? 1 : Math.max(.18, 1 - Math.max(0, idle - 1.2) * .6);   /* 손 떼고 1초 남짓 뒤 서서히 옅어짐 */
+    zsv.style.opacity = show.toFixed(2); zsv.style.display = flying || dead ? '' : 'none';
+    zP.setAttribute('fill', zoneOn === 'pad' ? 'rgba(185,255,74,.07)' : 'rgba(185,255,74,0)'); zM.setAttribute('fill', zoneOn === 'map' ? 'rgba(140,200,255,.06)' : 'rgba(140,200,255,0)'); };
+  addEventListener('pointerdown', e => { if (e.target.closest('#ui') || e.target.closest('#fire')) return; if (padZone(e.clientX, e.clientY) && flying && !dead) zoneHit('pad', true); }, true);
+  addEventListener('pointerup', () => { if (look.id === null) zoneHit(null, false); }, true);
+  addEventListener('pointerdown', e => { if (look.id !== null || e.target.closest('#ui') || e.target.closest('#fire')) return; if (!dead && flying && padZone(e.clientX, e.clientY)) return;   /* 조이스틱 칸만 빼고 어디든 끌면 둘러보기 */
+    zoneHit(padZone(e.clientX, e.clientY) && !dead && flying ? 'pad' : 'map', true);
     look.id = e.pointerId; look.px = e.clientX; look.py = e.clientY; look.pt = performance.now(); });
   addEventListener('pointermove', e => { if (e.pointerId !== look.id) return; const now = performance.now(), dx = e.clientX - look.px, dy = e.clientY - look.py, sp = Math.hypot(dx, dy) / Math.max(1, now - look.pt) * 1000;
     const r = canvas.getBoundingClientRect(), mpp = 2 * camD * Math.tan(camera.fov * Math.PI / 360) / Math.max(1, r.height), fast = 1 + Math.min(2.5, sp / 900), a = cfg.ang * Math.PI / 180;
     look.x -= dx * mpp * fast; look.z -= dy * mpp * fast / Math.max(.35, Math.sin(a)); const l = Math.hypot(look.x, look.z); if (l > 160) { look.x *= 160 / l; look.z *= 160 / l; }
     look.px = e.clientX; look.py = e.clientY; look.pt = now; });
-  const lookUp = e => { if (e.pointerId === look.id) look.id = null; }; addEventListener('pointerup', lookUp); addEventListener('pointercancel', lookUp);
+  const lookUp = e => { if (e.pointerId === look.id) look.id = null; zoneHit(null, false); }; addEventListener('pointerup', lookUp); addEventListener('pointercancel', lookUp);
 
   /* ── 쏘기: 버튼을 누르고 있거나 스페이스 ── */
   let fireOn = false; const fb = $('#fire'); fb.addEventListener('pointerdown', e => { e.stopPropagation(); fireOn = true; fb.setPointerCapture(e.pointerId); }); const fu = () => { fireOn = false; }; fb.addEventListener('pointerup', fu); fb.addEventListener('pointercancel', fu);
@@ -306,7 +324,7 @@ export async function start(canvas, onProgress = () => {}) {
     if (flying) travel.update(t, dt, cam);
     { const L = travel.mode === 'dest' ? travel.dest.g.Gd.layer : null, k = Math.min(1, dt * 2); jungle.setFocus(L, L ? travel.dest.g.Gd.ty : 0); visU += ((L === 'up' ? 1 : 0) - visU) * k; visD += ((L === 'dn' ? 1 : 0) - visD) * k; meadow.setVisit(visU, visD); }   /* 도착한 층은 옅은 빛을 걷어 또렷하게 */
     if (flying) { if (travel.mode !== 'trip') { flyY += (travel.yOff - flyY) * Math.min(1, dt * 1.5); fly.position.y = flyY + gim.hop; } else flyY = fly.position.y; fly.updateMatrixWorld(true); fly.userData.update(t, dt);   /* 판 위 높이에서 비행 높이로 스르륵 */ for (const o of oldSh) o.visible = false; travel.pose(); }
-    gim.update(t, dt, { flying, mode: travel.mode, camera, pxRatio: renderer.getPixelRatio() });
+    gim.update(t, dt, { flying, mode: travel.mode, camera, pxRatio: renderer.getPixelRatio() }); zoneTick();
     xrayM.uniforms.uH.value += ((gim.hidden() ? 1 : 0) - xrayM.uniforms.uH.value) * Math.min(1, dt * 6); xrayM.depthFunc = xrayM.uniforms.uH.value > .5 ? THREE.AlwaysDepth : THREE.GreaterDepth;   /* 숨는 동안은 기체 전체를 초록 실루엣으로 (나무에 가린 곳도 · 안 가린 곳도) */
     { const sp = flying ? bship.getWorldPosition(v3) : v3.set(cam.x, cam.y, cam.z); sight.position.set(sp.x, sp.y - .2, sp.z); sightU.uOn.value += ((flying || dead ? 1 : 0) - sightU.uOn.value) * Math.min(1, dt * 1.5); sightU.uT.value = t; }
     if (shockT < .8) { shockT += dt; shock.visible = true; shockM.uniforms.uR.value = .3 + shockT * 4.5; shockM.uniforms.uI.value = Math.max(0, 1 - shockT / .8) * 1.3; } else shock.visible = false;

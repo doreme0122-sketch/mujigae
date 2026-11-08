@@ -11,9 +11,9 @@
 import * as THREE from 'three';
 import { buildShip, engineSpots } from '../core/ships/build.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { flameMesh } from './sortie.js?v=11081850';
-import { MAP } from './mapfloor.js?v=11081850';
-import { applyShipHeat, heatVis } from './shipheat.js?v=11081850';
+import { flameMesh } from './sortie.js?v=11082248';
+import { MAP } from './mapfloor.js?v=11082248';
+import { applyShipHeat, heatVis } from './shipheat.js?v=11082248';
 
 export const FLY = { LEN: 2, HOVER: .7, R: .8, SPEEDS: [9, 12, 15, 18], TURN: 7, ACC: .22, TURNMAX: 9,
   BASE: 9, SHIELD: 3, BOOST: 5, BOOSTK: 1.5 };   /* 기지 고리(반지름 9m)를 벗어나는 순간: 보호막 3초 · 가속 5초(1.5배) — 기지 출구 앞 매복에 바로 당하지 않게 */
@@ -69,12 +69,13 @@ export async function makeFlight(renderer, B, start, face) {
   sparks.frustumCulled = false; sparks.renderOrder = 9; G.add(sparks); const SP = Array.from({ length: NS }, () => ({ l: 0, p: new THREE.Vector3(), v: new THREE.Vector3() })); let spI = 0;
 
   /* 조이스틱 */
+  /* 조이스틱 칸: 왼쪽 아래 네모 (가로 40% · 세로 아래 55%) — 그 밖은 맵 둘러보기 칸 (사용자 2026-11-08) */
   const pad = document.createElement('div'), knob = document.createElement('i');
   pad.style.cssText = 'position:fixed;width:120px;height:120px;margin:-60px 0 0 -60px;border-radius:50%;border:1.5px solid rgba(185,255,74,.35);background:radial-gradient(rgba(185,255,74,.08),rgba(0,0,0,.25));pointer-events:none;display:none;z-index:5';
   knob.style.cssText = 'position:absolute;left:50%;top:50%;width:46px;height:46px;margin:-23px 0 0 -23px;border-radius:50%;background:radial-gradient(circle at 40% 35%,rgba(230,255,190,.9),rgba(140,210,60,.55));box-shadow:0 0 16px rgba(185,255,74,.5)';
   pad.appendChild(knob); document.body.appendChild(pad);
   const inp = { x: 0, y: 0 }, keys = new Set(); let pid = null, ox = 0, oy = 0;
-  addEventListener('pointerdown', e => { if (pid !== null || S.noPad || e.target.closest('#ui') || e.clientX > innerWidth * .55) return;   /* noPad: 죽어 있는 동안엔 조이스틱 대신 둘러보기 */ pid = e.pointerId; ox = e.clientX; oy = e.clientY;
+  addEventListener('pointerdown', e => { if (pid !== null || S.noPad || e.target.closest('#ui') || !padZone(e.clientX, e.clientY)) return;   /* noPad: 죽어 있는 동안엔 조이스틱 대신 둘러보기 */ pid = e.pointerId; ox = e.clientX; oy = e.clientY;
     pad.style.left = ox + 'px'; pad.style.top = oy + 'px'; pad.style.display = 'block'; knob.style.transform = ''; });
   addEventListener('pointermove', e => { if (e.pointerId !== pid) return; let dx = e.clientX - ox, dy = e.clientY - oy; const l = Math.hypot(dx, dy), R = 52;
     if (l > R) { dx *= R / l; dy *= R / l; } knob.style.transform = `translate(${dx}px,${dy}px)`; inp.x = dx / R; inp.y = dy / R; });
@@ -203,6 +204,8 @@ void main() {
 
 /* 기체 부품 합치기 (2026-11-08 최적화): 원본 모델은 부품마다 따로 그려 한 장면에 기체만 145번(+ 벽 너머 비침 145번) 그렸음.
    같은 칠 · 같은 정보(자리·빛 방향·그림 좌표)를 쓰는 부품끼리 한 덩어리로 합침 → 모양·칠은 그대로, 그리는 횟수만 줄어듦 (부품은 따로 움직이지 않음) */
+export const PADZ = { w: .4, h: .55 };
+export const padZone = (x, y) => x < innerWidth * PADZ.w && y > innerHeight * (1 - PADZ.h);
 export function mergeShip(root) {
   root.updateMatrixWorld(true); const inv = new THREE.Matrix4().copy(root.matrixWorld).invert(), groups = new Map(), drop = [];
   root.traverse(o => { if (!o.isMesh || Array.isArray(o.material) || o.isSkinnedMesh || o.morphTargetInfluences) return; const g = o.geometry;

@@ -50,14 +50,14 @@ input[type=range]{flex:1;min-width:0;accent-color:#b9ff4a;height:18px;margin:0}
 </style>
 <script>
 window.__ver = fetch('ver.json?t=' + Date.now(), { cache: 'no-store' }).then(r => r.json()).then(j => {
-  const f = location.pathname.split('/').pop() || 'index.html', want = j[f], mine = window.__mine = '11081850';
+  const f = location.pathname.split('/').pop() || 'index.html', want = j[f], mine = window.__mine = '11082248';
   if (want && +want > +mine) { location.replace(f + '?v=' + want + '&r=' + Date.now() + location.hash); return new Promise(() => {}); } }).catch(() => {});
 </script>
 <script type="importmap">{"imports":{"three":"./vendor/three.module.js","three/addons/":"./vendor/addons/"}}</script>
 </head><body>
 <canvas id="cv"></canvas>
 <div id="ui">
-  <div id="head"><b>하늘 맵 · 태어나는 곳과 무지개 벽</b><span>화면 왼쪽을 끌어 몰기 · 컴퓨터는 WASD · 쏘기 버튼(스페이스)으로 벽을 쏴 보기</span></div>
+  <div id="head"><b>하늘 맵 · 태어나는 곳과 무지개 벽</b><span>왼쪽 아래 칸을 끌어 몰기 · 나머지를 끌면 맵 둘러보기 · 컴퓨터는 WASD · 쏘기 버튼(스페이스)으로 벽을 쏴 보기</span></div>
   <div id="fps"></div>
   <div id="where"></div>
   <button id="fire" type="button" aria-label="쏘기">쏘기</button>
@@ -72,7 +72,7 @@ window.__ver = fetch('ver.json?t=' + Date.now(), { cache: 'no-store' }).then(r =
 <div id="rot">기기를 가로로 돌려 주세요</div>
 <script type="module">
 await window.__ver;
-const { start } = await import('./src/proto/skymap.js?v=11081850');
+const { start } = await import('./src/proto/skymap.js?v=11082248');
 const bar = document.querySelector('#load i');
 document.querySelector('#tog').onclick = () => { const v = document.querySelector('#view'); v.classList.toggle('shut'); document.querySelector('#tog').textContent = v.classList.contains('shut') ? '설정 펴기 ▾' : '설정 접기 ▴'; };
 start(document.querySelector('#cv'), p => { bar.style.transform = `scaleX(${p})`; })
