@@ -8,25 +8,25 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
-import { makeBloom } from '../core/hangar/bloom.js?v=11081703';
-import { makePad } from '../core/hangar/pad.js?v=11081703';
-import { makeMag } from '../core/hangar/mag.js?v=11081703';
+import { makeBloom } from '../core/hangar/bloom.js?v=11081719';
+import { makePad } from '../core/hangar/pad.js?v=11081719';
+import { makeMag } from '../core/hangar/mag.js?v=11081719';
 import { buildShip } from '../core/ships/build.js';
-import { makeGoldStar } from './goldstar.js?v=11081703';
-import { makeArena, SPEED, WAVE_R0 } from './arena.js?v=11081703';
-import { makeGuardians, GUARD } from './guardian.js?v=11081703';
-import { makeBirth, BIRTH } from './birth.js?v=11081703';
-import { makeHeightLine } from './hline.js?v=11081703';
-import { makeTravel } from './travel.js?v=11081703';
-import { spiralPath } from './path.js?v=11081703';
-import { makePerf } from './perf.js?v=11081703';
+import { makeGoldStar } from './goldstar.js?v=11081719';
+import { makeArena, SPEED, WAVE_R0 } from './arena.js?v=11081719';
+import { makeGuardians, GUARD } from './guardian.js?v=11081719';
+import { makeBirth, BIRTH } from './birth.js?v=11081719';
+import { makeHeightLine } from './hline.js?v=11081719';
+import { makeTravel } from './travel.js?v=11081719';
+import { spiralPath } from './path.js?v=11081719';
+import { makePerf } from './perf.js?v=11081719';
 import { makeGlow } from '../preview/glow.js';
-import { makeFlight, FLY } from './flight.js?v=11081703';
-import { pedestal, gate4 } from './gates.js?v=11081703';
-import { makeMeadow, MEADOW } from './meadow.js?v=11081703';
-import { makeClouds } from './clouds.js?v=11081703';
-import { makeLife } from './life.js?v=11081703';
-import { makeJungle, jungleLayout, SANCT_TEST } from './jungle.js?v=11081703';
+import { makeFlight, FLY } from './flight.js?v=11081719';
+import { pedestal, gate4 } from './gates.js?v=11081719';
+import { makeMeadow, MEADOW } from './meadow.js?v=11081719';
+import { makeClouds } from './clouds.js?v=11081719';
+import { makeLife } from './life.js?v=11081719';
+import { makeJungle, jungleLayout, SANCT_TEST } from './jungle.js?v=11081719';
 
 const $ = s => document.querySelector(s), clamp = THREE.MathUtils.clamp, HOVER = FLY.HOVER;
 const R = 240, NB = 10, GAPH = 5.6, BASE_D = 0;     /* 맵 반지름 · 기지 수 · 벽 틈 반 폭(= 기지 반지름) · 기지 가운데는 벽 선 위 (앞 절반은 맵 안, 뒤 절반은 맵 밖 · 사용자 2026-11-06) */
@@ -53,18 +53,25 @@ export async function start(canvas, onProgress = () => {}) {
   const HEMI0 = new THREE.Color(0xb7c8e8), GND0 = new THREE.Color(0x3a3020), HEMI_J = new THREE.Color(0x7a6cff), GND_J = new THREE.Color(0x3a0a4a), CLR0 = new THREE.Color(0xbcd2ea), CLR_J = new THREE.Color(0x1a1238); let mood = 0;   /* 정글 분위기 */
   const glow = makeGlow(); scene.add(glow.mesh);
   /* 아래 구름 바다 */
-  const sea = new THREE.Mesh(new THREE.PlaneGeometry(2400, 2400).rotateX(-Math.PI / 2), new THREE.ShaderMaterial({ uniforms: { uT: { value: 0 } },
+  /* 구름 무늬 그림 (2026-11-08 최적화: 화면 칸마다 잡음 약 29번 계산 → 미리 구운 그림 한 장에서 9번 읽기 · 무늬·흐름·겹은 그대로)
+     이어 붙여도 이음매 없는 기울기 잡음(격자가 덜 드러남) · R = 다섯 겹 쌓은 구름 · G = 한 겹 */
+  const seaNoise = (() => { const S = 512, P = 16, d = new Uint8Array(S * S * 4), G = [];
+    for (let i = 0; i < 256 * 256; i++) { const a = Math.sin(i * 12.9898 + 78.233) * 43758.5453, an = (a - Math.floor(a)) * 6.2832; G.push(Math.cos(an), Math.sin(an)); }
+    const gr = (ix, iy, per) => { ix = ((ix % per) + per) % per; iy = ((iy % per) + per) % per; let h = Math.imul(ix, 374761393) ^ Math.imul(iy, 668265263) ^ Math.imul(per, 1442695041); h = Math.imul(h ^ (h >>> 13), 1274126177); h ^= h >>> 16; const k = ((h >>> 0) % 65536) * 2; return [G[k], G[k + 1]]; };
+    const fade = t => t * t * t * (t * (t * 6 - 15) + 10);
+    const pn = (x, y, per) => { const ix = Math.floor(x), iy = Math.floor(y), fx = x - ix, fy = y - iy, u = fade(fx), v = fade(fy);
+      const dot = (gx, gy, dx, dy) => { const g = gr(ix + gx, iy + gy, per); return g[0] * dx + g[1] * dy; };
+      const a = dot(0, 0, fx, fy), b = dot(1, 0, fx - 1, fy), c = dot(0, 1, fx, fy - 1), e = dot(1, 1, fx - 1, fy - 1); return (a + (b - a) * u + (c - a) * v + (a - b - c + e) * u * v) * 1.4 * .5 + .5; };
+    for (let j = 0; j < S; j++) for (let i = 0; i < S; i++) { const x = i / S * P, y = j / S * P; let s2 = 0, a = .5, f = 1, n1 = 0;
+      for (let o = 0; o < 5; o++) { const v = pn(x * f + o * 3.1, y * f + o * 1.7, P * f); if (!o) n1 = v; s2 += a * v; a *= .5; f *= 2; }
+      const k = (j * S + i) * 4; d[k] = Math.max(0, Math.min(255, Math.round(s2 / .97 * 255))); d[k + 1] = Math.max(0, Math.min(255, Math.round(n1 * 255))); d[k + 2] = 0; d[k + 3] = 255; }
+    const t = new THREE.DataTexture(d, S, S); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.magFilter = THREE.LinearFilter; t.minFilter = THREE.LinearMipmapLinearFilter; t.generateMipmaps = true; t.needsUpdate = true; return t; })();
+  const sea = new THREE.Mesh(new THREE.PlaneGeometry(2400, 2400).rotateX(-Math.PI / 2), new THREE.ShaderMaterial({ uniforms: { uT: { value: 0 }, uN: { value: seaNoise } },
     vertexShader: 'varying vec3 vW; void main(){ vec4 w=modelMatrix*vec4(position,1.); vW=w.xyz; gl_Position=projectionMatrix*viewMatrix*w; }',
-    fragmentShader: `uniform float uT; varying vec3 vW; float h(vec2 p){ return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453); }
-      /* 구름 무늬 (사용자 2026-11-06: 네모 칸처럼 보임 → 격자가 드러나지 않는 부드러운 잡음 · 겹마다 돌려서 쌓고 서로 휘게 함) */
-      vec3 pm(vec3 x){ return mod(((x*34.)+1.)*x, 289.); }
-      float sn(vec2 v){ const vec4 C=vec4(.211324865,.366025404,-.577350269,.024390244); vec2 i=floor(v+dot(v,C.yy)); vec2 x0=v-i+dot(i,C.xx);
-        vec2 i1=(x0.x>x0.y)?vec2(1.,0.):vec2(0.,1.); vec4 x12=x0.xyxy+C.xxzz; x12.xy-=i1; i=mod(i,289.);
-        vec3 p=pm(pm(i.y+vec3(0.,i1.y,1.))+i.x+vec3(0.,i1.x,1.)); vec3 m=max(.5-vec3(dot(x0,x0),dot(x12.xy,x12.xy),dot(x12.zw,x12.zw)),0.); m=m*m; m=m*m;
-        vec3 x=2.*fract(p*C.www)-1.; vec3 hh=abs(x)-.5; vec3 ox=floor(x+.5); vec3 a0=x-ox; m*=1.79284291-.85373472*(a0*a0+hh*hh);
-        vec3 g; g.x=a0.x*x0.x+hh.x*x0.y; g.yz=a0.yz*x12.xz+hh.yz*x12.yw; return 130.*dot(m,g); }
-      float n(vec2 p){ return sn(p)*.5+.5; }
-      float fbm(vec2 p){ float a=.5, s=0.; mat2 m=mat2(1.6,1.2,-1.2,1.6); for(int i=0;i<5;i++){ s+=a*n(p); p=m*p+vec2(3.1,1.7); a*=.5; } return s/.97; }
+    fragmentShader: `uniform float uT; uniform sampler2D uN; varying vec3 vW; float h(vec2 p){ return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453); }
+      /* 구름 무늬 (사용자 2026-11-06: 네모 칸처럼 보임 → 격자가 드러나지 않는 부드러운 잡음 · 겹을 쌓고 서로 휘게 함) — 미리 구운 그림에서 읽음 */
+      float n(vec2 p){ return texture2D(uN, p/16.).g; }
+      float fbm(vec2 p){ return texture2D(uN, p/16.+vec2(.37,.61)).r; }
       void main(){ float rr=length(vW.xz);
         /* 하늘 → 우주: 구름 모양대로 울퉁불퉁하게 옅어지며 하늘빛이 어두워지고 별이 하나둘 · 경계를 따라 푸른 대기 빛 (사용자 2026-11-06) */
         vec2 q=vW.xz*.011; vec2 wv=vec2(fbm(q+vec2(uT*.006,0.)), fbm(q+vec2(5.2,1.3)-vec2(0.,uT*.004)));
@@ -153,7 +160,7 @@ export async function start(canvas, onProgress = () => {}) {
   onProgress(.4);
   /* ── 초원 고리 ── */
   const JL = jungleLayout({ TOP: MEADOW.TOP, UP: MEADOW.UP, DN: MEADOW.DN });   /* 정글 배치 계획을 먼저 → 초원이 경계 너머로 섬을 놓을 때 피해 감 */
-  const meadow = await makeMeadow(scene, new URL('./assets/kit_meadow.glb?v=11081703', import.meta.url).href, p => onProgress(.4 + p * .4), new URL('./assets/kit_meadow_decor.glb?v=11081703', import.meta.url).href, new URL('./assets/kit_meadow_lo.glb?v=11081703', import.meta.url).href, { avoid: JL });
+  const meadow = await makeMeadow(scene, new URL('./assets/kit_meadow.glb?v=11081719', import.meta.url).href, p => onProgress(.4 + p * .4), new URL('./assets/kit_meadow_decor.glb?v=11081719', import.meta.url).href, new URL('./assets/kit_meadow_lo.glb?v=11081719', import.meta.url).href, { avoid: JL });
   const clouds = makeClouds(scene, { R0: MEADOW.R0, R1: MEADOW.R1 });   /* 층 사이 흘러가는 구름 · 기체 높이 숨는 구름 */
   const jungle = makeJungle(scene, { TOP: MEADOW.TOP, UP: MEADOW.UP, DN: MEADOW.DN, avoid: meadow.place.concat(meadow.CORR.map(c => ({ x: c[0], z: c[1], rr: c[2], layer: 'all' }))) });   /* 우주 정글 고리 (초원 안쪽) */
   /* ── 위아래 문 다섯: 흩어진 고리 문(0.8배) + 보물 던전 섬까지 뻗는 빛 띠 (위층 = 금빛 · 아래층 = 보랏빛) ── */
@@ -285,7 +292,7 @@ export async function start(canvas, onProgress = () => {}) {
     if (look.id === null) { const k = Math.min(1, dt * 3.5); look.x -= look.x * k; look.z -= look.z * k; }   /* 손 떼면 돌아옴 */
     /* 기체 */
     if (flying) travel.update(t, dt, cam);
-    { const L = travel.mode === 'dest' ? travel.dest.g.Gd.layer : null, k = Math.min(1, dt * 2); visU += ((L === 'up' ? 1 : 0) - visU) * k; visD += ((L === 'dn' ? 1 : 0) - visD) * k; meadow.setVisit(visU, visD); }   /* 도착한 층은 옅은 빛을 걷어 또렷하게 */
+    { const L = travel.mode === 'dest' ? travel.dest.g.Gd.layer : null, k = Math.min(1, dt * 2); jungle.setFocus(L, L ? travel.dest.g.Gd.ty : 0); visU += ((L === 'up' ? 1 : 0) - visU) * k; visD += ((L === 'dn' ? 1 : 0) - visD) * k; meadow.setVisit(visU, visD); }   /* 도착한 층은 옅은 빛을 걷어 또렷하게 */
     if (flying) { if (travel.mode !== 'trip') fly.position.y += (travel.yOff - fly.position.y) * Math.min(1, dt * 1.5); fly.updateMatrixWorld(true); fly.userData.update(t, dt);   /* 판 위 높이에서 비행 높이로 스르륵 */ for (const o of oldSh) o.visible = false; travel.pose(); }
     if (shockT < .8) { shockT += dt; shock.visible = true; shockM.uniforms.uR.value = .3 + shockT * 4.5; shockM.uniforms.uI.value = Math.max(0, 1 - shockT / .8) * 1.3; } else shock.visible = false;
     /* 쏘기 · 벽에 맞으면 무지개빛이 번짐 */

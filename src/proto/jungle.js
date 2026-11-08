@@ -9,10 +9,10 @@
    · 초원 → 정글은 점점: 경계 둘레에 작은 부유체가 섞이고, 기체가 안쪽으로 들어갈수록 하늘이 어두운 보랏빛으로 (skymap에서) */
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { spiralPath, SWEEP } from './path.js?v=11081703';
-import { buildSanctum } from './jsanct.js?v=11081703';
-export { SANCT_TEST } from './jsanct.js?v=11081703';
-import { makeDresser } from './jdress.js?v=11081703';
+import { spiralPath, SWEEP } from './path.js?v=11081719';
+import { buildSanctum } from './jsanct.js?v=11081719';
+export { SANCT_TEST } from './jsanct.js?v=11081719';
+import { makeDresser } from './jdress.js?v=11081719';
 let CAM = { position: new THREE.Vector3() };
 let LOD_T = .5, LOD_N = 30;   /* 섬 둘레 · 덩굴 마디 수 (키트 원래 44 · 1배) */
 /* ===================== 우주 정글 지형 키트 (사용자 제작 · 생성 코드 그대로) ===================== */
@@ -583,11 +583,14 @@ export function makeJungle(scene, { R0 = 136, R1 = 187, TOP = -3, UP = 20, DN = 
     for (const [m, list] of groups.values()) { const parts = list.map(o => { const g = o.geometry.clone(); for (const k of Object.keys(g.attributes)) if (g.attributes[k].isInterleavedBufferAttribute) g.setAttribute(k, g.attributes[k].clone()); g.applyMatrix4(new THREE.Matrix4().multiplyMatrices(inv, o.matrixWorld)); return g; });
       const mg = parts.length > 1 ? mergeGeometries(parts, false) : parts[0]; if (!mg) continue; const me = new THREE.Mesh(mg, m); me.renderOrder = list[0].renderOrder; fz.add(me); }
     pack(fz); p.G.add(fz); p.frozen = fz; p.mov = mv; p.fz = false; }
-  const update = (t, dt, camera) => { CAM = camera; T.value = t; dress.update(t, camera.position); pv.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse); fr.setFromProjectionMatrix(pv);
+  /* 도착 섬(위·아래층)에 있을 때: 다른 층 섬은 수십 m 아래·위로 보임 → 작은 풀·덩굴·안개는 안 그리고 · 120m까지만 · 움직임 없이 멈춘 판 (2026-11-08 최적화 · 사용자: 다른 섬·구름 바다 끄면 확 좋아짐) */
+  let FOC = null, FOCY = 0; const setFocus = (L, y) => { FOC = L; FOCY = y; };
+  const update = (t, dt, camera) => { CAM = camera; T.value = t; dress.update(t, camera.position, FOC ? FOCY : null); pv.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse); fr.setFromProjectionMatrix(pv);
     for (const p of pieces) { const d = Math.hypot(p.x - camera.position.x, p.z - camera.position.z); sph.center.set(p.x, p.y, p.z); sph.radius = p.rad;
-      const vis = d < 170 && fr.intersectsSphere(sph) && (!globalThis.__HIDE_OTHER || (p.o && p.o.t === 'sanct')); p.G.visible = vis;   /* __HIDE_OTHER: 폰 무게 재기 */ if (!vis) continue; const d3 = Math.hypot(d, p.y - camera.position.y), near = d3 < 65; if (p.G.userData.lod) p.G.userData.lod(d3);   /* 높이 차이도 (위층에서 내려다보면 먼 것) */
+      const other = FOC && p.o && p.o.layer !== FOC && Math.abs(p.y - FOCY) > 6;
+      const vis = d < (other ? 120 : 170) && fr.intersectsSphere(sph) && (!globalThis.__HIDE_OTHER || (p.o && p.o.t === 'sanct')); p.G.visible = vis;   /* __HIDE_OTHER: 폰 무게 재기 */ if (!vis) continue; const d3 = Math.hypot(d, p.y - camera.position.y), near = d3 < 65 && !other; if (p.G.userData.lod) p.G.userData.lod(d3);   /* 높이 차이도 (위층에서 내려다보면 먼 것) */
       if (p.frozen && p.fz === near) { p.fz = !near; for (const o of p.mov) o.visible = near; p.frozen.visible = !near; }   /* 65m 밖: 멈춘 판 */
-      if (near || (!p.frozen && d < 95)) for (const f of p.anim) f(t, dt); } };   /* 먼 것은 움직임을 멈춤 */
+      if (near || (!p.frozen && d < 95 && !other)) for (const f of p.anim) f(t, dt); } };   /* 먼 것은 움직임을 멈춤 */
   const setLight = k => { KL.uLift.value = k; };
-  return { update, blocked, GATES, pieces, setLight };
+  return { update, blocked, GATES, pieces, setLight, setFocus };
 }

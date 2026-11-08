@@ -8,9 +8,9 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { deinterleaveGeometry } from 'three/addons/utils/BufferGeometryUtils.js';
-import { makeLand, makeChunk, makePillar, makeWall, paletteFrom } from './land.js?v=11081703';
-import { CLOUD_NOISE } from './clouds.js?v=11081703';
-import { spiralPath } from './path.js?v=11081703';
+import { makeLand, makeChunk, makePillar, makeWall, paletteFrom } from './land.js?v=11081719';
+import { CLOUD_NOISE } from './clouds.js?v=11081719';
+import { spiralPath } from './path.js?v=11081719';
 
 /* 아래로 늘어진 섬 몸통 줄이기 (사용자 2026-11-07: 위층 섬 밑을 지나갈 때 몸통이 카메라와 기체 사이를 꽉 막음) — 윗면은 그대로, y0 아래만 깊이 maxD로 눌러 줌 · 빛 받는 방향도 같이 고침 */
 export function squashBelow(geo, y0, maxD) { const P = geo.attributes.position, N = geo.attributes.normal; let lo = 1e9; for (let i = 0; i < P.count; i++) lo = Math.min(lo, P.getY(i));
