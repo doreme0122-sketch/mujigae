@@ -8,25 +8,25 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
-import { makeBloom } from '../core/hangar/bloom.js?v=11081645';
-import { makePad } from '../core/hangar/pad.js?v=11081645';
-import { makeMag } from '../core/hangar/mag.js?v=11081645';
+import { makeBloom } from '../core/hangar/bloom.js?v=11081703';
+import { makePad } from '../core/hangar/pad.js?v=11081703';
+import { makeMag } from '../core/hangar/mag.js?v=11081703';
 import { buildShip } from '../core/ships/build.js';
-import { makeGoldStar } from './goldstar.js?v=11081645';
-import { makeArena, SPEED, WAVE_R0 } from './arena.js?v=11081645';
-import { makeGuardians, GUARD } from './guardian.js?v=11081645';
-import { makeBirth, BIRTH } from './birth.js?v=11081645';
-import { makeHeightLine } from './hline.js?v=11081645';
-import { makeTravel } from './travel.js?v=11081645';
-import { spiralPath } from './path.js?v=11081645';
-import { makePerf } from './perf.js?v=11081645';
+import { makeGoldStar } from './goldstar.js?v=11081703';
+import { makeArena, SPEED, WAVE_R0 } from './arena.js?v=11081703';
+import { makeGuardians, GUARD } from './guardian.js?v=11081703';
+import { makeBirth, BIRTH } from './birth.js?v=11081703';
+import { makeHeightLine } from './hline.js?v=11081703';
+import { makeTravel } from './travel.js?v=11081703';
+import { spiralPath } from './path.js?v=11081703';
+import { makePerf } from './perf.js?v=11081703';
 import { makeGlow } from '../preview/glow.js';
-import { makeFlight, FLY } from './flight.js?v=11081645';
-import { pedestal, gate4 } from './gates.js?v=11081645';
-import { makeMeadow, MEADOW } from './meadow.js?v=11081645';
-import { makeClouds } from './clouds.js?v=11081645';
-import { makeLife } from './life.js?v=11081645';
-import { makeJungle, jungleLayout, SANCT_TEST } from './jungle.js?v=11081645';
+import { makeFlight, FLY } from './flight.js?v=11081703';
+import { pedestal, gate4 } from './gates.js?v=11081703';
+import { makeMeadow, MEADOW } from './meadow.js?v=11081703';
+import { makeClouds } from './clouds.js?v=11081703';
+import { makeLife } from './life.js?v=11081703';
+import { makeJungle, jungleLayout, SANCT_TEST } from './jungle.js?v=11081703';
 
 const $ = s => document.querySelector(s), clamp = THREE.MathUtils.clamp, HOVER = FLY.HOVER;
 const R = 240, NB = 10, GAPH = 5.6, BASE_D = 0;     /* 맵 반지름 · 기지 수 · 벽 틈 반 폭(= 기지 반지름) · 기지 가운데는 벽 선 위 (앞 절반은 맵 안, 뒤 절반은 맵 밖 · 사용자 2026-11-06) */
@@ -153,7 +153,7 @@ export async function start(canvas, onProgress = () => {}) {
   onProgress(.4);
   /* ── 초원 고리 ── */
   const JL = jungleLayout({ TOP: MEADOW.TOP, UP: MEADOW.UP, DN: MEADOW.DN });   /* 정글 배치 계획을 먼저 → 초원이 경계 너머로 섬을 놓을 때 피해 감 */
-  const meadow = await makeMeadow(scene, new URL('./assets/kit_meadow.glb?v=11081645', import.meta.url).href, p => onProgress(.4 + p * .4), new URL('./assets/kit_meadow_decor.glb?v=11081645', import.meta.url).href, new URL('./assets/kit_meadow_lo.glb?v=11081645', import.meta.url).href, { avoid: JL });
+  const meadow = await makeMeadow(scene, new URL('./assets/kit_meadow.glb?v=11081703', import.meta.url).href, p => onProgress(.4 + p * .4), new URL('./assets/kit_meadow_decor.glb?v=11081703', import.meta.url).href, new URL('./assets/kit_meadow_lo.glb?v=11081703', import.meta.url).href, { avoid: JL });
   const clouds = makeClouds(scene, { R0: MEADOW.R0, R1: MEADOW.R1 });   /* 층 사이 흘러가는 구름 · 기체 높이 숨는 구름 */
   const jungle = makeJungle(scene, { TOP: MEADOW.TOP, UP: MEADOW.UP, DN: MEADOW.DN, avoid: meadow.place.concat(meadow.CORR.map(c => ({ x: c[0], z: c[1], rr: c[2], layer: 'all' }))) });   /* 우주 정글 고리 (초원 안쪽) */
   /* ── 위아래 문 다섯: 흩어진 고리 문(0.8배) + 보물 던전 섬까지 뻗는 빛 띠 (위층 = 금빛 · 아래층 = 보랏빛) ── */
@@ -271,7 +271,8 @@ export async function start(canvas, onProgress = () => {}) {
   const v3 = new THREE.Vector3(), say = $('#where');
   let t = 0, last = performance.now(), camD = 25 * .7; const WARP = { r: 0, s: 0 };
   wake(.6);
-  renderer.setAnimationLoop(now => { try {
+  const CPU = { a: 0, b: 0, n: 0, tt: 0, el: null };   /* 폰 무게 재기: 한 장면에서 계산(움직임·판정) 시간 · 그리기 명령 시간 */
+  renderer.setAnimationLoop(now => { try { const c0 = performance.now();
     const dt = clamp((now - last) / 1000, 0, .05); last = now; t += dt;
     /* 기지들 */
     const on = t >= onAt, filling = t >= holdAt; if (on && !born) { born = true; bship.visible = true; birth.userData.start(t); } B0.mag.userData.setHold(filling && !flying);
@@ -311,8 +312,10 @@ export async function start(canvas, onProgress = () => {}) {
     { const r = Math.hypot(FS.x, FS.z), ts = flying && travel.status(); say.textContent = dead ? `다시 태어나기까지 ${Math.max(1, Math.ceil(reviveAt - t))}초 · 화면을 끌어 맵을 둘러보세요` : ts ? ts : !flying ? '태어나는 중' : baseAt(FS.x, FS.z) ? '태어나는 곳 · 출구로 나가면 맵 안' : r > R - 25 ? '초원 · 무지개 벽 가까이 · 쏘면 무지개빛이 번져요' : (r > MEADOW.R0 ? '초원' : '맵 안') + (clouds.inCloud(FS.x, FS.z) ? ' · 구름 속에 숨음' : '') + ' · 한가운데까지 ' + Math.round(r) + 'm'; }
     /* 별똥별이 꽂힐 때 공간 일그러짐 충격파 (시작 기지와 같은 효과) */
     if (WARP.s > 0) { B0.w.localToWorld(v3.set(0, .2, 0)); v3.project(camera); bloom.warp(v3.x * .5 + .5, v3.y * .5 + .5, WARP.r, WARP.s, Wd / Hd); } else bloom.warp(.5, .5, 0, 0, Wd / Hd);
-    renderer.setRenderTarget(bloom.scene); renderer.clear(); renderer.render(scene, camera);
+    const c1 = performance.now(); renderer.setRenderTarget(bloom.scene); renderer.clear(); renderer.render(scene, camera); CPU.calls = renderer.info.render.calls;
     bloom.render(Wd, Hd, !perf.st.bloom); perf.tick(dt);
+    { const c2 = performance.now(); CPU.a += c1 - c0; CPU.b += c2 - c1; CPU.n++; CPU.tt += dt; if (CPU.tt > .5) { if (!CPU.el) { CPU.el = document.createElement('div'); CPU.el.style.cssText = 'position:absolute;top:calc(env(safe-area-inset-top,0px) + 50px);left:max(18px,env(safe-area-inset-left,0px));font-size:11px;color:rgba(185,255,74,.85);pointer-events:none;font-family:monospace'; document.querySelector('#ui').append(CPU.el); }
+        CPU.el.textContent = `계산 ${(CPU.a / CPU.n).toFixed(1)}ms · 그리기 명령 ${(CPU.b / CPU.n).toFixed(1)}ms · 그리기 ${CPU.calls}번`; CPU.a = CPU.b = CPU.n = CPU.tt = 0; } }
   } catch (e) { console.error('[전체 맵]', e); } });
   onProgress(1);
   window.__sm = { scene, renderer, camera, perf, travel, gates, meadow, clouds, life, jungle, info: () => ({ ...meadow.info(), drawCalls: renderer.info.render.calls, gpuTris: renderer.info.render.triangles }), FS, fly, BASES, cam, cfg, HITS, get t() { return t; }, get flying() { return flying; }, wake };

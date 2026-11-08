@@ -307,8 +307,7 @@ for(let k=0;k<4;k++){const a=k/4*Math.PI*2+.35,r=outline(a)+.4,g=new THREE.Group
   const N=90,pg=new THREE.BufferGeometry(),pp=new Float32Array(N*3),meta=[];for(let i=0;i<N;i++)meta.push([rnd(-1,1),R(),rnd(.6,1.4)]);pg.setAttribute('position',new THREE.BufferAttribute(pp,3));
   const sp=new THREE.Points(pg,new THREE.PointsMaterial({size:.8*K,map:dot,color:'#dff0ff',transparent:true,opacity:.85,blending:THREE.AdditiveBlending,depthWrite:false}));sp.frustumCulled=false;g.add(sp);
   anim.push((t,dt)=>{for(let i=0;i<N;i++){const m=meta[i];m[1]=(m[1]+dt*.22*m[2])%1;const v=m[1];pp[i*3]=m[0]*2.5*(1+v*1.4);pp[i*3+1]=-70*Math.pow(v,1.15);pp[i*3+2]=5*Math.sqrt(v)+1.6+m[0];}pg.attributes.position.needsUpdate=true;});
-  const ch=new THREE.Mesh(new THREE.PlaneGeometry(1.2,r-FLOOR_R+1),new THREE.MeshBasicMaterial({color:'#c8a050',transparent:true,opacity:.5,blending:THREE.AdditiveBlending,depthWrite:false}));
-  ch.rotation.x=-Math.PI/2;ch.position.set(0,.2,-(r-FLOOR_R+1)/2);g.add(ch);}
+  /* 바닥까지 잇는 금빛 줄(원본의 빛 길)은 뺌 — 사용자 2026-11-08: 성소 땅 위 십자 줄이 계속 움직여 보임(땅에 너무 붙어 떨림) → 삭제 */}
 // =====================================================================
 const barkM=new THREE.MeshPhongMaterial({color:C('#2c2432'),specular:C('#1a1a26'),shininess:12});
 const leafM=new THREE.MeshPhongMaterial({color:C('#1b4a48'),specular:C('#4a9a90'),shininess:30,emissive:C('#041412'),side:THREE.DoubleSide});
@@ -516,8 +515,7 @@ root.traverse(o=>{if(o.isMesh&&!o.isInstancedMesh&&[marbleM,pillarM,rockOM].incl
 export function buildSanctum({ clearA = null } = {}) {
   const T = template(), G = new THREE.Group(), root = T.root.clone(true), psi = clearA == null ? 0 : .35 - clearA; root.rotation.y = psi; G.add(root);
   const flat = []; root.traverse(o => flat.push(o)); const pairs = T.moving.map(i => [T.flat[i], flat[i]]), egg = flat[T.eggIdx], ep = new THREE.Vector3();
-  root.traverse(o => { if (o.isMesh && LIT.has(o.material)) o.onBeforeRender = (r, s, c, g, m) => { egg.getWorldPosition(ep); if (!m.uniforms.uEP.value.equals(ep)) { m.uniforms.uEP.value.copy(ep); m.uniformsNeedUpdate = true; } else m.uniformsNeedUpdate = true; }; });   /* 알 빛 자리는 성소마다 다름 */
-  const anim = [(t, dt) => { T.tick(t, dt); for (const [a, b] of pairs) { b.position.copy(a.position); b.quaternion.copy(a.quaternion); b.scale.copy(a.scale); } }];
+  const anim = [(t, dt) => { T.tick(t, dt); for (const [a, b] of pairs) { b.position.copy(a.position); b.quaternion.copy(a.quaternion); b.scale.copy(a.scale); } egg.getWorldPosition(LU.uEP.value); }];   /* 알 빛 자리: 가까운(움직이는) 성소 것으로 한 프레임에 한 번 (전엔 부품 그릴 때마다 칠 정보를 통째로 다시 보냈음 → 폰 계산 부담) */
   const outline = a => T.outline(a + psi) * K;
   /* 멀리서(75m 밖) 안 보이는 잔것은 그리지 않음: 풀잎 · 작은 고사리 · 덩굴 잎 · 꼬투리 · 작은 빛 · 빛 알갱이 · 낮은 안개 (나무 지붕·돌·금·빛기둥·폭포는 그대로) */
   const SM = ['blade', 'fern', 'broadS', 'pod', 'pod2'], cat = { shaft: [], fall: [], glow: [], leafS: [], leaf: [] };
