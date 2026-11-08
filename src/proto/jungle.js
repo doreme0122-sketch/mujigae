@@ -9,10 +9,10 @@
    · 초원 → 정글은 점점: 경계 둘레에 작은 부유체가 섞이고, 기체가 안쪽으로 들어갈수록 하늘이 어두운 보랏빛으로 (skymap에서) */
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { spiralPath, SWEEP } from './path.js?v=11081719';
-import { buildSanctum } from './jsanct.js?v=11081719';
-export { SANCT_TEST } from './jsanct.js?v=11081719';
-import { makeDresser } from './jdress.js?v=11081719';
+import { spiralPath, SWEEP } from './path.js?v=11081746';
+import { buildSanctum } from './jsanct.js?v=11081746';
+export { SANCT_TEST } from './jsanct.js?v=11081746';
+import { makeDresser } from './jdress.js?v=11081746';
 let CAM = { position: new THREE.Vector3() };
 let LOD_T = .5, LOD_N = 30;   /* 섬 둘레 · 덩굴 마디 수 (키트 원래 44 · 1배) */
 /* ===================== 우주 정글 지형 키트 (사용자 제작 · 생성 코드 그대로) ===================== */
@@ -169,7 +169,8 @@ function eyeStalk(G,B,p,s,eyes){const h=rnd(2.5,5)*s,lean=V(rnd(-.4,.4),1,rnd(-.
   const iris=new THREE.Mesh(new THREE.CircleGeometry(.42*s,16),new THREE.MeshBasicMaterial({color:pick([GLOWS.lime,GLOWS.mag,GLOWS.cyan])}));iris.position.z=.74*s;e.add(iris);
   const pup=new THREE.Mesh(new THREE.CircleGeometry(.18*s,12),new THREE.MeshBasicMaterial({color:'#05040a'}));pup.position.z=.76*s;pup.scale.y=1.8;e.add(pup);
   eyes.push({e,ph:R()*10,blink:R()*5});}
-function jellyfish(G,center,r,col,orbitR,speed){const g=new THREE.Group();G.add(g);
+export function hideMark(G,x,y,z,r){const m=new THREE.Object3D();m.position.set(x,y,z);m.userData.hideR=r;m.name='hide';G.add(m);return m;}   /* 숨을 곳 표시: 빈 점 하나 (그리지 않음) · 반지름은 섬 크기만큼 함께 커짐 */
+function jellyfish(G,center,r,col,orbitR,speed){const g=new THREE.Group();G.add(g);g.userData.jelly=r;   /* 기믹: 닿으면 튕김 (gimmick.js가 찾음) */
   const bell=new THREE.Mesh(new THREE.SphereGeometry(r,18,10,0,Math.PI*2,0,Math.PI*.55),fresnelMat(col,1.8,.9));g.add(bell);
   const core=glowSprite(col,r*2.4,.55);core.position.y=r*.25;g.add(core);
   const inner=new THREE.Mesh(new THREE.SphereGeometry(r*.35,10,8),new THREE.MeshBasicMaterial({color:col}));inner.position.y=r*.2;g.add(inner);
@@ -177,7 +178,7 @@ function jellyfish(G,center,r,col,orbitR,speed){const g=new THREE.Group();G.add(
     const l=new THREE.Line(geo,new THREE.LineBasicMaterial({color:col,transparent:true,opacity:.7,blending:THREE.AdditiveBlending,depthWrite:false}));l.frustumCulled=false;g.add(l);lines.push({arr,geo,a:k/nt*6.28,len:r*rnd(2.4,4)});}
   const ph=R()*10;
   anim.push(t=>{const a=t*speed+ph;g.position.set(center.x+Math.cos(a)*orbitR,center.y+Math.sin(t*.7+ph)*2.2,center.z+Math.sin(a)*orbitR);
-    const pulse=Math.sin(t*2.2+ph);bell.scale.set(1+pulse*.08,1-pulse*.14,1+pulse*.08);g.rotation.z=Math.sin(t*.5+ph)*.12;
+    const pulse=Math.sin(t*2.2+ph),sq=g.userData.sq||0;bell.scale.set((1+pulse*.08)*(1+sq*.35),(1-pulse*.14)*(1-sq*.5),(1+pulse*.08)*(1+sq*.35));   /* 기체가 튕겨 나가면 갓이 납작하게 눌렸다 출렁 돌아옴 */g.rotation.z=Math.sin(t*.5+ph)*.12;
     lines.forEach(L=>{for(let i=0;i<np;i++){const f=i/(np-1),rr=r*.75*(1-f*.4);L.arr[i*3]=Math.cos(L.a)*rr+Math.sin(t*1.6+f*5+L.a)*f*r*.5;L.arr[i*3+1]=-f*L.len;L.arr[i*3+2]=Math.sin(L.a)*rr+Math.cos(t*1.3+f*4+L.a)*f*r*.5;}L.geo.attributes.position.needsUpdate=true;});});}
 function tentacleTree(G,p,s,podCol,mat,spotMat){let parent=new THREE.Group();parent.position.copy(p);G.add(parent);
   const segs=7,ph=R()*10,joints=[];let rad=.9*s;
@@ -210,7 +211,8 @@ PIECES.push({name:'균사 뿌리섬',tags:['기본 섬','중형'],fy:-4,size:30,
 PIECES.push({name:'수정 산호 숲',tags:['정글','엄폐 지형'],fy:5,size:28,
   desc:'나무 대신 가지가 갈라지는 수정 산호가 숲을 이룸. 가지 끝마다 청록·분홍 결정이 빛나고, 바닥엔 발광 결절이 깔림. 가지 사이 틈을 누비는 회피 구간.',
   build(G){const B=newB(),I=isle(B,0,0,0,{r:23,depth:30,vein:GLOWS.mag});
-    const placed=[];for(let k=0;k<11;k++){for(let t=0;t<20;t++){const[a,b]=I.pt(0,.8);if(placed.every(q=>Math.hypot(q[0]-a,q[1]-b)>6)){placed.push([a,b]);break;}}}
+    const placed=[];for(let k=0;k<15;k++){for(let t=0;t<24;t++){const[a,b]=I.pt(0,.76);if(placed.every(q=>Math.hypot(q[0]-a,q[1]-b)>4.6)){placed.push([a,b]);break;}}}   /* 숲을 더 빽빽이 (숨는 덤불) */
+    hideMark(G,0,0,0,23*.8);
     placed.forEach(([a,b],i)=>coral(B,V(a,0,b),rnd(.8,1.35),i%3?GLOWS.cyan:GLOWS.mag));
     for(let k=0;k<26;k++){const[a,b]=I.pt(0,.9),c=pick([GLOWS.cyan,GLOWS.mag,GLOWS.vio]);for(let n=0;n<3;n++)add(B,new THREE.IcosahedronGeometry(rnd(.2,.55),0),V(a+rnd(-.8,.8),.2,b+rnd(-.8,.8)),null,null,c,{to:'glow',vary:.1});}
     for(let k=0;k<6;k++){const[a,b]=I.pt(.3,.88),h=rnd(2,5);add(B,new THREE.ConeGeometry(.7,h,5),V(a,h/2,b),E(rnd(-.3,.3),0,rnd(-.3,.3)),null,'#3a5c9a',{to:'gloss'});}
@@ -221,7 +223,8 @@ PIECES.push({name:'촉수 나무 숲',tags:['정글','움직이는 장애물'],f
   desc:'줄기가 촉수처럼 마디마디 흔들리는 나무들. 꼭대기의 발광 꼬투리가 숨 쉬듯 부풀고, 바닥의 눈알 줄기들이 카메라를 따라 쳐다봄. 계속 움직여서 피하기 까다로운 숲.',
   build(G){const B=newB(),eyes=[],I=isle(B,0,0,0,{r:21,depth:28,vein:GLOWS.lime,top:'#251f3c'});
     const mat=new THREE.MeshPhongMaterial({color:'#4a2f6e',flatShading:true,shininess:40,specular:'#9a7aff'}),spot=new THREE.MeshBasicMaterial({color:GLOWS.lime});
-    const placed=[];for(let k=0;k<8;k++){for(let t=0;t<20;t++){const[a,b]=I.pt(0,.78);if(placed.every(q=>Math.hypot(q[0]-a,q[1]-b)>6)){placed.push([a,b]);break;}}}
+    const placed=[];for(let k=0;k<10;k++){for(let t=0;t<24;t++){const[a,b]=I.pt(0,.72);if(placed.every(q=>Math.hypot(q[0]-a,q[1]-b)>5)){placed.push([a,b]);break;}}}   /* 숲을 더 빽빽이 (숨는 덤불) */
+    hideMark(G,0,0,0,21*.76);
     placed.forEach(([a,b])=>tentacleTree(G,V(a,0,b),rnd(.8,1.25),pick([GLOWS.lime,GLOWS.teal,GLOWS.mag]),mat,spot));
     for(let k=0;k<7;k++){const[a,b]=I.pt(.2,.88);eyeStalk(G,B,V(a,0,b),rnd(.7,1.1),eyes);}
     for(let k=0;k<30;k++){const[a,b]=I.pt(0,.93);const h=rnd(.6,1.6);add(B,new THREE.ConeGeometry(.12,h,4),V(a,h/2,b),E(rnd(-.4,.4),0,rnd(-.4,.4)),null,GLOWS.lime,{to:'glow',grad:'#102010',pow:1.5});}
@@ -262,9 +265,12 @@ PIECES.push({name:'거대 포식 꽃',tags:['위험 지형','주기 공격'],fy:
     const lure=new THREE.Mesh(new THREE.SphereGeometry(1.1,14,10),new THREE.MeshBasicMaterial({color:'#ffd6ff'}));lure.position.y=1.4;head.add(lure);const lg=glowSprite(GLOWS.mag,10,.8);lure.add(lg);
     const N=80,mg=new THREE.BufferGeometry(),mp=new Float32Array(N*3),mo=[];for(let i=0;i<N;i++)mo.push([R()*6.28,rnd(2,7),rnd(-1,5),rnd(.3,1)]);mg.setAttribute('position',new THREE.BufferAttribute(mp,3));
     const motes=new THREE.Points(mg,new THREE.PointsMaterial({size:.9,map:dot,color:'#ff9cf4',transparent:true,blending:THREE.AdditiveBlending,depthWrite:false}));motes.frustumCulled=false;head.add(motes);
-    anim.push(t=>{const P=7,ph=t%P;let ang;
-      if(ph<4)ang=-.22-Math.sin(t*1.5)*.04;else if(ph<4.25)ang=-.22-(ph-4)/.25*1.18;else if(ph<5.5)ang=-1.4+Math.sin((ph-4.25)*30)*.02;else ang=-1.4+(ph-5.5)/1.5*1.18;
-      pivots.forEach((p,i)=>{p.rotation.x=ang+Math.sin(t*2+i)*.03;});const open=ph<4||ph>5.5;lg.material.opacity=open?.8:.25;
+    G.userData.flower=1;   /* 기믹: 가까이 오면 삼키고 · 씹고 · 뱉음 (gimmick.js가 bite·near를 줌) */
+    anim.push(t=>{const P=7,ph=t%P;let ang;const bt=G.userData.bite,nr=G.userData.near||0;
+      if(bt)ang=-.22-1.18*bt.k+(bt.chew?Math.sin(t*11)*.07:0);   /* 삼킨 동안: 꽉 닫고 우물우물 씹음 */
+      else if(ph<4)ang=-.22-Math.sin(t*1.5)*.04+nr*(.2+Math.sin(t*17)*.05);   /* 기체가 다가오면 꽃잎이 더 벌어지며 떨림 (군침) */
+      else if(ph<4.25)ang=-.22-(ph-4)/.25*1.18;else if(ph<5.5)ang=-1.4+Math.sin((ph-4.25)*30)*.02;else ang=-1.4+(ph-5.5)/1.5*1.18;
+      pivots.forEach((p,i)=>{p.rotation.x=ang+Math.sin(t*2+i)*.03;});const open=bt?bt.k<.5:ph<4||ph>5.5;lg.material.opacity=open?.8+nr*.2:.25;
       for(let i=0;i<N;i++){const o=mo[i],a=o[0]+t*o[3]*(open?1:3),r=o[1]*(open?1:.4);mp[i*3]=Math.cos(a)*r;mp[i*3+1]=o[2]+Math.sin(t+i)*.5;mp[i*3+2]=Math.sin(a)*r;}mg.attributes.position.needsUpdate=true;});
     spores(G,40,14,0,12,GLOWS.mag,.6,1);}});
 
@@ -562,7 +568,7 @@ export function makeJungle(scene, { R0 = 136, R1 = 187, TOP = -3, UP = 20, DN = 
   /* 막힘 칸: 사냥터 섬·포식 꽃의 단단한 몸이 기체 높이 단면을 지나는 곳 + 덩굴 기둥 줄기를 25cm 칸으로 찍음 · 빛 무리·포자·선은 뺌 */
   const CL = .25, N = Math.ceil(R1 * 2 / CL) + 2, grid = new Uint8Array(N * N), cellOf = v => Math.floor((v + R1 + 1) / CL), Y0 = .45, Y1 = .95;   /* 25cm 칸 · 기체 높이 단면 */
   { const a = new THREE.Vector3(), b = new THREE.Vector3(), c = new THREE.Vector3(), w = new THREE.Vector3();
-    for (const p of SOLID) { if (p.y - p.rad > Y1 || p.y + p.rad < Y0) continue; p.G.updateMatrixWorld(true);
+    if (0) for (const p of SOLID) { if (p.y - p.rad > Y1 || p.y + p.rad < Y0) continue;   /* 막힘 없앰 (사용자 2026-11-08) → 칸 지도 안 만듦 (불러오기 빨라짐) */ p.G.updateMatrixWorld(true);
       p.G.traverse(m => { if (!m.isMesh || m.isInstancedMesh || !m.geometry || !m.geometry.attributes.position) return; const mt = m.material; if (mt && (mt.blending === THREE.AdditiveBlending || mt.depthWrite === false)) return;
         const P = m.geometry.attributes.position, I = m.geometry.index, cnt = I ? I.count : P.count, M = m.matrixWorld;
         for (let i = 0; i + 2 < cnt; i += 3) { a.fromBufferAttribute(P, I ? I.getX(i) : i).applyMatrix4(M); b.fromBufferAttribute(P, I ? I.getX(i + 1) : i + 1).applyMatrix4(M); c.fromBufferAttribute(P, I ? I.getX(i + 2) : i + 2).applyMatrix4(M);
@@ -571,7 +577,7 @@ export function makeJungle(scene, { R0 = 136, R1 = 187, TOP = -3, UP = 20, DN = 
           for (let u = 0; u <= n; u++) for (let v = 0; v <= n - u; v++) { const s1 = u / n, s2 = v / n; w.set(0, 0, 0).addScaledVector(a, 1 - s1 - s2).addScaledVector(b, s1).addScaledVector(c, s2);
             if (w.y < Y0 || w.y > Y1) continue; const gx = cellOf(w.x), gz = cellOf(w.z); if (gx >= 0 && gz >= 0 && gx < N && gz < N) grid[gz * N + gx] = 1; } } });
       fillHoles(grid, N, cellOf(p.x - p.rad), cellOf(p.z - p.rad), cellOf(p.x + p.rad), cellOf(p.z + p.rad)); } }
-  for (const v of VINES) { const r = v[2]; for (let z = v[1] - r; z <= v[1] + r; z += CL) for (let x = v[0] - r; x <= v[0] + r; x += CL) if ((x - v[0]) ** 2 + (z - v[1]) ** 2 < r * r) { const gx = cellOf(x), gz = cellOf(z); if (gx >= 0 && gz >= 0 && gx < N && gz < N) grid[gz * N + gx] = 1; } }   /* 덩굴 줄기도 칸 지도에 → 한 번에 찾음 */
+  if (0) for (const v of VINES) { const r = v[2]; for (let z = v[1] - r; z <= v[1] + r; z += CL) for (let x = v[0] - r; x <= v[0] + r; x += CL) if ((x - v[0]) ** 2 + (z - v[1]) ** 2 < r * r) { const gx = cellOf(x), gz = cellOf(z); if (gx >= 0 && gz >= 0 && gx < N && gz < N) grid[gz * N + gx] = 1; } }   /* 덩굴 줄기도 칸 지도에 → 한 번에 찾음 */
   const blocked = (x, z) => { const gx = cellOf(x), gz = cellOf(z); return gx >= 0 && gz >= 0 && gx < N && gz < N && grid[gz * N + gx] === 1; };   /* 층을 뚫는 덩굴 기둥 + 사냥터 섬·포식 꽃 */
   const sph = new THREE.Sphere(), fr = new THREE.Frustum(), pv = new THREE.Matrix4();
   /* 멀리서는 움직임이 안 보임 → 움직이는 부품을 칠마다 합친 '멈춘 판'을 미리 만들어 두고 65m 밖에선 그것만 그림 (2026-11-08 최적화)

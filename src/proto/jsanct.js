@@ -477,6 +477,11 @@ for(let k=0;k<55;k++){const a=R()*Math.PI*2;if(!angOK(a,lanes,.08))continue;cons
 for(let k=0;k<40;k++){const a=R()*Math.PI*2,d=rnd(52,outline(a)-4);grassPatch(V(Math.cos(a)*d,0,Math.sin(a)*d),4,25);}
 for(let k=0;k<26;k++){const a=R()*Math.PI*2,d=rnd(55,120),L=rnd(8,18),b=a+rnd(-.5,.5),p0=V(Math.cos(a)*d,0,Math.sin(a)*d),p1=p0.clone().add(V(Math.cos(b)*L,0,Math.sin(b)*L));
   putBark(new THREE.TubeGeometry(new THREE.CatmullRomCurve3([p0.clone().add(V(0,.4,0)),p0.clone().lerp(p1,.5).add(V(0,1.2,0)),p1.clone().add(V(0,.2,0))]),12,rnd(.3,.7),6,false));}
+/* ── 추가 (사용자 2026-11-08): 숲 네 덩이를 더 빽빽이 → 그 안은 숨을 곳 · 원본 무늬가 바뀌지 않게 원본 다 그린 뒤에 덧심음 ── */
+[[1.1,95],[2.75,100],[4.3,92],[5.75,98]].forEach(([ga,gd])=>{const d0=Math.min(gd,outline(ga)-20);
+  for(let k=0;k<4;k++){const a=ga+rnd(-.17,.17),d=d0+rnd(-11,11);if(!angOK(a,lanes,.12)||d>outline(a)-14)continue;alienTree(V(Math.cos(a)*d,0,Math.sin(a)*d),rnd(1.2,1.6));}
+  for(let k=0;k<6;k++){const a=ga+rnd(-.2,.2),d=d0+rnd(-14,14);if(d>outline(a)-6||d<52)continue;fernCluster(V(Math.cos(a)*d,0,Math.sin(a)*d),rnd(.9,1.4),k%2?'fern':'frondA');}
+  const hm=new THREE.Object3D();hm.position.set(Math.cos(ga)*d0,0,Math.sin(ga)*d0);hm.userData.hideR=24;hm.name='hide';root.add(hm);});
 flushFoliage();flushBark();
 
 const glyphM=new THREE.MeshBasicMaterial({color:'#7ad0ff'}),rockOM=new THREE.MeshStandardMaterial({color:C('#2a2634'),roughness:.9});

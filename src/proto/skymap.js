@@ -8,25 +8,25 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
-import { makeBloom } from '../core/hangar/bloom.js?v=11081719';
-import { makePad } from '../core/hangar/pad.js?v=11081719';
-import { makeMag } from '../core/hangar/mag.js?v=11081719';
+import { makeBloom } from '../core/hangar/bloom.js?v=11081746';
+import { makePad } from '../core/hangar/pad.js?v=11081746';
+import { makeMag } from '../core/hangar/mag.js?v=11081746';
 import { buildShip } from '../core/ships/build.js';
-import { makeGoldStar } from './goldstar.js?v=11081719';
-import { makeArena, SPEED, WAVE_R0 } from './arena.js?v=11081719';
-import { makeGuardians, GUARD } from './guardian.js?v=11081719';
-import { makeBirth, BIRTH } from './birth.js?v=11081719';
-import { makeHeightLine } from './hline.js?v=11081719';
-import { makeTravel } from './travel.js?v=11081719';
-import { spiralPath } from './path.js?v=11081719';
-import { makePerf } from './perf.js?v=11081719';
+import { makeGoldStar } from './goldstar.js?v=11081746';
+import { makeArena, SPEED, WAVE_R0 } from './arena.js?v=11081746';
+import { makeGuardians, GUARD } from './guardian.js?v=11081746';
+import { makeBirth, BIRTH } from './birth.js?v=11081746';
+import { makeTravel } from './travel.js?v=11081746';
+import { spiralPath } from './path.js?v=11081746';
+import { makePerf } from './perf.js?v=11081746';
 import { makeGlow } from '../preview/glow.js';
-import { makeFlight, FLY } from './flight.js?v=11081719';
-import { pedestal, gate4 } from './gates.js?v=11081719';
-import { makeMeadow, MEADOW } from './meadow.js?v=11081719';
-import { makeClouds } from './clouds.js?v=11081719';
-import { makeLife } from './life.js?v=11081719';
-import { makeJungle, jungleLayout, SANCT_TEST } from './jungle.js?v=11081719';
+import { makeFlight, FLY } from './flight.js?v=11081746';
+import { pedestal, gate4 } from './gates.js?v=11081746';
+import { makeMeadow, MEADOW } from './meadow.js?v=11081746';
+import { makeClouds } from './clouds.js?v=11081746';
+import { makeLife } from './life.js?v=11081746';
+import { makeJungle, jungleLayout, SANCT_TEST } from './jungle.js?v=11081746';
+import { makeGimmicks } from './gimmick.js?v=11081746';
 
 const $ = s => document.querySelector(s), clamp = THREE.MathUtils.clamp, HOVER = FLY.HOVER;
 const R = 240, NB = 10, GAPH = 5.6, BASE_D = 0;     /* 맵 반지름 · 기지 수 · 벽 틈 반 폭(= 기지 반지름) · 기지 가운데는 벽 선 위 (앞 절반은 맵 안, 뒤 절반은 맵 밖 · 사용자 2026-11-06) */
@@ -160,7 +160,7 @@ export async function start(canvas, onProgress = () => {}) {
   onProgress(.4);
   /* ── 초원 고리 ── */
   const JL = jungleLayout({ TOP: MEADOW.TOP, UP: MEADOW.UP, DN: MEADOW.DN });   /* 정글 배치 계획을 먼저 → 초원이 경계 너머로 섬을 놓을 때 피해 감 */
-  const meadow = await makeMeadow(scene, new URL('./assets/kit_meadow.glb?v=11081719', import.meta.url).href, p => onProgress(.4 + p * .4), new URL('./assets/kit_meadow_decor.glb?v=11081719', import.meta.url).href, new URL('./assets/kit_meadow_lo.glb?v=11081719', import.meta.url).href, { avoid: JL });
+  const meadow = await makeMeadow(scene, new URL('./assets/kit_meadow.glb?v=11081746', import.meta.url).href, p => onProgress(.4 + p * .4), new URL('./assets/kit_meadow_decor.glb?v=11081746', import.meta.url).href, new URL('./assets/kit_meadow_lo.glb?v=11081746', import.meta.url).href, { avoid: JL });
   const clouds = makeClouds(scene, { R0: MEADOW.R0, R1: MEADOW.R1 });   /* 층 사이 흘러가는 구름 · 기체 높이 숨는 구름 */
   const jungle = makeJungle(scene, { TOP: MEADOW.TOP, UP: MEADOW.UP, DN: MEADOW.DN, avoid: meadow.place.concat(meadow.CORR.map(c => ({ x: c[0], z: c[1], rr: c[2], layer: 'all' }))) });   /* 우주 정글 고리 (초원 안쪽) */
   /* ── 위아래 문 다섯: 흩어진 고리 문(0.8배) + 보물 던전 섬까지 뻗는 빛 띠 (위층 = 금빛 · 아래층 = 보랏빛) ── */
@@ -194,11 +194,11 @@ export async function start(canvas, onProgress = () => {}) {
   const FL = 4.3 * BS - .25, EXH = 1.6;   /* 기지 판 반지름(계단 단 안쪽) · 출구 길 반 폭 */
   const baseAt = (x, z) => BASES.find(b => Math.hypot(x - b.x, z - b.z) < 6.2);
   const baseBlocked = (x, z) => { const b = baseAt(x, z); if (!b) return false; const lx = (x - b.x) * b.dx + (z - b.z) * b.dz, lz = -(x - b.x) * b.dz + (z - b.z) * b.dx; return !(Math.hypot(lx, lz) < FL || (lx > 0 && Math.abs(lz) < EXH)); };
-  const hline = makeHeightLine(scene, (x, z) => travel && travel.mode === 'dest' ? travel.blocked(x, z) : meadow.blocked(x, z) || jungle.blocked(x, z) || gateBlocked(x, z) || (Math.hypot(x, z) < R - .9 && baseBlocked(x, z)), HOVER);   /* 파란 높이선: 막히는 모든 것 (기지 계단 단 포함) · 무지개 벽만 뺌(벽 자체가 보임) · 도착 섬에선 섬 가장자리·돌아가는 문 */
+  /* 파란 높이선(막힘 안내)은 없앰: 섬·바위·나무 어디에도 안 막히니 안내할 막힘이 없음 */
   let travel = null, visU = 0, visD = 0;
   const B = { blocked: (x, z) => { if (travel && travel.mode !== 'mid') return travel.blocked(x, z);   /* 길 타는 중엔 안 막힘 · 도착 섬에선 그 섬 땅 밖이 막힘 */ const b = baseAt(x, z);
       if (b) { const lx = (x - b.x) * b.dx + (z - b.z) * b.dz, lz = -(x - b.x) * b.dz + (z - b.z) * b.dx; return !(Math.hypot(lx, lz) < FL || (lx > 0 && Math.abs(lz) < EXH)); }   /* 계단 단에 묻히지 않게 */
-      return Math.hypot(x, z) > R - .9 || meadow.blocked(x, z) || jungle.blocked(x, z) || gateBlocked(x, z); }, region: () => 0 };   /* 초원 섬: 기체 높이를 지나는 바위·땅만 막음 (풀·나무는 통과) */
+      return Math.hypot(x, z) > R - .9 || gateBlocked(x, z); }, region: () => 0 };   /* 섬·바위·나무는 모두 통과 (기믹 도구만 몸으로 닿음) · 남는 막힘: 바깥 무지개 벽·출발 기지·길 문 돌 */
   const fly = await makeFlight(renderer, B, [B0.x, B0.z], 0); scene.add(fly); const FS = fly.userData.S; fly.visible = false;
   const oldSh = []; fly.traverse(o => { if (o.isMesh && o.renderOrder === 1 && o.geometry.type === 'PlaneGeometry') oldSh.push(o); });
   /* 기체는 한 대만 (사용자 2026-11-06): 조이스틱으로 모는 그 기체가 태어나는 동안엔 기지 판 위(기지 안)에 앉아 있다가, 태어나면 그대로 이어서 몬다 */
@@ -229,7 +229,7 @@ export async function start(canvas, onProgress = () => {}) {
   const shock = new THREE.Mesh(new THREE.CircleGeometry(3, 96), shockM); shock.renderOrder = 9; shock.visible = false; scene.add(shock); let shockT = 9;
   const launch = t => { bship.updateMatrixWorld(true); const p = new THREE.Vector3(), q = new THREE.Quaternion(); bship.getWorldPosition(p); bship.getWorldQuaternion(q); birth.userData.stop();
     const yaw = new THREE.Euler().setFromQuaternion(q, 'YXZ').y;   /* 판 위에 있던 그대로의 자리 · 높이 · 방향에서 이어 몬다 */
-    fly.add(bship); bship.scale.setScalar(S0); bship.visible = true; fly.userData.moveTo(p.x, p.z, yaw); fly.position.y = p.y - HOVER; fly.visible = true; flying = true;
+    fly.add(bship); bship.scale.setScalar(S0); bship.visible = true; fly.userData.moveTo(p.x, p.z, yaw); fly.position.y = p.y - HOVER; flyY = fly.position.y; fly.visible = true; flying = true;
     FS.armed = true; FS.vx = FS.vz = 0; };   /* 기지 고리 9m를 벗어나면 보호막 3초 · 가속 5초 */
   /* ── 죽음 → 기다림 → 다시 태어남 (사용자 2026-11-07):
         죽는 순간 그 자리에 카메라가 머물고 화면이 살짝 어두워짐 · 기다리는 동안 둘러보기로 맵을 자유롭게 봄
@@ -237,7 +237,9 @@ export async function start(canvas, onProgress = () => {}) {
   let LV = 1, dead = false, reviveAt = 0;
   const dim = document.createElement('div'); dim.style.cssText = 'position:fixed;inset:0;pointer-events:none;background:rgba(6,8,18,.42);opacity:0;transition:opacity .6s;z-index:2'; document.body.appendChild(dim);
   const die = () => { if (dead) return; dead = true; reviveAt = t + Math.min(20, 5 + LV); travel.reset(); flying = false; fly.visible = false; bolts.length = 0; FS.noPad = true; dim.style.opacity = '1'; holdAt = onAt = launchAt = 1e9; };
-  const revive = () => { dead = false; FS.noPad = false; dim.style.opacity = '0'; look.x = look.z = 0; cam.x = B0.x; cam.z = B0.z; cam.y = HOVER; camD = cfg.dist * .7; wake(t + .3); };   /* 카메라가 태어나는 곳으로 바로 */
+  const gim = makeGimmicks(scene, { meadow, jungle, fly, bship, R, gates, bases: BASES, die: () => die(), hoverY: HOVER });   /* 숨는 숲 · 바람길 · 포식 꽃 · 해파리 · 포자 늪 · 체력 */
+  let flyY = 0;
+  const revive = () => { dead = false; FS.noPad = false; gim.reset(); dim.style.opacity = '0'; look.x = look.z = 0; cam.x = B0.x; cam.z = B0.z; cam.y = HOVER; camD = cfg.dist * .7; wake(t + .3); };   /* 카메라가 태어나는 곳으로 바로 */
   $('#again').onclick = () => die();
   /* ── 둘러보기 (이미 정한 방식 · 플레이 중에도 늘 됨): 버튼 없는 빈 화면(오른쪽)에서 끌면 지도를 밀듯이(오른쪽으로 밀면 카메라는 왼쪽으로) ·
         끄는 빠르기에 따라 움직이는 속도가 다름 · 손 떼면 내 기체(죽어 있을 땐 죽은 자리) 화면으로 저절로 돌아옴 · 죽어 있을 땐 화면 어디서 끌어도 됨 */
@@ -293,7 +295,8 @@ export async function start(canvas, onProgress = () => {}) {
     /* 기체 */
     if (flying) travel.update(t, dt, cam);
     { const L = travel.mode === 'dest' ? travel.dest.g.Gd.layer : null, k = Math.min(1, dt * 2); jungle.setFocus(L, L ? travel.dest.g.Gd.ty : 0); visU += ((L === 'up' ? 1 : 0) - visU) * k; visD += ((L === 'dn' ? 1 : 0) - visD) * k; meadow.setVisit(visU, visD); }   /* 도착한 층은 옅은 빛을 걷어 또렷하게 */
-    if (flying) { if (travel.mode !== 'trip') fly.position.y += (travel.yOff - fly.position.y) * Math.min(1, dt * 1.5); fly.updateMatrixWorld(true); fly.userData.update(t, dt);   /* 판 위 높이에서 비행 높이로 스르륵 */ for (const o of oldSh) o.visible = false; travel.pose(); }
+    if (flying) { if (travel.mode !== 'trip') { flyY += (travel.yOff - flyY) * Math.min(1, dt * 1.5); fly.position.y = flyY + gim.hop; } else flyY = fly.position.y; fly.updateMatrixWorld(true); fly.userData.update(t, dt);   /* 판 위 높이에서 비행 높이로 스르륵 */ for (const o of oldSh) o.visible = false; travel.pose(); }
+    gim.update(t, dt, { flying, mode: travel.mode, camera, pxRatio: renderer.getPixelRatio() });
     if (shockT < .8) { shockT += dt; shock.visible = true; shockM.uniforms.uR.value = .3 + shockT * 4.5; shockM.uniforms.uI.value = Math.max(0, 1 - shockT / .8) * 1.3; } else shock.visible = false;
     /* 쏘기 · 벽에 맞으면 무지개빛이 번짐 */
     cool -= dt; if (flying && travel.mode !== 'trip' && fireOn && cool <= 0) { cool = .16; const h = FS.head, x = FS.x - Math.sin(h) * 1.2, z = FS.z - Math.cos(h) * 1.2; bolts.push({ x, z, vx: -Math.sin(h) * 40 + FS.vx * .5, vz: -Math.cos(h) * 40 + FS.vz * .5, life: 1.6 }); }
@@ -306,7 +309,6 @@ export async function start(canvas, onProgress = () => {}) {
     for (const b of bolts) glow.add(b.x, HOVER + travel.yOff + .3, b.z, -b.vx * .04, 0, -b.vz * .04, .18, 0, [.5, 1.2, .7], 1, b.x);
     for (let i = fx.length - 1; i >= 0; i--) { const f = fx[i]; f.t += dt; if (f.t > .3) { fx.splice(i, 1); continue; } glow.add(f.x, HOVER + travel.yOff + .3, f.z, 0, 0, 0, .5 + f.t * 3, 3, [1.2, 1.1, 1.3], 1 - f.t / .3); }
     glow.end(); glow.uT.value = t;
-    hline.update(flying && travel.mode !== 'trip', FS.x, FS.z, FS.head, t, dt, HOVER + travel.yOff);
     /* 카메라 */
     let tx, tz; if (flying) { const sp = bship.position; tx = sp.x + FS.vx * .25; tz = sp.z + FS.vz * .25; } else if (dead) { tx = cam.x; tz = cam.z; } else { tx = B0.x; tz = B0.z; }   /* 죽어 있을 땐 죽은 자리에 머묾 */
     if (!(flying && travel.camera(cam, bship.position, dt))) { const k = Math.min(1, dt * (flying ? 4 : 2)); cam.x += (tx - cam.x) * k; cam.z += (tz - cam.z) * k; }   /* 길 타는 동안은 travel이 카메라를 이끎 · 그 밖엔 높이만 층을 따라감 */
@@ -316,7 +318,7 @@ export async function start(canvas, onProgress = () => {}) {
       mood += (jk - mood) * Math.min(1, dt * 1.5); sun.intensity = 2.8 * (1 - mood * .6); hemi.color.copy(HEMI0).lerp(HEMI_J, mood); hemi.groundColor.copy(GND0).lerp(GND_J, mood);
       renderer.setClearColor(CLR0.clone().lerp(CLR_J, mood), 1); meadow.setMood?.(mood); }
     sea.position.x = cam.x + look.x; sea.position.z = cam.z + look.z; sea.material.uniforms.uT.value = t; meadow.update(v3.set(cam.x + look.x, HOVER, cam.z + look.z), camera, t); clouds.update(t, v3.set(flying ? FS.x : cam.x, HOVER + travel.yOff, flying ? FS.z : cam.z), camera.position); jungle.update(t, dt, camera); life.update(t, dt, v3, camera.position);
-    { const r = Math.hypot(FS.x, FS.z), ts = flying && travel.status(); say.textContent = dead ? `다시 태어나기까지 ${Math.max(1, Math.ceil(reviveAt - t))}초 · 화면을 끌어 맵을 둘러보세요` : ts ? ts : !flying ? '태어나는 중' : baseAt(FS.x, FS.z) ? '태어나는 곳 · 출구로 나가면 맵 안' : r > R - 25 ? '초원 · 무지개 벽 가까이 · 쏘면 무지개빛이 번져요' : (r > MEADOW.R0 ? '초원' : '맵 안') + (clouds.inCloud(FS.x, FS.z) ? ' · 구름 속에 숨음' : '') + ' · 한가운데까지 ' + Math.round(r) + 'm'; }
+    { const r = Math.hypot(FS.x, FS.z), ts = flying && travel.status(); say.textContent = dead ? `다시 태어나기까지 ${Math.max(1, Math.ceil(reviveAt - t))}초 · 화면을 끌어 맵을 둘러보세요` : flying && gim.status() ? gim.status() : ts ? ts : !flying ? '태어나는 중' : baseAt(FS.x, FS.z) ? '태어나는 곳 · 출구로 나가면 맵 안' : r > R - 25 ? '초원 · 무지개 벽 가까이 · 쏘면 무지개빛이 번져요' : (r > MEADOW.R0 ? '초원' : '맵 안') + (clouds.inCloud(FS.x, FS.z) ? ' · 구름 속에 숨음' : '') + ' · 한가운데까지 ' + Math.round(r) + 'm'; }
     /* 별똥별이 꽂힐 때 공간 일그러짐 충격파 (시작 기지와 같은 효과) */
     if (WARP.s > 0) { B0.w.localToWorld(v3.set(0, .2, 0)); v3.project(camera); bloom.warp(v3.x * .5 + .5, v3.y * .5 + .5, WARP.r, WARP.s, Wd / Hd); } else bloom.warp(.5, .5, 0, 0, Wd / Hd);
     const c1 = performance.now(); renderer.setRenderTarget(bloom.scene); renderer.clear(); renderer.render(scene, camera); CPU.calls = renderer.info.render.calls;
@@ -325,5 +327,5 @@ export async function start(canvas, onProgress = () => {}) {
         CPU.el.textContent = `계산 ${(CPU.a / CPU.n).toFixed(1)}ms · 그리기 명령 ${(CPU.b / CPU.n).toFixed(1)}ms · 그리기 ${CPU.calls}번`; CPU.a = CPU.b = CPU.n = CPU.tt = 0; } }
   } catch (e) { console.error('[전체 맵]', e); } });
   onProgress(1);
-  window.__sm = { scene, renderer, camera, perf, travel, gates, meadow, clouds, life, jungle, info: () => ({ ...meadow.info(), drawCalls: renderer.info.render.calls, gpuTris: renderer.info.render.triangles }), FS, fly, BASES, cam, cfg, HITS, get t() { return t; }, get flying() { return flying; }, wake };
+  window.__sm = { scene, renderer, camera, perf, travel, gates, meadow, clouds, life, jungle, gim, info: () => ({ ...meadow.info(), drawCalls: renderer.info.render.calls, gpuTris: renderer.info.render.triangles }), FS, fly, BASES, cam, cfg, HITS, get t() { return t; }, get flying() { return flying; }, wake };
 }

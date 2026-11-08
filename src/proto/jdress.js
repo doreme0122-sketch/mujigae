@@ -5,7 +5,7 @@
    ④ 화석(막힘): 엎드려 죽은 큰 짐승 — 척추가 기체보다 높게 아치를 이루고 갈비가 양옆 땅에 박힘 → 갈비 사이(약 3m)로 들락날락 · 벌어진 입으로 들어가 목 아래를 지나 갈비 굴로
    모든 크기는 실제 미터 (섬 크기와 상관없이 기체 기준으로 맞춤) */
 import * as THREE from 'three';
-import { HC, RIBP, TEETH, boneGeo } from './jbones.js?v=11081719';
+import { HC, RIBP, TEETH, boneGeo } from './jbones.js?v=11081746';
 
 export const V = (x, y, z) => new THREE.Vector3(x, y, z);
 export const rng = seed => { let s = seed >>> 0 || 1; return () => (s = (s * 1664525 + 1013904223) >>> 0) / 4294967296; };
@@ -263,8 +263,9 @@ export function makeDresser(scene, KL) {
     for (let i = 0, n = Math.round(area / 9); i < n; i++) { const [x, z] = spot(.08, .93); if (fbm(x * .18 + (seed % 97) * .37 + 9, z * .18 + (seed % 97) * .61) > .55) plant(P.glint, x, z, .8 + R() * .8); }   /* 이끼 자리에만 빛 알갱이 */
     for (let i = 0, n = Math.round(area / 45); i < n; i++) { const [x, z] = spot(.1, .95); plant(P.pebble, x, z, .6 + R() * 1.1, (R() - .5) * .5); }
     /* 가장자리 숲: 몇 군데에 몰려 자람 (숲 사이로 하늘이 트이게) */
-    const groves = 4 + Math.floor(Rm / 8); for (let g = 0; g < groves; g++) { const ga = R() * 6.28, gf = .68 + R() * .2, [gx, gz] = [Math.cos(ga) * outlineK(ga) * s * gf, Math.sin(ga) * outlineK(ga) * s * gf], nT = 3 + Math.floor(R() * 4);
-      for (let t = 0; t < nT; t++) { const x = gx + (R() - .5) * 5, z = gz + (R() - .5) * 5; if (Math.hypot(x, z) > outlineK(Math.atan2(z, x)) * s * .9 || inFossil(x, z) || nearB(x, z, 1.5)) continue; const [wx, wz] = toW(x, z); bag.add(TREES[Math.floor(R() * TREES.length)], wx, ground(x, z) - .05, wz, R() * 6.28, .85 + R() * .3, (R() - .5) * .15); }
+    const groves = 4 + Math.floor(Rm / 8); for (let g = 0; g < groves; g++) { const ga = R() * 6.28, gf = .68 + R() * .2, [gx, gz] = [Math.cos(ga) * outlineK(ga) * s * gf, Math.sin(ga) * outlineK(ga) * s * gf], nT = 6 + Math.floor(R() * 4);   /* 숲 덩이를 더 빽빽이 → 그 안은 숨을 곳 (사용자 2026-11-08) */
+      { const [hx, hz] = toW(gx, gz), m = new THREE.Object3D(); m.position.set(hx, ground(gx, gz), hz); m.userData.hideR = 3.4; m.name = 'hide'; grp.add(m); }
+      for (let t = 0; t < nT; t++) { const x = gx + (R() - .5) * 4.6, z = gz + (R() - .5) * 4.6; if (Math.hypot(x, z) > outlineK(Math.atan2(z, x)) * s * .9 || inFossil(x, z) || nearB(x, z, 1.5)) continue; const [wx, wz] = toW(x, z); bag.add(TREES[Math.floor(R() * TREES.length)], wx, ground(x, z) - .05, wz, R() * 6.28, .85 + R() * .3, (R() - .5) * .15); }
       for (let k = 0; k < 14; k++) { const x = gx + (R() - .5) * 7, z = gz + (R() - .5) * 7; if (Math.hypot(x, z) < outlineK(Math.atan2(z, x)) * s * .92) plant(R() < .5 ? P.fern : P.shroom, x, z, .9 + R() * .8); } }
     bag.build(grp, matOf); };
   /* ─────────── 다른 정글 섬 전부 꾸미기 (사용자 2026-11-08) ───────────

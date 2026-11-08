@@ -8,9 +8,9 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { deinterleaveGeometry } from 'three/addons/utils/BufferGeometryUtils.js';
-import { makeLand, makeChunk, makePillar, makeWall, paletteFrom } from './land.js?v=11081719';
-import { CLOUD_NOISE } from './clouds.js?v=11081719';
-import { spiralPath } from './path.js?v=11081719';
+import { makeLand, makeChunk, makePillar, makeWall, paletteFrom } from './land.js?v=11081746';
+import { CLOUD_NOISE } from './clouds.js?v=11081746';
+import { spiralPath } from './path.js?v=11081746';
 
 /* 아래로 늘어진 섬 몸통 줄이기 (사용자 2026-11-07: 위층 섬 밑을 지나갈 때 몸통이 카메라와 기체 사이를 꽉 막음) — 윗면은 그대로, y0 아래만 깊이 maxD로 눌러 줌 · 빛 받는 방향도 같이 고침 */
 export function squashBelow(geo, y0, maxD) { const P = geo.attributes.position, N = geo.attributes.normal; let lo = 1e9; for (let i = 0; i < P.count; i++) lo = Math.min(lo, P.getY(i));
@@ -74,7 +74,7 @@ export async function makeMeadow(scene, url, onProgress = () => {}, decorUrl = n
     const y = layer === 'up' ? UP - K.top * sy : layer === 'dn' ? DN - K.top * sy : layer === 'pillar' ? (extra.ptop != null ? extra.ptop : UP + 6) - K.hi * sy : layer === 'rock' || layer === 'deco' || layer === 'gap' || layer === 'upgap' ? extra.y : TOP - K.top * sy;
     place.push({ ...extra, k, x, z, y: extra.yset != null ? extra.yset : y, yaw, layer, s, sy, rr: extra.land ? K.rad : K.rad * s * .78, pillar: layer === 'pillar' }); };
   /* ── 넓은 땅: 새 땅 판 + 받은 섬에서 떼어 낸 나무·덤불·바위·풀꽃·뿌리 ── */
-  let landN = 0; const LANDS = [];
+  let landN = 0; const LANDS = [], GROVES = [];
   const RUIN = [], WALL = [];
   for (let i = 0; i < 6; i++) { const g = makePillar(700 + i * 17, PAL, 1.9 + (i % 3) * .45); g.computeBoundingBox(); const k = 'ruinP_' + i; KIT[k] = { prims: [{ geo: g, mat: 'Terrain', src: MATS.Terrain }], top: 0, bot: g.boundingBox.min.y, hi: g.boundingBox.max.y, rad: 1 }; RUIN.push(k); }
   for (let i = 0; i < 4; i++) { const g = makeWall(800 + i * 23, PAL, 4.5 + i); g.computeBoundingBox(); const k = 'ruinW_' + i; KIT[k] = { prims: [{ geo: g, mat: 'Terrain', src: MATS.Terrain }], top: 0, bot: g.boundingBox.min.y, hi: g.boundingBox.max.y, rad: 3 }; WALL.push(k); }
@@ -94,12 +94,23 @@ export async function makeMeadow(scene, url, onProgress = () => {}, decorUrl = n
     const area = Math.PI * radius * radius, grove = (lx, lz) => .5 + .5 * Math.sin(lx * .35 + seed) * Math.cos(lz * .3 - seed * .7);
     const deco = (kind, n, sc, edgeIn = 1.4) => { for (let t = 0, got = 0; t < n * 8 && got < n; t++) { const a = R() * 6.28, rr = Math.sqrt(R()) * (L.rad(a) - edgeIn), lx = Math.cos(a) * rr, lz = Math.sin(a) * rr;
         if (opt.clear && Math.hypot(lx, lz) < opt.clear + (kind === 'tiny' ? 0 : 1.5)) continue;
-        if ((kind === 'tree' || kind === 'bush') && R() > grove(lx, lz) + .25) continue;   /* 나무는 숲처럼 몰려 자람 */
+        if (kind === 'tree' && GROVES.some(g => Math.hypot(g.x - toW(lx, lz)[0], g.z - toW(lx, lz)[1]) < g.r + 3)) continue;   /* 외톨이 나무는 숲 덤불과 떨어뜨림 */
         const h = hAt(lx, lz); if (h === null) continue; const [wx, wz] = toW(lx, lz), list = DECO[kind]; if (!list.length) return;
         if (opt.lane != null && kind !== 'tiny') { const o0 = opt.laneO || [0, 0], ux = wx - o0[0], uz = wz - o0[1]; if (Math.abs(-Math.sin(opt.lane) * ux + Math.cos(opt.lane) * uz) < (opt.laneW || 5) && (!opt.laneO || Math.cos(opt.lane) * ux + Math.sin(opt.lane) * uz > 0)) continue; }   /* 길(출구 길 · 빛의 길)은 비워 둠 */   /* 기지 출구 앞 길은 비워 둠 (풀꽃만) */
         const pk = list[Math.floor(R() * list.length)]; let ss = sc * (.85 + R() * .4); if (kind === 'tree' || kind === 'bush') ss = Math.min(ss, 4.5 / Math.max(.1, KIT[pk].hi * SC));   /* 나무 꼭대기가 기체 높이에 닿지 않게 */
         put(pk, wx, wz, 'deco', R() * 6.28, { s: ss, y: BY + h - .04, deco: kind, rl }); got++; } };
-    deco('tree', Math.round(area / 30 * dens), 1); deco('bush', Math.round(area / 18 * dens), 1); deco('rock', Math.round(area / 55 * dens), 1); deco('tiny', Math.round(area / 7 * dens), 1, .6);   /* 풀포기·꽃은 촘촘히 */
+    /* 숲 덤불(숨을 곳): 나무를 흩뿌리지 않고 몇 무더기로 빽빽이 모음 → 그 무더기 안에 들어가면 숨음 · 외톨이 나무 한두 그루는 숨을 곳 아님 */
+    const grove1 = (gx, gz, gr) => { const plant = (kind, n) => { const list = DECO[kind]; if (!list.length) return; for (let t = 0, got = 0; t < n * 6 && got < n; t++) { const a = R() * 6.28, rr = Math.sqrt(R()) * gr, lx = gx + Math.cos(a) * rr, lz = gz + Math.sin(a) * rr;
+          if (Math.hypot(lx, lz) > L.rad(Math.atan2(lz, lx)) - 1.2) continue; const h = hAt(lx, lz); if (h === null) continue; const [wx, wz] = toW(lx, lz), pk = list[Math.floor(R() * list.length)];
+          const edge = rr / gr, ss = Math.min(.85 + R() * .4, 4.5 / Math.max(.1, KIT[pk].hi * SC)) * (kind === 'tree' ? 1 - edge * .25 : 1);   /* 가운데는 크고 가장자리로 갈수록 낮아짐 → 둥근 숲 덩이 */
+          put(pk, wx, wz, 'deco', R() * 6.28, { s: ss, y: BY + h - .04, deco: kind, rl }); got++; } };
+      const A = Math.PI * gr * gr; plant('tree', Math.round(A / 2.6)); plant('bush', Math.round(A / 2.2)); };
+    const okG = (lx, lz, gr) => { if (Math.hypot(lx, lz) > L.rad(Math.atan2(lz, lx)) - gr * .6 - 1) return false; if (opt.clear && Math.hypot(lx, lz) < opt.clear + gr + 1.5) return false;
+      const [wx, wz] = toW(lx, lz); if (opt.lane != null) { const o0 = opt.laneO || [0, 0], ux = wx - o0[0], uz = wz - o0[1]; if (Math.abs(-Math.sin(opt.lane) * ux + Math.cos(opt.lane) * uz) < (opt.laneW || 5) + gr && (!opt.laneO || Math.cos(opt.lane) * ux + Math.sin(opt.lane) * uz > -gr)) return false; }
+      for (const g of GROVES) if (Math.hypot(g.x - wx, g.z - wz) < g.r + gr + 2.5) return false; return true; };
+    { const nG = Math.max(radius > 7 ? 1 : 0, Math.round(area * dens / 260)); for (let t = 0, got = 0; t < 40 && got < nG; t++) { const gr = Math.min(radius * .45, 3.4 + R() * 3), a = R() * 6.28, rr = Math.sqrt(R()) * radius * .7, lx = Math.cos(a) * rr, lz = Math.sin(a) * rr;
+        if (!okG(lx, lz, gr)) continue; const h = hAt(lx, lz); if (h === null) continue; const [wx, wz] = toW(lx, lz); grove1(lx, lz, gr); GROVES.push({ x: wx, z: wz, r: gr, y: BY + h, layer: LY }); got++; } }
+    deco('tree', Math.min(2, Math.round(area / 200)), 1); deco('bush', Math.round(area / 60 * dens), 1);   /* 외톨이 나무 한두 그루 · 낮은 덤불 몇 개 */ deco('rock', Math.round(area / 55 * dens), 1); deco('tiny', Math.round(area / 7 * dens), 1, .6);   /* 풀포기·꽃은 촘촘히 */
     /* 오래된 돌 유적: 돌기둥 몇 개 + 무너진 돌담 (둥지 싸움 자리 · 출구 길은 피함) */
     if (LY === 'mid' && RUIN.length && radius > 9) for (let tries = 0, done = 0; tries < 30 && done < 1; tries++) {
       const a = R() * 6.28, rr = (opt.clear ? opt.clear + 3 : 2) + R() * (radius * .75 - (opt.clear ? opt.clear + 3 : 2)), lx = Math.cos(a) * rr, lz = Math.sin(a) * rr, [wx, wz] = toW(lx, lz);
@@ -302,5 +313,5 @@ export async function makeMeadow(scene, url, onProgress = () => {}, decorUrl = n
     for (let i = 0; i < P.count; i++) if (P.getY(i) < lo + .6) { acc.add(v.fromBufferAttribute(P, i)); n++; }
     if (n) { acc.divideScalar(n).applyMatrix4(p.m); if (acc.y < -4) MIST.push(acc.clone()); } }
   const setVisit = (u, d) => { LIT.uUpC.value = u; LIT.uDnC.value = d; };
-  return { setVisit, NESTS, CORR, root, blocked, update, setMood, info, place, TREASURE, GATES, KIT, LANDS, MIST, PAL, CHUNK };
+  return { setVisit, NESTS, CORR, root, blocked, update, GROVES, setMood, info, place, TREASURE, GATES, KIT, LANDS, MIST, PAL, CHUNK };
 }

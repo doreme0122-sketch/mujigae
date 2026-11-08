@@ -5,7 +5,7 @@
    · 도착한 섬: 그 섬 땅 위만 날 수 있음(땅 밖은 막힘) · 섬 가장자리에 돌아가는 문(받침 섬 위) — 같은 방법으로 돌아감
    · 돌아가는 문과 도착 섬의 땅 지도는 '갈 때만' 만들고 돌아오면 비움 (지금 쓰는 것만 올림 · 설계 원칙) */
 import * as THREE from 'three';
-import { gate4, pedestal } from './gates.js?v=11081719';
+import { gate4, pedestal } from './gates.js?v=11081746';
 
 const clamp = THREE.MathUtils.clamp, smooth = (a, b, x) => { const k = clamp((x - a) / (b - a), 0, 1); return k * k * (3 - 2 * k); };
 const AB = { transparent: true, depthWrite: false, blending: THREE.AdditiveBlending };
@@ -96,7 +96,7 @@ export function makeTravel({ scene, gates, meadow, jungle, fly, ship, FS, HOVER,
     return out; };
   /* 돌아가는 문: 빛의 길 끝(섬 가장자리 바로 밖) · 받침 섬 위 · 길 쪽을 바라봄 */
   const openDest = g => {
-    const ms = destMeshes(g), isle = footprint(ms, g.Gd.tx, g.Gd.tz, g.Gd.rad * 1.6 + 4), solid = solidMap(ms, g.Gd.tx, g.Gd.tz, g.Gd.rad * 1.6 + 4, g.y1, g.Gd.ty);
+    const ms = destMeshes(g), isle = footprint(ms, g.Gd.tx, g.Gd.tz, g.Gd.rad * 1.6 + 4), solid = null;   /* 섬 위 바위·뼈는 통과 (사용자 2026-11-08) → 막힘 지도 안 만듦 */
     /* 섬 가장자리는 들쭉날쭉 → 길 쪽 실제 가장자리를 재서, 받침 섬이 섬 가장자리에 닿게 크기를 맞춤 (사이 빈 하늘에 갇히지 않게) */
     const D = Math.hypot(g.ex - g.Gd.tx, g.ez - g.Gd.tz); let edge = 0; for (let s = 0; s <= D + 6; s += .25) if (isle(g.Gd.tx + (g.ex - g.Gd.tx) / D * s, g.Gd.tz + (g.ez - g.Gd.tz) / D * s)) edge = s;
     const pr = Math.max(3.6, D - edge + 1.8), G = gate4(GATE_H / .8); G.g.scale.setScalar(.8); const root = new THREE.Group(), ped = pedestal(91 + gates.indexOf(g) * 7); ped.scale.setScalar(pr / 7.2); root.add(ped); root.add(G.g);
@@ -106,7 +106,7 @@ export function makeTravel({ scene, gates, meadow, jungle, fly, ship, FS, HOVER,
   const closeDest = () => { if (!dest) return; const r = dest.exitG.root; scene.remove(r); r.traverse(o => { if (o.geometry) o.geometry.dispose(); if (o.material) (Array.isArray(o.material) ? o.material : [o.material]).forEach(m => m.dispose()); }); dest = null; };
   const stones = (gg, x, z) => { const dx = x - gg.x, dz = z - gg.z; if (dx > 4 || dx < -4 || dz > 4 || dz < -4) return false; const along = dx * gg.ax + dz * gg.az, lat = Math.abs(dx * -gg.az + dz * gg.ax); return Math.abs(along) < .5 && lat > 1.9 && lat < 3.0; };
   /* 도착 섬에서 막힘: 고리 돌 조각 · 섬 땅 밖 */
-  const blocked = (x, z) => { if (mode === 'trip') return false; if (mode !== 'dest' || !dest) return null; if (stones(dest.exitG, x, z) || dest.solid(x, z)) return true; return !(dest.onPed(x, z) || dest.isle(x, z)); };
+  const blocked = (x, z) => { if (mode === 'trip') return false; if (mode !== 'dest' || !dest) return null; if (stones(dest.exitG, x, z)) return true;   /* 섬 위 바위·뼈·나무는 통과 */ return !(dest.onPed(x, z) || dest.isle(x, z)); };
   const startTrip = (g, back, t) => { const dir = g.curve.getTangentAt(back ? 1 : 0); if (back) dir.negate();
     trip = { g, back, u: 0, dur: clamp(g.len / 40, 2.6, 3.4), cam0: { ...camT } };   /* 감아 도는 긴 길 → 약 3초 (사용자 2026-11-07) */ mode = 'trip'; FS.aim = null; SND.depart(trip.dur);
     if (!back) openDest(g);
