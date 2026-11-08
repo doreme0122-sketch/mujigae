@@ -8,9 +8,9 @@
      알 둥지는 이번엔 안 씀 · 포식 꽃·촉수 나무·해파리는 장식(기체를 막거나 잡지 않음)
    · 초원 → 정글은 점점: 경계 둘레에 작은 부유체가 섞이고, 기체가 안쪽으로 들어갈수록 하늘이 어두운 보랏빛으로 (skymap에서) */
 import * as THREE from 'three';
-import { spiralPath, SWEEP } from './path.js?v=11081253';
-import { buildSanctum } from './jsanct.js?v=11081253';
-import { makeDresser } from './jdress.js?v=11081253';
+import { spiralPath, SWEEP } from './path.js?v=11081333';
+import { buildSanctum } from './jsanct.js?v=11081333';
+import { makeDresser } from './jdress.js?v=11081333';
 let CAM = { position: new THREE.Vector3() };
 let LOD_T = .5, LOD_N = 30;   /* 섬 둘레 · 덩굴 마디 수 (키트 원래 44 · 1배) */
 /* ===================== 우주 정글 지형 키트 (사용자 제작 · 생성 코드 그대로) ===================== */
@@ -521,8 +521,7 @@ export function makeJungle(scene, { R0 = 136, R1 = 187, TOP = -3, UP = 20, DN = 
   const dress = makeDresser(scene, KL);
   for (const p of pieces) if (p.o && p.o.t === 'hunt' && p.outline) { const n0 = dress.solids.length; dress.hunt({ x: p.x, y: p.y, z: p.z, yaw: p.o.yaw, extra: null }, p.outline, p.o.s, p.o.seed, { block: p.block });
     p.extra = dress.solids.slice(n0); for (const m of p.extra) SOLID.push({ G: m, y: p.y, rad: 20 }); }
-  /* 보물 성소: 바깥 땅에 정글 (가운데 바닥은 비움 · 오벨리스크·기둥·아치 둘레는 피함) */
-  for (const p of pieces) if (p.o && p.o.t === 'sanct') dress.hunt({ x: p.x, y: p.y, z: p.z, yaw: p.o.yaw }, p.outline, 1, p.o.seed, { fossil: false, Rm: 22.8, hole: p.hole, block: p.block });
+  /* 보물 성소는 사용자 디자인 파일의 숲·풀·덩굴을 그대로 씀 (jsanct.js) → 여기서 따로 꾸미지 않음 */
   /* 나머지 정글 섬 전부 꾸미기 (사용자 2026-11-08: 정글 섬 전체를 퀄리티 있게) — 섬 종류마다 다른 식물 · 가까운 섬끼리 덩굴 · 그 밑 안개 (빛의 길 근처는 비움) */
   for (const p of pieces) { const o = p.o; if (!o || o.t === 'hunt' || o.t === 'sanct' || !p.top) continue;
     dress.isle({ x: p.x, y: p.y, z: p.z, yaw: o.yaw, s: o.s, sy: o.sy, kind: o.t === 'vine' ? 6 : o.kind, top: p.top, seed: o.seed, layer: o.layer, lite: !!o.lite || o.layer === 'dn', gate: o.t === 'gate', single: o.t === 'single' }); }
