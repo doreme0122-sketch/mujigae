@@ -163,10 +163,10 @@ export async function start(canvas, onProgress = () => {}) {
       /* s: { mode:'auto'|'lock'|'release', p:{x,y,z}, r, t, k(진입 0..1), fire, ten(버팀 0..1), sp(무지개 스침 0..1), out(사라짐 0..1) } */
       draw(s) { const { p, r, t } = s, lock = s.mode === 'lock', A = (1 - (s.out || 0));
         st.a += (lock ? .25 : .8) * s.dt; const pull = lock ? eob(s.k) : 0, shake = s.ten * .06;
-        const R0 = r * 1.5 + 1.69, R1 = r * .95 + 1.69, rad = R0 + (R1 - R0) * pull - s.fire * .25;   /* 칼날 뿌리까지 거리 (칼끝 = 뿌리 - 1.25) */
+        const R0 = r * 1.4 + 1.01, R1 = r * .95 + 1.01, rad = R0 + (R1 - R0) * pull - s.fire * .25;   /* 칼날 뿌리까지 거리 (칼끝 = 뿌리 - 1.01) */
         blades.forEach((b, i) => { b.visible = true; const a = st.a + i * TAU / 3 + (lock ? 0 : Math.sin(t * 1.3 + i) * .08), y = p.y + (lock ? 0 : Math.sin(t * 1.7 + i * 2) * .18) + .1;
           b.position.set(p.x + Math.cos(a) * rad + (R() - .5) * shake, y, p.z + Math.sin(a) * rad + (R() - .5) * shake);
-          b.scale.setScalar(1.35); b.rotation.set(0, -a + Math.PI, 0); b.rotateZ((lock ? -.35 : -.15) + (1 - pull) * Math.sin(t + i) * .1);   /* 칼끝이 대상을 향하고 · 고정되면 아래로 꽂히듯 기울어짐 */
+          b.scale.set(1.35 * .6, 1.35, 1.35);   /* 삼각뿔 길이만 60%로 (사용자 2026-11-09: 좀 짧게) */ b.rotation.set(0, -a + Math.PI, 0); b.rotateZ((lock ? -.35 : -.15) + (1 - pull) * Math.sin(t + i) * .1);   /* 칼끝이 대상을 향하고 · 고정되면 아래로 꽂히듯 기울어짐 */
           const U = b.material.uniforms; U.uT.value = t + i * .33; U.uSp.value = s.sp; U.uC.value.copy(lock ? SILVER.clone().lerp(CORAL, .55).lerp(AMBER, s.ten * .6) : SILVER); U.uA.value = (lock ? 1.5 : 1.15) * A; });
         ring.visible = lock || s.mode === 'release'; if (ring.visible) { ring.position.set(p.x, .3, p.z); const U = ring.material.uniforms; U.uR.value = r * 1.7 * (1 + (1 - sm(clamp(s.k * 1.6, 0, 1))) * .6) * (1 + (s.out || 0) * .8); U.uArc.value = sm(clamp(s.k * 1.4, 0, 1)); U.uRot.value = -t * .2;
           U.uC.value.copy(CORAL).lerp(AMBER, s.ten); U.uA.value = 1.3 * A; U.uT.value = t; U.uSp.value = s.sp; U.uSeg.value = 0; U.uTick.value = 0; ring.scale.setScalar(1); } },
