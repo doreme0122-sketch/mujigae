@@ -6,8 +6,8 @@
    단위 m */
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { stoneMaterial, solid, glowMaterial } from './wardbase.js?v=11091256';
-import { gem } from './guardian.js?v=11091256';
+import { stoneMaterial, solid, glowMaterial } from './wardbase.js?v=11091450';
+import { gem } from './guardian.js?v=11091450';
 
 const AB = { transparent: true, depthWrite: false, blending: THREE.AdditiveBlending };
 const clean = g => { for (const k of Object.keys(g.attributes)) if (k !== 'position' && k !== 'normal') g.deleteAttribute(k); return g.index ? g.toNonIndexed() : g; };

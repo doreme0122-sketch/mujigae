@@ -4,12 +4,14 @@
    ③ 포식 꽃 (정글 꽃섬): 다가가면 사정거리가 빨간 얇은 원으로 보임(가까울수록 진함) → 원 안에 들면 꽃 머리가 목을 쭉 늘여 기체 쪽으로 덮침 → 물고 제자리로 돌아와 씹음(체력 닳음) → 조금 뒤 멀리 퉤 뱉음
    ④ 해파리 (정글 해파리 군락): 갓에 닿으면 출렁 눌리며 기체를 위로 톡 튕겨 냄 (짧은 점프 + 옆으로 밀림)
    ⑤ 포자 늪 (정글 늪): 물 위에 들어가면 포자가 끈적하게 붙어 느려지고, 화면에 포자 안개가 낌 → 나와도 안개가 천천히 걷힘
+   ⑥ 분화 첨봉 (화산 · 사용자 2026-11-09): 꽃보다 훨씬 넓은 빨간 사정거리 원 · 원을 따라 빛이 차오르고 · 터지기 직전 깜빡임 → 터지는 순간 원 안 기체를 밖으로 밀어내며 체력 10%
+   ⑦ 바위 아치 홀로그램: 아치 가운데 둥근 빛 문 → 지나가면 잠깐 빨라짐 · 빛 문은 사라졌다가 잠시 뒤 다시 나타남 (남은 시간 표시는 없음)
    + 체력 100: 포식 꽃이 닳게 함 · 4초 동안 안 다치면 천천히 참 · 0이 되면 죽음 */
 import * as THREE from 'three';
 
 const hash = n => { const x = Math.sin(n * 127.1) * 43758.5453; return x - Math.floor(x); };
 
-export function makeGimmicks(scene, { meadow, jungle, fly, bship, R, gates = [], bases = [], die, hoverY = .7 }) {
+export function makeGimmicks(scene, { meadow, jungle, volc, fly, bship, R, gates = [], bases = [], die, hoverY = .7 }) {
   const FS = fly.userData.S, wp = new THREE.Vector3(), tmp = new THREE.Vector3();
   /* ── 화면: 체력 막대 · 늪 안개 · 꽃 속 ── */
   const css = document.createElement('style'); css.textContent = `
@@ -57,6 +59,38 @@ export function makeGimmicks(scene, { meadow, jungle, fly, bship, R, gates = [],
         gl_FragColor = vec4(vec3(1., .16, .2) * (1. + line * .6), k); }` });
   const RINGS = [0, 1, 2].map(() => { const m = new THREE.Mesh(new THREE.PlaneGeometry(2, 2).rotateX(-Math.PI / 2), ringM()); m.renderOrder = 50; m.frustumCulled = false; m.visible = false; scene.add(m); return m; });
   const lp = new THREE.Vector3();
+
+  /* ── ⑥ 분화 첨봉: 사정거리 원 (꽃 원과 같은 빨간 실선 · 넓이는 훨씬 넓게) + 차오르는 빛 · 깜빡임 · 터질 때 퍼지는 충격 고리 ── */
+  const PK = volc ? volc.peaks : [], AR = volc ? volc.arches : [], VP = volc ? 12 : 12, VTB = 12 - 2.4;
+  const pkM = () => new THREE.ShaderMaterial({ transparent: true, depthWrite: false, uniforms: { uA: { value: 0 }, uR: { value: 14 }, uT: { value: 0 }, uF: { value: 0 }, uW: { value: 0 }, uB: { value: 0 }, uS: { value: 0 } },
+    vertexShader: 'varying vec2 vP; void main(){ vP = position.xz; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.); }',
+    fragmentShader: `uniform float uA, uR, uT, uF, uW, uB, uS; varying vec2 vP;
+      void main(){ float d = length(vP) * uR * 1.2, e = d - uR, a = atan(vP.x, vP.y), u = fract(a / 6.2832 + 1.);   /* u: 원 위 자리 (12시에서 시계 방향) */
+        float blink = mix(1., .35 + .65 * step(.5, fract(uT * (2. + uW * 7.))), uW);   /* 터지기 직전: 점점 빨라지는 깜빡임 */
+        float w = .07 + uA * .06, line = exp(-e * e / (w * w)), halo = exp(-e * e / .7) * .3;
+        float teeth = .55 + .45 * smoothstep(.15, .35, abs(fract(u * 48. + uT * .04) - .5));
+        float fill = step(u, uF) * smoothstep(0., .02, uF), head = exp(-pow((u - uF) * 60., 2.)) * step(.01, uF);   /* 원을 따라 차오르는 빛 · 끝머리가 밝게 */
+        float charged = fill * (exp(-e * e / ((w * 1.8) * (w * 1.8))) * 1.25 + halo * .9) + head * exp(-e * e / .5) * 1.4;
+        float inside = (1. - smoothstep(uR - .3, uR, d)) * (.03 + .1 * uF * uF) * uA;   /* 안쪽은 차오를수록 붉게 달아오름 */
+        float eb = d - uB * uR, shock = uB > 0. && uB < 1. ? exp(-eb * eb / (.9 + uB * 2.)) * (1. - uB) * 1.6 : 0.;   /* 터지는 순간 가운데에서 밖으로 퍼지는 충격 고리 */
+        float k = ((line * teeth + halo * uA) * (.16 + .84 * uA) * (1. - uS * .7) + charged * uA + inside) * blink + shock * uA; if (k < .003) discard;
+        vec3 c = mix(vec3(1., .14, .12), vec3(1., .55, .16), clamp(fill + head, 0., 1.)) + vec3(.4, .3, .1) * head + vec3(1., .7, .3) * shock;
+        gl_FragColor = vec4(c * (1. + line * .5), min(1., k)); }` });
+  const PR = [0, 1].map(() => { const m = new THREE.Mesh(new THREE.PlaneGeometry(2, 2).rotateX(-Math.PI / 2), pkM()); m.renderOrder = 50; m.frustumCulled = false; m.visible = false; scene.add(m); return m; });
+  /* ── ⑦ 아치 빛 문 (둥근 홀로그램): 금빛 테 · 안쪽으로 빨려 드는 물결 · 테를 따라 도는 눈금 ── */
+  const hoM = new THREE.ShaderMaterial({ transparent: true, depthWrite: false, side: THREE.DoubleSide, blending: THREE.AdditiveBlending, uniforms: { uT: { value: 0 } },
+    vertexShader: 'attribute float aK; attribute float aB; varying vec2 vP; varying float vK; varying float vB; void main(){ vP = uv * 2. - 1.; vK = aK; vB = aB; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.); }',
+    fragmentShader: `uniform float uT; varying vec2 vP; varying float vK; varying float vB;
+      void main(){ float R = .78 * (.6 + .4 * vK) * (1. + vB * .9), d = length(vP), e = d - R, a = atan(vP.y, vP.x);
+        float rim = exp(-e * e / .0009) * 1.3 + exp(-e * e / .012) * .45;
+        float tick = step(.8, fract(a * 24. / 6.2832 + uT * .12)) * step(R + .03, d) * step(d, R + .1) * .8;
+        float film = (1. - smoothstep(R - .03, R, d)) * (.07 + .07 * (sin(d * 26. + uT * 7.) * .5 + .5) * (1. - d / max(R, .01)));   /* 가운데로 빨려 드는 물결 */
+        float spk = pow(max(0., sin(a * 3. - uT * 2.6)), 24.) * exp(-e * e / .004) * 1.4;   /* 테를 따라 도는 빛 셋 */
+        float k = (rim + tick + film + spk) * vK * (1. - vB) + exp(-e * e / .02) * vB * (1. - vB) * 3.;
+        vec3 c = mix(vec3(1., .62, .2), vec3(1., .95, .8), clamp(rim * .6 + spk, 0., 1.)); if (k < .004) discard; gl_FragColor = vec4(c * k, 1.); }` });
+  for (const A of AR) { const g = new THREE.PlaneGeometry(2 * (A.R + .55), 2 * (A.R + .55)), n = g.attributes.position.count; g.setAttribute('aK', new THREE.BufferAttribute(new Float32Array(n).fill(1), 1)); g.setAttribute('aB', new THREE.BufferAttribute(new Float32Array(n), 1));
+    const m = new THREE.Mesh(g, hoM); m.position.set(A.x, hoverY, A.z); m.rotation.y = Math.atan2(A.ax, A.az); m.renderOrder = 45; m.frustumCulled = false; scene.add(m); A.m = m; A.prev = null; A.used = -99; }
+  const ARCH_CD = 8; let archMsg = -99, pkWarn = 0, nowT = 0;
   /* 꽃에 삼켜진 상태 */
   let sw = null;   /* { f, t0, phase, dir } */
   const endSwallow = (t, spit) => { if (!sw) return; const f = sw.f; bship.visible = true; FS.noPad = false; maw.style.opacity = '0';
@@ -98,6 +132,27 @@ export function makeGimmicks(scene, { meadow, jungle, fly, bship, R, gates = [],
       if (Math.hypot(lx, lz) < S.pr(Math.atan2(lz, lx)) * S.s) { inS = true; break; } }
     gooK += ((inS ? .85 : 0) - gooK) * Math.min(1, dt * (inS ? 3 : 1.6)); FS.goo = gooK > .01 ? gooK : 0;   /* 들어가면 끈적하게 붙고 · 나오면 서서히 떨어져 나감 */
     hazeK += ((inS ? 1 : 0) - hazeK) * Math.min(1, dt * (inS ? 1.4 : .45)); haze.style.opacity = hazeK > .005 ? (hazeK * (.82 + .18 * Math.sin(t * 1.3))).toFixed(3) : '0';   /* 포자 안개: 금방 끼고 · 천천히 걷힘 */
+
+    /* 분화 첨봉 */
+    nowT = t; pkWarn = 0; const pnear = [];
+    for (const k of PK) { const ph = ((t + k.off) % VP + VP) % VP, d = Math.hypot(sx - k.x, sz - k.z), same = Math.abs(sy - hoverY) < 6; k.ph = ph; k.d = d;
+      if (live && same && d < k.r * 2.6) pnear.push(k);
+      if (k.lastPh < VTB && ph >= VTB && live && same && d < k.r && !sw && hp > 0) {   /* 터짐: 원 밖으로 밀어냄 + 체력 10% */
+        const l = d || 1, ux = d > .05 ? (sx - k.x) / l : Math.cos(FS.head), uz = d > .05 ? (sz - k.z) / l : Math.sin(FS.head), sp = 28, dur = Math.min(.8, Math.max(.3, (k.r - d + 3) / sp));
+        FS.dashVx = ux * sp; FS.dashVz = uz * sp; FS.dashUntil = t + dur; FS.dashEndK = .4; hop = { t0: t, d: 1, h: 3.4 }; hurt(10, t); k.hitAt = t; }
+      if (live && same && d < k.r && ph < VTB) pkWarn = Math.max(pkWarn, ph / VTB > .7 ? 2 : 1);
+      k.lastPh = ph; }
+    pnear.sort((a, b) => a.d - b.d); PR.forEach((m, i) => { const k = pnear[i]; if (!k) { m.visible = false; return; } m.visible = true; m.position.set(k.x, sy - .35, k.z); m.scale.setScalar(k.r * 1.2);
+      const U = m.material.uniforms, ch = k.ph < VTB; U.uR.value = k.r; U.uT.value = t; U.uA.value = THREE.MathUtils.smoothstep(k.r * 2.6 - k.d, 0, k.r * 1.4);
+      U.uF.value = ch ? k.ph / VTB : 0; U.uW.value = ch ? THREE.MathUtils.clamp((k.ph / VTB - .7) / .3, 0, 1) : 0; U.uB.value = ch ? 0 : Math.min(1, (k.ph - VTB) / 1.3); U.uS.value = ch ? 0 : 1 - Math.min(1, (k.ph - VTB) / (VP - VTB)); });   /* 터진 뒤엔 원이 식어 옅음 */
+    /* 아치 빛 문: 지나가면 빨라짐 → 사라짐 → 쉬었다 다시 */
+    hoM.uniforms.uT.value = t;
+    for (const A of AR) { const vis = !volc || A.p.vis; A.m.visible = vis; if (!vis) { A.prev = null; continue; }
+      const back = t - A.used, kA = back < .7 ? 0 : THREE.MathUtils.smoothstep(back, ARCH_CD, ARCH_CD + .9), kB = back < .7 ? back / .7 : 0;
+      const aK = A.m.geometry.attributes.aK, aB = A.m.geometry.attributes.aB; if (aK.array[0] !== kA || aB.array[0] !== kB) { aK.array.fill(kA); aB.array.fill(kB); aK.needsUpdate = aB.needsUpdate = true; }
+      const dx = sx - A.x, dz = sz - A.z, along = dx * A.ax + dz * A.az, lat = Math.abs(-dx * A.az + dz * A.ax);
+      if (live && !sw && A.prev != null && Math.sign(along) !== Math.sign(A.prev) && Math.abs(along) < 2.5 && lat < A.R && Math.abs(sy - hoverY) < 2.5 && back > ARCH_CD + .9) { A.used = t; FS.boost = Math.max(FS.boost || 0, 2.4); archMsg = t; }
+      A.prev = Math.hypot(dx, dz) < 12 ? along : null; }
     /* 점프 (해파리·뱉기) */
     if (hop) { const x = (t - hop.t0) / hop.d; if (x >= 1) { hop = null; api.hop = 0; } else api.hop = 4 * hop.h * x * (1 - x); } else api.hop = 0;
     /* 체력 */
@@ -105,7 +160,7 @@ export function makeGimmicks(scene, { meadow, jungle, fly, bship, R, gates = [],
     const hr = Math.round(hp); if (hr !== shownHP) { shownHP = hr; hpN.textContent = hr; hpF.style.transform = `scaleX(${hp / 100})`; hpL.style.transform = `scaleX(${hp / 100})`; }
     hpEl.classList.toggle('hurt', t - hurtAt < .3); hpEl.style.opacity = flying ? '1' : '.35';
   };
-  api.dbg = { HIDES, FL, JE, SW, RINGS, get hp() { return hp; } };
-  api.status = () => sw ? '포식 꽃에 삼켜졌어요! 체력이 닳는 중…' : gooK > .3 ? '포자 늪 · 포자가 달라붙어 느려져요' : hideOn ? '숲에 숨었어요 · 밖에서는 안 보여요' : null;
+  api.dbg = { HIDES, FL, JE, SW, RINGS, PK, AR, PR, get hp() { return hp; } };
+  api.status = () => sw ? '포식 꽃에 삼켜졌어요! 체력이 닳는 중…' : PK.some(k => k.hitAt && nowT - k.hitAt < 1.6) ? '분화 첨봉이 터졌어요! 밀려나며 체력 10%' : pkWarn === 2 ? '분화 첨봉 · 곧 터져요! 원 밖으로' : pkWarn === 1 ? '분화 첨봉 사정거리 · 빛이 다 차면 터져요' : nowT - archMsg < 1.6 ? '아치 빛 문 통과 · 잠깐 빨라져요!' : gooK > .3 ? '포자 늪 · 포자가 달라붙어 느려져요' : hideOn ? '숲에 숨었어요 · 밖에서는 안 보여요' : null;
   return api;
 }

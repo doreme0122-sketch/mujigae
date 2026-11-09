@@ -8,25 +8,26 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
-import { makeBloom } from '../core/hangar/bloom.js?v=11091256';
-import { makePad } from '../core/hangar/pad.js?v=11091256';
-import { makeMag } from '../core/hangar/mag.js?v=11091256';
+import { makeBloom } from '../core/hangar/bloom.js?v=11091450';
+import { makePad } from '../core/hangar/pad.js?v=11091450';
+import { makeMag } from '../core/hangar/mag.js?v=11091450';
 import { buildShip } from '../core/ships/build.js';
-import { makeGoldStar } from './goldstar.js?v=11091256';
-import { makeArena, SPEED, WAVE_R0 } from './arena.js?v=11091256';
-import { makeGuardians, GUARD } from './guardian.js?v=11091256';
-import { makeBirth, BIRTH } from './birth.js?v=11091256';
-import { makeTravel } from './travel.js?v=11091256';
-import { spiralPath } from './path.js?v=11091256';
-import { makePerf } from './perf.js?v=11091256';
+import { makeGoldStar } from './goldstar.js?v=11091450';
+import { makeArena, SPEED, WAVE_R0 } from './arena.js?v=11091450';
+import { makeGuardians, GUARD } from './guardian.js?v=11091450';
+import { makeBirth, BIRTH } from './birth.js?v=11091450';
+import { makeTravel } from './travel.js?v=11091450';
+import { spiralPath } from './path.js?v=11091450';
+import { makePerf } from './perf.js?v=11091450';
 import { makeGlow } from '../preview/glow.js';
-import { makeFlight, FLY, PADZ, padZone } from './flight.js?v=11091256';
-import { pedestal, gate4 } from './gates.js?v=11091256';
-import { makeMeadow, MEADOW } from './meadow.js?v=11091256';
-import { makeClouds } from './clouds.js?v=11091256';
-import { makeLife } from './life.js?v=11091256';
-import { makeJungle, jungleLayout, SANCT_TEST } from './jungle.js?v=11091256';
-import { makeGimmicks } from './gimmick.js?v=11091256';
+import { makeFlight, FLY, PADZ, padZone } from './flight.js?v=11091450';
+import { pedestal, gate4 } from './gates.js?v=11091450';
+import { makeMeadow, MEADOW } from './meadow.js?v=11091450';
+import { makeClouds } from './clouds.js?v=11091450';
+import { makeLife } from './life.js?v=11091450';
+import { makeJungle, jungleLayout, SANCT_TEST } from './jungle.js?v=11091450';
+import { makeGimmicks } from './gimmick.js?v=11091450';
+import { makeVolcano, VOLC } from './volcano.js?v=11091450';
 
 const $ = s => document.querySelector(s), clamp = THREE.MathUtils.clamp, HOVER = FLY.HOVER;
 const R = 240, NB = 10, GAPH = 5.6, BASE_D = 0;     /* 맵 반지름 · 기지 수 · 벽 틈 반 폭(= 기지 반지름) · 기지 가운데는 벽 선 위 (앞 절반은 맵 안, 뒤 절반은 맵 밖 · 사용자 2026-11-06) */
@@ -50,6 +51,7 @@ export async function start(canvas, onProgress = () => {}) {
   { const pm = new THREE.PMREMGenerator(renderer); scene.environment = pm.fromScene(new RoomEnvironment(), .04).texture; scene.environmentIntensity = .7; pm.dispose(); }
   const sun = new THREE.DirectionalLight(0xfff0dc, 2.8); sun.position.set(-9, 14, -8); scene.add(sun);
   const hemi = new THREE.HemisphereLight(0xb7c8e8, 0x3a3020, .85); scene.add(hemi);
+  const HEMI_V = new THREE.Color(0xc8a49a).multiplyScalar(1.15), GND_V = new THREE.Color(0x4a1e10), CLR_V = new THREE.Color(0x3a1a10), SUN0C = new THREE.Color(0xfff0dc), SUN_V = new THREE.Color(0xffcfa8); let vmood = 0;   /* 화산 분위기 (원본 키트 빛: 붉은 재 하늘 · 따뜻한 해) */
   const HEMI0 = new THREE.Color(0xb7c8e8), GND0 = new THREE.Color(0x3a3020), HEMI_J = new THREE.Color(0x7a6cff), GND_J = new THREE.Color(0x3a0a4a), CLR0 = new THREE.Color(0xbcd2ea), CLR_J = new THREE.Color(0x1a1238); let mood = 0;   /* 정글 분위기 */
   const glow = makeGlow(); scene.add(glow.mesh);
   /* 아래 구름 바다 */
@@ -89,6 +91,10 @@ export async function start(canvas, onProgress = () => {}) {
         float jz=smoothstep(204.,150.,rr+(n(vW.xz*.018)-.5)*46.+(n(vW.xz*.06)-.5)*14.)*(1.-k);   /* 경계는 구름 결 따라 들쭉날쭉 · 넓게 번지며 바뀜 */
         vec3 neb=mix(vec3(.05,.03,.12),vec3(.32,.12,.48),cl)+vec3(.1,.55,.7)*pow(smoothstep(.55,.95,c),3.)*.6+vec3(.6,.2,.8)*pow(smoothstep(.62,.98,wv.x*c*1.6),2.)*.35;
         col=mix(col,neb,jz);
+        /* 화산 지역 아래 (반지름 약 150m 안쪽): 재 구름 · 구름 틈으로 용암빛이 비침 (사용자 2026-11-09: 정글에서 화산으로 천천히) */
+        float vz=smoothstep(162.,108.,rr+(n(vW.xz*.02)-.5)*40.+(n(vW.xz*.07)-.5)*12.)*(1.-k);
+        vec3 ash=mix(vec3(.11,.04,.025),vec3(.38,.15,.08),cl)+vec3(1.,.32,.05)*pow(smoothstep(.45,.92,c),2.)*(.7+.3*sin(uT*.7+c*9.))+vec3(.9,.18,.03)*pow(smoothstep(.6,.98,wv.y*c*1.6),2.)*.4;
+        col=mix(col,ash,vz);
         gl_FragColor=vec4(col+cl*k*vec3(.15,.18,.25)*(1.-jz),1.); }` }));
   sea.position.y = -150; scene.add(sea);   /* 아래층(−30m) 섬 밑으로 구름 바다가 깔리게 */
   onProgress(.1);
@@ -160,9 +166,10 @@ export async function start(canvas, onProgress = () => {}) {
   onProgress(.4);
   /* ── 초원 고리 ── */
   const JL = jungleLayout({ TOP: MEADOW.TOP, UP: MEADOW.UP, DN: MEADOW.DN });   /* 정글 배치 계획을 먼저 → 초원이 경계 너머로 섬을 놓을 때 피해 감 */
-  const meadow = await makeMeadow(scene, new URL('./assets/kit_meadow.glb?v=11091256', import.meta.url).href, p => onProgress(.4 + p * .4), new URL('./assets/kit_meadow_decor.glb?v=11091256', import.meta.url).href, new URL('./assets/kit_meadow_lo.glb?v=11091256', import.meta.url).href, { avoid: JL });
+  const meadow = await makeMeadow(scene, new URL('./assets/kit_meadow.glb?v=11091450', import.meta.url).href, p => onProgress(.4 + p * .4), new URL('./assets/kit_meadow_decor.glb?v=11091450', import.meta.url).href, new URL('./assets/kit_meadow_lo.glb?v=11091450', import.meta.url).href, { avoid: JL });
   const clouds = makeClouds(scene, { R0: MEADOW.R0, R1: MEADOW.R1 });   /* 층 사이 흘러가는 구름 · 기체 높이 숨는 구름 */
   const jungle = makeJungle(scene, { TOP: MEADOW.TOP, UP: MEADOW.UP, DN: MEADOW.DN, avoid: meadow.place.concat(meadow.CORR.map(c => ({ x: c[0], z: c[1], rr: c[2], layer: 'all' }))) });   /* 우주 정글 고리 (초원 안쪽) */
+  const volc = /novolc/.test(location.search) ? { update() {}, setFocus() {}, peaks: [], arches: [], P: [], L: [], T: [], info: () => ({}) } : makeVolcano(scene, { jungle, TOP: MEADOW.TOP, UP: MEADOW.UP, DN: MEADOW.DN, renderer });   /* 화산 지역 고리 (정글 안쪽 85~136m · 사용자 2026-11-09) */
   /* ── 위아래 문 다섯: 흩어진 고리 문(0.8배) + 보물 던전 섬까지 뻗는 빛 띠 (위층 = 금빛 · 아래층 = 보랏빛) ── */
   const GATE_H = HOVER - MEADOW.GATE_Y, gates = [], roadMs = [];
   const roadM = () => new THREE.ShaderMaterial({ ...AB, side: THREE.DoubleSide, uniforms: { uC: { value: new THREE.Color() }, uA: { value: 1 }, uT: { value: 0 }, uL: { value: 60 } },
@@ -237,7 +244,7 @@ export async function start(canvas, onProgress = () => {}) {
   let LV = 1, dead = false, reviveAt = 0;
   const dim = document.createElement('div'); dim.style.cssText = 'position:fixed;inset:0;pointer-events:none;background:rgba(6,8,18,.42);opacity:0;transition:opacity .6s;z-index:2'; document.body.appendChild(dim);
   const die = () => { if (dead) return; dead = true; reviveAt = t + Math.min(20, 5 + LV); travel.reset(); flying = false; fly.visible = false; bolts.length = 0; FS.noPad = true; dim.style.opacity = '1'; holdAt = onAt = launchAt = 1e9; };
-  const gim = makeGimmicks(scene, { meadow, jungle, fly, bship, R, gates, bases: BASES, die: () => die(), hoverY: HOVER });   /* 숨는 숲 · 바람길 · 포식 꽃 · 해파리 · 포자 늪 · 체력 */
+  const gim = makeGimmicks(scene, { meadow, jungle, volc, fly, bship, R, gates, bases: BASES, die: () => die(), hoverY: HOVER });   /* 숨는 숲 · 바람길 · 포식 꽃 · 해파리 · 포자 늪 · 체력 */
   let flyY = 0;
   /* 플레이어 시야 (사용자 2026-11-08 · 예전 시야 가림처럼 부드럽게): 기체 둘레는 밝고 바깥으로 갈수록 어둑해짐
      · 칸칸이 끊기지 않게 둥글게 번짐 · 가장자리는 아주 느린 물결로 살짝 일렁여 눈이 어둠에 적응하는 느낌 · 화면 위 한 장(그리기 1번) */
@@ -322,7 +329,7 @@ export async function start(canvas, onProgress = () => {}) {
     if (look.id === null) { const k = Math.min(1, dt * 3.5); look.x -= look.x * k; look.z -= look.z * k; }   /* 손 떼면 돌아옴 */
     /* 기체 */
     if (flying) travel.update(t, dt, cam);
-    { const L = travel.mode === 'dest' ? travel.dest.g.Gd.layer : null, k = Math.min(1, dt * 2); jungle.setFocus(L, L ? travel.dest.g.Gd.ty : 0); visU += ((L === 'up' ? 1 : 0) - visU) * k; visD += ((L === 'dn' ? 1 : 0) - visD) * k; meadow.setVisit(visU, visD); }   /* 도착한 층은 옅은 빛을 걷어 또렷하게 */
+    { const L = travel.mode === 'dest' ? travel.dest.g.Gd.layer : null, k = Math.min(1, dt * 2); jungle.setFocus(L, L ? travel.dest.g.Gd.ty : 0); volc.setFocus(L, L ? travel.dest.g.Gd.ty : 0); visU += ((L === 'up' ? 1 : 0) - visU) * k; visD += ((L === 'dn' ? 1 : 0) - visD) * k; meadow.setVisit(visU, visD); }   /* 도착한 층은 옅은 빛을 걷어 또렷하게 */
     if (flying) { if (travel.mode !== 'trip') { flyY += (travel.yOff - flyY) * Math.min(1, dt * 1.5); fly.position.y = flyY + gim.hop; } else flyY = fly.position.y; fly.updateMatrixWorld(true); fly.userData.update(t, dt);   /* 판 위 높이에서 비행 높이로 스르륵 */ for (const o of oldSh) o.visible = false; travel.pose(); }
     gim.update(t, dt, { flying, mode: travel.mode, camera, pxRatio: renderer.getPixelRatio() }); zoneTick();
     xrayM.uniforms.uH.value += ((gim.hidden() ? 1 : 0) - xrayM.uniforms.uH.value) * Math.min(1, dt * 6); xrayM.depthFunc = xrayM.uniforms.uH.value > .5 ? THREE.AlwaysDepth : THREE.GreaterDepth;   /* 숨는 동안은 기체 전체를 초록 실루엣으로 (나무에 가린 곳도 · 안 가린 곳도) */
@@ -345,10 +352,11 @@ export async function start(canvas, onProgress = () => {}) {
     if (!dead) camD += (cfg.dist * (flying ? 1 : .7) - camD) * Math.min(1, dt * 1.2);   /* 태어나는 동안 가까이 → 몰기 시작하면 천천히 물러남 */
     const a = cfg.ang * Math.PI / 180, D = camD, vx = cam.x + look.x, vz = cam.z + look.z; camera.position.set(vx, cam.y + D * Math.sin(a), vz + D * Math.cos(a)); camera.lookAt(vx, cam.y, vz); camera.updateMatrixWorld();   /* 둘러보기만큼 옮겨 봄 */
     { const sr = Math.hypot(flying ? FS.x : cam.x, flying ? FS.z : cam.z), jk = THREE.MathUtils.smoothstep(196 - sr, 0, 26);   /* 정글 안쪽으로 들어갈수록 */
-      mood += (jk - mood) * Math.min(1, dt * 1.5); sun.intensity = 2.8 * (1 - mood * .6); hemi.color.copy(HEMI0).lerp(HEMI_J, mood); hemi.groundColor.copy(GND0).lerp(GND_J, mood);
-      renderer.setClearColor(CLR0.clone().lerp(CLR_J, mood), 1); meadow.setMood?.(mood); }
-    sea.position.x = cam.x + look.x; sea.position.z = cam.z + look.z; sea.material.uniforms.uT.value = t; meadow.update(v3.set(cam.x + look.x, HOVER, cam.z + look.z), camera, t); clouds.update(t, v3.set(flying ? FS.x : cam.x, HOVER + travel.yOff, flying ? FS.z : cam.z), camera.position); jungle.update(t, dt, camera); life.update(t, dt, v3, camera.position);
-    { const r = Math.hypot(FS.x, FS.z), ts = flying && travel.status(); say.textContent = dead ? `다시 태어나기까지 ${Math.max(1, Math.ceil(reviveAt - t))}초 · 화면을 끌어 맵을 둘러보세요` : flying && gim.status() ? gim.status() : ts ? ts : !flying ? '태어나는 중' : baseAt(FS.x, FS.z) ? '태어나는 곳 · 출구로 나가면 맵 안' : r > R - 25 ? '초원 · 무지개 벽 가까이 · 쏘면 무지개빛이 번져요' : (r > MEADOW.R0 ? '초원' : '맵 안') + (clouds.inCloud(FS.x, FS.z) ? ' · 구름 속에 숨음' : '') + ' · 한가운데까지 ' + Math.round(r) + 'm'; }
+      const vk = THREE.MathUtils.smoothstep(150 - sr, 0, 34);   /* 정글 안쪽 화산 지역으로 갈수록 (경계 150m부터 116m까지 천천히) */
+      mood += (jk - mood) * Math.min(1, dt * 1.5); vmood += (vk - vmood) * Math.min(1, dt * 1.5); sun.intensity = 2.8 * (1 - mood * .6) * (1 - vmood) + 2.2 * vmood; sun.color.copy(SUN0C).lerp(SUN_V, vmood); hemi.color.copy(HEMI0).lerp(HEMI_J, mood).lerp(HEMI_V, vmood); hemi.groundColor.copy(GND0).lerp(GND_J, mood).lerp(GND_V, vmood); hemi.intensity = .85 + vmood * .55; scene.environmentIntensity = .7 - vmood * .5;
+      renderer.setClearColor(CLR0.clone().lerp(CLR_J, mood).lerp(CLR_V, vmood), 1); meadow.setMood?.(mood); }
+    sea.position.x = cam.x + look.x; sea.position.z = cam.z + look.z; sea.material.uniforms.uT.value = t; meadow.update(v3.set(cam.x + look.x, HOVER, cam.z + look.z), camera, t); clouds.update(t, v3.set(flying ? FS.x : cam.x, HOVER + travel.yOff, flying ? FS.z : cam.z), camera.position); jungle.update(t, dt, camera); volc.update(t, dt, camera); life.update(t, dt, v3, camera.position);
+    { const r = Math.hypot(FS.x, FS.z), ts = flying && travel.status(); say.textContent = dead ? `다시 태어나기까지 ${Math.max(1, Math.ceil(reviveAt - t))}초 · 화면을 끌어 맵을 둘러보세요` : flying && gim.status() ? gim.status() : ts ? ts : !flying ? '태어나는 중' : baseAt(FS.x, FS.z) ? '태어나는 곳 · 출구로 나가면 맵 안' : r > R - 25 ? '초원 · 무지개 벽 가까이 · 쏘면 무지개빛이 번져요' : (r > MEADOW.R0 ? '초원' : r > VOLC.R1 ? '우주 정글' : r > VOLC.R0 - 4 ? '화산 지역' : '맵 안') + (clouds.inCloud(FS.x, FS.z) ? ' · 구름 속에 숨음' : '') + ' · 한가운데까지 ' + Math.round(r) + 'm'; }
     /* 별똥별이 꽂힐 때 공간 일그러짐 충격파 (시작 기지와 같은 효과) */
     if (WARP.s > 0) { B0.w.localToWorld(v3.set(0, .2, 0)); v3.project(camera); bloom.warp(v3.x * .5 + .5, v3.y * .5 + .5, WARP.r, WARP.s, Wd / Hd); } else bloom.warp(.5, .5, 0, 0, Wd / Hd);
     const c1 = performance.now(); renderer.setRenderTarget(bloom.scene); renderer.clear(); renderer.render(scene, camera); CPU.calls = renderer.info.render.calls;
@@ -357,5 +365,5 @@ export async function start(canvas, onProgress = () => {}) {
         CPU.el.textContent = `계산 ${(CPU.a / CPU.n).toFixed(1)}ms · 그리기 명령 ${(CPU.b / CPU.n).toFixed(1)}ms · 그리기 ${CPU.calls}번`; CPU.a = CPU.b = CPU.n = CPU.tt = 0; } }
   } catch (e) { console.error('[전체 맵]', e); } });
   onProgress(1);
-  window.__sm = { scene, renderer, camera, perf, travel, gates, meadow, clouds, life, jungle, gim, info: () => ({ ...meadow.info(), drawCalls: renderer.info.render.calls, gpuTris: renderer.info.render.triangles }), FS, fly, BASES, cam, cfg, HITS, get t() { return t; }, get flying() { return flying; }, wake };
+  window.__sm = { scene, renderer, camera, perf, travel, gates, meadow, clouds, life, jungle, volc, gim, info: () => ({ ...meadow.info(), drawCalls: renderer.info.render.calls, gpuTris: renderer.info.render.triangles }), FS, fly, BASES, cam, cfg, HITS, get t() { return t; }, get flying() { return flying; }, wake };
 }
