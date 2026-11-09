@@ -5,7 +5,7 @@
    · 떨어지는 흙·돌: 섬 가장자리에서 작은 돌 조각이 이따금 떨어져 구름 속으로 사라짐
    모두 한 종류마다 한 번에 그림 · 기체에서 먼 것은 움직임 계산을 건너뜀 */
 import * as THREE from 'three';
-import { makeChunk } from './land.js?v=11092118';
+import { makeChunk } from './land.js?v=11092203';
 
 const rnd = seed => { let s = seed >>> 0; return () => ((s = (s * 1664525 + 1013904223) >>> 0) / 4294967296); };
 const smooth = t => t * t * (3 - 2 * t);

@@ -5,18 +5,18 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
-import { makeBloom } from '../core/hangar/bloom.js?v=11092118';
-import { makePad } from '../core/hangar/pad.js?v=11092118';
-import { makeMag } from '../core/hangar/mag.js?v=11092118';
+import { makeBloom } from '../core/hangar/bloom.js?v=11092203';
+import { makePad } from '../core/hangar/pad.js?v=11092203';
+import { makeMag } from '../core/hangar/mag.js?v=11092203';
 import { buildShip } from '../core/ships/build.js';
-import { makeGoldStar } from './goldstar.js?v=11092118';
-import { makeArena, SPEED, WAVE_R0 } from './arena.js?v=11092118';
-import { makeGuardians, GUARD } from './guardian.js?v=11092118';
-import { makeBirth, BIRTH } from './birth.js?v=11092118';
-import { makePerf } from './perf.js?v=11092118';
-import { autoMerge } from './automerge.js?v=11092118';
+import { makeGoldStar } from './goldstar.js?v=11092203';
+import { makeArena, SPEED, WAVE_R0 } from './arena.js?v=11092203';
+import { makeGuardians, GUARD } from './guardian.js?v=11092203';
+import { makeBirth, BIRTH } from './birth.js?v=11092203';
+import { makePerf } from './perf.js?v=11092203';
+import { autoMerge } from './automerge.js?v=11092203';
 import { makeGlow } from '../preview/glow.js';
-import { makeFlight, FLY, PADZ, padZone } from './flight.js?v=11092118';
+import { makeFlight, FLY, PADZ, padZone } from './flight.js?v=11092203';
 
 const $ = s => document.querySelector(s), clamp = THREE.MathUtils.clamp, HOVER = FLY.HOVER;
 const R = 240, NB = 10, GAPH = 5.6, BASE_D = 0;     /* 맵 반지름 · 기지 수 · 벽 틈 반 폭(= 기지 반지름) · 기지 가운데는 벽 선 위 (앞 절반은 맵 안, 뒤 절반은 맵 밖 · 사용자 2026-11-06) */
@@ -35,48 +35,34 @@ function skyTone(root) { root.traverse(o => { if (!o.isMesh) return; for (const 
 
 export async function start(canvas, onProgress = () => {}) {
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: false, powerPreference: 'high-performance' });
-  renderer.toneMapping = THREE.NoToneMapping; renderer.autoClear = false; renderer.setClearColor(0xbcd2ea, 1);
+  renderer.toneMapping = THREE.NoToneMapping; renderer.autoClear = false; renderer.setClearColor(0x04060f, 1);
   const scene = new THREE.Scene(), camera = new THREE.PerspectiveCamera(20, 1, .5, 1600), bloom = makeBloom(renderer, { samples: 0 });
   { const pm = new THREE.PMREMGenerator(renderer); scene.environment = pm.fromScene(new RoomEnvironment(), .04).texture; scene.environmentIntensity = .7; pm.dispose(); }
   const sun = new THREE.DirectionalLight(0xfff0dc, 2.8); sun.position.set(-9, 14, -8); scene.add(sun);
   const hemi = new THREE.HemisphereLight(0xb7c8e8, 0x3a3020, .85); scene.add(hemi);
-  const CLR0 = new THREE.Color(0xbcd2ea);
   const glow = makeGlow(); scene.add(glow.mesh);
-  /* 아래 구름 바다 */
-  /* 구름 무늬 그림 (2026-11-08 최적화: 화면 칸마다 잡음 약 29번 계산 → 미리 구운 그림 한 장에서 9번 읽기 · 무늬·흐름·겹은 그대로)
-     이어 붙여도 이음매 없는 기울기 잡음(격자가 덜 드러남) · R = 다섯 겹 쌓은 구름 · G = 한 겹 */
-  const seaNoise = (() => { const S = 512, P = 16, d = new Uint8Array(S * S * 4), G = [];
-    for (let i = 0; i < 256 * 256; i++) { const a = Math.sin(i * 12.9898 + 78.233) * 43758.5453, an = (a - Math.floor(a)) * 6.2832; G.push(Math.cos(an), Math.sin(an)); }
-    const gr = (ix, iy, per) => { ix = ((ix % per) + per) % per; iy = ((iy % per) + per) % per; let h = Math.imul(ix, 374761393) ^ Math.imul(iy, 668265263) ^ Math.imul(per, 1442695041); h = Math.imul(h ^ (h >>> 13), 1274126177); h ^= h >>> 16; const k = ((h >>> 0) % 65536) * 2; return [G[k], G[k + 1]]; };
-    const fade = t => t * t * t * (t * (t * 6 - 15) + 10);
-    const pn = (x, y, per) => { const ix = Math.floor(x), iy = Math.floor(y), fx = x - ix, fy = y - iy, u = fade(fx), v = fade(fy);
-      const dot = (gx, gy, dx, dy) => { const g = gr(ix + gx, iy + gy, per); return g[0] * dx + g[1] * dy; };
-      const a = dot(0, 0, fx, fy), b = dot(1, 0, fx - 1, fy), c = dot(0, 1, fx, fy - 1), e = dot(1, 1, fx - 1, fy - 1); return (a + (b - a) * u + (c - a) * v + (a - b - c + e) * u * v) * 1.4 * .5 + .5; };
-    for (let j = 0; j < S; j++) for (let i = 0; i < S; i++) { const x = i / S * P, y = j / S * P; let s2 = 0, a = .5, f = 1, n1 = 0;
-      for (let o = 0; o < 5; o++) { const v = pn(x * f + o * 3.1, y * f + o * 1.7, P * f); if (!o) n1 = v; s2 += a * v; a *= .5; f *= 2; }
-      const k = (j * S + i) * 4; d[k] = Math.max(0, Math.min(255, Math.round(s2 / .97 * 255))); d[k + 1] = Math.max(0, Math.min(255, Math.round(n1 * 255))); d[k + 2] = 0; d[k + 3] = 255; }
-    const t = new THREE.DataTexture(d, S, S); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.magFilter = THREE.LinearFilter; t.minFilter = THREE.LinearMipmapLinearFilter; t.generateMipmaps = true; t.needsUpdate = true; return t; })();
-  const sea = new THREE.Mesh(new THREE.PlaneGeometry(2400, 2400).rotateX(-Math.PI / 2), new THREE.ShaderMaterial({ uniforms: { uT: { value: 0 }, uN: { value: seaNoise } },
-    vertexShader: 'varying vec3 vW; void main(){ vec4 w=modelMatrix*vec4(position,1.); vW=w.xyz; gl_Position=projectionMatrix*viewMatrix*w; }',
-    fragmentShader: `uniform float uT; uniform sampler2D uN; varying vec3 vW; float h(vec2 p){ return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453); }
-      /* 구름 무늬 (사용자 2026-11-06: 네모 칸처럼 보임 → 격자가 드러나지 않는 부드러운 잡음 · 겹을 쌓고 서로 휘게 함) — 미리 구운 그림에서 읽음 */
-      float n(vec2 p){ return texture2D(uN, p/16.).g; }
-      float fbm(vec2 p){ return texture2D(uN, p/16.+vec2(.37,.61)).r; }
-      void main(){ float rr=length(vW.xz);
-        /* 하늘 → 우주: 구름 모양대로 울퉁불퉁하게 옅어지며 하늘빛이 어두워지고 별이 하나둘 · 경계를 따라 푸른 대기 빛 (사용자 2026-11-06) */
-        vec2 q=vW.xz*.011; vec2 wv=vec2(fbm(q+vec2(uT*.006,0.)), fbm(q+vec2(5.2,1.3)-vec2(0.,uT*.004)));
-        float c=fbm(q*1.3+wv*1.7+vec2(uT*.01,0.))*.72+fbm(q*3.3-vec2(uT*.022,uT*.012))*.28;   /* 큰 구름 덩어리는 천천히 · 잔 구름은 조금 빠르게 */
-        float edge=rr-${R}.-8.-(n(vW.xz*.02)*.6+n(vW.xz*.05)*.4)*38.;                    /* 구름 가닥이 우주 쪽으로 들쭉날쭉 */
-        float k=smoothstep(-6.,34.,edge);                                                  /* 0 = 하늘 · 1 = 우주 */
-        float cl=smoothstep(.3+k*.4,.8+k*.15,c)*(1.-k);                                     /* 구름이 점점 옅어져 흩어짐 */
-        vec3 sky=mix(vec3(.62,.72,.9),vec3(.97,.98,1.),cl);
-        vec3 space=vec3(.006,.008,.018);
-        vec2 g=floor(vW.xz*.35); float st=step(.985,h(g)); float tw=.55+.45*sin(uT*1.7+h(g+3.)*40.); vec2 f=fract(vW.xz*.35)-.5; float sd=exp(-dot(f,f)*60.);
-        vec3 stars=vec3(.85,.9,1.)*st*tw*sd*(.5+h(g+7.)*.8)*smoothstep(.35,1.,k);
-        vec3 col=mix(sky*mix(1.,.35,k),space,smoothstep(.2,1.,k))+stars;
-        col+=vec3(.35,.6,1.15)*exp(-pow((k-.32)/.16,2.))*.32;                               /* 대기 빛 띠: 은은하게 */
-        gl_FragColor=vec4(col+cl*k*vec3(.15,.18,.25),1.); }` }));
-  sea.position.y = -150; scene.add(sea);   /* 아래층(−30m) 섬 밑으로 구름 바다가 깔리게 */
+  /* 우주 (사용자 2026-11-09: 아래 구름 대신 우주) — 바탕·성운은 로딩 때 그림 한 장에 미리 굽고, 별은 화면 점 크기로 그려 좁은 시야에서도 또렷 · 카메라를 감싼 공 하나(그리기 1번)
+     · 깊은 검푸른 바탕 · 옅은 성운(푸른 보라 · 청록 · 아주 옅은 분홍)이 번짐 · 별 크기·밝기 제각각 · 밝은 별만 은은하게 반짝 */
+  const spaceTex = (() => { const W = 1024, H = 512, c = document.createElement('canvas'); c.width = W; c.height = H; const g = c.getContext('2d'); let sd = 7;
+    const rnd = () => (sd = (sd * 16807) % 2147483647) / 2147483647;
+    const bg = g.createLinearGradient(0, 0, 0, H); bg.addColorStop(0, '#060a1c'); bg.addColorStop(.5, '#04060f'); bg.addColorStop(1, '#03040b'); g.fillStyle = bg; g.fillRect(0, 0, W, H);
+    g.globalCompositeOperation = 'lighter';
+    const cloud = (x, y, r, col, a) => { for (const dx of [-W, 0, W]) { const gr = g.createRadialGradient(x + dx, y, 0, x + dx, y, r); gr.addColorStop(0, `rgba(${col},${a})`); gr.addColorStop(.45, `rgba(${col},${a * .42})`); gr.addColorStop(1, `rgba(${col},0)`); g.fillStyle = gr; g.fillRect(x + dx - r, y - r, r * 2, r * 2); } };
+    for (const [cx, cy, sp, col, n] of [[.22, .62, .16, '70,80,190', 70], [.58, .7, .2, '40,140,170', 60], [.83, .55, .13, '150,70,170', 45], [.4, .45, .1, '90,60,180', 35]])
+      for (let i = 0; i < n; i++) { const a = rnd() * 6.28, d = Math.pow(rnd(), .7) * sp; cloud((cx + Math.cos(a) * d * 1.6) * W, (cy + Math.sin(a) * d) * H, (10 + rnd() * 45) * (1 - d / sp * .5), col, .035 + rnd() * .05); }   /* 성운: 옅은 빛 덩이를 겹겹이 */
+    const tx = new THREE.CanvasTexture(c); tx.colorSpace = THREE.SRGBColorSpace; tx.anisotropy = 4; return tx; })();
+  const space = new THREE.Mesh(new THREE.SphereGeometry(900, 48, 24), new THREE.ShaderMaterial({ side: THREE.BackSide, depthWrite: false, depthTest: false, uniforms: { map: { value: spaceTex }, uT: { value: 0 } },
+    vertexShader: 'varying vec2 vU; void main(){ vU = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.); }',
+    fragmentShader: `uniform sampler2D map; uniform float uT; varying vec2 vU;
+      float h(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+      vec3 stars(vec2 N, float pr, float sz0, float br){ vec2 g = vU * N, id = floor(g), f = fract(g); if (h(id) > pr) return vec3(0.);   /* 칸마다 별 하나일 수도 · 크기는 화면 점 기준이라 좁은 시야에서도 늘 또렷 */
+        vec2 p = vec2(.15) + .7 * vec2(h(id + 1.3), h(id + 7.7)); vec2 dp = (f - p) / max(fwidth(g), vec2(1e-5)); float b = pow(h(id + 3.1), 5.), sz = sz0 + b * 1.6, k = exp(-dot(dp, dp) / (sz * sz));
+        float tw = 1. + .5 * sin(uT * (1. + h(id + 9.1) * 2.5) + h(id) * 60.) * step(.35, b);   /* 밝은 별만 은은하게 반짝 */
+        vec3 col = mix(vec3(.75, .82, 1.), vec3(1., .88, .76), step(.85, h(id + 5.5))); return col * k * (.25 + b * 2.4) * tw * br; }
+      void main(){ vec3 c = pow(texture2D(map, vU).rgb, vec3(2.2));   /* 바탕 · 성운 (그림 한 장) */
+        c += stars(vec2(1300., 650.), .055, .7, .65) + stars(vec2(3000., 1500.), .025, .5, .25);   /* 별 두 겹: 드문 밝은 별 · 촘촘하고 흐린 별 */
+        gl_FragColor = vec4(c, 1.); }` }));
+  space.renderOrder = -10; space.frustumCulled = false; scene.add(space);
   onProgress(.1);
 
   /* ── 무지개 홀로그램 벽 ── */
@@ -250,7 +236,7 @@ export async function start(canvas, onProgress = () => {}) {
       const xr = () => { const o = []; bsm.traverse(q => { if (q.name === 'xray') o.push(q); }); return o; };
       const vis = (L, v) => L.forEach(o => o.visible = v), others = () => BASES.filter(b => b !== B0).map(b => b.root || b.w.parent || b.w);
       const T = [['출발 기지', () => B0.w.visible, v => { B0.w.visible = v; }], ['다른 기지', () => others().every(o => o.visible), v => vis(others(), v)], ['무지개 벽', () => wall.visible, v => { wall.visible = v; }],
-        ['구름 바다', () => sea.visible, v => { sea.visible = v; }], ['빛 번짐', () => !!perf.st.bloom, v => { perf.st.bloom = v; }], ['기체 비침', () => xr().every(o => o.visible), v => xr().forEach(o => o.visible = v)], ['시야 어둠', () => sight.visible, v => { sight.visible = v; }]];
+        ['우주', () => space.visible, v => { space.visible = v; }], ['빛 번짐', () => !!perf.st.bloom, v => { perf.st.bloom = v; }], ['기체 비침', () => xr().every(o => o.visible), v => xr().forEach(o => o.visible = v)], ['시야 어둠', () => sight.visible, v => { sight.visible = v; }]];
       /* 부분마다 끄고 켜며 오른쪽 위 프레임 숫자를 봄 (새 맵 2026-11-09) */
       for (const [label, get, set] of T) { const b = document.createElement('button'); b.type = 'button'; b.style.cssText = BS; const draw = () => { b.textContent = `${label} ${get() ? '켬' : '끔'}`; b.style.opacity = get() ? 1 : .5; }; b.onclick = () => { set(!get()); draw(); }; draw(); inner.append(b); }
       row.append(head); box.append(row, inner); } }
@@ -306,7 +292,7 @@ export async function start(canvas, onProgress = () => {}) {
     { const k = Math.min(1, dt * (flying ? 4 : 2)); cam.x += (tx - cam.x) * k; cam.z += (tz - cam.z) * k; }   /* 길 타는 동안은 travel이 카메라를 이끎 · 그 밖엔 높이만 층을 따라감 */
     if (!dead) camD += (cfg.dist * CAMK * (flying ? 1 : .7) - camD) * Math.min(1, dt * 1.2);   /* 태어나는 동안 가까이 → 몰기 시작하면 천천히 물러남 */
     const a = cfg.ang * Math.PI / 180, D = camD, vx = cam.x + look.x, vz = cam.z + look.z; camera.position.set(vx, cam.y + D * Math.sin(a), vz + D * Math.cos(a)); camera.lookAt(vx, cam.y, vz); camera.updateMatrixWorld();   /* 둘러보기만큼 옮겨 봄 */
-    sea.position.x = cam.x + look.x; sea.position.z = cam.z + look.z; sea.material.uniforms.uT.value = t;
+    space.position.copy(camera.position); space.material.uniforms.uT.value = t;   /* 우주는 카메라를 늘 감쌈 */
     { const r = Math.hypot(FS.x, FS.z); say.textContent = dead ? `다시 태어나기까지 ${Math.max(1, Math.ceil(reviveAt - t))}초` : !flying ? '태어나는 중' : baseAt(FS.x, FS.z) ? '태어나는 곳 · 출구로 나가면 맵 안' : '새 하늘 맵 · 한가운데까지 ' + Math.round(r) + 'm'; }
     /* 별똥별이 꽂힐 때 공간 일그러짐 충격파 (시작 기지와 같은 효과) */
     if (WARP.s > 0) { B0.w.localToWorld(v3.set(0, .2, 0)); v3.project(camera); bloom.warp(v3.x * .5 + .5, v3.y * .5 + .5, WARP.r, WARP.s, Wd / Hd); } else bloom.warp(.5, .5, 0, 0, Wd / Hd);
