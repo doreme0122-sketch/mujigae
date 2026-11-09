@@ -94,7 +94,7 @@ function simplify(g, err) {
 const sig = g => Object.keys(g.attributes).sort().map(k => { const a = g.attributes[k]; return k + a.itemSize + (a.normalized ? 'n' : '') + a.array.constructor.name; }).join(',');
 
 /* fi: 기체 종류(0~8) · size: 게임에서 기체 가장 긴 쪽(날개폭이나 몸길이) */
-export async function makeForgeShip(renderer, camera, fi, { size = 2.4, patch = true } = {}) {   /* patch: false = 칠을 바꾸지 않음 (원본과 비교 시험용) */
+export async function makeForgeShip(renderer, camera, fi, { size = 3.6, patch = true } = {}) {   /* patch: false = 칠을 바꾸지 않음 (원본과 비교 시험용) */
   await MO.ready; const t0 = performance.now();
   F ||= makeForge(renderer, camera); F.setNoFx(true);
   const C = F.CATALOG[fi], S = F.buildShip(fi, 0, 0); F.scene.remove(S.root);
