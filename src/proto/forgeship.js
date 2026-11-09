@@ -104,7 +104,8 @@ const sig = g => Object.keys(g.attributes).sort().map(k => { const a = g.attribu
 /* fi: 기체 종류(0~8) · size: 게임에서 기체 가장 긴 쪽(날개폭이나 몸길이) */
 export async function makeForgeShip(renderer, camera, fi, { size = 3.6, patch = true } = {}) {   /* patch: false = 칠을 바꾸지 않음 (원본과 비교 시험용) */
   await MO.ready; const t0 = performance.now();
-  F ||= makeForge(renderer, camera); F.setNoFx(false);   /* 효과 모두 켬 (사용자 2026-11-09) */
+  F ||= makeForge(renderer, camera);
+  F.setNoFx(false);   /* 효과 모두 켬 (사용자 2026-11-09) */
   const C = F.CATALOG[fi], S = F.buildShip(fi, 0, 0); F.scene.remove(S.root);
   /* 몸 전체 흔들림(좌우 기울기 · 위아래 출렁임)은 게임 비행이 따로 줌 → 작업대 것은 끔 (두 번 흔들리면 붕 떠 보임) · 날개짓 · 꼬리 · 턱은 그대로 */
   const upd0 = S.update.bind(S); S.update = (dt, t) => { upd0(dt, t); S.body.position.set(0, 0, 0); S.body.rotation.set(0, 0, 0); };
@@ -183,8 +184,8 @@ export async function makeForgeShip(renderer, camera, fi, { size = 3.6, patch = 
   const TRAIL = `uniform mat4 fgVR; uniform mat4 fgRV; uniform vec4 fgHP[${HN}]; uniform vec4 fgHQ[${HN}]; uniform vec3 fgTr; uniform float fgTr2;
 vec3 fgQR(vec4 q, vec3 v){ return v + 2. * cross(q.xyz, cross(q.xyz, v) + q.w * v); }
 vec4 fgBendV(vec4 v, float secs){ vec4 r = fgVR * v; float d = r.z - fgTr.x;
-  /* 나온 지 몇 초인지: 효과가 스스로 아는 나이를 씀 (모르면 뒤로 간 거리로 셈) · 꼬리 끝 근처는 몸을 따라가다 뒤로 갈수록 지나온 길로 넘어감 */
-  float a = (secs >= 0. ? secs : max(d, 0.) / fgTr.y) * clamp(d / fgTr2, 0., 1.);
+  /* 나온 지 몇 초인지: 효과가 스스로 아는 나이를 씀 (갓 나온 건 나이가 0이라 몸을 따라감) · 모르는 효과만 뒤로 간 거리로 셈 */
+  float a = secs >= 0. ? secs : max(d, 0.) / fgTr.y * clamp(d / fgTr2, 0., 1.);   /* 나이를 알면 그 나이 그대로 (귀퉁이마다 다르게 휘면 부채꼴로 찢어짐) */
   if (a > 0.) { float fi = clamp(a / fgTr.z, 0., ${HN - 1}.0 - .001); int i = int(fi); float f = fi - float(i);
     vec3 hp = mix(fgHP[i].xyz, fgHP[i + 1].xyz, f); vec4 hq = normalize(mix(fgHQ[i], fgHQ[i + 1], f)); r.xyz = hp + fgQR(hq, r.xyz); }
   return fgRV * r; }
