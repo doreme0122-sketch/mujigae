@@ -178,12 +178,14 @@ export async function makeForgeShip(renderer, camera, fi, { size = 3.6, patch = 
   let z0 = -1e9; { const bb = new THREE.Box3(); S.root.updateMatrixWorld(true); const ir = S.root.matrixWorld.clone().invert();
     S.root.traverse(o => { if (!o.isMesh || isFx(o) || o.name === 'fgSprites' || o.material.blending === THREE.AdditiveBlending || !o.geometry.attributes.position.array.every(Number.isFinite)) return; o.geometry.computeBoundingBox(); bb.union(o.geometry.boundingBox.clone().applyMatrix4(o.matrixWorld.clone().premultiply(ir))); });
     z0 = bb.max.z; }   /* 꼬리 끝 (작업대에서 뒤쪽 = +z) */
-  const TU = { fgWR: { value: new THREE.Matrix4() }, fgRW: { value: new THREE.Matrix4() }, fgVR: { value: new THREE.Matrix4() }, fgRV: { value: new THREE.Matrix4() }, fgHP: { value: Array.from({ length: HN }, () => new THREE.Vector4()) }, fgHQ: { value: Array.from({ length: HN }, () => new THREE.Vector4(0, 0, 0, 1)) }, fgTr: { value: new THREE.Vector3(z0, WIND, HDT) } };
+  const TU = { fgWR: { value: new THREE.Matrix4() }, fgRW: { value: new THREE.Matrix4() }, fgVR: { value: new THREE.Matrix4() }, fgRV: { value: new THREE.Matrix4() }, fgHP: { value: Array.from({ length: HN }, () => new THREE.Vector4()) }, fgHQ: { value: Array.from({ length: HN }, () => new THREE.Vector4(0, 0, 0, 1)) }, fgTr: { value: new THREE.Vector3(z0, WIND, HDT) }, fgTr2: { value: C.radius * .25 } };
   /* 마지막에 화면 자리로 보내기 직전, 알갱이 자리를 기체 기준으로 되돌려 '나이'만큼 지나온 길에 옮김 (바람을 기체 쪽에서 더하든 화면 쪽에서 더하든 모두 잡힘) */
-  const TRAIL = `uniform mat4 fgVR; uniform mat4 fgRV; uniform vec4 fgHP[${HN}]; uniform vec4 fgHQ[${HN}]; uniform vec3 fgTr;
+  const TRAIL = `uniform mat4 fgVR; uniform mat4 fgRV; uniform vec4 fgHP[${HN}]; uniform vec4 fgHQ[${HN}]; uniform vec3 fgTr; uniform float fgTr2;
 vec3 fgQR(vec4 q, vec3 v){ return v + 2. * cross(q.xyz, cross(q.xyz, v) + q.w * v); }
-vec4 fgBendV(vec4 v){ vec4 r = fgVR * v; float d = r.z - fgTr.x;
-  if (d > 0.) { float fi = clamp(d / fgTr.y / fgTr.z, 0., ${HN - 1}.0 - .001); int i = int(fi); float f = fi - float(i);
+vec4 fgBendV(vec4 v, float secs){ vec4 r = fgVR * v; float d = r.z - fgTr.x;
+  /* 나온 지 몇 초인지: 효과가 스스로 아는 나이를 씀 (모르면 뒤로 간 거리로 셈) · 꼬리 끝 근처는 몸을 따라가다 뒤로 갈수록 지나온 길로 넘어감 */
+  float a = (secs >= 0. ? secs : max(d, 0.) / fgTr.y) * clamp(d / fgTr2, 0., 1.);
+  if (a > 0.) { float fi = clamp(a / fgTr.z, 0., ${HN - 1}.0 - .001); int i = int(fi); float f = fi - float(i);
     vec3 hp = mix(fgHP[i].xyz, fgHP[i + 1].xyz, f); vec4 hq = normalize(mix(fgHQ[i], fgHQ[i + 1], f)); r.xyz = hp + fgQR(hq, r.xyz); }
   return fgRV * r; }
 `;
@@ -193,7 +195,9 @@ vec4 fgBendV(vec4 v){ vec4 r = fgVR * v; float d = r.z - fgTr.x;
       o.frustumCulled = false; const v = m.vertexShader, at = v.indexOf('void main'); let body = v.slice(at); const X = [...body.matchAll(GLP)][0][1];
       /* 알갱이 네 귀퉁이를 펼치기(화면에서 xy로 더하기) 직전에 옮김 → 알갱이 하나는 한 덩어리로 같이 옮겨져 늘어나 번지지 않음 */
       let k = -1; for (const mm of body.matchAll(new RegExp('\\b' + X + '\\.(xyz?)\\s*\\+=([^;]*);', 'g'))) if (mm[1] === 'xy' || /\\baC\\b/.test(mm[2])) { k = mm.index; break; }   /* 귀퉁이(aC)를 펼치는 줄 */
-      body = k >= 0 ? body.slice(0, k) + `${X} = fgBendV(${X}); ` + body.slice(k) : body.replace(GLP, 'gl_Position = projectionMatrix * fgBendV($1);');
+      const vs = m.vertexShader, fr = vs.match(/age\s*=\s*fract\(\s*uFT\s*\/\s*([\w.]+)/);   /* 효과마다 나이(초) 적는 법 */
+      const AGE = /\bT\s*=\s*age\s*\*\s*life\b/.test(vs) ? 'T' : /\bfloat\s+life\s*=/.test(vs) && /\bage\s*=/.test(vs) ? 'age * life' : fr ? `age * ${fr[1]}` : /attribute\s+vec2\s+iA\b/.test(vs) ? 'iA.x * 2.5' : /attribute\s+float\s+aA\b/.test(vs) ? 'aA * 1.2' : '-1.';
+      body = k >= 0 ? body.slice(0, k) + `${X} = fgBendV(${X}, ${AGE}); ` + body.slice(k) : body.replace(GLP, `gl_Position = projectionMatrix * fgBendV($1, ${AGE});`);
       m.vertexShader = v.slice(0, at) + TRAIL + body; Object.assign(m.uniforms, TU); m.needsUpdate = true; nTrail++; } }); }
   /* 지나온 길 기억: 장면마다 기체 자리를 적고, 0.05초 간격 40칸으로 다시 뽑아 '지금 기체 기준' 상대 자리 · 방향으로 넘김 */
   const qPrev = new THREE.Quaternion(); const hist = []; const hM = new THREE.Matrix4(), hI = new THREE.Matrix4(), hP = new THREE.Vector3(), hQ = new THREE.Quaternion(), hS = new THREE.Vector3(), qa = new THREE.Quaternion(), qb = new THREE.Quaternion(), pa = new THREE.Vector3();
@@ -205,8 +209,8 @@ vec4 fgBendV(vec4 v){ vec4 r = fgVR * v; float d = r.z - fgTr.x;
       const f = B.t > A.t ? THREE.MathUtils.clamp((tt - A.t) / (B.t - A.t), 0, 1) : 0; pa.lerpVectors(A.p, B.p, f); qa.slerpQuaternions(A.q, B.q, f);
       pa.sub(hP).applyQuaternion(qi).divideScalar(sc); qb.copy(qi).multiply(qa); if (i && qb.dot(qPrev) < 0) qb.set(-qb.x, -qb.y, -qb.z, -qb.w); qPrev.copy(qb);   /* 이웃 칸과 같은 쪽 부호로 (섞을 때 뒤집혀 큰 세모가 튀던 원인) */ TU.fgHP.value[i].set(pa.x, pa.y, pa.z, 0); TU.fgHQ.value[i].set(qb.x, qb.y, qb.z, qb.w); } };
   const tq = new THREE.Vector4(), tv = new THREE.Vector3();
-  const bendCPU = w => { tv.copy(w).applyMatrix4(TU.fgWR.value); const d = tv.z - z0; if (d <= 0) return w;   /* 빛 덩이(연기 뭉치 등)도 같은 방식 */
-    const fi = Math.min(Math.max(d / WIND / HDT, 0), HN - 1.001), i = fi | 0, f = fi - i, A = TU.fgHP.value, Q = TU.fgHQ.value;
+  const bendCPU = w => { tv.copy(w).applyMatrix4(TU.fgWR.value); const d = tv.z - z0; if (d <= 0) return w; const age = d / WIND * Math.min(1, d / TU.fgTr2.value);   /* 빛 덩이(연기 뭉치 등)도 같은 방식 */
+    const fi = Math.min(Math.max(age / HDT, 0), HN - 1.001), i = fi | 0, f = fi - i, A = TU.fgHP.value, Q = TU.fgHQ.value;
     qa.set(Q[i].x, Q[i].y, Q[i].z, Q[i].w); qb.set(Q[i + 1].x, Q[i + 1].y, Q[i + 1].z, Q[i + 1].w); qa.slerp(qb, f);
     tv.applyQuaternion(qa).add(pa.set(A[i].x + (A[i + 1].x - A[i].x) * f, A[i].y + (A[i + 1].y - A[i].y) * f, A[i].z + (A[i + 1].z - A[i].z) * f)); return w.copy(tv).applyMatrix4(TU.fgRW.value); };
   const NP = PL.length, U = { fgDD: { value: KEYL.map(() => new THREE.Vector3()) }, fgDC: { value: KEYL.map(l => new THREE.Color(l[3]).multiplyScalar(l[4])) }, fgK: { value: 1 } };

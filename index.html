@@ -149,12 +149,12 @@ button{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:poin
   <a class="sub" href="reflect.html">반사 시험판으로</a>
   <a class="sub" href="map.html?v=11021548">맵 미리보기</a>
   <a class="sub" href="tools/ships.html">기체·도색 보기</a>
-  <a class="sub" href="rocks.html?v=11100813">맵 벽 보기</a>
+  <a class="sub" href="rocks.html?v=11100828">맵 벽 보기</a>
   <a class="sub" href="floor.html?v=11021548">지역 바닥 보기</a>
-  <a class="sub" href="base.html?v=11100813">시작 기지 보기</a>
-  <a class="sub" href="padring.html?v=11100813">시작 기지: 태어나는 곳</a>
-  <a class="sub" href="fall.html?v=11100813">유성 시안</a>
-  <a class="sub" href="world.html?v=11100813">맵 만들기</a>
+  <a class="sub" href="base.html?v=11100828">시작 기지 보기</a>
+  <a class="sub" href="padring.html?v=11100828">시작 기지: 태어나는 곳</a>
+  <a class="sub" href="fall.html?v=11100828">유성 시안</a>
+  <a class="sub" href="world.html?v=11100828">맵 만들기</a>
 </div></section>
 <section class="card ask" id="lvup" hidden><div>
   <span class="en">LEVEL UP</span><h3 style="margin:0;font-weight:500;font-size:20px;color:var(--g)">레벨 2</h3>
@@ -189,4 +189,4 @@ start(document.querySelector('#cv'), p => { bar.style.transform = `scaleX(${p})`
 fetch('ver.json?t=' + Date.now(), { cache: 'no-store' }).then(r => r.json()).then(j => {
   for (const a of document.querySelectorAll('a.sub[href]')) { const [f] = a.getAttribute('href').split('?'); if (j[f]) a.setAttribute('href', f + '?v=' + j[f]); } }).catch(() => {});
 </script>
-<a href="boss.html?v=11100813" hidden></a><a href="skillpick.html?v=11100813" hidden></a><a href="ward.html?v=11100813" hidden></a><a href="jelly.html?v=11100813" hidden></a><a href="heat.html?v=11100813" hidden></a><a href="range.html?v=11100813" hidden></a><a href="floorlab.html?v=11100813" hidden></a><a href="skyarena.html?v=11100813" hidden></a><a href="skypath.html?v=11100813" hidden></a><a href="gates.html?v=11100813" hidden></a><a href="skymap.html?v=11100813" hidden></a><a href="targetlab.html?v=11100813" hidden></a><a href="targetdesign.html?v=11100813" hidden></a><a href="map2.html?v=11100813" hidden></a></body></html>
+<a href="boss.html?v=11100828" hidden></a><a href="skillpick.html?v=11100828" hidden></a><a href="ward.html?v=11100828" hidden></a><a href="jelly.html?v=11100828" hidden></a><a href="heat.html?v=11100828" hidden></a><a href="range.html?v=11100828" hidden></a><a href="floorlab.html?v=11100828" hidden></a><a href="skyarena.html?v=11100828" hidden></a><a href="skypath.html?v=11100828" hidden></a><a href="gates.html?v=11100828" hidden></a><a href="skymap.html?v=11100828" hidden></a><a href="targetlab.html?v=11100828" hidden></a><a href="targetdesign.html?v=11100828" hidden></a><a href="map2.html?v=11100828" hidden></a></body></html>
