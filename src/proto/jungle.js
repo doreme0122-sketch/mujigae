@@ -9,10 +9,10 @@
    · 초원 → 정글은 점점: 경계 둘레에 작은 부유체가 섞이고, 기체가 안쪽으로 들어갈수록 하늘이 어두운 보랏빛으로 (skymap에서) */
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { spiralPath, SWEEP } from './path.js?v=11091623';
-import { buildSanctum } from './jsanct.js?v=11091623';
-export { SANCT_TEST } from './jsanct.js?v=11091623';
-import { makeDresser } from './jdress.js?v=11091623';
+import { spiralPath, SWEEP } from './path.js?v=11091804';
+import { buildSanctum } from './jsanct.js?v=11091804';
+export { SANCT_TEST } from './jsanct.js?v=11091804';
+import { makeDresser } from './jdress.js?v=11091804';
 let CAM = { position: new THREE.Vector3() };
 let LOD_T = .5, LOD_N = 30;   /* 섬 둘레 · 덩굴 마디 수 (키트 원래 44 · 1배) */
 /* ===================== 우주 정글 지형 키트 (사용자 제작 · 생성 코드 그대로) ===================== */
@@ -559,7 +559,7 @@ export function makeJungle(scene, { R0 = 136, R1 = 187, TOP = -3, UP = 20, DN = 
   /* 같은 모양 나눠 쓰기: 아래층 정글 섬과 작은 조각은 종류마다 몇 벌만 만들어 복사해 씀 (모양 데이터는 하나 · 크기·방향만 다르게) → 폰 메모리 절약 */
   const SHARE = new Map(), shared = (key, n, make) => { if (!SHARE.has(key)) SHARE.set(key, []); const arr = SHARE.get(key); if (arr.length < n) { const b = make(arr.length); arr.push(b); return b; }
     const src = arr[Math.floor(Math.random() * arr.length)]; if (!src.frozen) src.frozen = mergeStatic(src.G.clone(), []);   /* 복사본은 움직이지 않으므로 움직이던 부품까지 칠마다 합친 판을 한 번 만들어 나눠 씀 */
-    return { G: src.frozen.clone(), anim: [], size: src.size, outline: src.G.userData.outline, block: src.G.userData.block, top: src.G.userData.top }; };
+    const G = src.frozen.clone(); G.userData.srcF = src.frozen; return { G, anim: [], size: src.size, outline: src.G.userData.outline, block: src.G.userData.block, top: src.G.userData.top }; };
   for (const o of L) { cur = o;
     if (o.t === 'hunt' && o.dungeon) { const upL = o.layer === 'up';   /* 위층 던전: 아래로 늘어진 몸통을 눌러 줌 (밑을 지날 때 카메라와 기체 사이를 막지 않게 · 사용자 2026-11-07) */
       place(shared(upL ? 'hu' : 'h', 3, v => { const b = buildPiece(IDX.hunt, o.seed + v * 11, 1); if (upL) squashPiece(b.G, -1.5, 6 / o.s); return b; }), o.x, o.y, o.z, o.s, o.yaw); }   /* 위·아래층 던전은 멀리서 보는 곳 → 세 벌 나눠 씀 */
@@ -617,12 +617,33 @@ export function makeJungle(scene, { R0 = 136, R1 = 187, TOP = -3, UP = 20, DN = 
     pack(fz); p.G.add(fz); p.frozen = fz; p.mov = mv; p.fz = false; }
   /* 도착 섬(위·아래층)에 있을 때: 다른 층 섬은 수십 m 아래·위로 보임 → 작은 풀·덩굴·안개는 안 그리고 · 120m까지만 · 움직임 없이 멈춘 판 (2026-11-08 최적화 · 사용자: 다른 섬·구름 바다 끄면 확 좋아짐) */
   let FOC = null, FOCY = 0; const setFocus = (L, y) => { FOC = L; FOCY = y; };
-  const update = (t, dt, camera) => { CAM = camera; T.value = t; dress.update(t, camera.position, FOC ? FOCY : null); pv.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse); fr.setFromProjectionMatrix(pv);
+  /* 나눠 쓰는 정글 섬(같은 모양 복사본)은 모양마다 한 번에 그림 (2026-11-09 · 폰 그리기 횟수: 정글 가운데층 복사본이 그리기의 절반) — 칠마다 InstancedMesh · 빛 점(스프라이트)은 맵 전체 한 판 */
+  const SH = new Map(), GLW = []; const _m4 = new THREE.Matrix4(), _v = new THREE.Vector3();
+  for (const p of pieces) { const F = p.G.userData.srcF; if (!F) continue; if (!SH.has(F)) SH.set(F, { F, list: [], ims: [] }); SH.get(F).list.push(p); }
+  for (const S of SH.values()) { const ch = S.F.children; p0: for (let j = 0; j < ch.length; j++) { const c = ch[j];
+      if (c.isMesh && !c.isInstancedMesh && !c.children.length) { const im = new THREE.InstancedMesh(c.geometry, c.material, S.list.length); im.count = 0; im.frustumCulled = false; im.renderOrder = c.renderOrder; im.visible = false; scene.add(im); S.ims.push({ im, j, local: c.matrix.clone() }); } }
+    for (const p of S.list) { p.G.updateMatrixWorld(true); const kill = [];
+      p.G.children.forEach((c, j) => { if (S.ims.some(e => e.j === j)) kill.push(c); else if (c.isSprite && c.material.blending === THREE.AdditiveBlending && !c.children.length) { c.updateMatrixWorld(); const ws = new THREE.Vector3(); c.getWorldScale(ws); _v.setFromMatrixPosition(c.matrixWorld); GLW.push([_v.x, _v.y, _v.z, ws.x, ws.y, c.material.color, c.material.opacity, c.material.map]); kill.push(c); } });
+      kill.forEach(c => p.G.remove(c)); p.inst = S; p.pts = p.G.children.filter(c => c.isPoints); p.ptsOn = true; } S.dirty = true; }
+  { const byMap = new Map(); for (const g of GLW) { if (!byMap.has(g[7])) byMap.set(g[7], []); byMap.get(g[7]).push(g); }
+    const q = new THREE.PlaneGeometry(1, 1);
+    for (const [map, L] of byMap) { const g = new THREE.InstancedBufferGeometry(); g.index = q.index; g.setAttribute('position', q.attributes.position); g.setAttribute('uv', q.attributes.uv);
+      g.setAttribute('iP', new THREE.InstancedBufferAttribute(new Float32Array(L.flatMap(e => [e[0], e[1], e[2]])), 3)); g.setAttribute('iS', new THREE.InstancedBufferAttribute(new Float32Array(L.flatMap(e => [e[3], e[4]])), 2));
+      g.setAttribute('iC', new THREE.InstancedBufferAttribute(new Float32Array(L.flatMap(e => [e[5].r, e[5].g, e[5].b, e[6]])), 4)); g.instanceCount = L.length;
+      const m = new THREE.ShaderMaterial({ uniforms: { map: { value: map } }, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
+        vertexShader: 'attribute vec3 iP; attribute vec2 iS; attribute vec4 iC; varying vec2 vU; varying vec4 vC; void main(){ vU = uv; vC = iC; vec4 mv = viewMatrix * vec4(iP, 1.); vC.a *= 1. - smoothstep(100., 125., length(mv.xyz)); mv.xy += position.xy * iS; gl_Position = projectionMatrix * mv; }',
+        fragmentShader: map ? 'uniform sampler2D map; varying vec2 vU; varying vec4 vC; void main(){ vec4 t = texture2D(map, vU); gl_FragColor = vec4(vC.rgb * t.rgb, t.a * vC.a); }' : 'varying vec2 vU; varying vec4 vC; void main(){ gl_FragColor = vec4(vC.rgb, vC.a); }' });
+      const me = new THREE.Mesh(g, m); me.frustumCulled = false; me.renderOrder = 3; scene.add(me); } }
+  for (const p of pieces) { const J = []; p.G.traverse(o => { if (o.userData.jelly != null) J.push(o); }); if (J.length) { p.jel = J; p.jelOn = true; } }   /* 해파리 몸은 가까이에서만 그림 (튕김 판정은 자리만 씀) */
+  const instSync = () => { for (const S of SH.values()) { if (!S.dirty) continue; S.dirty = false; const vp = S.list.filter(p => p.G.visible);
+      for (const e of S.ims) { vp.forEach((p, i) => e.im.setMatrixAt(i, _m4.multiplyMatrices(p.G.matrixWorld, e.local))); e.im.count = vp.length; e.im.instanceMatrix.needsUpdate = true; e.im.visible = vp.length > 0; } } };
+  const NEARM = new Set();
+  const update = (t, dt, camera) => { CAM = camera; { const c = []; for (const p of pieces) if (p.frozen) c.push([Math.hypot(p.x - camera.position.x, p.z - camera.position.z, (p.y - camera.position.y) * .5), p]); c.sort((a, b) => a[0] - b[0]); NEARM.clear(); for (let i = 0; i < Math.min(2, c.length); i++) NEARM.add(c[i][1]); } T.value = t; dress.update(t, camera.position, FOC ? FOCY : null); pv.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse); fr.setFromProjectionMatrix(pv);
     for (const p of pieces) { const d = Math.hypot(p.x - camera.position.x, p.z - camera.position.z); sph.center.set(p.x, p.y, p.z); sph.radius = p.rad;
       const other = FOC && p.o && p.o.layer !== FOC && Math.abs(p.y - FOCY) > 6;
-      const vis = d < (other ? 120 : 170) && fr.intersectsSphere(sph) && (!globalThis.__HIDE_OTHER || (p.o && p.o.t === 'sanct')); p.G.visible = vis;   /* __HIDE_OTHER: 폰 무게 재기 */ if (!vis) continue; const d3 = Math.hypot(d, p.y - camera.position.y), near = d3 < 65 && !other; if (p.G.userData.lod) p.G.userData.lod(d3);   /* 높이 차이도 (위층에서 내려다보면 먼 것) */
+      const vis = d < (other ? 90 : 115) + p.rad * .5 && fr.intersectsSphere(sph) && (!globalThis.__HIDE_OTHER || (p.o && p.o.t === 'sanct')); if (p.inst && p.G.visible !== vis) p.inst.dirty = true; p.G.visible = vis; if (p.jel && vis) { const on = d < 40; if (on !== p.jelOn) { p.jelOn = on; for (const q of p.jel) q.visible = on; } } if (p.pts && vis) { const on = d < 42; if (on !== p.ptsOn) { p.ptsOn = on; for (const q of p.pts) q.visible = on; } }   /* 복사본 섬의 포자 알갱이는 가까이에서만 */   /* __HIDE_OTHER: 폰 무게 재기 */ if (!vis) continue; const d3 = Math.hypot(d, p.y - camera.position.y), near = d3 < 26 + p.rad * .5 && !other && (!p.frozen || NEARM.has(p));   /* 움직이는 부품(촉수·해파리…)은 가까운 섬 둘까지만 · 나머지는 멈춘 판 (2026-11-09 · 폰 그리기 횟수) */ if (p.G.userData.lod) p.G.userData.lod(d3);   /* 높이 차이도 (위층에서 내려다보면 먼 것) */
       if (p.frozen && p.fz === near) { p.fz = !near; for (const o of p.mov) o.visible = near; p.frozen.visible = !near; }   /* 65m 밖: 멈춘 판 */
-      if (near || (!p.frozen && d < 95 && !other)) for (const f of p.anim) f(t, dt); } };   /* 먼 것은 움직임을 멈춤 */
+      if (near || (!p.frozen && d < 95 && !other)) for (const f of p.anim) f(t, dt); } instSync(); };   /* 먼 것은 움직임을 멈춤 */
   const setLight = k => { KL.uLift.value = k; };
   return { update, blocked, GATES, pieces, setLight, setFocus };
 }

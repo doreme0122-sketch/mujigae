@@ -31,7 +31,7 @@ const dot=dotTex();
 function glow(col,s,op){const m=new THREE.Sprite(new THREE.SpriteMaterial({map:dot,color:col,transparent:true,opacity:op==null?.8:op,blending:THREE.AdditiveBlending,depthWrite:false}));m.scale.set(s,s,1);return m;}
 
 // ---------------- lava shader ----------------
-const LAVA_V='#ifdef USE_INSTANCING\n#define IMX instanceMatrix\n#else\n#define IMX mat4(1.)\n#endif\nvarying vec2 vUv;varying vec3 vW;void main(){vUv=uv;vW=position;gl_Position=projectionMatrix*modelViewMatrix*IMX*vec4(position,1.);}';
+const LAVA_V='#include <batching_pars_vertex>\n#ifdef USE_INSTANCING\n#define IMX instanceMatrix\n#elif defined(USE_BATCHING)\n#define IMX batchingMatrix\n#else\n#define IMX mat4(1.)\n#endif\nvarying vec2 vUv;varying vec3 vW;void main(){vUv=uv;\n#include <batching_vertex>\n vW=position;gl_Position=projectionMatrix*modelViewMatrix*IMX*vec4(position,1.);}';
 const LAVA_F=`uniform float time;uniform float mode;uniform vec2 sc;uniform float flow;uniform float inten;uniform float bank;varying vec2 vUv;varying vec3 vW;
 float hh(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453);}
 float n(vec2 p){vec2 i=floor(p),f=fract(p);f=f*f*(3.-2.*f);return mix(mix(hh(i),hh(i+vec2(1,0)),f.x),mix(hh(i+vec2(0,1)),hh(i+vec2(1,1)),f.x),f.y);}
@@ -54,12 +54,22 @@ let W2=200;
 // ---------------- procedural cooled-crust cracks (shader injected into lit materials) ----------------
 const TU={value:0};let UGLOW={value:1},UGLO={value:1},UFRONT={value:1e5},USOFT={value:6},OWNU=false,Q=1,PQ=1,TQ=1,MINB=0,TD=2,QT=1,QG=1,RW=1,VOPT={};const WM=new Map();
 const CRACK_GLSL=`uniform float uTime;uniform sampler2D heatMap;uniform float uMode;uniform float uMaskK;uniform float uW2;uniform float uSeed;uniform float uGlow;uniform float uGlowLo;uniform float uFront;uniform float uSoft;uniform float uPK;varying vec3 vWPos;
+#ifdef VK_HA
+varying float vHeat;
+#endif
+
 vec2 hash22(vec2 p){p=vec2(dot(p,vec2(127.1,311.7)),dot(p,vec2(269.5,183.3)));return fract(sin(p)*43758.5453);}
 float h21(vec2 p){return fract(sin(dot(p,vec2(12.9898,78.233)))*43758.5453);}
 float vn(vec2 p){vec2 i=floor(p),f=fract(p);f=f*f*(3.-2.*f);return mix(mix(h21(i),h21(i+vec2(1,0)),f.x),mix(h21(i+vec2(0,1)),h21(i+vec2(1,1)),f.x),f.y);}
 vec3 voro(vec2 x){vec2 n=floor(x),f=fract(x);float F1=8.,F2=8.;vec2 id=n;for(int j=-1;j<=1;j++)for(int i=-1;i<=1;i++){vec2 g=vec2(float(i),float(j));vec2 o=hash22(n+g);vec2 r=g+o-f;float d=dot(r,r);if(d<F1){F2=F1;F1=d;id=n+g;}else if(d<F2){F2=d;}}return vec3(sqrt(F2)-sqrt(F1),hash22(id));}
 vec3 crackGlow(out float halo){vec2 p;float mask;
- if(uMode<.5){p=vWPos.xz;mask=texture2D(heatMap,vec2(vWPos.x/uW2*.5+.5,1.-(vWPos.z/uW2*.5+.5))).r;}
+ if(uMode<.5){p=vWPos.xz;
+#ifdef VK_HA
+mask=vHeat;
+#else
+mask=texture2D(heatMap,vec2(vWPos.x/uW2*.5+.5,1.-(vWPos.z/uW2*.5+.5))).r;
+#endif
+}
  else if(uMode<1.5){p=vec2(vWPos.x+vWPos.z,vWPos.y*1.4);mask=smoothstep(.55,.95,sin(vWPos.y*.11+vn(vWPos.xz*.04)*5.)*.5+.5)*smoothstep(-170.,-6.,vWPos.y)*.9;}
  else if(uMode<2.5){p=vWPos.xz+vec2(vWPos.y*.7);mask=uMaskK;}
  else{p=vWPos.xz;mask=smoothstep(.42,.78,vn(p*.045+uSeed))*uMaskK+uMaskK*.12;}
@@ -72,9 +82,9 @@ vec3 crackGlow(out float halo){vec2 p;float mask;
 let HEAT=null;
 function addCracks(mat,mode,maskK,seed,U0){const U=U0||{uTime:TU,uGlow:UGLOW,uGlowLo:UGLO,uFront:UFRONT,uSoft:USOFT,heatMap:{value:HEAT},uMode:{value:mode},uMaskK:{value:maskK||0},uW2:{value:W2},uSeed:{value:seed||0},uPK:{value:1}};mat.userData.crk=[mode,maskK||0,seed||0];mat.__crkU=U;
   mat.onBeforeCompile=sh=>{Object.assign(sh.uniforms,U);
-  sh.vertexShader='varying vec3 vWPos;\n'+sh.vertexShader.replace('#include <begin_vertex>','#include <begin_vertex>\n#if defined(USE_INSTANCING)&&!defined(VK_PLACE)\n vWPos=(instanceMatrix*vec4(transformed,1.)).xyz;\n#else\n vWPos=transformed;\n#endif');
+  sh.vertexShader='varying vec3 vWPos;\n#ifdef VK_HA\nattribute float aHeat;varying float vHeat;\n#endif\n'+sh.vertexShader.replace('#include <begin_vertex>','#include <begin_vertex>\n#ifdef VK_HA\n vHeat=aHeat;\n#endif\n#if defined(USE_INSTANCING)&&!defined(VK_PLACE)\n vWPos=(instanceMatrix*vec4(transformed,1.)).xyz;\n#else\n vWPos=transformed;\n#endif');
   sh.fragmentShader=CRACK_GLSL+'\n'+sh.fragmentShader.replace('#include <emissivemap_fragment>','#include <emissivemap_fragment>\n float halo;vec3 cgl=crackGlow(halo);diffuseColor.rgb*=1.-.5*halo;float fk=1.-smoothstep(uFront-uSoft,uFront+uSoft,vWPos.y),bq=(vWPos.y-uFront)/uSoft,band=exp(-bq*bq)*step(uFront,9e4),gm=mix(uGlowLo,uGlow,fk)+band*uGlow*.7;totalEmissiveRadiance+=cgl*gm+vec3(1.,.4,.08)*halo*max(gm-1.,0.)*.35;');};
-  mat.customProgramCacheKey=()=>'crack'+mode+(mat.defines&&mat.defines.VK_PLACE?'p':'');return mat;}
+  mat.customProgramCacheKey=()=>'crack'+mode+(mat.defines&&mat.defines.VK_PLACE?'p':'')+(mat.defines&&mat.defines.VK_HA!=null?'h':'');return mat;}
 function wm(m){if(!OWNU||!m.userData.crk)return m;let c=WM.get(m);if(!c){c=m.clone();const k=m.userData.crk;addCracks(c,k[0],k[1],k[2]);WM.set(m,c);}return c;}
 // ---------------- Fire Heart sanctum: engraved obsidian floor, broken arc walls, heat shaft ----------------
 const goldM2=new THREE.MeshPhongMaterial({color:C('#b8903e'),specular:C('#ffe2a8'),shininess:90,emissive:C('#1c1204')});
@@ -99,7 +109,7 @@ function fireFloorTex(){const S=2048,c=document.createElement('canvas'),e=docume
   for(let k=0;k<36;k++){const a=k/36*Math.PI*2;g.lineWidth=k%3?2:5;g.beginPath();g.moveTo(cx+Math.cos(a)*.715*Rr,cx+Math.sin(a)*.715*Rr);g.lineTo(cx+Math.cos(a)*.93*Rr,cx+Math.sin(a)*.93*Rr);g.stroke();}
   [[.79,60,20],[.38,32,15],[.645,48,14]].forEach(([r,n,sz])=>{for(let k=0;k<n;k++){const a=k/n*Math.PI*2,x=cx+Math.cos(a)*r*Rr,y=cx+Math.sin(a)*r*Rr;g.lineWidth=3;g.strokeStyle=GOLD;glyphF(g,x,y,sz,a+Math.PI/2);if(k%2===0){ge.lineWidth=3.5;ge.strokeStyle='#ff9a3a';glyphF(ge,x,y,sz,a+Math.PI/2);}}});
   const dn=cv=>{if(TQ>=1)return cv;const s=Math.round(S*TQ),o=document.createElement('canvas');o.width=o.height=s;o.getContext('2d').drawImage(cv,0,0,s,s);return o;};const map=new THREE.CanvasTexture(dn(c)),em=new THREE.CanvasTexture(dn(e));map.colorSpace=em.colorSpace=THREE.SRGBColorSpace;map.anisotropy=em.anisotropy=4;return{map,em};}
-const SH_V='#ifdef USE_INSTANCING\n#define IMX instanceMatrix\n#else\n#define IMX mat4(1.)\n#endif\nvarying vec2 vUv;varying vec3 vN;varying vec3 vV;void main(){vUv=uv;vec4 mv=modelViewMatrix*IMX*vec4(position,1.);vN=normalize(normalMatrix*mat3(IMX)*normal);vV=normalize(-mv.xyz);gl_Position=projectionMatrix*mv;}';
+const SH_V='#include <batching_pars_vertex>\n#ifdef USE_INSTANCING\n#define IMX instanceMatrix\n#elif defined(USE_BATCHING)\n#define IMX batchingMatrix\n#else\n#define IMX mat4(1.)\n#endif\nvarying vec2 vUv;varying vec3 vN;varying vec3 vV;void main(){\n#include <batching_vertex>\n vUv=uv;vec4 mv=modelViewMatrix*IMX*vec4(position,1.);vN=normalize(normalMatrix*mat3(IMX)*normal);vV=normalize(-mv.xyz);gl_Position=projectionMatrix*mv;}';
 const SH_F=`uniform float time;uniform vec3 c1;uniform vec3 c2;uniform float op;uniform float sp;varying vec2 vUv;varying vec3 vN;varying vec3 vV;${NOISE3}
  void main(){float f=abs(dot(normalize(vN),normalize(vV)));float core=pow(f,2.2);float a0=vUv.x*6.2832;float n=fb(vec3(cos(a0)*1.6,sin(a0)*1.6,vUv.y*7.-time*sp));float st=smoothstep(.42,.82,n);
   float fade=smoothstep(0.,.06,vUv.y)*pow(1.-vUv.y,1.4);vec3 col=mix(c1,c2,st);float a=core*fade*(.2+st*.85)*op;gl_FragColor=vec4(col*a,a);}`;

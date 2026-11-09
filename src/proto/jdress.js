@@ -5,7 +5,7 @@
    ④ 화석(막힘): 엎드려 죽은 큰 짐승 — 척추가 기체보다 높게 아치를 이루고 갈비가 양옆 땅에 박힘 → 갈비 사이(약 3m)로 들락날락 · 벌어진 입으로 들어가 목 아래를 지나 갈비 굴로
    모든 크기는 실제 미터 (섬 크기와 상관없이 기체 기준으로 맞춤) */
 import * as THREE from 'three';
-import { HC, RIBP, TEETH, boneGeo } from './jbones.js?v=11091623';
+import { HC, RIBP, TEETH, boneGeo } from './jbones.js?v=11091804';
 import { sanctFlora } from './jsanct.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 
@@ -292,7 +292,7 @@ export function makeDresser(scene, KL) {
      폰 부담: 48m 칸마다 한 묶음 (땅 덮개는 칸마다 하나로 합침 · 같은 식물은 한 번에) → 작은 풀은 70m · 큰 식물은 115m · 땅·덩굴·안개는 170m 밖이면 안 그림 */
   const Q = { coral: [0, 1].map(i => makeCoralBush(201 + i * 7)), reed: [0, 1].map(i => makeReeds(221 + i * 5)), lily: [0, 1].map(i => makeLily(241 + i * 3)), bloom: [0, 1].map(i => makeBloom(261 + i * 11)), shard: [0, 1].map(i => makeShards(281 + i * 13)) };
   [...Q.reed, ...Q.bloom].forEach(g => SWAY.add(g));
-  const CELL = 48, cells = new Map(), LIST = [];
+  const CELL = 80, cells = new Map(), LIST = [];   /* 묶음 칸을 크게 (48→80m · 그리기 횟수 줄임 2026-11-09) */
   const cellAt = (x, y, z) => { const k = Math.floor(x / CELL) + ',' + Math.floor(z / CELL) + ',' + Math.round(y / 20); if (!cells.has(k)) cells.set(k, { y, x: 0, z: 0, n: 0, caps: [], near: Bag(), far: Bag(), vine: Builder(), nv: 0, mist: [], flo: Flo() }); return cells.get(k); };
   const KIND = ['root', 'coral', 'tent', 'swamp', 'flower', 'jelly', 'vine'];
   const isle = o => { const t = o.top; if (!t) return; const R = rng(o.seed || 1), s = o.s, Rm = t.r * s, yaw = o.yaw || 0, cy = Math.cos(yaw), sy = Math.sin(yaw), y0 = o.y + t.y * (o.sy || s);
@@ -352,7 +352,7 @@ export function makeDresser(scene, KL) {
       if (C.mist.length) { const m = new THREE.InstancedMesh(new THREE.PlaneGeometry(1, 1), mistMat, C.mist.length); C.mist.forEach((q, i) => { m.setMatrixAt(i, _m.makeScale(q[3], q[3], q[3]).setPosition(q[0], q[1], q[2])); m.setColorAt(i, MISTC[q[4]]); }); m.computeBoundingSphere(); m.renderOrder = 2; all.add(m); }
       CELLS.push({ x: C.x / C.n, y: C.y, z: C.z / C.n, all, near, far }); } cells.clear(); };
   /* 먼 섬(130m 밖)은 통째로 안 그림 · 화면 밖은 묶음마다 알아서 빠짐 */
-  const update = (t, cam, focY = null) => { T.value = t; if (!cam) return; const off = y => focY != null && Math.abs(y - focY) > 12;   /* 다른 층 꾸미기(풀·덩굴·안개)는 도착 섬에서 안 그림 */ if (globalThis.__HIDE_OTHER) { for (const o of isles) o.grp.visible = false; for (const c of CELLS) c.all.visible = false; return; }   /* 폰 무게 재기: 성소 말고 다 끔 */ for (const o of isles) o.grp.visible = !off(o.y) && Math.hypot(o.x - cam.x, o.z - cam.z) < 130 + o.r;
-    for (const c of CELLS) { const d = Math.hypot(c.x - cam.x, c.z - cam.z); c.all.visible = d < 200 && !off(c.y); c.near.visible = d < 104; c.far.visible = d < 150; } };
+  const update = (t, cam, focY = null) => { T.value = t; if (!cam) return; const off = y => focY != null && Math.abs(y - focY) > 12;   /* 다른 층 꾸미기(풀·덩굴·안개)는 도착 섬에서 안 그림 */ if (globalThis.__HIDE_OTHER) { for (const o of isles) o.grp.visible = false; for (const c of CELLS) c.all.visible = false; return; }   /* 폰 무게 재기: 성소 말고 다 끔 */ for (const o of isles) o.grp.visible = !off(o.y) && Math.hypot(o.x - cam.x, o.z - cam.z) < 105 + o.r;
+    for (const c of CELLS) { const d = Math.hypot(c.x - cam.x, c.z - cam.z); c.all.visible = d < 130 && !off(c.y); c.near.visible = d < 72; c.far.visible = d < 110; }   /* 폰 그리기 횟수 (2026-11-09): 보이는 거리 줄임 · 카메라 45°에선 화면 끝이 약 70m */ };
   return { hunt, isle, link, finish, solids, update };
 }

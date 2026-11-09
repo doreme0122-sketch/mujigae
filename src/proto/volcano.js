@@ -16,7 +16,7 @@ const mulberry32 = a => () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imu
 
 /* ── 한 번에 그리는 빛 무리 · 연기 · 불티 (원본은 하나하나 따로 그림 → 폰에서 그림 수가 너무 많음) ── */
 const BB_V = `attribute vec3 iP; attribute vec2 iS; attribute vec4 iC; varying vec2 vU; varying vec4 vC;
-  void main(){ vU = uv; vC = iC; vec4 mv = modelViewMatrix * vec4(iP, 1.); mv.xy += position.xy * iS * vec2(length(modelMatrix[0].xyz), length(modelMatrix[1].xyz)); gl_Position = projectionMatrix * mv; }`;
+  void main(){ vU = uv; vC = iC; vec4 mv = modelViewMatrix * vec4(iP, 1.); vC.a *= 1. - smoothstep(95., 115., length(mv.xyz)); mv.xy += position.xy * iS * vec2(length(modelMatrix[0].xyz), length(modelMatrix[1].xyz)); gl_Position = projectionMatrix * mv; }`;
 const BB_F = `uniform sampler2D map; varying vec2 vU; varying vec4 vC; void main(){ vec4 t = texture2D(map, vU); gl_FragColor = vec4(vC.rgb * t.rgb, t.a * vC.a); }`;
 const SM_V = `uniform float uT; attribute vec3 iP; attribute vec4 iA; attribute vec4 iB; varying vec2 vU; varying float vO; varying float vBig;
   float h1(float n){ return fract(sin(n) * 43758.5453); }
@@ -26,12 +26,12 @@ const SM_V = `uniform float uT; attribute vec3 iP; attribute vec4 iA; attribute 
     vec3 c = iP + vec3(dx * iA.x + L * (big > .5 ? 28. : 9.) * iA.y, L * (big > .5 ? 90. : 46.) * iA.y, dz * iA.x + L * 3. * iA.y);
     vec4 mv = modelViewMatrix * vec4(c, 1.); float a = iB.w * uT, ca = cos(a), sa = sin(a);
     mv.xy += vec2(position.x * ca - position.y * sa, position.x * sa + position.y * ca) * sc * vec2(length(modelMatrix[0].xyz), length(modelMatrix[1].xyz));
-    gl_Position = projectionMatrix * mv; vO = sin(L * 3.14159) * (big > .5 ? .55 : .45); vBig = big; }`;
+    gl_Position = projectionMatrix * mv; vO = sin(L * 3.14159) * (big > .5 ? .55 : .45) * (1. - smoothstep(42., 55., length(mv.xyz))); vBig = big; if (vO < .002) gl_Position = vec4(2., 2., 2., 1.); }`;   /* 멀면 안 그림 (화면 칠 아낌) */
 const SM_F = `uniform sampler2D map; uniform vec3 cS, cB; varying vec2 vU; varying float vO; varying float vBig;
   void main(){ vec4 t = texture2D(map, vU); gl_FragColor = vec4(mix(cS, cB, vBig) * t.rgb, t.a * vO); }`;
-const EM_V = `uniform float uT, uPS; attribute vec2 aY; attribute vec2 aS; varying float vA;
+const EM_V = `uniform float uT, uPS; attribute vec2 aY; attribute vec2 aS; attribute float aK; varying float vA;
   void main(){ vec3 p = position; float H = max(.1, aY.y - aY.x); p.y = aY.x + mod(p.y - aY.x + uT * 3.5 * aS.x, H); p.x -= 1.5 * cos(uT * .6 + aS.y);   /* 원본: 위로 오르다 꼭대기에서 바닥으로 · 옆으로 살랑 */
-    vec4 mv = modelViewMatrix * vec4(p, 1.); gl_Position = projectionMatrix * mv; gl_PointSize = 1.1 * length(modelMatrix[0].xyz) * uPS / -mv.z; vA = smoothstep(0., .08, (p.y - aY.x) / H) * (1. - smoothstep(.85, 1., (p.y - aY.x) / H)); }`;
+    vec4 mv = modelViewMatrix * vec4(p, 1.); gl_Position = projectionMatrix * mv; gl_PointSize = 1.1 * aK * uPS / -mv.z * (1. - smoothstep(45., 60., -mv.z)); vA = smoothstep(0., .08, (p.y - aY.x) / H) * (1. - smoothstep(.85, 1., (p.y - aY.x) / H)); }`;
 const EM_F = `uniform sampler2D map; varying float vA; void main(){ vec4 t = texture2D(map, gl_PointCoord); gl_FragColor = vec4(vec3(1., .54, .23) * t.rgb, t.a * .9 * vA); }`;
 
 export function makeVolcano(scene, { jungle, TOP = -1.2, UP = 36, DN = -30, sect = 10, renderer } = {}) {
@@ -46,7 +46,8 @@ export function makeVolcano(scene, { jungle, TOP = -1.2, UP = 36, DN = -30, sect
 
   /* ── 섬 한 벌 만들기: 원본 키트로 짓고 → 땅 밑 눌러 줄이기 → 움직이는 것 / 멈춘 것 가르기 → 멈춘 것은 재질마다 하나로 합침 ── */
   const placeMats = new Map();
-  const placeMat = (m, pk = 1) => { if (!m.userData.crk) return m; const key = m.uuid + pk; let c = placeMats.get(key); if (!c) { c = m.clone(); c.defines = { ...(c.defines || {}), VK_PLACE: '' }; const k = m.userData.crk; K.addCracks(c, k[0], k[1], k[2], { ...m.__crkU, uPK: { value: pk } }); placeMats.set(key, c); } return c; };   /* 균열 빛은 섬 안 좌표로 · 섬을 줄인 만큼 균열 칸을 키움(줄이면 선이 점보다 가늘어져 지글거림) */
+  const placeMat = (m, pk = 1, T = null) => { if (!m.userData.crk) return m; const k0 = m.userData.crk[0], share = k0 < 2 && T && T.kind !== 7, key = share ? 'c' + k0 + ':' + pk + ':' + m.type + m.roughness : m.uuid + pk;   /* 땅·밑면 칠은 섬 종류가 달라도 하나 (열 지도는 꼭짓점에 구워 둠) · 분화 첨봉은 따로(차오르는 빛) */
+    if (share && !placeMats.has(key)) { const c = m.clone(); c.defines = { ...(c.defines || {}), VK_PLACE: '', ...(k0 === 0 ? { VK_HA: '' } : {}) }; K.addCracks(c, k0, m.userData.crk[1], m.userData.crk[2], { ...m.__crkU, uPK: { value: pk } }); placeMats.set(key, c); } let c = placeMats.get(key); if (!c) { c = m.clone(); c.defines = { ...(c.defines || {}), VK_PLACE: '' }; const k = m.userData.crk; K.addCracks(c, k[0], k[1], k[2], { ...m.__crkU, uPK: { value: pk } }); placeMats.set(key, c); } return c; };   /* 균열 빛은 섬 안 좌표로 · 섬을 줄인 만큼 균열 칸을 키움(줄이면 선이 점보다 가늘어져 지글거림) */
   const T_ALL = [];
   function template(kind, o) { const tq0 = performance.now();
     const b = K.build(kind, o), W = b.W; W.updateMatrixWorld(true);
@@ -58,6 +59,10 @@ export function makeVolcano(scene, { jungle, TOP = -1.2, UP = 36, DN = -30, sect
         for (let i = 0; i < P.count; i++) { v.fromBufferAttribute(P, i).applyMatrix4(m.matrixWorld); if (v.y >= g) continue; v.y = sq(v.y); v.applyMatrix4(inv); P.setXYZ(i, v.x, v.y, v.z); ch = true; }
         if (ch) { P.needsUpdate = true; m.geometry.computeVertexNormals(); m.geometry.computeBoundingSphere(); } });
       for (const q of b.puffs) if (q.p.y < g) q.p.y = sq(q.p.y); for (const d of b.drips) { if (d.p.y < g) d.p.y = sq(d.p.y); d.fall *= k; } }
+    /* 열 지도(섬마다 다른 그림)를 땅 꼭짓점에 구워 둠 → 땅 칠을 섬끼리 나눠 씀 */
+    W.traverse(m => { const U = m.material?.__crkU; if (!m.isMesh || !U || m.material.userData.crk[0] !== 0 || !U.heatMap.value) return; const cv = U.heatMap.value.image, TS = cv.width, w2 = U.uW2.value, px = cv.getContext('2d').getImageData(0, 0, TS, TS).data, P = m.geometry.attributes.position, h = new Float32Array(P.count);
+      for (let i = 0; i < P.count; i++) { const x = Math.min(TS - 1, Math.max(0, Math.floor((P.getX(i) / w2 * .5 + .5) * TS))), z = Math.min(TS - 1, Math.max(0, Math.floor((P.getZ(i) / w2 * .5 + .5) * TS))); h[i] = px[(z * TS + x) * 4] / 255; }
+      m.geometry.setAttribute('aHeat', new THREE.BufferAttribute(h, 1)); });
     /* 움직이는 것 찾기: 키트 움직임을 여러 순간 돌려 보고 자리·크기·보임·투명도가 바뀌는 것 */
     const objs = []; W.traverse(x => objs.push(x)); const rec = () => { W.updateMatrixWorld(true); return objs.map(x => [x.matrixWorld.elements.slice(), x.visible, x.material && !Array.isArray(x.material) ? x.material.opacity : 0]); };
     const moving = new Set(); let prev = null; for (const ts of [1.37, 4.3, 7.77, 9.9, 10.4, 11.3]) { for (const f of b.anim) f(ts, .016); const s = rec(); if (prev) s.forEach((r, i) => { const p = prev[i]; if (r[1] !== p[1] || Math.abs(r[2] - p[2]) > 1e-4 || r[0].some((e, j) => Math.abs(e - p[0][j]) > 1e-5)) moving.add(objs[i]); }); prev = s; }
@@ -69,9 +74,9 @@ export function makeVolcano(scene, { jungle, TOP = -1.2, UP = 36, DN = -30, sect
       if (x.isInstancedMesh) { const Ms = []; for (let i = 0; i < x.count; i++) { const M = new THREE.Matrix4(); x.getMatrixAt(i, M); Ms.push(M.premultiply(x.matrixWorld)); } const C = x.instanceColor ? Array.from({ length: x.count }, (_, i) => { const c = new THREE.Color(); x.getColorAt(i, c); return c; }) : null; insts.push({ geo: x.geometry, mat: x.material, Ms, C }); continue; }
       if (x.isMesh && x.geometry?.attributes.position) { const m = x.material, key = m.uuid; if (!groups.has(key)) groups.set(key, { m, list: [] }); groups.get(key).list.push(x); } }
     const statics = [];
-    for (const { m, list } of groups.values()) { const keys = ['position', 'normal']; if (m.map || m.emissiveMap || m.isShaderMaterial || list.some(x => x.geometry.attributes.uv && m.map)) keys.push('uv'); if (m.vertexColors) keys.push('color');
+    for (const { m, list } of groups.values()) { const keys = ['position', 'normal']; if (m.map || m.emissiveMap || m.isShaderMaterial || list.some(x => x.geometry.attributes.uv && m.map)) keys.push('uv'); if (m.vertexColors) keys.push('color'); if (m.userData.crk && m.userData.crk[0] === 0) keys.push('aHeat');
       const parts = list.map(x => { const g = x.geometry.clone(); if (!g.attributes.normal) g.computeVertexNormals(); for (const k of Object.keys(g.attributes)) if (!keys.includes(k)) g.deleteAttribute(k);
-        for (const k of keys) if (!g.attributes[k]) g.setAttribute(k, new THREE.BufferAttribute(new Float32Array(g.attributes.position.count * (k === 'uv' ? 2 : 3)).fill(k === 'color' ? 1 : 0), k === 'uv' ? 2 : 3));
+        for (const k of keys) if (!g.attributes[k]) { const sz = k === 'uv' ? 2 : k === 'aHeat' ? 1 : 3; g.setAttribute(k, new THREE.BufferAttribute(new Float32Array(g.attributes.position.count * sz).fill(k === 'color' ? 1 : 0), sz)); }
         if (!g.index) { const n = g.attributes.position.count, ix = new (n > 65535 ? Uint32Array : Uint16Array)(n); for (let i = 0; i < n; i++) ix[i] = i; g.setIndex(new THREE.BufferAttribute(ix, 1)); } g.applyMatrix4(x.matrixWorld); return g; });
       const mg = parts.length > 1 ? mergeGeometries(parts, false) : parts[0]; if (parts.length > 1) parts.forEach(g => g.dispose()); if (mg) statics.push({ geo: mg, mat: m, ro: list[0].renderOrder }); }
     let glowG = null; if (glows.length) { glowG = new THREE.InstancedBufferGeometry(); glowG.index = quad.index; glowG.setAttribute('position', quad.attributes.position); glowG.setAttribute('uv', quad.attributes.uv);
@@ -141,38 +146,56 @@ export function makeVolcano(scene, { jungle, TOP = -1.2, UP = 36, DN = -30, sect
   const P = [], SMALL = { shard: 1, crown: 1, ftree: 1, arch: 1, peak: 0 };
   for (const o of L) { const T = TPL[o.t][o.v % TPL[o.t].length] || TPL[o.t].find(Boolean); if (!T) continue; const S = SPEC[o.t];
     const y = (o.t === 'tree' ? DN + 2 : o.t === 'ftree' ? LY.g : LY[o.b === '*' ? 'm' : o.b === 'gm' ? 'g' : o.b]) - S.gref * o.sy, root = new THREE.Group(); root.position.set(o.x, y, o.z); root.rotation.y = o.yaw; root.scale.set(o.s * (o.sx || 1), o.sy, o.s * (o.sz || 1)); scene.add(root); root.updateMatrixWorld(true); root.visible = false;
-    const p = { o, T, x: o.x, z: o.z, y, top: y + S.gref * o.sy, root, M: root.matrixWorld.clone(), rad: o.r * 1.15 + 4, vd: SMALL[o.t] ? (o.b === 'm' ? 62 : 50) : o.t === 'heart' ? 75 : 100, vis: false, near: false, pairs: [], fine: [], fz: false };
-    if (T.glowG) root.add(Object.assign(new THREE.Mesh(T.glowG, glowM), { frustumCulled: false, renderOrder: 3 }));
-    const fine = []; if (T.smokeG) fine.push(root.add(Object.assign(new THREE.Mesh(T.smokeG, smokeM), { frustumCulled: false, renderOrder: 4 })).children.at(-1));
-    if (T.embG) fine.push(root.add(Object.assign(new THREE.Points(T.embG, emberM), { frustumCulled: false, renderOrder: 4 })).children.at(-1));
+    const p = { o, T, x: o.x, z: o.z, y, top: y + S.gref * o.sy, root, M: root.matrixWorld.clone(), bids: [], rad: o.r * 1.15 + 4, vd: SMALL[o.t] ? (o.b === 'm' ? 62 : 50) : o.t === 'heart' ? 75 : 100, vis: false, near: false, pairs: [], fine: [], fz: false };
+    const fine = [];
     for (const src of T.live) { const c = src.clone(true), wrap = new THREE.Group(); src.parent.updateMatrixWorld(true); wrap.matrixAutoUpdate = false; wrap.matrix.copy(src.parent.matrixWorld); wrap.add(c); root.add(wrap);   /* 움직이는 것은 자리마다 복사 (모양·재질은 나눠 씀) → 키트 움직임을 따라 함 */
       const a = [], bb = []; src.traverse(x => a.push(x)); c.traverse(x => bb.push(x)); a.forEach((x, i) => { const d = bb[i]; if (d.isPoints && d.material.size) { d.material = d.material.clone(); d.material.size *= o.s; } d.frustumCulled = false; p.pairs.push([x, d]); }); }
     if (o.t !== 'peak') for (const w of root.children) if (w.children.length && w.matrixAutoUpdate === false) fine.push(w);   /* 움직이는 부품(보물 심장 고리 · 도는 조각 · 화로 불꽃…)은 가까이에서만 (첨봉은 터짐이 보여야 해서 늘) */   /* 작은 섬의 도는 조각 등은 가까이에서만 */
     p.fine = fine; for (const f of fine) f.visible = false;
     if (o.t === 'forest') hideMark(root, 0, S.gref, 0, KR.forest * (T.o.v?.rk || 1) * .72 * Math.min(o.sx || 1, o.sz || 1) / (o.sx || 1));   /* 숲 = 숨는 곳 (가장 짧은 쪽 반지름) */
     T.P.push(p); P.push(p); }
+  /* 빛 무리 · 연기 · 불티: 모든 섬 것을 맵 전체 한 판씩으로 (자리마다 따로 그리던 것 → 그리기 세 번) · 멀면 셰이더에서 사라짐 */
+  { const v = new THREE.Vector3(), gP = [], gS = [], gC = [], sP = [], sA = [], sB = [], eP = [], eY = [], eS = [], eK = [];
+    for (const p of P) { const T = p.T, M = p.M, sx = p.o.s * (p.o.sx || 1), sy = p.o.sy, s0 = p.o.s;
+      if (T.glowG) { const a = T.glowG.attributes; for (let i = 0; i < T.glowG.instanceCount; i++) { v.fromArray(a.iP.array, i * 3).applyMatrix4(M); gP.push(v.x, v.y, v.z); gS.push(a.iS.array[i * 2] * sx, a.iS.array[i * 2 + 1] * sy); for (let k = 0; k < 4; k++) gC.push(a.iC.array[i * 4 + k]); } }
+      if (T.smokeG) { const a = T.smokeG.attributes; for (let i = 0; i < T.smokeG.instanceCount; i++) { v.fromArray(a.iP.array, i * 3).applyMatrix4(M); sP.push(v.x, v.y, v.z); sA.push(a.iA.array[i * 4] * s0, a.iA.array[i * 4 + 1] * s0, a.iA.array[i * 4 + 2], a.iA.array[i * 4 + 3]); for (let k = 0; k < 4; k++) sB.push(a.iB.array[i * 4 + k]); } }
+      if (T.embG) { const a = T.embG.attributes; for (let i = 0; i < a.position.count; i++) { v.fromBufferAttribute(a.position, i).applyMatrix4(M); eP.push(v.x, v.y, v.z); eY.push(p.y + a.aY.array[i * 2] * sy, p.y + a.aY.array[i * 2 + 1] * sy); eS.push(a.aS.array[i * 2], a.aS.array[i * 2 + 1]); eK.push(s0); } } }
+    const inst = (attrs, n) => { const g = new THREE.InstancedBufferGeometry(); g.index = quad.index; g.setAttribute('position', quad.attributes.position); g.setAttribute('uv', quad.attributes.uv); for (const [k, arr, sz] of attrs) g.setAttribute(k, new THREE.InstancedBufferAttribute(new Float32Array(arr), sz)); g.instanceCount = n; return g; };
+    if (gP.length) scene.add(Object.assign(new THREE.Mesh(inst([['iP', gP, 3], ['iS', gS, 2], ['iC', gC, 4]], gP.length / 3), glowM), { frustumCulled: false, renderOrder: 3 }));
+    if (sP.length) scene.add(Object.assign(new THREE.Mesh(inst([['iP', sP, 3], ['iA', sA, 4], ['iB', sB, 4]], sP.length / 3), smokeM), { frustumCulled: false, renderOrder: 4 }));
+    if (eP.length) { const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(eP, 3)); g.setAttribute('aY', new THREE.Float32BufferAttribute(eY, 2)); g.setAttribute('aS', new THREE.Float32BufferAttribute(eS, 2)); g.setAttribute('aK', new THREE.Float32BufferAttribute(eK, 1)); scene.add(Object.assign(new THREE.Points(g, emberM), { frustumCulled: false, renderOrder: 4 })); } }
   /* 종류마다 멈춘 부분을 한 번에 그리는 판 (자리 수만큼) */
+  const BATCH = new Map();
   for (const T of T_ALL) { const n = T.P.length; if (!n) continue;
-    for (const st of T.statics) { const im = new THREE.InstancedMesh(st.geo, placeMat(st.mat, T.pk), n); im.frustumCulled = false; im.count = 0; im.renderOrder = st.ro || 0; im.visible = false; scene.add(im); T.meshes.push({ im, kit: null }); }
-    for (const it of T.insts) { const im = new THREE.InstancedMesh(it.geo, placeMat(it.mat, T.pk), it.Ms.length * n); im.frustumCulled = false; im.count = 0; im.visible = false; if (it.C) im.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(it.Ms.length * n * 3), 3); scene.add(im); T.meshes.push({ im, kit: it }); } }
+    const triN = g => (g.index ? g.index.count : g.attributes.position.count) / 3, tot = T.statics.reduce((a, st) => a + triN(st.geo), 0);
+    for (const st of T.statics) { const m = st.mat, key = (m.userData.crk && m.userData.crk[0] < 2) || m.userData.lava || m.map || triN(st.geo) > tot * .14, pm = placeMat(m, T.pk, T);
+      if (!BATCH.has(pm)) BATCH.set(pm, { mat: pm, ro: st.ro || 0, list: [] }); BATCH.get(pm).list.push({ T, geo: st.geo, detail: !key }); }   /* 땅·밑면·용암·나무·큰 덩어리 말고 자잘한 것(금 테·룬·쇠·뼈 조각…)은 가까이 왔을 때만 */
+    for (const it of T.insts) { const im = new THREE.InstancedMesh(it.geo, placeMat(it.mat, T.pk), it.Ms.length * n); im.frustumCulled = false; im.count = 0; im.visible = false; if (it.C) im.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(it.Ms.length * n * 3), 3); scene.add(im); T.meshes.push({ im, kit: it, detail: it.Ms.length > 30 && !it.mat.map }); } }
+  /* 멈춘 부분: 재질이 같으면 섬 종류가 달라도 한 판(BatchedMesh)으로 → 그리기 = 재질 수 (2026-11-09 · 폰 그리기 횟수) · 자리마다 보임/숨김 */
+  for (const B of BATCH.values()) { let nI = 0, nV = 0, nX = 0; for (const e of B.list) { nI += e.T.P.length; nV += e.geo.attributes.position.count; nX += e.geo.index.count; }
+    const bm = new THREE.BatchedMesh(nI, nV, nX, B.mat); bm.frustumCulled = false; bm.userData.nv = 0; bm.visible = false; bm.renderOrder = B.ro; scene.add(bm);
+    for (const e of B.list) { const gid = bm.addGeometry(e.geo); for (const p of e.T.P) { const id = bm.addInstance(gid); bm.setMatrixAt(id, p.M); bm.setVisibleAt(id, false); p.bids.push([bm, id, e.detail]); } } }
   for (const m of new Set([...placeMats.values()])) if (m.isMeshStandardMaterial) m.envMapIntensity = .12;
   T_ALL.forEach(T => T.W.traverse(x => { if (x.material?.isMeshStandardMaterial) x.material.envMapIntensity = .12; }));
 
   /* ── 매 판: 보일 자리만 · 가까운 것만 움직임 ── */
   const sph = new THREE.Sphere(), fr = new THREE.Frustum(), pv = new THREE.Matrix4(), tmpM = new THREE.Matrix4(), dsz = new THREE.Vector2();
-  let FOC = null, FOCY = 0; const setFocus = (Lr, y) => { FOC = Lr; FOCY = y; };
+  const LIVE = new Set(); let FOC = null, FOCY = 0; const setFocus = (Lr, y) => { FOC = Lr; FOCY = y; };
   const update = (t, dt, camera) => { TU.value = t; if (renderer) { renderer.getDrawingBufferSize(dsz); uPS.value = dsz.y * .5; }
     pv.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse); fr.setFromProjectionMatrix(pv); const cx = camera.position.x, cy = camera.position.y, cz = camera.position.z;
-    for (const T of T_ALL) { let changed = false, run = false;
+    { const c = []; for (const p of P) if (p.fine.length && p.vis) c.push([Math.hypot(p.x - cx, p.z - cz), p]); c.sort((a, b) => a[0] - b[0]); LIVE.clear(); for (let i = 0; i < Math.min(6, c.length); i++) LIVE.add(c[i][1]); }   /* 움직이는 부품·연기는 가장 가까운 섬 여섯까지만 */
+    for (const T of T_ALL) { let changed = false, run = false, fine = false;
       for (const p of T.P) { const d = Math.hypot(p.x - cx, p.z - cz); sph.center.set(p.x, p.top, p.z); sph.radius = p.rad * (p.o.t === 'tree' ? 3 : 1); if (p.o.t === 'tree') sph.center.y = p.top + 30 * p.o.sy;
         const other = FOC && Math.abs(p.top - FOCY) > 9 && p.o.b !== '*', vis = d < (other ? .75 : 1) * p.vd + p.rad && fr.intersectsSphere(sph);
         if (vis !== p.vis) { p.vis = vis; p.root.visible = vis; changed = true; } if (!vis) continue;
         const d3 = Math.hypot(d, p.top - cy); p.near = d3 < 70 + p.rad && !other; if (p.near) run = true;
-        const fz = d3 < 48 + p.rad * .6 && !other; if (fz !== p.fz) { p.fz = fz; for (const f of p.fine) f.visible = fz; } }   /* 연기·불티는 가까이에서만 */
+        const fz = d3 < 48 + p.rad * .6 && !other && LIVE.has(p); if (d3 < 48 + p.rad * .6 && !other) fine = true; if (fz !== p.fz) { p.fz = fz; for (const f of p.fine) f.visible = fz; } }   /* 연기·불티는 가까이에서만 */
       if (changed) { let k = 0; const vp = T.P.filter(p => p.vis);
         for (const { im, kit } of T.meshes) { if (!kit) { vp.forEach((p, i) => im.setMatrixAt(i, p.M)); im.count = vp.length; }
           else { let j = 0; for (const p of vp) for (let i = 0; i < kit.Ms.length; i++) { im.setMatrixAt(j, tmpM.multiplyMatrices(p.M, kit.Ms[i])); if (kit.C) im.setColorAt(j, kit.C[i]); j++; } im.count = j; if (kit.C && im.instanceColor) im.instanceColor.needsUpdate = true; }
-          im.instanceMatrix.needsUpdate = true; im.visible = im.count > 0; k++; } }
+          im.instanceMatrix.needsUpdate = true; k++; } }
+      for (const M of T.meshes) M.im.visible = M.im.count > 0 && (!M.detail || fine);
+      if (changed || fine !== T.fine) { T.fine = fine; for (const p of T.P) for (const [bm, id, det] of p.bids) { const v = p.vis && (!det || fine); if (bm.getVisibleAt(id) !== v) { bm.setVisibleAt(id, v); bm.userData.nv += v ? 1 : -1; bm.visible = bm.userData.nv > 0; } } }
       if (run && T.ranAt !== t) { T.ranAt = t; const tt = t + T.off; for (const f of T.anim) f(tt, dt);   /* 키트 움직임은 종류마다 한 번 → 가까운 자리들이 따라 함 */
         for (const p of T.P) if (p.vis && p.near) for (const [a, b] of p.pairs) { b.position.copy(a.position); b.quaternion.copy(a.quaternion); b.scale.copy(a.scale); b.visible = a.visible; } } } };
 

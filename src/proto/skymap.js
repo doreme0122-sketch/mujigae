@@ -8,26 +8,27 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
-import { makeBloom } from '../core/hangar/bloom.js?v=11091623';
-import { makePad } from '../core/hangar/pad.js?v=11091623';
-import { makeMag } from '../core/hangar/mag.js?v=11091623';
+import { makeBloom } from '../core/hangar/bloom.js?v=11091804';
+import { makePad } from '../core/hangar/pad.js?v=11091804';
+import { makeMag } from '../core/hangar/mag.js?v=11091804';
 import { buildShip } from '../core/ships/build.js';
-import { makeGoldStar } from './goldstar.js?v=11091623';
-import { makeArena, SPEED, WAVE_R0 } from './arena.js?v=11091623';
-import { makeGuardians, GUARD } from './guardian.js?v=11091623';
-import { makeBirth, BIRTH } from './birth.js?v=11091623';
-import { makeTravel } from './travel.js?v=11091623';
-import { spiralPath } from './path.js?v=11091623';
-import { makePerf } from './perf.js?v=11091623';
+import { makeGoldStar } from './goldstar.js?v=11091804';
+import { makeArena, SPEED, WAVE_R0 } from './arena.js?v=11091804';
+import { makeGuardians, GUARD } from './guardian.js?v=11091804';
+import { makeBirth, BIRTH } from './birth.js?v=11091804';
+import { makeTravel } from './travel.js?v=11091804';
+import { spiralPath } from './path.js?v=11091804';
+import { makePerf } from './perf.js?v=11091804';
 import { makeGlow } from '../preview/glow.js';
-import { makeFlight, FLY, PADZ, padZone } from './flight.js?v=11091623';
-import { pedestal, gate4 } from './gates.js?v=11091623';
-import { makeMeadow, MEADOW } from './meadow.js?v=11091623';
-import { makeClouds } from './clouds.js?v=11091623';
-import { makeLife } from './life.js?v=11091623';
-import { makeJungle, jungleLayout, SANCT_TEST } from './jungle.js?v=11091623';
-import { makeGimmicks } from './gimmick.js?v=11091623';
-import { makeVolcano, VOLC } from './volcano.js?v=11091623';
+import { makeFlight, FLY, PADZ, padZone } from './flight.js?v=11091804';
+import { pedestal, gate4 } from './gates.js?v=11091804';
+import { makeMeadow, MEADOW } from './meadow.js?v=11091804';
+import { makeClouds } from './clouds.js?v=11091804';
+import { makeLife } from './life.js?v=11091804';
+import { makeJungle, jungleLayout, SANCT_TEST } from './jungle.js?v=11091804';
+import { makeGimmicks } from './gimmick.js?v=11091804';
+import { makeVolcano, VOLC } from './volcano.js?v=11091804';
+import { autoMerge } from './automerge.js?v=11091804';
 
 const $ = s => document.querySelector(s), clamp = THREE.MathUtils.clamp, HOVER = FLY.HOVER;
 const R = 240, NB = 10, GAPH = 5.6, BASE_D = 0;     /* 맵 반지름 · 기지 수 · 벽 틈 반 폭(= 기지 반지름) · 기지 가운데는 벽 선 위 (앞 절반은 맵 안, 뒤 절반은 맵 밖 · 사용자 2026-11-06) */
@@ -166,7 +167,7 @@ export async function start(canvas, onProgress = () => {}) {
   onProgress(.4);
   /* ── 초원 고리 ── */
   const JL = jungleLayout({ TOP: MEADOW.TOP, UP: MEADOW.UP, DN: MEADOW.DN });   /* 정글 배치 계획을 먼저 → 초원이 경계 너머로 섬을 놓을 때 피해 감 */
-  const meadow = await makeMeadow(scene, new URL('./assets/kit_meadow.glb?v=11091623', import.meta.url).href, p => onProgress(.4 + p * .4), new URL('./assets/kit_meadow_decor.glb?v=11091623', import.meta.url).href, new URL('./assets/kit_meadow_lo.glb?v=11091623', import.meta.url).href, { avoid: JL });
+  const meadow = await makeMeadow(scene, new URL('./assets/kit_meadow.glb?v=11091804', import.meta.url).href, p => onProgress(.4 + p * .4), new URL('./assets/kit_meadow_decor.glb?v=11091804', import.meta.url).href, new URL('./assets/kit_meadow_lo.glb?v=11091804', import.meta.url).href, { avoid: JL });
   const clouds = makeClouds(scene, { R0: MEADOW.R0, R1: MEADOW.R1 });   /* 층 사이 흘러가는 구름 · 기체 높이 숨는 구름 */
   const jungle = makeJungle(scene, { TOP: MEADOW.TOP, UP: MEADOW.UP, DN: MEADOW.DN, avoid: meadow.place.concat(meadow.CORR.map(c => ({ x: c[0], z: c[1], rr: c[2], layer: 'all' }))) });   /* 우주 정글 고리 (초원 안쪽) */
   const volc = /novolc/.test(location.search) ? { update() {}, setFocus() {}, blocked: () => false, peaks: [], arches: [], P: [], L: [], T: [], info: () => ({}) } : makeVolcano(scene, { jungle, TOP: MEADOW.TOP, UP: MEADOW.UP, DN: MEADOW.DN, renderer });   /* 화산 지역 고리 (정글 안쪽 85~136m · 사용자 2026-11-09) */
@@ -212,6 +213,7 @@ export async function start(canvas, onProgress = () => {}) {
   const bship = fly.children[0], S0 = bship.scale.x, bsm = bship.children[0];
   const shipHalf = new THREE.Box3().setFromObject(bship).getSize(new THREE.Vector3()).y / BS / 2;   /* 기지 단위로 */
   const birth = makeBirth(bship); B0.w.add(birth);
+  const AM = autoMerge(B0.w); AM.done = null;
   travel = makeTravel({ scene, gates, meadow, jungle, fly, ship: bship, FS, HOVER, GATE_H });   /* 문 타고 오르내리기 */
   /* 가려진 기체 (사용자 2026-11-06: 섬이 기체를 가리면 그냥 가려지게 두고 기체가 거기 있다는 걸 보여 줌 → 깊이감):
      가려진 부분만 기체 모양 그대로 은은하게 빛나는 윤곽 — 앞에 무언가 있을 때만 그려짐(깊이를 거꾸로 비교) */
@@ -346,6 +348,7 @@ export async function start(canvas, onProgress = () => {}) {
     for (const b of bolts) glow.add(b.x, HOVER + travel.yOff + .3, b.z, -b.vx * .04, 0, -b.vz * .04, .18, 0, [.5, 1.2, .7], 1, b.x);
     for (let i = fx.length - 1; i >= 0; i--) { const f = fx[i]; f.t += dt; if (f.t > .3) { fx.splice(i, 1); continue; } glow.add(f.x, HOVER + travel.yOff + .3, f.z, 0, 0, 0, .5 + f.t * 3, 3, [1.2, 1.1, 1.3], 1 - f.t / .3); }
     glow.end(); glow.uT.value = t;
+    if (!AM.done) { AM.watch(); if (flying && t > launchAt + 3) { AM.done = AM.merge(); } }   /* 출발 기지: 태어나는 장면부터 지켜보고 한 번도 안 움직인 부품만 재질마다 합침 (그리기 횟수 줄이기 · 2026-11-09) */
     /* 카메라 */
     let tx, tz; if (flying) { const sp = bship.position; tx = sp.x + FS.vx * .25; tz = sp.z + FS.vz * .25; } else if (dead) { tx = cam.x; tz = cam.z; } else { tx = B0.x; tz = B0.z; }   /* 죽어 있을 땐 죽은 자리에 머묾 */
     if (!(flying && travel.camera(cam, bship.position, dt))) { const k = Math.min(1, dt * (flying ? 4 : 2)); cam.x += (tx - cam.x) * k; cam.z += (tz - cam.z) * k; }   /* 길 타는 동안은 travel이 카메라를 이끎 · 그 밖엔 높이만 층을 따라감 */
