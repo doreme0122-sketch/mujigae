@@ -48,34 +48,31 @@ export function makeGimmicks(scene, { meadow, jungle, volc, fly, bship, R, gates
     else if (o.kind === 3 && p.top && p.top.poolR) SW.push({ p, s, yaw: o.yaw || 0, py: p.y + (p.top.pool || 0) * sy, pr: p.top.poolR }); }
 
   /* 사정거리 원: 가까운 꽃 셋까지만 (빨간 얇은 선 · 이빨처럼 끊긴 마디가 천천히 돎 · 가까울수록 진하고 굵게 번짐) */
-  const ringM = () => new THREE.ShaderMaterial({ transparent: true, depthWrite: false, uniforms: { uA: { value: 0 }, uR: { value: 5 }, uT: { value: 0 } },
-    vertexShader: 'varying vec2 vP; void main(){ vP = position.xz; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.); }',
-    fragmentShader: `uniform float uA, uR, uT; varying vec2 vP;
-      void main(){ float d = length(vP) * uR * 1.2, e = d - uR, w = .05 + uA * .05;
-        float line = exp(-e * e / (w * w)), halo = exp(-e * e / (.6 * .6)) * .35, a = atan(vP.y, vP.x);
-        float teeth = .55 + .45 * smoothstep(.15, .35, abs(fract(a * 36. / 6.2832 + uT * .05) - .5));   /* 마디마다 살짝 끊김 */
-        float inside = (1. - smoothstep(uR - .2, uR, d)) * .07 * uA * uA;   /* 안쪽은 아주 옅게 붉음 (들어가면 위험) */
-        float k = (line * teeth + halo * uA) * (.18 + .82 * uA) + inside; if (k < .003) discard;
-        gl_FragColor = vec4(vec3(1., .16, .2) * (1. + line * .6), k); }` });
+  /* 사정거리 원: 아주 얇은 빨간 선 하나 (사용자 2026-11-09: 진짜 단순한 선만) — 가까울수록 진해짐 */
+  const LINE_F = `uniform float uA, uR, uK; varying vec2 vP;
+      void main(){ float d = length(vP) * uR * 1.2, e = d - uR, w = .035, line = exp(-e * e / (w * w)) * (.25 + .75 * uA) * uK; if (line < .004) discard;
+        gl_FragColor = vec4(vec3(1., .16, .16), line); }`;
+  const ringM = () => new THREE.ShaderMaterial({ transparent: true, depthWrite: false, uniforms: { uA: { value: 0 }, uR: { value: 5 }, uT: { value: 0 }, uK: { value: 1 } },
+    vertexShader: 'varying vec2 vP; void main(){ vP = position.xz; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.); }', fragmentShader: LINE_F });
   const RINGS = [0, 1, 2].map(() => { const m = new THREE.Mesh(new THREE.PlaneGeometry(2, 2).rotateX(-Math.PI / 2), ringM()); m.renderOrder = 50; m.frustumCulled = false; m.visible = false; scene.add(m); return m; });
   const lp = new THREE.Vector3();
+  const drops = new THREE.Group(); { const bb = new THREE.Box3().setFromObject(bship), sz = bb.getSize(new THREE.Vector3()), c = bb.getCenter(new THREE.Vector3()), ws = bship.getWorldScale(new THREE.Vector3()).x || 1;
+    const m = new THREE.MeshStandardMaterial({ color: 0xb8ff6a, emissive: 0x3a7a10, emissiveIntensity: .6, roughness: .08, metalness: 0, transparent: true, opacity: .82 }), R = (n => () => (n = (n * 16807) % 2147483647) / 2147483647)(7);
+    bship.worldToLocal(c); for (let i = 0; i < 11; i++) { const g = new THREE.SphereGeometry(1, 10, 8); g.scale(1, .7, 1); const o = new THREE.Mesh(g, m), a = R() * 6.28, b = (R() - .3) * 1.2;
+      o.position.set(c.x + Math.cos(a) * Math.cos(b) * sz.x / ws * .42, c.y + Math.sin(b) * sz.y / ws * .45 + sz.y / ws * .1, c.z + Math.sin(a) * Math.cos(b) * sz.z / ws * .42); o.userData.s = (.05 + R() * .07) / ws * Math.max(sz.x, sz.z) * .5; drops.add(o); } }
+  drops.visible = false; bship.add(drops);   /* 포자 늪: 끈적한 물방울이 기체 겉에 붙음 */
 
   /* ── ⑥ 분화 첨봉: 사정거리 원 (꽃 원과 같은 빨간 실선 · 넓이는 훨씬 넓게) + 차오르는 빛 · 깜빡임 · 터질 때 퍼지는 충격 고리 ── */
-  const PK = volc ? volc.peaks : [], AR = volc ? volc.arches : [], VP = volc ? 12 : 12, VTB = 12 - 2.4;
+  const PK = volc ? volc.peaks : [], AR = volc ? volc.arches : [], VP = 5, VTB = 5 - 2.4, SHOCK = .9;   /* 5초마다 (사용자 2026-11-09) · 충격파가 원 끝까지 퍼지는 데 0.9초 */
+  /* 분화 첨봉 원도 같은 얇은 선 하나: 차오를수록 진해지고 · 터지기 직전 깜빡임 · 터지면 같은 선이 가운데에서 밖으로 퍼지는 충격파 (닿으면 맞음) */
   const pkM = () => new THREE.ShaderMaterial({ transparent: true, depthWrite: false, uniforms: { uA: { value: 0 }, uR: { value: 14 }, uT: { value: 0 }, uF: { value: 0 }, uW: { value: 0 }, uB: { value: 0 }, uS: { value: 0 } },
     vertexShader: 'varying vec2 vP; void main(){ vP = position.xz; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.); }',
     fragmentShader: `uniform float uA, uR, uT, uF, uW, uB, uS; varying vec2 vP;
-      void main(){ float d = length(vP) * uR * 1.2, e = d - uR, a = atan(vP.x, vP.y), u = fract(a / 6.2832 + 1.);   /* u: 원 위 자리 (12시에서 시계 방향) */
-        float blink = mix(1., .35 + .65 * step(.5, fract(uT * (2. + uW * 7.))), uW);   /* 터지기 직전: 점점 빨라지는 깜빡임 */
-        float w = .07 + uA * .06, line = exp(-e * e / (w * w)), halo = exp(-e * e / .7) * .3;
-        float teeth = .55 + .45 * smoothstep(.15, .35, abs(fract(u * 48. + uT * .04) - .5));
-        float fill = step(u, uF) * smoothstep(0., .02, uF), head = exp(-pow((u - uF) * 60., 2.)) * step(.01, uF);   /* 원을 따라 차오르는 빛 · 끝머리가 밝게 */
-        float charged = fill * (exp(-e * e / ((w * 1.8) * (w * 1.8))) * 1.25 + halo * .9) + head * exp(-e * e / .5) * 1.4;
-        float inside = (1. - smoothstep(uR - .3, uR, d)) * (.03 + .1 * uF * uF) * uA;   /* 안쪽은 차오를수록 붉게 달아오름 */
-        float eb = d - uB * uR, shock = uB > 0. && uB < 1. ? exp(-eb * eb / (.9 + uB * 2.)) * (1. - uB) * 1.6 : 0.;   /* 터지는 순간 가운데에서 밖으로 퍼지는 충격 고리 */
-        float k = ((line * teeth + halo * uA) * (.16 + .84 * uA) * (1. - uS * .7) + charged * uA + inside) * blink + shock * uA; if (k < .003) discard;
-        vec3 c = mix(vec3(1., .14, .12), vec3(1., .55, .16), clamp(fill + head, 0., 1.)) + vec3(.4, .3, .1) * head + vec3(1., .7, .3) * shock;
-        gl_FragColor = vec4(c * (1. + line * .5), min(1., k)); }` });
+      void main(){ float d = length(vP) * uR * 1.2, w = .035, e = d - uR, eb = d - uB * uR;
+        float blink = mix(1., step(.5, fract(uT * (2.5 + uW * 8.))), uW);
+        float k = exp(-e * e / (w * w)) * (.2 + .8 * uF) * blink * (1. - uS * .75) * (.3 + .7 * uA);
+        float sh = uB > 0. && uB < 1. ? exp(-eb * eb / (.05 * .05)) * (1. - uB * .4) : 0.;
+        float a = max(k, sh * (.4 + .6 * uA)); if (a < .004) discard; gl_FragColor = vec4(mix(vec3(1., .16, .16), vec3(1., .55, .2), sh), a); }` });
   const PR = [0, 1].map(() => { const m = new THREE.Mesh(new THREE.PlaneGeometry(2, 2).rotateX(-Math.PI / 2), pkM()); m.renderOrder = 50; m.frustumCulled = false; m.visible = false; scene.add(m); return m; });
   /* ── ⑦ 아치 빛 문 (둥근 홀로그램): 금빛 테 · 안쪽으로 빨려 드는 물결 · 테를 따라 도는 눈금 ── */
   const hoM = new THREE.ShaderMaterial({ transparent: true, depthWrite: false, side: THREE.DoubleSide, blending: THREE.AdditiveBlending, uniforms: { uT: { value: 0 } },
@@ -94,11 +91,14 @@ export function makeGimmicks(scene, { meadow, jungle, volc, fly, bship, R, gates
   /* 꽃에 삼켜진 상태 */
   let sw = null;   /* { f, t0, phase, dir } */
   const endSwallow = (t, spit) => { if (!sw) return; const f = sw.f; bship.visible = true; FS.noPad = false; maw.style.opacity = '0';
-    if (spit) { const a = sw.dir, sp = 30; FS.x = f.x + Math.cos(a) * 1.5; FS.z = f.z + Math.sin(a) * 1.5; bship.visible = true; FS.dashVx = Math.cos(a) * sp; FS.dashVz = Math.sin(a) * sp; FS.dashUntil = t + .6; FS.dashEndK = .35; hop = { t0: t, d: 1.1, h: 3.4 }; FS.boost = Math.max(FS.boost, 1.2); }   /* 퉤: 멀리 날아감 + 포물선으로 붕 뜸 */
+    if (spit) { const a = sw.dir; FS.x = f.x + Math.cos(a) * 1.5; FS.z = f.z + Math.sin(a) * 1.5; bship.visible = true; knock(t, Math.cos(a), Math.sin(a), 20); }   /* 퉤: 아주 빠르게 멀리 날아감 → 2초 기절 */
     if (f.p.G.userData.bite) f.p.G.userData.bite.open = t; f.cd = t + 4; sw = null; };
-  let hop = null, gooK = 0, hazeK = 0, hideOn = false;
+  let hop = null, gooK = 0, hazeK = 0, hideOn = false, stunAt = -99;
+  /* 튕겨나가기 (사용자 2026-11-09): 아주 빠르게 · 날아가는 동안 조종 못 함 · 멈춘 자리에서 2초 기절 */
+  const knock = (t, ux, uz, dist) => { const sp = 44, dur = Math.max(.18, dist / sp); FS.dashVx = ux * sp; FS.dashVz = uz * sp; FS.dashUntil = t + dur; FS.dashEndK = 0; FS.stunUntil = t + dur + 2; stunAt = t + dur; hop = { t0: t, d: dur + .1, h: Math.min(3.4, 1.2 + dist * .12) }; };
+  const stars = new THREE.Group(); { const m = new THREE.MeshBasicMaterial({ color: 0xffe27a }); for (let i = 0; i < 4; i++) { const g = new THREE.OctahedronGeometry(.13, 0); g.scale(1, 1, .35); const o = new THREE.Mesh(g, m); stars.add(o); } } stars.visible = false; scene.add(stars);   /* 기절: 기체 위를 도는 작은 별 넷 */
   const api = { hop: 0, swallowed: () => !!sw, hidden: () => hideOn };
-  api.reset = () => { hp = 100; hurtAt = -99; if (sw) { bship.visible = true; FS.noPad = false; sw = null; } maw.style.opacity = '0'; hop = null; api.hop = 0; FS.goo = 0; };
+  api.reset = () => { FS.stunUntil = 0; stars.visible = false; hp = 100; hurtAt = -99; if (sw) { bship.visible = true; FS.noPad = false; sw = null; } maw.style.opacity = '0'; hop = null; api.hop = 0; FS.goo = 0; };
 
   api.update = (t, dt, { flying, mode, camera, pxRatio = 1 }) => {
     if (hidesAt < 0 || (t - hidesAt > 6 && HIDES.length === 0)) { collectHides(); hidesAt = t; }
@@ -113,7 +113,7 @@ export function makeGimmicks(scene, { meadow, jungle, volc, fly, bship, R, gates
       const B = G.userData.bite; if (B && B.open != null) { B.k = Math.max(0, 1 - (t - B.open) / .35); B.chew = false; B.ext = 0; if (B.k <= 0 && t % 7 < 4) G.userData.bite = null; }
       if (live && same && !sw && t > f.cd && d < f.r && hp > 0) { sw = { f, t0: t, caught: false }; G.userData.bite = { t0: t, k: -.4, chew: false, ext: 0, tp: [0, 10.6, 0] }; } }
     near.sort((a, b) => a.d - b.d); RINGS.forEach((m, i) => { const f = near[i]; if (!f || (sw && sw.f === f && sw.caught)) { m.visible = false; return; } m.visible = true; m.position.set(f.x, sy - .35, f.z); m.scale.setScalar(f.r * 1.2);
-      const U = m.material.uniforms; U.uR.value = f.r; U.uT.value = t; U.uA.value = THREE.MathUtils.smoothstep(f.r * 3 - f.d, 0, f.r * 2) * (t > f.cd ? 1 : .35); });   /* 쉬는 꽃(방금 뱉은)은 원이 옅음 */
+      const U = m.material.uniforms; U.uR.value = f.r; U.uT.value = t; U.uA.value = THREE.MathUtils.smoothstep(f.r * 3 - f.d, 0, f.r * 2); U.uK.value = t > f.cd ? 1 : .35; });   /* 쉬는 꽃(방금 뱉은)은 원이 옅음 */
     if (sw) { const f = sw.f, e = t - sw.t0, G = f.p.G, B = G.userData.bite, T1 = .32, T2 = .85, T3 = 3.0;
       if (!sw.caught) { lp.set(sx, sy, sz); G.worldToLocal(lp); B.tp[0] = lp.x; B.tp[1] = lp.y; B.tp[2] = lp.z; const u = Math.min(1, e / T1); B.ext = 1 - Math.pow(1 - u, 3); B.k = e < T1 - .06 ? -.4 : Math.min(1, -.4 + (e - (T1 - .06)) / .06 * 1.4);   /* 입을 크게 벌리고 목을 쭉 늘여 기체를 따라 덮침 → 닿는 순간 콱 닫음 */
         if (e >= T1) { sw.caught = true; FS.noPad = true; FS.dashUntil = 0; bship.visible = false; B.k = 1; } }
@@ -137,14 +137,14 @@ export function makeGimmicks(scene, { meadow, jungle, volc, fly, bship, R, gates
     nowT = t; pkWarn = 0; const pnear = [];
     for (const k of PK) { const ph = ((t + k.off) % VP + VP) % VP, d = Math.hypot(sx - k.x, sz - k.z), same = Math.abs(sy - hoverY) < 6; k.ph = ph; k.d = d;
       if (live && same && d < k.r * 2.6) pnear.push(k);
-      if (k.lastPh < VTB && ph >= VTB && live && same && d < k.r && !sw && hp > 0) {   /* 터짐: 원 밖으로 밀어냄 + 체력 10% */
-        const l = d || 1, ux = d > .05 ? (sx - k.x) / l : Math.cos(FS.head), uz = d > .05 ? (sz - k.z) / l : Math.sin(FS.head), sp = 28, dur = Math.min(.8, Math.max(.3, (k.r - d + 3) / sp));
-        FS.dashVx = ux * sp; FS.dashVz = uz * sp; FS.dashUntil = t + dur; FS.dashEndK = .4; hop = { t0: t, d: 1, h: 3.4 }; hurt(10, t); k.hitAt = t; }
+      const cyc = Math.floor((t + k.off) / VP), front = (ph - VTB) / SHOCK * k.r;   /* 충격파 앞머리 (터진 순간 가운데 → 0.9초에 원 끝) */
+      if (ph >= VTB && ph - VTB < SHOCK && k.hitN !== cyc && live && same && !sw && hp > 0 && d < k.r + .5 && d < front + .8 && d > front - 1.4) {   /* 충격파에 닿으면 맞음: 원 밖으로 튕겨나감 + 체력 10% */
+        const l = d || 1, ux = d > .05 ? (sx - k.x) / l : Math.cos(FS.head), uz = d > .05 ? (sz - k.z) / l : Math.sin(FS.head); k.hitN = cyc; knock(t, ux, uz, k.r - d + 4); hurt(10, t); k.hitAt = t; }
       if (live && same && d < k.r && ph < VTB) pkWarn = Math.max(pkWarn, ph / VTB > .7 ? 2 : 1);
       k.lastPh = ph; }
     pnear.sort((a, b) => a.d - b.d); PR.forEach((m, i) => { const k = pnear[i]; if (!k) { m.visible = false; return; } m.visible = true; m.position.set(k.x, sy - .35, k.z); m.scale.setScalar(k.r * 1.2);
       const U = m.material.uniforms, ch = k.ph < VTB; U.uR.value = k.r; U.uT.value = t; U.uA.value = THREE.MathUtils.smoothstep(k.r * 2.6 - k.d, 0, k.r * 1.4);
-      U.uF.value = ch ? k.ph / VTB : 0; U.uW.value = ch ? THREE.MathUtils.clamp((k.ph / VTB - .7) / .3, 0, 1) : 0; U.uB.value = ch ? 0 : Math.min(1, (k.ph - VTB) / 1.3); U.uS.value = ch ? 0 : 1 - Math.min(1, (k.ph - VTB) / (VP - VTB)); });   /* 터진 뒤엔 원이 식어 옅음 */
+      U.uF.value = ch ? k.ph / VTB : 0; U.uW.value = ch ? THREE.MathUtils.clamp((k.ph / VTB - .7) / .3, 0, 1) : 0; U.uB.value = ch ? 0 : Math.min(1, (k.ph - VTB) / SHOCK); U.uS.value = ch ? 0 : 1 - Math.min(1, (k.ph - VTB) / (VP - VTB)); });   /* 터진 뒤엔 원이 식어 옅음 */
     /* 아치 빛 문: 지나가면 빨라짐 → 사라짐 → 쉬었다 다시 */
     hoM.uniforms.uT.value = t;
     for (const A of AR) { const vis = !volc || A.p.vis; A.m.visible = vis; if (!vis) { A.prev = null; continue; }
@@ -153,6 +153,10 @@ export function makeGimmicks(scene, { meadow, jungle, volc, fly, bship, R, gates
       const dx = sx - A.x, dz = sz - A.z, along = dx * A.ax + dz * A.az, lat = Math.abs(-dx * A.az + dz * A.ax);
       if (live && !sw && A.prev != null && Math.sign(along) !== Math.sign(A.prev) && Math.abs(along) < 2.5 && lat < A.R && Math.abs(sy - hoverY) < 2.5 && back > ARCH_CD + .9) { A.used = t; FS.boost = Math.max(FS.boost || 0, 2.4); archMsg = t; }
       A.prev = Math.hypot(dx, dz) < 12 ? along : null; }
+    /* 기절 별 */
+    { const on = t < (FS.stunUntil || 0) && t >= stunAt; stars.visible = on; if (on) { const k = Math.min(1, (t - stunAt) * 4, (FS.stunUntil - t) * 3); stars.children.forEach((o, i) => { const a = t * 5 + i * Math.PI / 2; o.position.set(wp.x + Math.cos(a) * .55, wp.y + .75 + Math.sin(t * 7 + i) * .05, wp.z + Math.sin(a) * .55); o.rotation.y = t * 6 + i; o.scale.setScalar(k); }); } }
+    /* 포자 물방울: 느려지는 동안만 기체에 달라붙음 */
+    drops.visible = gooK > .04; if (drops.visible) drops.children.forEach((o, i) => { const q = o.userData; o.scale.setScalar(q.s * Math.min(1, gooK * 1.6) * (1 + .12 * Math.sin(t * 5 + i))); });
     /* 점프 (해파리·뱉기) */
     if (hop) { const x = (t - hop.t0) / hop.d; if (x >= 1) { hop = null; api.hop = 0; } else api.hop = 4 * hop.h * x * (1 - x); } else api.hop = 0;
     /* 체력 */
@@ -161,6 +165,6 @@ export function makeGimmicks(scene, { meadow, jungle, volc, fly, bship, R, gates
     hpEl.classList.toggle('hurt', t - hurtAt < .3); hpEl.style.opacity = flying ? '1' : '.35';
   };
   api.dbg = { HIDES, FL, JE, SW, RINGS, PK, AR, PR, get hp() { return hp; } };
-  api.status = () => sw ? '포식 꽃에 삼켜졌어요! 체력이 닳는 중…' : PK.some(k => k.hitAt && nowT - k.hitAt < 1.6) ? '분화 첨봉이 터졌어요! 밀려나며 체력 10%' : pkWarn === 2 ? '분화 첨봉 · 곧 터져요! 원 밖으로' : pkWarn === 1 ? '분화 첨봉 사정거리 · 빛이 다 차면 터져요' : nowT - archMsg < 1.6 ? '아치 빛 문 통과 · 잠깐 빨라져요!' : gooK > .3 ? '포자 늪 · 포자가 달라붙어 느려져요' : hideOn ? '숲에 숨었어요 · 밖에서는 안 보여요' : null;
+  api.status = () => (nowT < (FS.stunUntil || 0) && nowT >= stunAt) ? '기절! 잠깐 움직일 수 없어요' : sw ? '포식 꽃에 삼켜졌어요! 체력이 닳는 중…' : PK.some(k => k.hitAt && nowT - k.hitAt < 1.6) ? '분화 첨봉이 터졌어요! 밀려나며 체력 10%' : pkWarn === 2 ? '분화 첨봉 · 곧 터져요! 원 밖으로' : pkWarn === 1 ? '분화 첨봉 사정거리 · 빛이 다 차면 터져요' : nowT - archMsg < 1.6 ? '아치 빛 문 통과 · 잠깐 빨라져요!' : gooK > .3 ? '포자 늪 · 포자가 달라붙어 느려져요' : hideOn ? '숲에 숨었어요 · 밖에서는 안 보여요' : null;
   return api;
 }

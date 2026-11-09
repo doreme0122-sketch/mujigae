@@ -11,9 +11,9 @@
 import * as THREE from 'three';
 import { buildShip, engineSpots } from '../core/ships/build.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { flameMesh } from './sortie.js?v=11091450';
-import { MAP } from './mapfloor.js?v=11091450';
-import { applyShipHeat, heatVis } from './shipheat.js?v=11091450';
+import { flameMesh } from './sortie.js?v=11091550';
+import { MAP } from './mapfloor.js?v=11091550';
+import { applyShipHeat, heatVis } from './shipheat.js?v=11091550';
 
 export const FLY = { LEN: 2, HOVER: .7, R: .8, SPEEDS: [9, 12, 15, 18], TURN: 7, ACC: .22, TURNMAX: 9,
   BASE: 9, SHIELD: 3, BOOST: 5, BOOSTK: 1.5 };   /* 기지 고리(반지름 9m)를 벗어나는 순간: 보호막 3초 · 가속 5초(1.5배) — 기지 출구 앞 매복에 바로 당하지 않게 */
@@ -142,16 +142,17 @@ void main() {
     if (S.armed && Math.hypot(S.x - start[0], S.z - start[1]) > FLY.BASE) { S.armed = false; S.shield = FLY.SHIELD; S.boost = FLY.BOOST; }
     if (S.shield > 0 && (S.shield -= dt) <= 0) { S.shield = 0; S.pop = .3; }
     if (S.boost > 0) S.boost = Math.max(0, S.boost - dt);
-    const bk = Math.min(1, S.boost / .6) * (1 - S.aimK), spd = S.speed * (1 + (FLY.BOOSTK - 1) * bk * bk * (3 - 2 * bk)) * (1 - .5 * (S.goo || 0)) * (t < (S.brakeUntil || 0) ? .6 : 1) * (1 - (S.extraSlow || 0));   /* 빛 칼날 자세 잡는 동안 30% 느려짐 */   /* 해파리 점액 위: 50% 느려짐 (30%는 거의 안 느껴졌음 · 사용자) */
+    const bk = Math.min(1, S.boost / .6) * (1 - S.aimK), spd = S.speed * (1 + (FLY.BOOSTK - 1) * bk * bk * (3 - 2 * bk)) * (1 - .79 * (S.goo || 0)) * (t < (S.brakeUntil || 0) ? .6 : 1) * (1 - (S.extraSlow || 0));   /* 빛 칼날 자세 잡는 동안 30% 느려짐 */   /* 해파리 점액 위: 50% 느려짐 (30%는 거의 안 느껴졌음 · 사용자) */
     const sl = 1 - (S.fireSlow ?? .5) * S.aimK,   /* 쏘는 동안 느려지는 정도는 탄마다 (무거운 탄 60% · 모으는 중 65% …) */ tx = -Math.sin(S.mh) * spd * sl * m * (m > .08), tz = -Math.cos(S.mh) * spd * sl * m * (m > .08)   /* 쏘는 동안 느려짐 */, a = Math.min(1, dt / FLY.ACC);
     S.vx += (tx - S.vx) * a; S.vz += (tz - S.vz) * a;
-    { const cap = S.speed * 1.9 * sl * (1 - .5 * (S.goo || 0)) + 1e-3, v = Math.hypot(S.vx, S.vz); if (v > cap && (S.aimK > .5 || (S.goo || 0) > .5)) { const k = Math.max(cap / v, 1 - dt * 6); S.vx *= k; S.vz *= k; } }   /* 쏘는 중·점액 위에선 가속 중이어도 확실히 느려짐 */
+    { const cap = S.speed * 1.9 * sl * (1 - .79 * (S.goo || 0)) + 1e-3, v = Math.hypot(S.vx, S.vz); if (v > cap && (S.aimK > .5 || (S.goo || 0) > .5)) { const k = Math.max(cap / v, 1 - dt * 6); S.vx *= k; S.vz *= k; } }   /* 쏘는 중·점액 위에선 가속 중이어도 확실히 느려짐 */
     S.rc = Math.max(0, (S.rc || 0) - dt * 9); S.thr += (m - S.thr) * Math.min(1, dt * 8);
     /* 벽: 벽을 파고드는 힘만 없애고 벽을 따라가는 힘은 남김 → 비스듬히 닿으면 벽을 타고 미끄러짐, 정면이면 거의 멈춤
        ① 가려던 곳이 막혔으면 닿기 직전까지 감 ② 닿은 벽이 보는 쪽(바깥 방향)을 구함 ③ 그 방향 속도만 빼고 남은 시간만큼 다시 감 (꺾인 벽은 세 번까지)
        들이받은 세기(벽 쪽 속도)만큼 불티 */
     if (t < (S.dashUntil || 0)) { S.vx = S.dashVx; S.vz = S.dashVz; S.dashOn = true; }
-    else if (S.dashOn) { S.dashOn = false; const k = S.dashEndK ?? 1; S.vx *= k; S.vz *= k; S.dashEndK = 1; }   /* 밀림이 끝나는 순간 남은 속도를 줄여 정해 둔 거리에서 딱 멈춤 (반동 뒤 미끄러져 더 가던 것) */   /* 빛 칼날 도약: 베는 동안 앞으로 확 나감 (벽 미끄러짐은 아래 그대로) */
+    else if (S.dashOn) { S.dashOn = false; const k = S.dashEndK ?? 1; S.vx *= k; S.vz *= k; S.dashEndK = 1; }
+    if (t >= (S.dashUntil || 0) && t < (S.stunUntil || 0)) { S.vx = S.vz = 0; }   /* 기절: 튕겨나간 끝에서 2초 꼼짝 못 함 (사용자 2026-11-09) */   /* 밀림이 끝나는 순간 남은 속도를 줄여 정해 둔 거리에서 딱 멈춤 (반동 뒤 미끄러져 더 가던 것) */   /* 빛 칼날 도약: 베는 동안 앞으로 확 나감 (벽 미끄러짐은 아래 그대로) */
     const ex = S.ex || 0, ez = S.ez || 0; S.vx += ex; S.vz += ez;                                   /* 바깥 힘(블랙홀 소용돌이 흐름)을 실어 같이 움직임 — 벽 미끄러짐도 같이 적용 */
     if (!free(S.x, S.z)) { out: for (let r = .25; r <= 6; r += .25) for (let k = 0; k < 16; k++) { const a = k * Math.PI / 8, x = S.x + Math.cos(a) * r, z = S.z + Math.sin(a) * r; if (free(x, z)) { S.x = x; S.z = z; break out; } } }   /* 어쩌다 벽에 묻혀 있으면(옮겨진 자리·밀림) 가장 가까운 빈 곳으로 꺼냄 — 묻힌 채로는 어느 쪽으로도 못 움직여 갇히던 것 */
     let hitV = 0, rem = dt;

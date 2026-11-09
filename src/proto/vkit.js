@@ -53,7 +53,7 @@ const LAVC=new Map();function lavaMat(o){o=o||{};const key=[o.uv?1:0,o.sx||1,o.s
 let W2=200;
 // ---------------- procedural cooled-crust cracks (shader injected into lit materials) ----------------
 const TU={value:0};let UGLOW={value:1},UGLO={value:1},UFRONT={value:1e5},USOFT={value:6},OWNU=false,Q=1,PQ=1,TQ=1,MINB=0,TD=2,QT=1,VOPT={};const WM=new Map();
-const CRACK_GLSL=`uniform float uTime;uniform sampler2D heatMap;uniform float uMode;uniform float uMaskK;uniform float uW2;uniform float uSeed;uniform float uGlow;uniform float uGlowLo;uniform float uFront;uniform float uSoft;varying vec3 vWPos;
+const CRACK_GLSL=`uniform float uTime;uniform sampler2D heatMap;uniform float uMode;uniform float uMaskK;uniform float uW2;uniform float uSeed;uniform float uGlow;uniform float uGlowLo;uniform float uFront;uniform float uSoft;uniform float uPK;varying vec3 vWPos;
 vec2 hash22(vec2 p){p=vec2(dot(p,vec2(127.1,311.7)),dot(p,vec2(269.5,183.3)));return fract(sin(p)*43758.5453);}
 float h21(vec2 p){return fract(sin(dot(p,vec2(12.9898,78.233)))*43758.5453);}
 float vn(vec2 p){vec2 i=floor(p),f=fract(p);f=f*f*(3.-2.*f);return mix(mix(h21(i),h21(i+vec2(1,0)),f.x),mix(h21(i+vec2(0,1)),h21(i+vec2(1,1)),f.x),f.y);}
@@ -63,14 +63,14 @@ vec3 crackGlow(out float halo){vec2 p;float mask;
  else if(uMode<1.5){p=vec2(vWPos.x+vWPos.z,vWPos.y*1.4);mask=smoothstep(.55,.95,sin(vWPos.y*.11+vn(vWPos.xz*.04)*5.)*.5+.5)*smoothstep(-170.,-6.,vWPos.y)*.9;}
  else if(uMode<2.5){p=vWPos.xz+vec2(vWPos.y*.7);mask=uMaskK;}
  else{p=vWPos.xz;mask=smoothstep(.42,.78,vn(p*.045+uSeed))*uMaskK+uMaskK*.12;}
- vec2 w=vec2(vn(p*.05),vn(p*.05+7.))*6.;vec3 v1=voro((p+w)*.17);vec3 v2=voro((p+w)*.5+3.);
- float width=.025+.1*mask;float c1=1.-smoothstep(0.,width,v1.x),c2=(1.-smoothstep(0.,width*.55,v2.x))*smoothstep(.3,.75,mask);
+ p*=uPK; vec2 w=vec2(vn(p*.05),vn(p*.05+7.))*6.;vec3 v1=voro((p+w)*.17);vec3 v2=voro((p+w)*.5+3.);
+ float width=.025+.1*mask,aw=max(width,fwidth(v1.x)*1.3);float c1=(1.-smoothstep(0.,aw,v1.x))*mix(1.,width/aw,.55),c2=(1.-smoothstep(0.,width*.55,v2.x))*smoothstep(.3,.75,mask)*(1.-smoothstep(.015,.06,fwidth(v2.x)));
  float flick=.78+.22*sin(uTime*1.6+v1.y*30.);float crack=max(c1,c2*.65)*smoothstep(.04,.3,mask)*flick;
  halo=(1.-smoothstep(0.,.3,v1.x))*mask;
  vec3 col=mix(vec3(.5,.035,0.),vec3(1.,.33,.03),smoothstep(.1,.6,crack));col=mix(col,vec3(1.,.82,.45),smoothstep(.72,1.,crack));
  return col*crack*2.4+vec3(.4,.06,0.)*halo*.3+vec3(.3,.05,0.)*mask*mask*.3;}`;
 let HEAT=null;
-function addCracks(mat,mode,maskK,seed,U0){const U=U0||{uTime:TU,uGlow:UGLOW,uGlowLo:UGLO,uFront:UFRONT,uSoft:USOFT,heatMap:{value:HEAT},uMode:{value:mode},uMaskK:{value:maskK||0},uW2:{value:W2},uSeed:{value:seed||0}};mat.userData.crk=[mode,maskK||0,seed||0];mat.__crkU=U;
+function addCracks(mat,mode,maskK,seed,U0){const U=U0||{uTime:TU,uGlow:UGLOW,uGlowLo:UGLO,uFront:UFRONT,uSoft:USOFT,heatMap:{value:HEAT},uMode:{value:mode},uMaskK:{value:maskK||0},uW2:{value:W2},uSeed:{value:seed||0},uPK:{value:1}};mat.userData.crk=[mode,maskK||0,seed||0];mat.__crkU=U;
   mat.onBeforeCompile=sh=>{Object.assign(sh.uniforms,U);
   sh.vertexShader='varying vec3 vWPos;\n'+sh.vertexShader.replace('#include <begin_vertex>','#include <begin_vertex>\n#if defined(USE_INSTANCING)&&!defined(VK_PLACE)\n vWPos=(instanceMatrix*vec4(transformed,1.)).xyz;\n#else\n vWPos=transformed;\n#endif');
   sh.fragmentShader=CRACK_GLSL+'\n'+sh.fragmentShader.replace('#include <emissivemap_fragment>','#include <emissivemap_fragment>\n float halo;vec3 cgl=crackGlow(halo);diffuseColor.rgb*=1.-.5*halo;float fk=1.-smoothstep(uFront-uSoft,uFront+uSoft,vWPos.y),bq=(vWPos.y-uFront)/uSoft,band=exp(-bq*bq)*step(uFront,9e4),gm=mix(uGlowLo,uGlow,fk)+band*uGlow*.7;totalEmissiveRadiance+=cgl*gm+vec3(1.,.4,.08)*halo*max(gm-1.,0.)*.35;');};
@@ -214,9 +214,9 @@ const leafMat=new THREE.MeshPhongMaterial({map:EL.map,emissiveMap:EL.em,emissive
 const boneVM=new THREE.MeshStandardMaterial({vertexColors:true,roughness:.72,metalness:0});
 const SHARED=new Set([boneVM,basaltM,basaltTopM,obsidianM,obsidianFlatM,runeM,ironM,boneM,sootM,spireM,archM,scarM,boulderM,bombM,barkM,leafMat,goldM2,wallM]);
 function newWorld(){UGLOW={value:1};UGLO={value:1};UFRONT={value:1e5};USOFT={value:6};OWNU=false;WM.clear();HEAT=null;
-  W=new THREE.Group();anim.length=0;lavaMats=[];Object.keys(BK).forEach(k=>delete BK[k]);[LEAVES,BARKL,BLD,BOMB,LINKS,puffs,DRIPS,EMB].forEach(a=>a.length=0);}
+  W=new THREE.Group();anim.length=0;lavaMats=[];Object.keys(BK).forEach(k=>delete BK[k]);[LEAVES,BARKL,BLD,BOMB,LINKS,puffs,DRIPS,EMB,SPK,ARC].forEach(a=>a.length=0);}
 function smokeSrc(p,r,n,s,big){n=Math.max(1,Math.round(n*PQ));for(let i=0;i<n;i++)puffs.push({p:p.clone(),r,s:s||1,big:!!big,life:R(),sp:rnd(.7,1.3),dx:rnd(-1,1),dz:rnd(-1,1),rot:rnd(-.3,.3)});}
-const EMB=[];function embers(cx,cz,r,y0,y1,n){n=Math.round(n*PQ);if(n<4)return;EMB.push({cx,cz,r,y0,y1,n});}
+const EMB=[],SPK=[],ARC=[];function embers(cx,cz,r,y0,y1,n){n=Math.round(n*PQ);if(n<4)return;EMB.push({cx,cz,r,y0,y1,n});}
 function boulder(x,y,z,s,hot){if(s<MINB)return;(hot?BOMB:BLD).push(new THREE.Matrix4().compose(V(x,y+s*.25,z),new THREE.Quaternion().setFromEuler(new THREE.Euler(R()*3,R()*3,R()*3)),V(s,s,s)));}
 function drips(list,fall){list.forEach(p=>DRIPS.push({p,fall}));}
 // tapered gnarled tube: one continuous mesh per limb, radius from rf(t), bark-ridge noise, closed tip
@@ -250,7 +250,7 @@ function charredTree(p,s){const sd=R()*50,Ht=15*s,pts=[];for(let k=0;k<=9;k++){c
 function groundLeaves(x,y,z,n,s){n=Math.round(n*Q*Q);for(let k=0;k<n;k++){const a=R()*6.28,d=rnd(0,1.6)*s;LEAVES.push(new THREE.Matrix4().compose(V(x+Math.cos(a)*d,y+.1,z+Math.sin(a)*d),new THREE.Quaternion().setFromEuler(new THREE.Euler(-rnd(.2,.9),R()*6.28,0,'YXZ')),V(1.1*s,1.2*s,1.6*s)));}}
 function torusLinks(a,b,sag,rad,colA,colB){const dir=b.clone().sub(a).normalize(),L=a.distanceTo(b),n=Math.floor(L/(rad*1.7)),base=new THREE.Quaternion().setFromUnitVectors(V(0,0,1),dir);
   for(let k=0;k<=n;k++){const t=k/n,q=a.clone().lerp(b,t);q.y-=Math.sin(Math.PI*t)*sag;LINKS.push({m:new THREE.Matrix4().compose(q,base.clone().multiply(new THREE.Quaternion().setFromEuler(new THREE.Euler(0,Math.PI/2,k%2?Math.PI/2:0))),V(rad/.55,rad/.55,rad/.55)),c:new THREE.Color(colA).lerp(new THREE.Color(colB),Math.pow(Math.sin(Math.PI*t),1.3))});}}
-function spike(x,y,z,h,r,lean){const g=new THREE.CylinderGeometry(r*.08,r,h,9,8);const p=g.attributes.position;for(let i=0;i<p.count;i++){const yy=p.getY(i),f=1+(fbm2(Math.atan2(p.getZ(i),p.getX(i))*2+x,yy*.12+z)-.5)*.55;p.setX(i,p.getX(i)*f);p.setZ(i,p.getZ(i)*f);}g.computeVertexNormals();
+function spike(x,y,z,h,r,lean){SPK.push({x,y,z,h,r});const g=new THREE.CylinderGeometry(r*.08,r,h,9,8);const p=g.attributes.position;for(let i=0;i<p.count;i++){const yy=p.getY(i),f=1+(fbm2(Math.atan2(p.getZ(i),p.getX(i))*2+x,yy*.12+z)-.5)*.55;p.setX(i,p.getX(i)*f);p.setZ(i,p.getZ(i)*f);}g.computeVertexNormals();
   put('obs',g,V(x,y+h/2-1,z),lean||new THREE.Euler(rnd(-.08,.08),R()*3,rnd(-.08,.08)));}
 // eruption: light-particle burst + flash
 function eruption(gp,sc,P,skyK,o){o=Object.assign({v:1,n:1,g:1,f:1,size:1,gd:null,term:0,life:1},o||{});o.n*=PQ;const sprays=[[Math.round(1100*o.n),1.5*o.size],[Math.round(200*o.n),3.4*o.size]].map(([N,size])=>{const g=new THREE.BufferGeometry(),pp=new Float32Array(N*3),pc=new Float32Array(N*3),base=[],v=[],life=new Float32Array(N);for(let i=0;i<N;i++){base.push(new THREE.Color());v.push(V());}
@@ -325,7 +325,7 @@ function lavaSheet(cx,y,cz,fn,o){const sh=new THREE.Shape(),N=128;for(let k=0;k<
   const g=new THREE.ShapeGeometry(sh);g.rotateX(-Math.PI/2);g.translate(cx,y,cz);const m=new THREE.Mesh(g,lavaMat(Object.assign({i:1.35,flow:.02},o||{})));W.add(m);return m;}
 function crater(cx,y,cz,r,big){lavaSheet(cx,y,cz,()=>r);const cl=new FakePL(C('#ff6a2a'),3,big?260:120,1.4);cl.position.set(cx,y+8,cz);W.add(cl);const cg=glow('#ff5a14',r*4,.35);cg.position.set(cx,y+6,cz);W.add(cg);
   anim.push(t=>{cl.intensity=2.6+Math.sin(t*2.1)*.4+Math.sin(t*5.3)*.15;});smokeSrc(V(cx,y+2,cz),r*.5,big?34:18,big?1:.6,true);}
-function stoneArch(p0,p1,h,th){const pts=[];for(let i=0;i<=18;i++){const u=i/18;pts.push(p0.clone().lerp(p1,u).add(V(0,Math.sin(u*Math.PI)*h,0)));}
+function stoneArch(p0,p1,h,th){ARC.push({p0:p0.clone(),p1:p1.clone(),h,th});const pts=[];for(let i=0;i<=18;i++){const u=i/18;pts.push(p0.clone().lerp(p1,u).add(V(0,Math.sin(u*Math.PI)*h,0)));}
   const g=new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts),Math.round(110*Q),th,Math.max(8,Math.round(16*Q)),false),p=g.attributes.position;for(let i=0;i<p.count;i++){const x=p.getX(i),y=p.getY(i),z=p.getZ(i),n=(fbm2(x*.12,z*.12+y*.08)-.5)*th*.8;p.setXYZ(i,x+n,y+n*.6,z-n);}g.computeVertexNormals();
   const m=new THREE.Mesh(g,wm(archM));m.castShadow=m.receiveShadow=true;W.add(m);for(const q of[p0,p1]){const b=new THREE.Mesh(new THREE.CylinderGeometry(th*1.2,th*2,8,14),wm(archM));b.position.copy(q).add(V(0,1,0));W.add(b);}}
 function finish(){if(BK.boneV&&BK.boneV.length){const me=new THREE.Mesh(mergeC(BK.boneV),boneVM);me.castShadow=me.receiveShadow=true;W.add(me);delete BK.boneV;}Object.entries({obs:obsidianM,obsidian:obsidianM,obsF:obsidianFlatM,rune:runeM,gold:goldM2,iron:ironM,bone:boneM,soot:sootM,scar:scarM,basalt:basaltM,basaltTop:basaltTopM,spire:spireM}).forEach(([k,m])=>{if(!BK[k]||!BK[k].length)return;const me=new THREE.Mesh(mergeG(BK[k]),wm(m));me.castShadow=me.receiveShadow=k!=='rune';W.add(me);});
@@ -518,7 +518,7 @@ DEFS.push({name:'흑요석 첨탑림',tag:'장애물 숲',desc:'수십 개의 �
   [[0,0,.4],[42,-38,-.9],[-48,30,2.4]].forEach(([px,pz,a])=>{const pr=pools.find(p=>p[0]===px)[2];traceRiver(I,V(px+Math.cos(a)*(pr+6),0,pz+Math.sin(a)*(pr+6)),V(Math.cos(a),0,Math.sin(a)));});
   buildHeat(blob=>pools.forEach(([x,z,r])=>{blob(x,z,r*3,.9);}));buildIsland(I);
   pools.forEach(([px,pz,pr])=>{const y=I.Hw(px,pz)+1.6;lavaSheet(px,y,pz,a=>pr+2.4+.6*Math.sin(a*3));smokeSrc(V(px,y+.5,pz),pr*.6,10,.9);const g=glow('#ff5a14',pr*4.5,.3);g.position.set(px,y+1.5,pz);W.add(g);});
-  for(let c=0;c<16;c++){for(let t=0;t<40;t++){const a=R()*6.28,d=Math.sqrt(R())*I.ol(a)*.86,x=Math.cos(a)*d,z=Math.sin(a)*d;if(pools.some(([px,pz,pr])=>Math.hypot(x-px,z-pz)<pr+8)||nearRiver(x,z,9))continue;
+  for(let c=0;c<Math.round(16*(VOPT.sc||1));c++){for(let t=0;t<40;t++){const a=R()*6.28,d=Math.sqrt(R())*I.ol(a)*.86,x=Math.cos(a)*d,z=Math.sin(a)*d;if(pools.some(([px,pz,pr])=>Math.hypot(x-px,z-pz)<pr+8)||nearRiver(x,z,9))continue;
     const n=2+Math.floor(R()*3);for(let k=0;k<n;k++){const sx=x+rnd(-6,6),sz=z+rnd(-6,6),h=k===0?rnd(40,72):rnd(14,34),r=k===0?rnd(4.5,7):rnd(2,4);spike(sx,I.Hw(sx,sz),sz,h,r,new THREE.Euler(rnd(-.1,.1),R()*3,rnd(-.1,.1)));
       if(k===0){const g=glow('#ff4a10',r*4,.22);g.position.set(sx,I.Hw(sx,sz)+2,sz);W.add(g);}}break;}}
   for(let k=0;k<60;k++){const a=R()*6.28,d=Math.sqrt(R())*I.ol(a)*.9,x=Math.cos(a)*d,z=Math.sin(a)*d;if(nearRiver(x,z,5))continue;spike(x,I.Hw(x,z),z,rnd(3,9),rnd(.6,1.4));}
@@ -581,7 +581,7 @@ DEFS.push({name:'분화 첨봉',tag:'작은 섬',desc:'작고 가파른 화산 �
   [.6,.6+2.6].forEach(a=>{const rv=traceRiver(I,V(Math.cos(a)*5.5,0,Math.sin(a)*5.5),V(Math.cos(a),0,Math.sin(a)));rv.wStart=1.3;rv.wEnd=3;});
   buildHeat(blob=>{blob(0,0,14,1);blob(0,0,26,.6);blob(0,0,36,.45);});buildIsland(I);
   // charge-up: every crack on the cone slowly brightens; at full heat the cone erupts, then the glow collapses and builds again
-  const P=12,TB=P-2.4,y=I.Hw(0,0)+2;crater(0,y,0,5,false);
+  const P=5,TB=P-2.4,y=I.Hw(0,0)+2;crater(0,y,0,5,false);
   const fl=[0,1,2,3].map(k=>{const a=k/4*6.28+.4,l=new FakePL(C('#ff5a1a'),0,70,1.5);l.position.set(Math.cos(a)*16,I.Hw(Math.cos(a)*16,Math.sin(a)*16)+6,Math.sin(a)*16);W.add(l);return l;});
   const aura=glow('#ff4a10',70,0);aura.position.set(0,y-8,0);W.add(aura);const HOTC=new THREE.Color('#ff3a10'),FULL=new THREE.Color('#ffd27a');
   anim.push(t=>{const ph=t%P;let f=ph<TB?Math.pow(ph/TB,1.6):Math.exp(-(ph-TB)*3.2);const warn=ph<TB?clamp((ph/TB-.7)/.3,0,1):0,pulse=.5+.5*Math.sin(t*(3+warn*20));
@@ -642,6 +642,6 @@ DEFS.push({name:'현무암 왕관섬',tag:'작은 섬',desc:'육각 현무암 �
 const api={DEFS,TU,dot,SMK,addCracks,
   build(i,o){o=o||{};const cm=THREE.ColorManagement.enabled;THREE.ColorManagement.enabled=false;try{R=mulberry32(o.seed||81207);Q=o.q||1;PQ=o.pq==null?1:o.pq;TQ=o.tq||1;MINB=o.minb||0;TD=o.td==null?2:o.td;QT=o.qt||Q;VOPT=o.v||{};
     newWorld();const view=DEFS[i].build();finish();
-    return{W,anim:anim.slice(),ISL:ISL.slice(),puffs:puffs.slice(),embers:EMB.slice(),drips:DRIPS.slice(),view};}finally{THREE.ColorManagement.enabled=cm;}}};
+    return{W,anim:anim.slice(),ISL:ISL.slice(),puffs:puffs.slice(),embers:EMB.slice(),drips:DRIPS.slice(),spikes:SPK.slice(),arcs:ARC.slice(),view};}finally{THREE.ColorManagement.enabled=cm;}}};
 return api;
 } finally { THREE.ColorManagement.enabled=cm0; } }

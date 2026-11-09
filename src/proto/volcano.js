@@ -11,7 +11,7 @@ import { makeVolcKit } from './vkit.js';
 import { hideMark } from './jungle.js';
 
 export const VOLC = { R0: 85, R1: 136, P: 12, TB: 12 - 2.4 };
-const KD = { heart: 0, hab: 1, canyon: 2, spire: 3, cald: 4, forest: 5, isles: 6, peak: 7, shard: 8, tree: 9, arch: 10, crown: 11 };
+const KD = { heart: 0, hab: 1, canyon: 2, spire: 3, cald: 4, forest: 5, isles: 6, peak: 7, shard: 8, tree: 9, ftree: 9, arch: 10, crown: 11 };
 const mulberry32 = a => () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
 
 /* ── 한 번에 그리는 빛 무리 · 연기 · 불티 (원본은 하나하나 따로 그림 → 폰에서 그림 수가 너무 많음) ── */
@@ -46,7 +46,7 @@ export function makeVolcano(scene, { jungle, TOP = -1.2, UP = 36, DN = -30, sect
 
   /* ── 섬 한 벌 만들기: 원본 키트로 짓고 → 땅 밑 눌러 줄이기 → 움직이는 것 / 멈춘 것 가르기 → 멈춘 것은 재질마다 하나로 합침 ── */
   const placeMats = new Map();
-  const placeMat = m => { if (!m.userData.crk) return m; let c = placeMats.get(m); if (!c) { c = m.clone(); c.defines = { ...(c.defines || {}), VK_PLACE: '' }; const k = m.userData.crk; K.addCracks(c, k[0], k[1], k[2], m.__crkU); placeMats.set(m, c); } return c; };   /* 균열 빛은 섬 안 좌표로 (자리마다 같은 무늬) */
+  const placeMat = (m, pk = 1) => { if (!m.userData.crk) return m; const key = m.uuid + pk; let c = placeMats.get(key); if (!c) { c = m.clone(); c.defines = { ...(c.defines || {}), VK_PLACE: '' }; const k = m.userData.crk; K.addCracks(c, k[0], k[1], k[2], { ...m.__crkU, uPK: { value: pk } }); placeMats.set(key, c); } return c; };   /* 균열 빛은 섬 안 좌표로 · 섬을 줄인 만큼 균열 칸을 키움(줄이면 선이 점보다 가늘어져 지글거림) */
   const T_ALL = [];
   function template(kind, o) { const tq0 = performance.now();
     const b = K.build(kind, o), W = b.W; W.updateMatrixWorld(true);
@@ -82,14 +82,14 @@ export function makeVolcano(scene, { jungle, TOP = -1.2, UP = 36, DN = -30, sect
       smokeG.setAttribute('iB', new THREE.InstancedBufferAttribute(new Float32Array(P.flatMap(q => [q.sp, q.dx, q.dz, q.rot])), 4)); smokeG.instanceCount = P.length; }
     let embG = null; if (b.embers.length) { const R = mulberry32((o.seed || 1) * 7 + 3), pos = [], aY = [], aS = []; for (const e of b.embers) for (let i = 0; i < e.n; i++) { const a = R() * 6.28, d = Math.sqrt(R()) * e.r; pos.push(e.cx + Math.cos(a) * d, e.y0 + R() * (e.y1 - e.y0), e.cz + Math.sin(a) * d); aY.push(e.y0, e.y1); aS.push(.5 + R(), i); }
       embG = new THREE.BufferGeometry(); embG.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); embG.setAttribute('aY', new THREE.Float32BufferAttribute(aY, 2)); embG.setAttribute('aS', new THREE.Float32BufferAttribute(aS, 2)); }
-    const T = { kind, o, W, anim: b.anim, I: b.ISL[0], ISL: b.ISL, view: b.view, statics, insts, live, glowG, smokeG, embG, P: [], meshes: [], off: o.off || 0, ranAt: -1 };
+    const T = { kind, o, W, anim: b.anim, I: b.ISL[0], ISL: b.ISL, view: b.view, spikes: b.spikes, arcs: b.arcs, statics, insts, live, glowG, smokeG, embG, P: [], meshes: [], off: o.off || 0, ranAt: -1 };
     T_ALL.push(T); globalThis.__vlog && __vlog('tpl', kind, Math.round(performance.now() - tq0)); return T; }
 
   /* ── 자리 정하기 ── */
-  const VAR = { heart: [{}], hab: [{}, {}], canyon: [{}, {}], spire: [{}, {}], cald: [{}, {}], isles: [{}, {}], forest: [{ v: { rk: .78, tk: .34 } }, { v: { rk: 1, tk: .3 } }, { v: { rk: .9, tk: .36 } }, { v: { rk: 1.12, tk: .28 } }],
-    peak: [{ off: 0 }, { off: 4.1 }, { off: 8.3 }], shard: [{}, {}, {}], tree: [{}, {}], arch: [{}, {}], crown: [{}, {}, {}] };
+  const VAR = { heart: [{}, {}], hab: [{}, {}, {}], canyon: [{}, {}, {}], spire: [{}, {}, {}], cald: [{}, {}, {}], isles: [{}, {}, {}], forest: [{ v: { rk: .78, tk: .34 } }, { v: { rk: 1, tk: .3 } }, { v: { rk: .9, tk: .36 } }, { v: { rk: 1.12, tk: .28 } }],
+    peak: [{ off: 0 }, { off: 1.7 }, { off: 3.4 }], shard: [{}, {}, {}, {}], tree: [{}, {}, {}], ftree: [{}, {}], arch: [{}, {}, {}], crown: [{}, {}, {}, {}] };   /* 종류마다 여러 모양 (사용자 2026-11-09: 복붙 같음) */
   const SA = Math.PI * 2 / sect, deg = Math.PI / 180, at = (th, r) => [Math.cos(th) * r, Math.sin(th) * r], Rn = mulberry32(8521), L = [];
-  const clash = (a, b) => a === '*' || b === '*' || a === b;   /* 층마다 따로 (가운데층 몸통은 6m로 눌러 아래 사이 섬과 높이가 안 겹침) */
+  const clash = (a, b) => a === '*' || b === '*' || a === b || (a === 'gm' && (b === 'm' || b === 'g')) || (b === 'gm' && (a === 'm' || a === 'g'));   /* 층마다 따로 (가운데층 몸통은 6m로 눌러 아래 사이 섬과 높이가 안 겹침) */
   const JB = { mid: 'm', gap: 'g', upgap: 'ug', up: 'up', dn: 'd', pillar: '*', all: '*', rock: 'g' };
   const AV = []; for (const p of (jungle ? jungle.pieces : [])) { const l = p.o ? JB[p.o.layer] || 'm' : 'm'; if (Math.hypot(p.x, p.z) - p.rad < R1 + 14) AV.push({ x: p.x, z: p.z, r: p.rad * .8, b: l }); }
   for (let i = 0; i < sect; i++) { const [x, z] = at((i + .5) * SA, 136); AV.push({ x, z, r: 8, b: '*' }); }   /* 정글 와드 자리 (기지 사이 한가운데 136m) 비움 */
@@ -100,51 +100,61 @@ export function makeVolcano(scene, { jungle, TOP = -1.2, UP = 36, DN = -30, sect
     for (let c = 0; c < tries; c++) { const th = th0 + Rn() * SA, rr = rMin + o.r + Rn() * Math.max(0, rMax - rMin - 2 * o.r), [x, z] = at(th, rr), g = gapOf(x, z, o.r, o.b); if (g < -1.2) continue; if (!best || g > best.g) best = { x, z, g }; }
     if (!best) globalThis.__vlog && __vlog('fail', i, o.t, o.b, o.r.toFixed(1)); return best ? put(o, best.x, best.z) : null; };
   const SPEC = {   /* s = 크기 · sy = 높이 배율 · gref = 원본 땅 높이 기준 · maxD = 땅 밑 깊이(m) */
-    heart: { s: .115, gref: 5, maxD: 8 }, hab: { s: .075, gref: 5, maxD: 6 }, canyon: { s: .07, sy: .19, gref: 6.3, maxD: 6 }, spire: { s: .075, gref: 8, maxD: 6 },
-    cald: { s: .085, gref: 7.5, maxD: 5 }, isles: { s: .065, gref: 6, maxD: 5 }, forest: { s: .065, sy: .11, gref: 10, maxD: 6 }, peak: { s: .16, gref: 3, maxD: 6 },
-    shard: { s: .13, gref: 5.3, maxD: 4 }, tree: { s: .3, sy: 1.4, gref: 10.9, maxD: 7 }, arch: { s: .16, gref: 8, maxD: 5 }, crown: { s: .16, gref: 7, maxD: 5 } };
-  const KR = { heart: 186, hab: 186, canyon: 140, spire: 128, cald: 145, forest: 132, isles: 172, peak: 36, shard: 24, tree: 30, arch: 34, crown: 29 };   /* 원본 섬 둘레 (가장자리 출렁임 포함) */
+    heart: { s: .115, gref: 5, maxD: 8 }, hab: { s: .066, gref: 5, maxD: 6 }, canyon: { s: .07, sy: .19, gref: 6.3, maxD: 6 }, spire: { s: .075, gref: 8, maxD: 6 },
+    cald: { s: .072, gref: 7.5, maxD: 5 }, isles: { s: .065, gref: 6, maxD: 5 }, forest: { s: .065, sy: .11, gref: 10, maxD: 6 }, peak: { s: .16, gref: 3, maxD: 6 },
+    shard: { s: .13, gref: 5.3, maxD: 4 }, tree: { s: .3, sy: 1.4, gref: 10.9, maxD: 7 }, ftree: { s: .2, sy: .2, gref: 10.9, maxD: 4 }, arch: { s: .16, gref: 8, maxD: 5 }, crown: { s: .16, gref: 7, maxD: 5 } };
+  const KR = { ftree: 30, heart: 186, hab: 186, canyon: 140, spire: 128, cald: 145, forest: 132, isles: 172, peak: 36, shard: 24, tree: 30, arch: 34, crown: 29 };   /* 원본 섬 둘레 (가장자리 출렁임 포함) */
   const item = (t, b, v = 0, ex = {}) => { const S = SPEC[t], s = ex.s || S.s; return { t, b, v, s, sy: ex.sy || (S.sy ? S.sy * s / S.s : s), yaw: ex.yaw != null ? ex.yaw : Rn() * 6.28, r: KR[t] * s * (ex.rk || 1) * (ex.sx ? Math.max(ex.sx, ex.sz) : 1), ...ex }; };
   for (let i = 0; i < sect; i++) { const th0 = i * SA, thg = (i + .5) * SA;
-    if (i % 2 === 1) add(i, item('tree', '*', i % 4 === 1 ? 0 : 1), R0, R1, 30, [th0, 128]);   /* 고목 기둥 다섯 (홀수 조각 · 정글 쪽 가장자리) */
-    if (i % 2 === 0) add(i, item('heart', i % 4 === 0 ? 'up' : 'd', 0, { yaw: thg * 2.1 }), R0, R1, 30, [thg, 111]);   /* 보물 다섯: 위 셋 · 아래 둘 번갈아 */
-    add(i, item('hab', 'm', i % 2, { yaw: thg + 2.4 }), R0, R1, 30, [thg - 8 * deg, 106]);
-    add(i, item(i % 2 ? 'spire' : 'canyon', 'm', (i >> 1) % 2, { yaw: i % 4 < 2 ? thg + Math.PI / 2 : thg }), R0, R1, 30, [thg + 10 * deg, 108]);   /* 협곡: 고리를 따라 · 또는 가운데를 향해 */
-    for (let n = 0; n < 3; n++) { const v = (i * 3 + n) % 4, sx = .85 + Rn() * .35; add(i, item('forest', 'm', v, { s: .055 + Rn() * .02, sx, sz: 1 / sx * (.9 + Rn() * .25), rk: VAR.forest[v].v.rk }), R0, R1, 40); }   /* 숲: 네 가지 모양 × 크기 · 길쭉함 · 방향 제각각 */
+    add(i, item('tree', '*', 0, i % 2 ? {} : { sy: .45 }), R0, R1, 30, [th0, 128]);   /* 고목 기둥: 아래층에서 위층까지 · 짝수 조각은 아래층에서 가운데층 밑까지 */
+    if (i % 2 === 0) add(i, item('heart', i % 4 === 0 ? 'up' : 'd', 0, { yaw: thg * 2.1 }), R0, R1, 30, [thg, 107]);   /* 보물 다섯: 위 셋 · 아래 둘 번갈아 */
+    add(i, item('hab', 'm', 0, { yaw: thg + 2.4 }), R0, R1, 30, [thg - 8 * deg, 106]);
+    add(i, item(i % 2 ? 'spire' : 'canyon', 'm', 0, { yaw: i % 4 < 2 ? thg + Math.PI / 2 : thg }), R0, R1, 30, [thg + 10 * deg, 108]);   /* 협곡: 고리를 따라 · 또는 가운데를 향해 */
+    for (let n = 0; n < 3; n++) { const v = (i * 3 + n) % 4, sx = .8 + Rn() * .45; add(i, item('forest', 'm', v, { s: .052 + Rn() * .024, sx, sz: 1 / sx * (.9 + Rn() * .25), rk: VAR.forest[v].v.rk }), R0, R1, 40); }   /* 숲: 네 가지 모양 × 크기 · 길쭉함 · 방향 제각각 */
     add(i, item('peak', 'm', i % 3), R0, R1, 40);
-    add(i, item('arch', 'm', i % 2, { yaw: thg + Math.PI / 2 + (Rn() - .5) * .8 }), R0, R1, 40);   /* 아치 문은 고리를 따라 나는 방향으로 */
-    add(i, item(i % 2 ? 'isles' : 'cald', 'ug', (i >> 1) % 2), R0, R1, 30, [thg + 10 * deg, 109]);
-    add(i, item(i % 2 ? 'cald' : 'isles', 'g', ((i >> 1) + 1) % 2), R0, R1, 40);
-    for (let n = 0; n < 3; n++) add(i, item(n % 2 ? 'crown' : 'shard', 'm', n % 3, { s: (n % 2 ? .13 : .11) + Rn() * .05 }), R0, R1, 24);
-    for (let n = 0; n < 2; n++) add(i, item('shard', 'ug', n + 1, { s: .1 + Rn() * .07 }), R0, R1, 24);
-    for (let n = 0; n < 2; n++) add(i, item(n ? 'crown' : 'shard', 'g', n, { s: .1 + Rn() * .06 }), R0, R1, 24);
-    for (let n = 0; n < 3; n++) add(i, item(n % 2 ? 'crown' : 'shard', n === 1 ? 'g' : 'ug', n % 3, { s: .09 + Rn() * .05, border: true }), R1 - 8, R1 + 12, 30);   /* 정글 경계에 섞여 들어가는 작은 화산 섬 */
+    add(i, item('arch', 'm', 0, { yaw: thg + Math.PI / 2 + (Rn() - .5) * .8 }), R0, R1, 40);   /* 아치 문은 고리를 따라 나는 방향으로 */
+    /* 층 사이 (사용자 2026-11-09: 각 층 사이에도 구조물) — 큰 섬 하나 + 작은 섬 여럿 + 떠 있는 고목 */
+    add(i, item(i % 2 ? 'isles' : 'cald', 'ug', 0, { s: (i % 2 ? .055 : .062) + Rn() * .015 }), R0, R1, 30, [thg + 10 * deg, 109]);
+    add(i, item(i % 2 ? 'cald' : 'isles', 'g', 0, { s: (i % 2 ? .062 : .055) + Rn() * .015 }), R0, R1, 40);
+    add(i, item('ftree', 'gm', 0, { s: .14 + Rn() * .06 }), R0, R1, 30);
+    for (let n = 0; n < 2; n++) add(i, item(n % 2 ? 'crown' : 'shard', 'm', 0, { s: (n % 2 ? .13 : .11) + Rn() * .05 }), R0, R1, 24);
+    for (let n = 0; n < 4; n++) add(i, item(n % 2 ? 'crown' : 'shard', 'ug', 0, { s: .1 + Rn() * .08 }), R0, R1, 24);
+    for (let n = 0; n < 4; n++) add(i, item(n % 2 ? 'shard' : 'crown', 'g', 0, { s: .1 + Rn() * .07 }), R0, R1, 24);
+    for (let n = 0; n < 2; n++) add(i, item(n ? 'arch' : 'shard', 'm', 0, { s: n ? .12 : .1 + Rn() * .04 }), R0, R1, 24);
+    for (let n = 0; n < 6; n++) add(i, item(['crown', 'shard', 'ftree'][n % 3], ['ug', 'g', 'gm'][n % 3], 0, { s: n % 3 === 2 ? .12 + Rn() * .04 : .09 + Rn() * .06, border: true }), R1 - 10, R1 + 16, 30);   /* 정글 경계에 섞여 들어가는 화산 섬 · 떠 있는 고목 */
+    for (let n = 0; n < 2; n++) add(i, item('shard', 'm', 0, { s: .09 + Rn() * .04, border: true }), R1 - 8, R1 + 10, 30);
   }
+  /* 같은 모양이 바로 옆에 오지 않게: 자리마다 가까운 같은 종류와 가장 멀리 떨어지는 모양을 고름 */
+  for (const o of L) { const n = VAR[o.t].length; if (o.t === 'forest' || o.t === 'peak' || n < 2) continue; let best = 0, bd = -1;
+    for (let v = 0; v < n; v++) { let d = 1e9; for (const q of L) if (q !== o && q.vSet && q.t === o.t && q.v === v) d = Math.min(d, Math.hypot(q.x - o.x, q.z - o.z)); d += Rn() * 3; if (d > bd) { bd = d; best = v; } } o.v = best; o.vSet = true; }
+  for (const o of L) { if (o.t === 'peak' || o.t === 'forest') o.vSet = true; if (!o.sx && o.t !== 'tree' && o.t !== 'ftree' && o.t !== 'heart') { const k = .82 + Rn() * .36; o.sx = k; o.sz = (.88 + Rn() * .24) / k; } }   /* 같은 모양도 길쭉함을 달리 */
 
   /* ── 종류마다 한 벌씩 만들기 (분화 첨봉은 터지는 때를 세 갈래로 나눠 세 벌) ── */
-  const QOF = { heart: { q: .45, qt: .22, td: 1, tq: .5, v: { gk: .45 } }, hab: { q: .36, qt: .2, td: 1, v: { gk: .35 } }, canyon: { q: .42, qt: .22, td: 1, v: { gk: .5 } }, spire: { q: .45 }, cald: { q: .42, qt: .22, td: 1, v: { gk: .5 } }, isles: { q: .45, qt: .24, td: 1 }, forest: { q: .4, qt: .2, td: 1 },
-    peak: { q: .55 }, shard: { q: .55 }, tree: { q: .55, qt: .42, td: 2 }, arch: { q: .55, qt: .3, td: 1 }, crown: { q: .55 } };
+  const QOF = { heart: { q: .36, qt: .2, td: 1, tq: .5, v: { gk: .3 } }, hab: { q: .3, qt: .2, td: 1, v: { gk: .3 } }, canyon: { q: .42, qt: .22, td: 1, v: { gk: .5 } }, spire: { q: .45, v: { sc: .55 } }, cald: { q: .42, qt: .22, td: 1, v: { gk: .5 } }, isles: { q: .45, qt: .24, td: 1 }, forest: { q: .4, qt: .2, td: 1 },
+    peak: { q: .55 }, shard: { q: .55 }, tree: { q: .5, qt: .32, td: 2 }, ftree: { q: .45, qt: .26, td: 1 }, arch: { q: .55, qt: .3, td: 1 }, crown: { q: .55 } };
   const TPL = {}; let seedN = 300;
   for (const t of Object.keys(VAR)) TPL[t] = VAR[t].map((x, v) => { const S = SPEC[t], q = QOF[t]; if (!L.some(o => o.t === t && o.v % VAR[t].length === v)) return null;
     return template(KD[t], { seed: seedN += 17, pq: .22, minb: .22 / S.s, ...q, ...x, v: { ...(q.v || {}), ...(x.v || {}) }, gref: S.gref, maxD: S.maxD / (S.sy || S.s) }); });
+  for (const t of Object.keys(TPL)) for (const T of TPL[t]) if (T) T.pk = Math.min(1, Math.max(.28, SPEC[t].s * 5));
 
   /* ── 자리마다 놓기 ── */
-  const P = [];
+  const P = [], SMALL = { shard: 1, crown: 1, ftree: 1, arch: 1, peak: 0 };
   for (const o of L) { const T = TPL[o.t][o.v % TPL[o.t].length] || TPL[o.t].find(Boolean); if (!T) continue; const S = SPEC[o.t];
-    const y = (o.t === 'tree' ? DN + 2 : LY[o.b === '*' ? 'm' : o.b]) - S.gref * o.sy, root = new THREE.Group(); root.position.set(o.x, y, o.z); root.rotation.y = o.yaw; root.scale.set(o.s * (o.sx || 1), o.sy, o.s * (o.sz || 1)); scene.add(root); root.updateMatrixWorld(true); root.visible = false;
-    const p = { o, T, x: o.x, z: o.z, y, top: y + S.gref * o.sy, root, M: root.matrixWorld.clone(), rad: o.r * 1.15 + 4, vis: false, near: false, pairs: [], fine: [], fz: false };
+    const y = (o.t === 'tree' ? DN + 2 : o.t === 'ftree' ? LY.g : LY[o.b === '*' ? 'm' : o.b === 'gm' ? 'g' : o.b]) - S.gref * o.sy, root = new THREE.Group(); root.position.set(o.x, y, o.z); root.rotation.y = o.yaw; root.scale.set(o.s * (o.sx || 1), o.sy, o.s * (o.sz || 1)); scene.add(root); root.updateMatrixWorld(true); root.visible = false;
+    const p = { o, T, x: o.x, z: o.z, y, top: y + S.gref * o.sy, root, M: root.matrixWorld.clone(), rad: o.r * 1.15 + 4, vd: SMALL[o.t] ? (o.b === 'm' ? 62 : 50) : o.t === 'heart' ? 75 : 100, vis: false, near: false, pairs: [], fine: [], fz: false };
     if (T.glowG) root.add(Object.assign(new THREE.Mesh(T.glowG, glowM), { frustumCulled: false, renderOrder: 3 }));
     const fine = []; if (T.smokeG) fine.push(root.add(Object.assign(new THREE.Mesh(T.smokeG, smokeM), { frustumCulled: false, renderOrder: 4 })).children.at(-1));
     if (T.embG) fine.push(root.add(Object.assign(new THREE.Points(T.embG, emberM), { frustumCulled: false, renderOrder: 4 })).children.at(-1));
     for (const src of T.live) { const c = src.clone(true), wrap = new THREE.Group(); src.parent.updateMatrixWorld(true); wrap.matrixAutoUpdate = false; wrap.matrix.copy(src.parent.matrixWorld); wrap.add(c); root.add(wrap);   /* 움직이는 것은 자리마다 복사 (모양·재질은 나눠 씀) → 키트 움직임을 따라 함 */
       const a = [], bb = []; src.traverse(x => a.push(x)); c.traverse(x => bb.push(x)); a.forEach((x, i) => { const d = bb[i]; if (d.isPoints && d.material.size) { d.material = d.material.clone(); d.material.size *= o.s; } d.frustumCulled = false; p.pairs.push([x, d]); }); }
+    if (o.t !== 'peak') for (const w of root.children) if (w.children.length && w.matrixAutoUpdate === false) fine.push(w);   /* 움직이는 부품(보물 심장 고리 · 도는 조각 · 화로 불꽃…)은 가까이에서만 (첨봉은 터짐이 보여야 해서 늘) */   /* 작은 섬의 도는 조각 등은 가까이에서만 */
     p.fine = fine; for (const f of fine) f.visible = false;
     if (o.t === 'forest') hideMark(root, 0, S.gref, 0, KR.forest * (T.o.v?.rk || 1) * .72 * Math.min(o.sx || 1, o.sz || 1) / (o.sx || 1));   /* 숲 = 숨는 곳 (가장 짧은 쪽 반지름) */
     T.P.push(p); P.push(p); }
   /* 종류마다 멈춘 부분을 한 번에 그리는 판 (자리 수만큼) */
   for (const T of T_ALL) { const n = T.P.length; if (!n) continue;
-    for (const st of T.statics) { const im = new THREE.InstancedMesh(st.geo, placeMat(st.mat), n); im.frustumCulled = false; im.count = 0; im.renderOrder = st.ro || 0; im.visible = false; scene.add(im); T.meshes.push({ im, kit: null }); }
-    for (const it of T.insts) { const im = new THREE.InstancedMesh(it.geo, placeMat(it.mat), it.Ms.length * n); im.frustumCulled = false; im.count = 0; im.visible = false; if (it.C) im.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(it.Ms.length * n * 3), 3); scene.add(im); T.meshes.push({ im, kit: it }); } }
+    for (const st of T.statics) { const im = new THREE.InstancedMesh(st.geo, placeMat(st.mat, T.pk), n); im.frustumCulled = false; im.count = 0; im.renderOrder = st.ro || 0; im.visible = false; scene.add(im); T.meshes.push({ im, kit: null }); }
+    for (const it of T.insts) { const im = new THREE.InstancedMesh(it.geo, placeMat(it.mat, T.pk), it.Ms.length * n); im.frustumCulled = false; im.count = 0; im.visible = false; if (it.C) im.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(it.Ms.length * n * 3), 3); scene.add(im); T.meshes.push({ im, kit: it }); } }
   for (const m of new Set([...placeMats.values()])) if (m.isMeshStandardMaterial) m.envMapIntensity = .25;
   T_ALL.forEach(T => T.W.traverse(x => { if (x.material?.isMeshStandardMaterial) x.material.envMapIntensity = .25; }));
 
@@ -154,8 +164,8 @@ export function makeVolcano(scene, { jungle, TOP = -1.2, UP = 36, DN = -30, sect
   const update = (t, dt, camera) => { TU.value = t; if (renderer) { renderer.getDrawingBufferSize(dsz); uPS.value = dsz.y * .5; }
     pv.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse); fr.setFromProjectionMatrix(pv); const cx = camera.position.x, cy = camera.position.y, cz = camera.position.z;
     for (const T of T_ALL) { let changed = false, run = false;
-      for (const p of T.P) { const d = Math.hypot(p.x - cx, p.z - cz); sph.center.set(p.x, p.top, p.z); sph.radius = p.rad * (p.o.t === 'tree' ? 3 : 1);
-        const other = FOC && Math.abs(p.top - FOCY) > 9 && p.o.b !== '*', vis = d < (other ? 75 : 100) + p.rad && fr.intersectsSphere(sph);
+      for (const p of T.P) { const d = Math.hypot(p.x - cx, p.z - cz); sph.center.set(p.x, p.top, p.z); sph.radius = p.rad * (p.o.t === 'tree' ? 3 : 1); if (p.o.t === 'tree') sph.center.y = p.top + 30 * p.o.sy;
+        const other = FOC && Math.abs(p.top - FOCY) > 9 && p.o.b !== '*', vis = d < (other ? .75 : 1) * p.vd + p.rad && fr.intersectsSphere(sph);
         if (vis !== p.vis) { p.vis = vis; p.root.visible = vis; changed = true; } if (!vis) continue;
         const d3 = Math.hypot(d, p.top - cy); p.near = d3 < 70 + p.rad && !other; if (p.near) run = true;
         const fz = d3 < 48 + p.rad * .6 && !other; if (fz !== p.fz) { p.fz = fz; for (const f of p.fine) f.visible = fz; } }   /* 연기·불티는 가까이에서만 */
@@ -165,8 +175,23 @@ export function makeVolcano(scene, { jungle, TOP = -1.2, UP = 36, DN = -30, sect
           im.instanceMatrix.needsUpdate = true; im.visible = im.count > 0; k++; } }
       if (run && T.ranAt !== t) { T.ranAt = t; const tt = t + T.off; for (const f of T.anim) f(tt, dt);   /* 키트 움직임은 종류마다 한 번 → 가까운 자리들이 따라 함 */
         for (const p of T.P) if (p.vis && p.near) for (const [a, b] of p.pairs) { b.position.copy(a.position); b.quaternion.copy(a.quaternion); b.scale.copy(a.scale); b.visible = a.visible; } } } };
+
+  /* ── 막힘 (사용자 2026-11-09): 가운데층 기체 높이에서 화산 봉우리(첨봉 · 서식지 화산) · 흑요석 첨탑 · 아치 기둥은 부딪힘 → 25cm 칸 지도로 미리 구움
+     기체는 닿으면 벽을 따라 미끄러짐 (flight.js) · 가운데 빛 문 · 숲 · 그 밖의 섬은 통과 */
+  const CL = .25, GH = 140, GN = Math.ceil(GH * 2 / CL), grid = new Uint8Array(GN * GN), cell = v => Math.floor((v + GH) / CL), FLY_Y = .35;
+  const mark = (x, z) => { const gx = cell(x), gz = cell(z); if (gx >= 0 && gz >= 0 && gx < GN && gz < GN) grid[gz * GN + gx] = 1; };
+  const disc = (x, z, r) => { for (let zz = z - r; zz <= z + r; zz += CL) for (let xx = x - r; xx <= x + r; xx += CL) if ((xx - x) ** 2 + (zz - z) ** 2 <= r * r) mark(xx, zz); };
+  const inv = new THREE.Matrix4(), vv = new THREE.Vector3();
+  for (const p of P) { if (p.o.b !== 'm') continue; const t = p.o.t, T = p.T; inv.copy(p.M).invert(); const sx = p.o.s * (p.o.sx || 1), sz = p.o.s * (p.o.sz || 1), sy = p.o.sy;
+    if (t === 'peak' || t === 'hab') { const I = T.I, rr = p.rad; for (let z = p.z - rr; z <= p.z + rr; z += CL) for (let x = p.x - rr; x <= p.x + rr; x += CL) { vv.set(x, 0, z).applyMatrix4(inv); if (!I.inside(vv.x, vv.z, 0)) continue;
+        if (t === 'hab' && Math.hypot(vv.x + 112, vv.z - 42) > 60) continue;   /* 서식지는 화산 봉우리만 */
+        if (p.y + I.Hw(vv.x, vv.z) * sy > FLY_Y) mark(x, z); } }
+    if (t === 'spire') for (const k of T.spikes) { const yc = (FLY_Y - p.y) / sy, b0 = k.y - 1; if (yc < b0 || yc > b0 + k.h) continue; const r = k.r * (1 - (yc - b0) / k.h * .92) * Math.min(sx, sz) * .9; if (r < .12) continue;   /* 첨탑: 기체 높이에서 잘린 굵기 그대로 */
+      vv.set(k.x, 0, k.z).applyMatrix4(p.M); disc(vv.x, vv.z, r); }
+    if (t === 'arch') for (const a of T.arcs) for (const q of [a.p0, a.p1]) { vv.set(q.x, 0, q.z).applyMatrix4(p.M); disc(vv.x, vv.z, a.th * 1.7 * Math.min(sx, sz)); } }   /* 아치: 휘어진 기둥 두 발 (가운데 문은 열림) */
+  const blocked = (x, z) => { const gx = cell(x), gz = cell(z); return gx >= 0 && gz >= 0 && gx < GN && gz < GN && grid[gz * GN + gx] === 1; };
   /* 기믹이 쓸 자리 정보 */
-  const peaks = P.filter(p => p.o.t === 'peak').map(p => ({ p, x: p.x, z: p.z, y: LY.m, off: p.T.off, r: 14, cd: -9, lastPh: 0 }));
+  const peaks = P.filter(p => p.o.t === 'peak').map(p => ({ p, x: p.x, z: p.z, y: LY.m, off: p.T.off, r: 14, cd: -9, lastPh: 0, hitN: -1 }));
   const arches = P.filter(p => p.o.t === 'arch').map(p => { const c = new THREE.Vector3(1, 0, 0).applyMatrix4(p.M), ax = Math.cos(p.o.yaw), az = -Math.sin(p.o.yaw); return { p, x: c.x, z: c.z, ax, az, y: LY.m, R: 1.35, off: -99 }; });   /* 아치 가운데 · 지나가는 방향 = 섬의 x축 */
-  return { update, setFocus, P, L, T: T_ALL, peaks, arches, LY, info: () => ({ placements: P.length, templates: T_ALL.length, draws: T_ALL.reduce((a, T) => a + T.meshes.filter(m => m.im.visible).length, 0) + P.filter(p => p.vis).reduce((a, p) => a + p.root.children.length, 0) }) };
+  return { update, setFocus, blocked, P, L, T: T_ALL, peaks, arches, LY, info: () => ({ placements: P.length, templates: T_ALL.length, draws: T_ALL.reduce((a, T) => a + T.meshes.filter(m => m.im.visible).length, 0) + P.filter(p => p.vis).reduce((a, p) => a + p.root.children.length, 0) }) };
 }
