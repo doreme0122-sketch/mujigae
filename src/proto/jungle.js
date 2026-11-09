@@ -9,10 +9,10 @@
    · 초원 → 정글은 점점: 경계 둘레에 작은 부유체가 섞이고, 기체가 안쪽으로 들어갈수록 하늘이 어두운 보랏빛으로 (skymap에서) */
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { spiralPath, SWEEP } from './path.js?v=11091804';
-import { buildSanctum } from './jsanct.js?v=11091804';
-export { SANCT_TEST } from './jsanct.js?v=11091804';
-import { makeDresser } from './jdress.js?v=11091804';
+import { spiralPath, SWEEP } from './path.js?v=11092118';
+import { buildSanctum } from './jsanct.js?v=11092118';
+export { SANCT_TEST } from './jsanct.js?v=11092118';
+import { makeDresser } from './jdress.js?v=11092118';
 let CAM = { position: new THREE.Vector3() };
 let LOD_T = .5, LOD_N = 30;   /* 섬 둘레 · 덩굴 마디 수 (키트 원래 44 · 1배) */
 /* ===================== 우주 정글 지형 키트 (사용자 제작 · 생성 코드 그대로) ===================== */

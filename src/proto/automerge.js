@@ -3,14 +3,14 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 
-export function autoMerge(root) {
+export function autoMerge(root, { skip = null } = {}) {
   const first = new Map(), moved = new Set(), inv = new THREE.Matrix4(), rel = new THREE.Matrix4();
   const watch = () => { root.updateMatrixWorld(true); inv.copy(root.matrixWorld).invert();
     root.traverse(o => { if (!o.isMesh || moved.has(o)) return; rel.multiplyMatrices(inv, o.matrixWorld); let vis = true; for (let q = o; q && q !== root; q = q.parent) if (!q.visible) vis = false;
       const k = rel.elements.map(e => e.toFixed(4)).join(',') + '|' + vis + '|' + o.material?.uuid + '|' + (o.material?.opacity ?? 1);
       const f = first.get(o); if (f == null) first.set(o, k); else if (f !== k) moved.add(o); }); };
   const merge = () => { root.updateMatrixWorld(true); inv.copy(root.matrixWorld).invert(); const groups = new Map(); let n0 = 0, n1 = 0;
-    root.traverse(o => { if (!o.isMesh) return; n0++; if (o.isInstancedMesh || o.isSkinnedMesh || moved.has(o) || !first.has(o) || first.get(o).includes('|false|') || Array.isArray(o.material) || !o.geometry?.attributes.position || o.geometry.morphAttributes?.position) return;
+    root.traverse(o => { if (!o.isMesh) return; n0++; if ((skip && skip(o)) || o.isInstancedMesh || o.isSkinnedMesh || moved.has(o) || !first.has(o) || first.get(o).includes('|false|') || Array.isArray(o.material) || !o.geometry?.attributes.position || o.geometry.morphAttributes?.position) return;
       for (let q = o.parent; q && q !== root; q = q.parent) if (moved.has(q)) return;
       const g = o.geometry, key = o.material.uuid + '|' + Object.keys(g.attributes).sort().join(',') + '|' + (g.index ? 1 : 0) + '|' + o.renderOrder + '|' + o.frustumCulled;
       if (!groups.has(key)) groups.set(key, []); groups.get(key).push(o); });
