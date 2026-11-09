@@ -9,7 +9,7 @@
 <canvas id="cv"></canvas><div id="ui"></div>
 <div id="ld"><div>타겟팅 시험장 불러오는 중<i><b id="lb"></b></i></div></div>
 <script type="module">
-const { start } = await import('./src/proto/tlab.js?v=11091035');
+const { start } = await import('./src/proto/tlab.js?v=11091215');
 const lb = document.getElementById('lb'), ld = document.getElementById('ld');
 try { await start(document.getElementById('cv'), p => lb.style.width = (p * 100) + '%'); ld.style.opacity = 0; setTimeout(() => ld.remove(), 600); }
 catch (e) { ld.textContent = '오류: ' + e.message; console.error(e); }
