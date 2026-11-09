@@ -340,6 +340,7 @@ export async function start(canvas, onProgress = () => {}) {
       if (T.auto) { const e = T.auto; if (!alive(e)) T.auto = fire.on ? pickTarget(AR) : null;
         else if (!seen(e) || dOf(e) > AR * 1.5) { T.auto = null; T.blocked = true; flashState('대상이 풀렸어요 · 쏘기를 다시 누르면 새로 잡아요'); } }
       if (!T.auto && fire.on && !fire.drag && !T.blocked) T.auto = pickTarget(AR);
+      if (T.auto && T.auto.kind === 'monster') { const pl = ENT.filter(e => e.kind === 'player' && seen(e) && dOf(e) <= AR); if (pl.length) { T.auto = byCfg(pl); flashState('적 기체 등장 · 대상을 넘김'); } }   /* 몬스터를 노리다 적 플레이어가 사거리에 들어오면 바로 넘어감 (사용자 2026-11-09 '나') · 플레이어끼리는 유지 */
       if (T.auto !== prev) T.autoK = 0; } else if (AR <= 0) T.auto = null;
     T.autoK = Math.min(1, T.autoK + dt * 4);
     label = T.lock ? `고정 · ${T.lock.name}` : T.auto ? `자동 조준 · ${T.auto.name}` : AR > 0 ? `쏘기를 누르면 ${AR}m 안에서 자동 조준` : '빛 칼날: 자동 조준 없음 (앞쪽만 벰)';
