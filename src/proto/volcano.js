@@ -130,11 +130,11 @@ export function makeVolcano(scene, { jungle, TOP = -1.2, UP = 36, DN = -30, sect
   for (const o of L) { if (o.t === 'peak' || o.t === 'forest') o.vSet = true; if (!o.sx && o.t !== 'tree' && o.t !== 'ftree' && o.t !== 'heart') { const k = .82 + Rn() * .36; o.sx = k; o.sz = (.88 + Rn() * .24) / k; } }   /* 같은 모양도 길쭉함을 달리 */
 
   /* ── 종류마다 한 벌씩 만들기 (분화 첨봉은 터지는 때를 세 갈래로 나눠 세 벌) ── */
-  const QOF = { heart: { q: .36, qt: .2, td: 1, tq: .5, v: { gk: .3 } }, hab: { q: .3, qt: .2, td: 1, v: { gk: .3 } }, canyon: { q: .42, qt: .22, td: 1, v: { gk: .5 } }, spire: { q: .45, v: { sc: .55 } }, cald: { q: .42, qt: .22, td: 1, v: { gk: .5 } }, isles: { q: .45, qt: .24, td: 1 }, forest: { q: .4, qt: .2, td: 1 },
-    peak: { q: .55 }, shard: { q: .55 }, tree: { q: .5, qt: .32, td: 2 }, ftree: { q: .45, qt: .26, td: 1 }, arch: { q: .55, qt: .3, td: 1 }, crown: { q: .55 } };
+  const QOF = { heart: { q: .36, qt: .2, td: 1, tq: .5, qg: .6, rw: 1.8, v: { gk: .3 } }, hab: { q: .3, qt: .2, td: 1, qg: .6, rw: 1.8, v: { gk: .3 } }, canyon: { q: .42, qt: .22, td: 1, qg: .65, rw: 1.6, v: { gk: .5 } }, spire: { q: .45, qg: .65, rw: 1.8, v: { sc: .55 } }, cald: { q: .42, qt: .22, td: 1, qg: .65, rw: 1.8, v: { gk: .5 } }, isles: { q: .45, qt: .24, td: 1, qg: .7, rw: 1.8 }, forest: { q: .4, qt: .28, td: 1, qg: .6, rw: 1.8 },
+    peak: { q: .55, qg: .8, rw: 1.5 }, shard: { q: .55, qg: .8, rw: 1.5 }, tree: { q: .5, qt: .32, td: 2, qg: .7, rw: 1.5 }, ftree: { q: .45, qt: .26, td: 1, qg: .7, rw: 1.5 }, arch: { q: .55, qt: .3, td: 1, qg: .8, rw: 1.5 }, crown: { q: .55, qg: .8, rw: 1.5 } };   /* qg = 땅 해상도 · rw = 용암 강 폭 (줄인 섬에서 강이 실처럼 가늘어 보여서) */
   const TPL = {}; let seedN = 300;
   for (const t of Object.keys(VAR)) TPL[t] = VAR[t].map((x, v) => { const S = SPEC[t], q = QOF[t]; if (!L.some(o => o.t === t && o.v % VAR[t].length === v)) return null;
-    return template(KD[t], { seed: seedN += 17, pq: .22, minb: .22 / S.s, ...q, ...x, v: { ...(q.v || {}), ...(x.v || {}) }, gref: S.gref, maxD: S.maxD / (S.sy || S.s) }); });
+    return template(KD[t], { seed: seedN += 17, pq: .22, minb: .14 / S.s, ...q, ...x, v: { ...(q.v || {}), ...(x.v || {}) }, gref: S.gref, maxD: S.maxD / (S.sy || S.s) }); });
   for (const t of Object.keys(TPL)) for (const T of TPL[t]) if (T) T.pk = Math.min(1, Math.max(.28, SPEC[t].s * 5));
 
   /* ── 자리마다 놓기 ── */
@@ -155,8 +155,8 @@ export function makeVolcano(scene, { jungle, TOP = -1.2, UP = 36, DN = -30, sect
   for (const T of T_ALL) { const n = T.P.length; if (!n) continue;
     for (const st of T.statics) { const im = new THREE.InstancedMesh(st.geo, placeMat(st.mat, T.pk), n); im.frustumCulled = false; im.count = 0; im.renderOrder = st.ro || 0; im.visible = false; scene.add(im); T.meshes.push({ im, kit: null }); }
     for (const it of T.insts) { const im = new THREE.InstancedMesh(it.geo, placeMat(it.mat, T.pk), it.Ms.length * n); im.frustumCulled = false; im.count = 0; im.visible = false; if (it.C) im.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(it.Ms.length * n * 3), 3); scene.add(im); T.meshes.push({ im, kit: it }); } }
-  for (const m of new Set([...placeMats.values()])) if (m.isMeshStandardMaterial) m.envMapIntensity = .25;
-  T_ALL.forEach(T => T.W.traverse(x => { if (x.material?.isMeshStandardMaterial) x.material.envMapIntensity = .25; }));
+  for (const m of new Set([...placeMats.values()])) if (m.isMeshStandardMaterial) m.envMapIntensity = .12;
+  T_ALL.forEach(T => T.W.traverse(x => { if (x.material?.isMeshStandardMaterial) x.material.envMapIntensity = .12; }));
 
   /* ── 매 판: 보일 자리만 · 가까운 것만 움직임 ── */
   const sph = new THREE.Sphere(), fr = new THREE.Frustum(), pv = new THREE.Matrix4(), tmpM = new THREE.Matrix4(), dsz = new THREE.Vector2();

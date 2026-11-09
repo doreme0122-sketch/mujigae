@@ -52,7 +52,7 @@ const LAVC=new Map();function lavaMat(o){o=o||{};const key=[o.uv?1:0,o.sx||1,o.s
 
 let W2=200;
 // ---------------- procedural cooled-crust cracks (shader injected into lit materials) ----------------
-const TU={value:0};let UGLOW={value:1},UGLO={value:1},UFRONT={value:1e5},USOFT={value:6},OWNU=false,Q=1,PQ=1,TQ=1,MINB=0,TD=2,QT=1,VOPT={};const WM=new Map();
+const TU={value:0};let UGLOW={value:1},UGLO={value:1},UFRONT={value:1e5},USOFT={value:6},OWNU=false,Q=1,PQ=1,TQ=1,MINB=0,TD=2,QT=1,QG=1,RW=1,VOPT={};const WM=new Map();
 const CRACK_GLSL=`uniform float uTime;uniform sampler2D heatMap;uniform float uMode;uniform float uMaskK;uniform float uW2;uniform float uSeed;uniform float uGlow;uniform float uGlowLo;uniform float uFront;uniform float uSoft;uniform float uPK;varying vec3 vWPos;
 vec2 hash22(vec2 p){p=vec2(dot(p,vec2(127.1,311.7)),dot(p,vec2(269.5,183.3)));return fract(sin(p)*43758.5453);}
 float h21(vec2 p){return fract(sin(dot(p,vec2(12.9898,78.233)))*43758.5453);}
@@ -284,7 +284,7 @@ function buildHeat(blobs){const TS=1024,toT=(x,z)=>[(x/W2*.5+.5)*TS,(z/W2*.5+.5)
   blobs(blob);const t=new THREE.CanvasTexture(c);t.minFilter=THREE.LinearFilter;HEAT=t;}
 function buildIsland(I){const R0=I.R0,cx=I.cx,cz=I.cz,cy=I.cy,ol=I.ol,Hw=I.Hw;
   // terrain
-  {const NR=Math.max(12,Math.round(clamp(R0*.85,40,120)*Q)),NS=Math.max(24,Math.round(clamp(R0*2,96,280)*Q)),pos=[],col=[],idx=[];const basalt=C('#1c1718'),ash=C('#4a4040'),scorch=C('#3a1e16');
+  {const NR=Math.max(12,Math.round(clamp(R0*.85,40,120)*QG)),NS=Math.max(24,Math.round(clamp(R0*2,96,280)*QG)),pos=[],col=[],idx=[];const basalt=C('#1e1614'),ash=C('#5a4238'),scorch=C('#4a1c10');
     pos.push(cx,Hw(cx,cz),cz);col.push(ash.r,ash.g,ash.b);
     for(let i=1;i<=NR;i++){const u=Math.pow(i/NR,1.2);for(let k=0;k<NS;k++){const a=k/NS*Math.PI*2,r=ol(a)*u,x=cx+Math.cos(a)*r,z=cz+Math.sin(a)*r,y=Hw(x,z);pos.push(x,y,z);
       const e=.9,sl=Math.hypot(Hw(x+e,z)-Hw(x-e,z),Hw(x,z+e)-Hw(x,z-e))/(2*e),n=fbm2(x*.08,z*.08);
@@ -293,7 +293,7 @@ function buildIsland(I){const R0=I.R0,cx=I.cx,cz=I.cz,cy=I.cy,ol=I.ol,Hw=I.Hw;
     const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(pos,3));g.setAttribute('color',new THREE.Float32BufferAttribute(col,3));g.setIndex(idx);g.computeVertexNormals();
     const m=new THREE.Mesh(g,addCracks(new THREE.MeshStandardMaterial({vertexColors:true,roughness:.9}),0));m.receiveShadow=m.castShadow=true;W.add(m);}
   // underside
-  {const N=Math.max(24,Math.round(clamp(R0*1.5,72,200)*Q)),L=Math.max(8,Math.round(16*Q)),depth=I.depth,rings=[];for(let i=0;i<=L;i++){const t=i/L;rings.push({t,sc:i?Math.max(.03,Math.pow(1-t,.85)*(1-.12*t)):1,off:V(Math.sin(t*2.1+cx)*R0*.1*t,0,Math.cos(t*1.7+cz)*R0*.09*t)});}
+  {const N=Math.max(24,Math.round(clamp(R0*1.5,72,200)*QG)),L=Math.max(8,Math.round(16*QG)),depth=I.depth,rings=[];for(let i=0;i<=L;i++){const t=i/L;rings.push({t,sc:i?Math.max(.03,Math.pow(1-t,.85)*(1-.12*t)):1,off:V(Math.sin(t*2.1+cx)*R0*.1*t,0,Math.cos(t*1.7+cz)*R0*.09*t)});}
     const pos=[],col=[],idx=[],top=C('#2a2224'),mid=C('#1a1416'),bot=C('#0a0606');
     rings.forEach((rg,i)=>{for(let k=0;k<N;k++){const a=k/N*Math.PI*2,nz=fbm2(Math.cos(a)*3+7+cx*.01,rg.t*6),nz2=fbm2(a*4+cz*.01,rg.t*14),ex=ol(a);
       if(i===0)pos.push(cx+Math.cos(a)*ex,Hw(cx+Math.cos(a)*ex,cz+Math.sin(a)*ex),cz+Math.sin(a)*ex);
@@ -308,9 +308,9 @@ function buildIsland(I){const R0=I.R0,cx=I.cx,cz=I.cz,cy=I.cy,ol=I.ol,Hw=I.Hw;
       const pp=V(cx+rg.off.x+Math.cos(a)*r,y0-Ls/2+1,cz+rg.off.z+Math.sin(a)*r);put('spire',cg,pp,new THREE.Euler(Math.PI,0,0));if(k%2===0)dl.push(pp.clone().add(V(0,-Ls/2,0)));}drips(dl,70);}
   // rivers & falls
   I.rivers.forEach(rv=>{if(rv.length<6)return;W.add(new THREE.Mesh(ribbon(rv,cfgW(rv,0),cfgW(rv,1),Hw),lavaMat({uv:1,sx:.6,sy:.09,flow:.9,i:1.3,side:THREE.DoubleSide,bank:1})));
-    const e=rv[rv.length-1],pr=rv[Math.max(0,rv.length-4)],out=V(e.x-pr.x,0,e.z-pr.z).normalize();if(!I.inside(e.x,e.z,2.5))lavaFall(e.clone().add(V(0,-.3,0)),out,Math.min(110,I.depth*.7),rv.wEnd||6);
+    const e=rv[rv.length-1],pr=rv[Math.max(0,rv.length-4)],out=V(e.x-pr.x,0,e.z-pr.z).normalize();if(!I.inside(e.x,e.z,2.5))lavaFall(e.clone().add(V(0,-.3,0)),out,Math.min(110,I.depth*.7),(rv.wEnd||6)*RW);
     const mid=rv[Math.floor(rv.length*.45)],pl=new FakePL(C('#ff6a2a'),1.2,70,1.6);pl.position.copy(mid).add(V(0,6,0));W.add(pl);});}
-const cfgW=(rv,end)=>end?(rv.wEnd||7.5):(rv.wStart||3.2);
+const cfgW=(rv,end)=>(end?(rv.wEnd||7.5):(rv.wStart||3.2))*RW;
 function ribbon(pts,w0,w1,Hw){const pos=[],uv=[],idx=[];let L=0;
   for(let i=0;i<pts.length;i++){const p=pts[i],nx=pts[Math.min(i+1,pts.length-1)],pv=pts[Math.max(i-1,0)],dir=V(nx.x-pv.x,0,nx.z-pv.z);if(dir.lengthSq()<1e-6)dir.set(1,0,0);dir.normalize();
     const side=V(-dir.z,0,dir.x);if(i)L+=p.distanceTo(pts[i-1]);const t=i/(pts.length-1),w=w0+(w1-w0)*t,l=p.clone().addScaledVector(side,w*(1+.25*Math.sin(i*.37))),r=p.clone().addScaledVector(side,-w*(1+.25*Math.cos(i*.29)));
@@ -640,7 +640,7 @@ DEFS.push({name:'현무암 왕관섬',tag:'작은 섬',desc:'육각 현무암 �
 
 
 const api={DEFS,TU,dot,SMK,addCracks,
-  build(i,o){o=o||{};const cm=THREE.ColorManagement.enabled;THREE.ColorManagement.enabled=false;try{R=mulberry32(o.seed||81207);Q=o.q||1;PQ=o.pq==null?1:o.pq;TQ=o.tq||1;MINB=o.minb||0;TD=o.td==null?2:o.td;QT=o.qt||Q;VOPT=o.v||{};
+  build(i,o){o=o||{};const cm=THREE.ColorManagement.enabled;THREE.ColorManagement.enabled=false;try{R=mulberry32(o.seed||81207);Q=o.q||1;PQ=o.pq==null?1:o.pq;TQ=o.tq||1;MINB=o.minb||0;TD=o.td==null?2:o.td;QT=o.qt||Q;QG=o.qg||Q;RW=o.rw||1;VOPT=o.v||{};
     newWorld();const view=DEFS[i].build();finish();
     return{W,anim:anim.slice(),ISL:ISL.slice(),puffs:puffs.slice(),embers:EMB.slice(),drips:DRIPS.slice(),spikes:SPK.slice(),arcs:ARC.slice(),view};}finally{THREE.ColorManagement.enabled=cm;}}};
 return api;
