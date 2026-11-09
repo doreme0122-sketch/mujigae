@@ -5,18 +5,18 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
-import { makeBloom } from '../core/hangar/bloom.js?v=11092203';
-import { makePad } from '../core/hangar/pad.js?v=11092203';
-import { makeMag } from '../core/hangar/mag.js?v=11092203';
-import { buildShip } from '../core/ships/build.js';
-import { makeGoldStar } from './goldstar.js?v=11092203';
-import { makeArena, SPEED, WAVE_R0 } from './arena.js?v=11092203';
-import { makeGuardians, GUARD } from './guardian.js?v=11092203';
-import { makeBirth, BIRTH } from './birth.js?v=11092203';
-import { makePerf } from './perf.js?v=11092203';
-import { autoMerge } from './automerge.js?v=11092203';
+import { makeBloom } from '../core/hangar/bloom.js?v=11092305';
+import { makePad } from '../core/hangar/pad.js?v=11092305';
+import { makeMag } from '../core/hangar/mag.js?v=11092305';
+import { makeForgeShip, forgeList } from './forgeship.js?v=11092305';
+import { makeGoldStar } from './goldstar.js?v=11092305';
+import { makeArena, SPEED, WAVE_R0 } from './arena.js?v=11092305';
+import { makeGuardians, GUARD } from './guardian.js?v=11092305';
+import { makeBirth, BIRTH } from './birth.js?v=11092305';
+import { makePerf } from './perf.js?v=11092305';
+import { autoMerge } from './automerge.js?v=11092305';
 import { makeGlow } from '../preview/glow.js';
-import { makeFlight, FLY, PADZ, padZone } from './flight.js?v=11092203';
+import { makeFlight, FLY, PADZ, padZone } from './flight.js?v=11092305';
 
 const $ = s => document.querySelector(s), clamp = THREE.MathUtils.clamp, HOVER = FLY.HOVER;
 const R = 240, NB = 10, GAPH = 5.6, BASE_D = 0;     /* 맵 반지름 · 기지 수 · 벽 틈 반 폭(= 기지 반지름) · 기지 가운데는 벽 선 위 (앞 절반은 맵 안, 뒤 절반은 맵 밖 · 사용자 2026-11-06) */
@@ -139,7 +139,12 @@ export async function start(canvas, onProgress = () => {}) {
   const B = { blocked: (x, z) => { const b = baseAt(x, z);
       if (b) { const lx = (x - b.x) * b.dx + (z - b.z) * b.dz, lz = -(x - b.x) * b.dz + (z - b.z) * b.dx; return !(Math.hypot(lx, lz) < FL || (lx > 0 && Math.abs(lz) < EXH)); }   /* 계단 단에 묻히지 않게 */
       return Math.hypot(x, z) > R - .9; }, region: () => 0 };   /* 섬·바위·나무는 모두 통과 (기믹 도구만 몸으로 닿음) · 남는 막힘: 바깥 무지개 벽·출발 기지·길 문 돌 */
-  const fly = await makeFlight(renderer, B, [B0.x, B0.z], 0); scene.add(fly); const FS = fly.userData.S; fly.visible = false;
+  /* 내 기체 = 초프리미엄 스킨 (사용자 2026-11-09) · 고른 스킨은 이 기기에 기억 · 처음엔 가장 무거운 블레이즈 드레이크 */
+  const SKINS = forgeList(renderer, camera); let skinId = 'blazedrake'; try { skinId = localStorage.getItem('mj-skin') || skinId; } catch (e) {}
+  const FG = await makeForgeShip(renderer, camera, Math.max(0, SKINS.findIndex(s => s.id === skinId)));
+  { const sel = $('#skin'); if (sel) { for (const k of SKINS) { const o = document.createElement('option'); o.value = k.id; o.textContent = k.name; o.selected = k.id === FG.C.id; sel.append(o); }
+      sel.onchange = () => { try { localStorage.setItem('mj-skin', sel.value); } catch (e) {} location.reload(); }; } }   /* 바꾸면 다시 불러옴: 새 스킨도 로딩 때 가볍게 바꿔 끼워야 해서 */
+  const fly = await makeFlight(renderer, B, [B0.x, B0.z], 0, FG); scene.add(fly); const FS = fly.userData.S; fly.visible = false;
   const oldSh = []; fly.traverse(o => { if (o.isMesh && o.renderOrder === 1 && o.geometry.type === 'PlaneGeometry') oldSh.push(o); });
   /* 기체는 한 대만 (사용자 2026-11-06): 조이스틱으로 모는 그 기체가 태어나는 동안엔 기지 판 위(기지 안)에 앉아 있다가, 태어나면 그대로 이어서 몬다 */
   const bship = fly.children[0], S0 = bship.scale.x, bsm = bship.children[0];
@@ -147,14 +152,11 @@ export async function start(canvas, onProgress = () => {}) {
   const birth = makeBirth(bship); B0.w.add(birth);
   /* 가려진 기체 (사용자 2026-11-06: 섬이 기체를 가리면 그냥 가려지게 두고 기체가 거기 있다는 걸 보여 줌 → 깊이감):
      가려진 부분만 기체 모양 그대로 은은하게 빛나는 윤곽 — 앞에 무언가 있을 때만 그려짐(깊이를 거꾸로 비교) */
-  const xrayM = new THREE.ShaderMaterial({ transparent: true, depthWrite: false, depthFunc: THREE.GreaterDepth, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -4,
+  const xrayM = new THREE.ShaderMaterial({ transparent: false, blending: THREE.CustomBlending, blendSrc: THREE.SrcAlphaFactor, blendDst: THREE.OneMinusSrcAlphaFactor, depthWrite: false, depthFunc: THREE.GreaterDepth,   /* 불투명 줄에서 기체보다 먼저 그림 (반투명 줄은 늘 기체 뒤에 그려져 기체가 자기 몸을 가린 곳까지 빛났음) */ polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -4,
     uniforms: { uT: { value: 0 }, uH: { value: 0 } },
     vertexShader: 'varying vec3 vN; varying vec3 vV; void main(){ vec4 mv = modelViewMatrix * vec4(position, 1.); vN = normalize(normalMatrix * normal); vV = normalize(-mv.xyz); gl_Position = projectionMatrix * mv; }',
     fragmentShader: 'uniform float uT, uH; varying vec3 vN; varying vec3 vV; void main(){ float f = 1. - abs(dot(normalize(vN), normalize(vV))), rim = f * f; vec3 c = mix(vec3(1., .5, .42), vec3(1., .92, .85), rim), g = mix(vec3(.35, .9, .55), vec3(.8, 1., .85), rim); float br = (.7 + rim * 1.6) * (.9 + .1 * sin(uT * 4.)); c = mix(c * br, g * (.8 + rim * 1.6) * (.85 + .15 * sin(uT * 1.6)), uH); gl_FragColor = vec4(c, mix(.55 + rim * .45, .55 + rim * .45, uH)); }' });   /* uH: 숲에 숨으면 옅은 초록 반투명 실루엣(숨 쉬듯 천천히 일렁) · 지형 지나감은 따뜻한 빛 윤곽 — 색으로 구분 (사용자 2026-11-08) */
-  { const xr = []; bship.traverse(o => { if (o.isMesh && o.geometry && o.geometry.attributes.normal) xr.push(o); });   /* 벽 너머 비침: 기체 모양 전체를 한 덩어리로 (부품마다 따로 그리던 것 → 한 번) */
-    bsm.updateMatrixWorld(true); const inv = new THREE.Matrix4().copy(bsm.matrixWorld).invert();
-    const parts = xr.map(o => { const g = new THREE.BufferGeometry(), src = o.geometry.index ? o.geometry.toNonIndexed() : o.geometry; g.setAttribute('position', src.attributes.position.clone()); g.setAttribute('normal', src.attributes.normal.clone()); g.applyMatrix4(new THREE.Matrix4().multiplyMatrices(inv, o.matrixWorld)); return g; });
-    const mg = mergeGeometries(parts, false); parts.forEach(g => g.dispose()); const m = new THREE.Mesh(mg, xrayM); m.renderOrder = 60; m.frustumCulled = false; m.name = 'xray'; bsm.add(m); }
+  FG.buildXray(xrayM);   /* 벽 너머 비침: 같이 움직이는 덩어리마다 윤곽 하나 (날개짓을 따라감) */
   onProgress(.9);
 
   /* ── 태어나기 → 튀어 나가기 (빛의 닻 순서 그대로: 탑 → 빛 물결 → 금테 별 → 정중앙에 모이는 순간 유성이 꽂힘) ── */
@@ -239,6 +241,9 @@ export async function start(canvas, onProgress = () => {}) {
         ['우주', () => space.visible, v => { space.visible = v; }], ['빛 번짐', () => !!perf.st.bloom, v => { perf.st.bloom = v; }], ['기체 비침', () => xr().every(o => o.visible), v => xr().forEach(o => o.visible = v)], ['시야 어둠', () => sight.visible, v => { sight.visible = v; }]];
       /* 부분마다 끄고 켜며 오른쪽 위 프레임 숫자를 봄 (새 맵 2026-11-09) */
       for (const [label, get, set] of T) { const b = document.createElement('button'); b.type = 'button'; b.style.cssText = BS; const draw = () => { b.textContent = `${label} ${get() ? '켬' : '끔'}`; b.style.opacity = get() ? 1 : .5; }; b.onclick = () => { set(!get()); draw(); }; draw(); inner.append(b); }
+      { const st = document.createElement('div'); st.style.cssText = 'font-size:10.5px;color:#e8ffd0;line-height:1.5;width:100%'; const n = o => o.toLocaleString();
+        const xt = () => { let x = 0; bsm.traverse(q => { if (q.name === 'xray') { const g = q.geometry; x += (g.index ? g.index.count : g.attributes.position.count) / 3; } }); return x; };
+        const s1 = FG.stats(); st.textContent = `기체 ${FG.C.kname.split(' · ')[0]}: 그리기 ${s1.draws}번 · 삼각형 ${n(s1.tris)}개 (원본 ${FG.before.meshes}번 · ${n(Math.round(FG.before.tris))}개) · 비침 삼각형 ${n(Math.round(xt()))}개`; inner.append(st); }   /* 기체 무게 (사용자 2026-11-09) */
       row.append(head); box.append(row, inner); } }
   function size() { const r = canvas.getBoundingClientRect(); [Wd, Hd] = perf.size(r.width, r.height); renderer.setSize(Wd, Hd, false); bloom.size(Wd, Hd); camera.aspect = Wd / Hd; camera.updateProjectionMatrix(); glow.uRes.value.set(Wd, Hd);
     B0.mag.userData.setPixel(Hd / 20); birth.userData.setPx(Hd); fly.userData.setPx?.(Hd / (2 * Math.tan(camera.fov * Math.PI / 360))); }
@@ -259,8 +264,8 @@ export async function start(canvas, onProgress = () => {}) {
     { const LU = B0.pad.userData.lampU, q = (t - holdAt) / FILL; if (filling && q < 1.1) { LU.uIn.value = Math.max(0, 1.62 * (1 - Math.min(1, q))); LU.uInHead.value = q < 1 ? 1.4 : 0; } else { LU.uIn.value = -1; LU.uInHead.value = 0; } }
     birth.userData.update(t, dt); { const S = birth.userData.S; WARP.r = S.warpR; WARP.s = S.warpS; for (const o of [B0.pad, B0.mag, B0.star, stand]) o.position.y = S.punch; B0.star.userData.burst(S.burst); B0.ring.userData.impact(S.impR, S.impK); }
   };
-  /* 로딩 때 미리 합치기 (2026-11-09 · 그리기 횟수): 태어나는 장면을 미리 끝까지 돌려 보며 한 번도 안 움직인 부품만 부분(판·별·고리·탑·받침)마다 재질별로 합침 · 기체 모양도 칠마다 합침 */
-  { const AMS = []; for (const b of BASES) for (const o of [b.pad, b.star, b.ring, b.guards, b.mag, ...b.root.children.filter(c => c !== b.w)].filter(Boolean)) AMS.push(autoMerge(o));   /* 받침(흰 돌·금 띠·빛 홈·수정)도 */ AMS.push(autoMerge(bsm, { skip: o => o.name === 'xray' }));
+  /* 로딩 때 미리 합치기 (2026-11-09 · 그리기 횟수): 태어나는 장면을 미리 끝까지 돌려 보며 한 번도 안 움직인 부품만 부분(판·별·고리·탑·받침)마다 재질별로 합침 · 기체는 forgeship.js가 따로 합침 */
+  { const AMS = []; for (const b of BASES) for (const o of [b.pad, b.star, b.ring, b.guards, b.mag, ...b.root.children.filter(c => c !== b.w)].filter(Boolean)) AMS.push(autoMerge(o));   /* 받침(흰 돌·금 띠·빛 홈·수정)도 */
     wake(.6); for (let ts = 0; ts < launchAt + 1.5; ts += .08) { baseStep(ts, .08); for (const A of AMS) A.watch(); }
     birth.userData.stop(); let saved = 0; for (const A of AMS) saved += A.merge().saved; console.log('[새 맵] 미리 합친 부품', saved); }
   wake(.6);
@@ -275,6 +280,7 @@ export async function start(canvas, onProgress = () => {}) {
     /* 기체 */
     if (flying) { fly.position.y = flyY; fly.updateMatrixWorld(true); fly.userData.update(t, dt); for (const o of oldSh) o.visible = false; }
     zoneTick();
+    FG.step(dt, t, { moving: flying && Math.hypot(FS.vx, FS.vz) > 1.5, fire: flying && fireOn });   /* 기체 움직임: 날면 무빙 자세(날개짓 빨라짐) · 쏘면 입을 벌림 */
     { const sp = flying ? bship.getWorldPosition(v3) : v3.set(cam.x, cam.y, cam.z); sight.position.set(sp.x, sp.y - .2, sp.z); sightU.uOn.value += ((flying || dead ? 1 : 0) - sightU.uOn.value) * Math.min(1, dt * 1.5); sightU.uT.value = t; }
     if (shockT < .8) { shockT += dt; shock.visible = true; shockM.uniforms.uR.value = .3 + shockT * 4.5; shockM.uniforms.uI.value = Math.max(0, 1 - shockT / .8) * 1.3; } else shock.visible = false;
     /* 쏘기 · 벽에 맞으면 무지개빛이 번짐 */
@@ -296,6 +302,7 @@ export async function start(canvas, onProgress = () => {}) {
     { const r = Math.hypot(FS.x, FS.z); say.textContent = dead ? `다시 태어나기까지 ${Math.max(1, Math.ceil(reviveAt - t))}초` : !flying ? '태어나는 중' : baseAt(FS.x, FS.z) ? '태어나는 곳 · 출구로 나가면 맵 안' : '새 하늘 맵 · 한가운데까지 ' + Math.round(r) + 'm'; }
     /* 별똥별이 꽂힐 때 공간 일그러짐 충격파 (시작 기지와 같은 효과) */
     if (WARP.s > 0) { B0.w.localToWorld(v3.set(0, .2, 0)); v3.project(camera); bloom.warp(v3.x * .5 + .5, v3.y * .5 + .5, WARP.r, WARP.s, Wd / Hd); } else bloom.warp(.5, .5, 0, 0, Wd / Hd);
+    FG.preRender(camera);   /* 기체 불빛 방향 · 빛 덩이 자리 */
     const c1 = performance.now(); renderer.setRenderTarget(bloom.scene); renderer.clear(); renderer.render(scene, camera); CPU.calls = renderer.info.render.calls;
     bloom.render(Wd, Hd, !perf.st.bloom); perf.tick(dt);
     { const c2 = performance.now(); CPU.a += c1 - c0; CPU.b += c2 - c1; CPU.n++; CPU.tt += dt; if (CPU.tt > .5) { if (!CPU.el) { CPU.el = document.createElement('div'); CPU.el.style.cssText = 'position:absolute;top:calc(env(safe-area-inset-top,0px) + 50px);left:max(18px,env(safe-area-inset-left,0px));font-size:11px;color:rgba(185,255,74,.85);pointer-events:none;font-family:monospace'; document.querySelector('#ui').append(CPU.el); }

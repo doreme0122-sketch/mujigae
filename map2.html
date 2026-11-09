@@ -50,7 +50,7 @@ input[type=range]{flex:1;min-width:0;accent-color:#b9ff4a;height:18px;margin:0}
 </style>
 <script>
 window.__ver = fetch('ver.json?t=' + Date.now(), { cache: 'no-store' }).then(r => r.json()).then(j => {
-  const f = location.pathname.split('/').pop() || 'index.html', want = j[f], mine = window.__mine = '11092203';
+  const f = location.pathname.split('/').pop() || 'index.html', want = j[f], mine = window.__mine = '11092305';
   if (want && +want > +mine) { location.replace(f + '?v=' + want + '&r=' + Date.now() + location.hash); return new Promise(() => {}); } }).catch(() => {});
 </script>
 <script type="importmap">{"imports":{"three":"./vendor/three.module.js","three/addons/":"./vendor/addons/"}}</script>
@@ -63,6 +63,8 @@ window.__ver = fetch('ver.json?t=' + Date.now(), { cache: 'no-store' }).then(r =
   <button id="fire" type="button" aria-label="쏘기">쏘기</button>
   <div id="view"><button id="tog" type="button">설정 접기 ▴</button>
     <button id="again" type="button" style="font-size:12px;padding:6px 4px;border:1px solid var(--g);border-radius:10px;color:#f2ffe2;background:rgba(var(--gr),.2)">다시 태어나기</button>
+    <div class="cap">기체 스킨</div>
+    <select id="skin" aria-label="기체 스킨" style="font:inherit;font-size:11px;padding:4px 6px;border:1px solid rgba(var(--gr),.4);border-radius:9px;color:#e8ffd0;background:rgba(20,40,10,.6)"></select>
     <div class="cap">카메라</div>
     <div class="row"><label for="ang">각도</label><input id="ang" type="range" min="15" max="90" step="1" value="45"><output id="angv"></output></div>
     <div class="row"><label for="dist">거리</label><input id="dist" type="range" min="12" max="120" step="1" value="25"><output id="distv"></output></div>
@@ -72,7 +74,7 @@ window.__ver = fetch('ver.json?t=' + Date.now(), { cache: 'no-store' }).then(r =
 <div id="rot">기기를 가로로 돌려 주세요</div>
 <script type="module">
 await window.__ver;
-const { start } = await import('./src/proto/map2.js?v=11092203');
+const { start } = await import('./src/proto/map2.js?v=11092305');
 const bar = document.querySelector('#load i');
 document.querySelector('#tog').onclick = () => { const v = document.querySelector('#view'); v.classList.toggle('shut'); document.querySelector('#tog').textContent = v.classList.contains('shut') ? '설정 펴기 ▾' : '설정 접기 ▴'; };
 start(document.querySelector('#cv'), p => { bar.style.transform = `scaleX(${p})`; })

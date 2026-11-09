@@ -17,7 +17,7 @@ export function applyShipHeat(root, uT) {
   const inv = new THREE.Matrix4().copy(root.matrixWorld).invert(), bx = new THREE.Box3().setFromObject(root).applyMatrix4(inv);
   const U = { uHeat: { value: 0 }, uFlash: { value: 0 }, uInv: { value: new THREE.Matrix4() }, uZ0: { value: bx.min.z }, uZ1: { value: bx.max.z }, uT };
   root.traverse(o => { if (!o.isMesh) return; const arr = Array.isArray(o.material) ? o.material : [o.material];
-    const nm = arr.map(m0 => { const m = m0.clone(); m.userData = { ...m0.userData }; const prev = m0.onBeforeCompile;
+    const nm = arr.map(m0 => { if (m0.isShaderMaterial) return m0;   /* 직접 짠 칠(눈 · 빛 덩이 등)은 달아오를 금속이 아님 · 복사하면 시간 값이 끊겨 멈춤 */ const m = m0.clone(); m.userData = { ...m0.userData }; const prev = m0.onBeforeCompile;
       m.onBeforeCompile = (sh, r) => { prev?.call(m0, sh, r); Object.assign(sh.uniforms, U);
         sh.vertexShader = 'varying vec3 vHw;\n' + sh.vertexShader.replace('#include <project_vertex>', '#include <project_vertex>\n vHw = (modelMatrix * vec4(transformed, 1.)).xyz;');
         sh.fragmentShader = `varying vec3 vHw; uniform float uHeat, uFlash, uZ0, uZ1, uT; uniform mat4 uInv;\n${BB_GLSL}\n` + sh.fragmentShader.replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>

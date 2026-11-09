@@ -11,9 +11,9 @@
 import * as THREE from 'three';
 import { buildShip, engineSpots } from '../core/ships/build.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { flameMesh } from './sortie.js?v=11092203';
-import { MAP } from './mapfloor.js?v=11092203';
-import { applyShipHeat, heatVis } from './shipheat.js?v=11092203';
+import { flameMesh } from './sortie.js?v=11092305';
+import { MAP } from './mapfloor.js?v=11092305';
+import { applyShipHeat, heatVis } from './shipheat.js?v=11092305';
 
 export const FLY = { LEN: 2, HOVER: .7, R: .8, SPEEDS: [9, 12, 15, 18], TURN: 7, ACC: .22, TURNMAX: 9,
   BASE: 9, SHIELD: 3, BOOST: 5, BOOSTK: 1.5 };   /* 기지 고리(반지름 9m)를 벗어나는 순간: 보호막 3초 · 가속 5초(1.5배) — 기지 출구 앞 매복에 바로 당하지 않게 */
@@ -42,11 +42,14 @@ export async function loadBlock(url) {
     region: (x, z) => { const k = at(x, z); return k < 0 ? 17 : reg[k]; } };
 }
 
-export async function makeFlight(renderer, B, start, face) {
-  const G = new THREE.Group();
-  const b = await buildShip(1, 1, 'ruby', { renderer, size: FLY.LEN }); const ship = b.root, sm = ship.children[0]; G.add(ship);
-  const sz = new THREE.Box3().setFromObject(sm).getSize(new THREE.Vector3()); const ENG = engineSpots(b.ship, sm, sz), K = FLY.LEN / 2.9;
-  mergeShip(sm);   /* 기체 부품 145개를 칠마다 하나로 (모양·칠 그대로 · 그리는 횟수 145번 → 몇 번) */
+/* model: 미리 만든 기체 { root, sm(모양 덩어리), engines(엔진 빛 자리) } — 없으면 예전 기체를 불러 옴 (초프리미엄 스킨은 forgeship.js가 만들어 넘김 · 엔진 불꽃 · 꼬리는 그 기체 효과를 넣을 때까지 안 그림) */
+export async function makeFlight(renderer, B, start, face, model = null) {
+  const G = new THREE.Group(), K = FLY.LEN / 2.9; let ship, sm, ENG;
+  if (model) { ship = model.root; sm = model.sm; ENG = model.engines; }
+  else { const b = await buildShip(1, 1, 'ruby', { renderer, size: FLY.LEN }); ship = b.root; sm = ship.children[0];
+    ENG = engineSpots(b.ship, sm, new THREE.Box3().setFromObject(sm).getSize(new THREE.Vector3()));
+    mergeShip(sm); }   /* 기체 부품 145개를 칠마다 하나로 (모양·칠 그대로 · 그리는 횟수 145번 → 몇 번) */
+  G.add(ship);
   const flames = ENG.map(() => { const f = flameMesh(); G.add(f); return f; });
   /* 그림자: 떠 있는 높이가 높을수록 넓고 옅게 */
   const shM = new THREE.ShaderMaterial({ transparent: true, depthWrite: false, uniforms: { uA: { value: .5 } },
@@ -188,6 +191,7 @@ void main() {
     const gf = (S.goo || 0) * (.5 + .5 * Math.sin(t * 23) * Math.sin(t * 7.3)), I = (.35 + S.thr * 1.1) * (1 + .5 * bk) * (1 - .45 * gf),   /* 점액에 붙잡히면 불꽃이 힘겹게 깜빡임 */ len = (.35 + S.thr * 1.1) * K * (1 + .8 * bk);   /* 가속 중엔 불꽃이 길고 밝음 (힘을 더 냄) */
     flames.forEach((f, i) => { v.copy(ENG[i]).applyMatrix4(sm.matrixWorld); const u = f.material.uniforms; u.uA.value.copy(v); u.uB.value.copy(v).addScaledVector(fw, -len * (.9 + .1 * Math.sin(t * 50 + i))); u.uW.value = .1 * K * (1 + S.thr * .4); u.uI.value = I; u.uT.value = t; });
     /* 꼬리 */
+    trail.visible = ENG.length > 0; if (ENG.length) {
     c.set(0, 0, 0); ENG.forEach(p => c.add(v.copy(p).applyMatrix4(sm.matrixWorld))); c.divideScalar(ENG.length);
     if (t < (S.dashUntil || 0) + .35) hist.length = 0;   /* 빛 칼날 도약 동안은 엔진 꼬리를 남기지 않음 (굵은 띠가 남던 것) */
     hist.unshift({ p: c.clone(), t }); if (hist.length > NT) hist.pop();
@@ -195,7 +199,7 @@ void main() {
     for (let i = 0; i < NT; i++) { const h = hist[Math.min(i, hist.length - 1)], al = h ? Math.max(0, 1 - (t - h.t) / life) : 0, p = h ? h.p : c, w = (.1 * (1 - i / NT) + .02) * K * 1.4;
       const sx = Math.cos(S.head) * w, sz2 = -Math.sin(S.head) * w;
       tp[i * 6] = p.x + sx; tp[i * 6 + 1] = p.y; tp[i * 6 + 2] = p.z + sz2; tp[i * 6 + 3] = p.x - sx; tp[i * 6 + 4] = p.y; tp[i * 6 + 5] = p.z - sz2; ta[i * 2] = ta[i * 2 + 1] = al * S.thr; }
-    tg.attributes.position.needsUpdate = tg.attributes.aA.needsUpdate = true;
+    tg.attributes.position.needsUpdate = tg.attributes.aA.needsUpdate = true; }
     { const P = sg.attributes.position, L = sg.attributes.aL;
       SP.forEach((s, i) => { if (s.l > 0) { s.l -= dt; s.v.y -= 14 * dt; s.p.addScaledVector(s.v, dt); if (s.p.y < .05) { s.p.y = .05; s.v.y *= -.3; s.v.x *= .6; s.v.z *= .6; } } P.setXYZ(i, s.p.x, s.p.y, s.p.z); L.setX(i, Math.max(0, s.l) * 1.6); });
       P.needsUpdate = L.needsUpdate = true; }
