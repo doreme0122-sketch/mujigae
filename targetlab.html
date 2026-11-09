@@ -1,0 +1,222 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>타겟팅 표시 시안</title>
+<style>
+:root{--bg:#070914;--card:#0e1224;--line:#26304f;--fg:#e9ecff;--sub:#9aa3c7;--acc:#b9ff4a}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.6 system-ui,-apple-system,"Apple SD Gothic Neo","Noto Sans KR",sans-serif;padding:16px max(16px,env(safe-area-inset-left)) 40px max(16px,env(safe-area-inset-right))}
+h1{font-size:20px;font-weight:600;margin:4px 0 2px}
+.lead{color:var(--sub);margin:0 0 16px;font-size:13.5px}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,420px),1fr));gap:16px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;overflow:hidden}
+.card canvas{display:block;width:100%;aspect-ratio:16/10;touch-action:manipulation;cursor:pointer}
+.meta{padding:10px 14px 14px}
+.meta b{font-size:16px}
+.meta .tag{display:inline-block;margin-left:6px;font-size:11.5px;color:#0b1a00;background:var(--acc);border-radius:20px;padding:1px 8px;vertical-align:2px}
+.meta p{margin:4px 0 0;color:var(--sub);font-size:13px}
+.state{font-size:12px;color:#cfd6ff;margin-top:6px;font-variant-numeric:tabular-nums}
+.foot{color:var(--sub);font-size:12.5px;margin-top:18px}
+</style>
+</head>
+<body>
+<h1>타겟팅 표시 시안 4가지</h1>
+<p class="lead">각 화면이 자동 조준 → 터치 고정 → 적이 시야 밖으로 도망 → 고정 끊김 → 대상 버튼 바꾸기 순서로 계속 돌아요. 화면을 누르면 그 자리에서 고정/풀기를 직접 해 볼 수 있어요.</p>
+<div class="grid" id="grid"></div>
+<p class="foot">오른쪽 아래 작은 버튼 두 개 = 대상 버튼 (발톱 = 몬스터 먼저 · 기체 = 플레이어 먼저). 밝게 켜진 쪽이 지금 고른 것.</p>
+<script>
+const SETS = [
+  { id: 'A', name: '프리즘 조각', tag: '추천', desc: '자동: 유리 조각 셋이 맴돎 · 고정: 조각이 모여 육각 결정 고리로 닫히고 빛줄기가 이어짐 · 끊김: 빛줄기에 금이 가고 결정이 깨져 흩어짐' },
+  { id: 'B', name: '반사 거울 모서리', desc: '자동: 네 모서리 거울 사이로 빛이 반사돼 미끄러짐 · 고정: 거울이 다가와 마름모 틀로 돌며 잠김, 빛줄기가 꺾여 반사 · 끊김: 거울에 금이 가며 튕겨 나감' },
+  { id: 'C', name: '무지개 궤도 고리', desc: '자동: 끊긴 무지개 호가 천천히 돎 · 고정: 호가 이어져 온전한 고리 + 안쪽 눈금이 조여듦 · 끊김: 고리가 풀려 한 줄로 늘어나다 사라짐' },
+  { id: 'D', name: '조리개 눈', desc: '자동: 조리개 날개가 반쯤 열려 적을 봄 · 고정: 날개가 착 닫히며 가운데 프리즘 눈동자가 빛남 · 끊김: 날개가 빙글 열리며 흩어짐' },
+];
+const CYC = 11;   /* 한 바퀴 11초 */
+const PH = [[0, '자동 조준'], [2.4, '터치! 고정'], [3.0, '고정 중'], [5.4, '시야 밖으로 도망 · 1.5초 버팀'], [7.3, '고정 끊김'], [8.2, '대상 버튼: 플레이어 먼저'], [9.6, '자동 조준 (플레이어)']];
+const TAU = Math.PI * 2, clamp = (x, a, b) => x < a ? a : x > b ? b : x, ease = x => x * x * (3 - 2 * x), eob = x => { const c = 1.7; return 1 + (c + 1) * Math.pow(x - 1, 3) + c * Math.pow(x - 1, 2); };
+const hue = (h, l = 70, a = 1) => `hsla(${h % 360},95%,${l}%,${a})`;
+function rnd(s) { return () => (s = (s * 16807) % 2147483647) / 2147483647; }
+
+const grid = document.getElementById('grid');
+const views = SETS.map((S, i) => {
+  const c = document.createElement('div'); c.className = 'card';
+  c.innerHTML = `<canvas></canvas><div class="meta"><b>${S.id}. ${S.name}</b>${S.tag ? `<span class="tag">${S.tag}</span>` : ''}<p>${S.desc}</p><div class="state">-</div></div>`;
+  grid.appendChild(c);
+  const cv = c.querySelector('canvas'), st = c.querySelector('.state');
+  const R = rnd(7 + i * 13), stars = Array.from({ length: 70 }, () => [R(), R(), R() * 1.2 + .2, R() * 6]);
+  const v = { S, cv, st, stars, manual: null, shards: [] };
+  cv.addEventListener('pointerdown', e => { const r = cv.getBoundingClientRect(); v.tap = { x: (e.clientX - r.left) / r.width, y: (e.clientY - r.top) / r.height, t: performance.now() / 1000 }; v.manual = v.manual ? null : { t0: performance.now() / 1000 }; });
+  return v;
+});
+
+/* ── 그림 재료 ── */
+function bg(g, W, H, v, t) {
+  const gr = g.createRadialGradient(W * .55, H * .45, 10, W * .5, H * .5, W * .8); gr.addColorStop(0, '#1a1f45'); gr.addColorStop(.6, '#0c1029'); gr.addColorStop(1, '#05060f'); g.fillStyle = gr; g.fillRect(0, 0, W, H);
+  for (const [x, y, s, p] of v.stars) { g.fillStyle = `rgba(220,230,255,${.25 + .35 * (.5 + .5 * Math.sin(t * 1.3 + p))})`; g.fillRect(x * W, y * H, s, s); }
+  /* 아래 구름 바다 */
+  for (let k = 0; k < 3; k++) { g.fillStyle = `rgba(150,170,255,${.05 + k * .03})`; g.beginPath(); g.moveTo(0, H); for (let x = 0; x <= W; x += 8) g.lineTo(x, H * (.86 - k * .05) + Math.sin(x * .02 + t * .4 + k * 2) * 6); g.lineTo(W, H); g.fill(); }
+}
+function sight(g, W, H, sx, sy, rr) {   /* 시야: 기체 둘레는 밝고 바깥은 어둑 */
+  const gr = g.createRadialGradient(sx, sy, rr * .45, sx, sy, rr); gr.addColorStop(0, 'rgba(2,3,10,0)'); gr.addColorStop(1, 'rgba(2,3,10,.62)'); g.fillStyle = gr; g.fillRect(0, 0, W, H);
+  g.strokeStyle = 'rgba(160,190,255,.12)'; g.setLineDash([3, 6]); g.beginPath(); g.arc(sx, sy, rr * .82, 0, TAU); g.stroke(); g.setLineDash([]);
+}
+function ship(g, x, y, a, s, t) {   /* 내 기체: 앞이 뾰족한 날개 + 무지개 꼬리 */
+  g.save(); g.translate(x, y); g.rotate(a);
+  for (let i = 0; i < 7; i++) { g.strokeStyle = hue(t * 90 + i * 40, 65, .35 - i * .04); g.lineWidth = s * (.5 - i * .05); g.beginPath(); g.moveTo(-s * .9 - i * s * .45, Math.sin(t * 9 + i) * s * .08); g.lineTo(-s * .9 - (i + 1) * s * .45, Math.sin(t * 9 + i + 1) * s * .08); g.stroke(); }
+  const body = g.createLinearGradient(-s, 0, s * 1.4, 0); body.addColorStop(0, '#5a6aa8'); body.addColorStop(.6, '#dfe6ff'); body.addColorStop(1, '#ffffff');
+  g.fillStyle = body; g.beginPath(); g.moveTo(s * 1.4, 0); g.lineTo(-s * .2, -s * .32); g.lineTo(-s * .55, -s * 1.05); g.lineTo(-s * .95, -s * .9); g.lineTo(-s * .7, -s * .2); g.lineTo(-s * .95, 0); g.lineTo(-s * .7, s * .2); g.lineTo(-s * .95, s * .9); g.lineTo(-s * .55, s * 1.05); g.lineTo(-s * .2, s * .32); g.closePath(); g.fill();
+  g.strokeStyle = 'rgba(255,255,255,.6)'; g.lineWidth = 1; g.stroke();
+  g.fillStyle = '#7ef9ff'; g.beginPath(); g.ellipse(s * .35, 0, s * .28, s * .12, 0, 0, TAU); g.fill();
+  g.restore();
+}
+function beast(g, x, y, s, t, kind) {   /* 적: 몬스터(촉수 달린 해파리 짐승) 또는 적 플레이어 기체 */
+  if (kind === 'player') { g.save(); g.translate(x, y); g.rotate(Math.PI + Math.sin(t) * .2);
+    const b = g.createLinearGradient(-s, 0, s, 0); b.addColorStop(0, '#5a1530'); b.addColorStop(1, '#ff6a8a'); g.fillStyle = b;
+    g.beginPath(); g.moveTo(s * 1.2, 0); g.lineTo(-s * .3, -s * .4); g.lineTo(-s * .7, -s * 1.1); g.lineTo(-s, -s * .2); g.lineTo(-s * .8, 0); g.lineTo(-s, s * .2); g.lineTo(-s * .7, s * 1.1); g.lineTo(-s * .3, s * .4); g.closePath(); g.fill(); g.strokeStyle = 'rgba(255,200,210,.7)'; g.lineWidth = 1; g.stroke();
+    g.fillStyle = '#ffd36a'; g.beginPath(); g.ellipse(s * .3, 0, s * .25, s * .1, 0, 0, TAU); g.fill(); g.restore(); return; }
+  for (let i = 0; i < 6; i++) { const a0 = (i / 5 - .5) * 1.6; g.strokeStyle = `rgba(190,120,255,${.55 - i * .03})`; g.lineWidth = s * .14; g.lineCap = 'round'; g.beginPath(); g.moveTo(x + Math.sin(a0) * s * .6, y + s * .3);
+    for (let k = 1; k <= 6; k++) g.lineTo(x + Math.sin(a0) * s * (.6 + k * .12) + Math.sin(t * 2.2 + i + k * .7) * s * .18 * k / 6, y + s * .3 + k * s * .22); g.stroke(); }
+  const gb = g.createRadialGradient(x - s * .2, y - s * .3, s * .1, x, y, s); gb.addColorStop(0, '#f4d6ff'); gb.addColorStop(.45, '#a35cf0'); gb.addColorStop(1, '#3b1a6e');
+  g.fillStyle = gb; g.beginPath(); g.ellipse(x, y, s * (1 + Math.sin(t * 2.2) * .05), s * (.75 - Math.sin(t * 2.2) * .04), 0, Math.PI, 0); g.quadraticCurveTo(x + s, y + s * .35, x, y + s * .38); g.quadraticCurveTo(x - s, y + s * .35, x - s, y); g.fill();
+  for (const ex of [-.35, .35]) { g.fillStyle = '#fff6a0'; g.beginPath(); g.arc(x + ex * s, y - s * .05, s * .12, 0, TAU); g.fill(); g.fillStyle = '#ff7a2a'; g.beginPath(); g.arc(x + ex * s, y - s * .05, s * .06, 0, TAU); g.fill(); }
+}
+function bolt(g, sx, sy, tx, ty, p) { const x = sx + (tx - sx) * p, y = sy + (ty - sy) * p; for (let i = 0; i < 5; i++) { g.fillStyle = hue(200 + i * 30, 75, .8 - i * .15); g.beginPath(); g.arc(x - (tx - sx) * i * .02, y - (ty - sy) * i * .02, 3.5 - i * .5, 0, TAU); g.fill(); } }
+
+/* 빛줄기 (고정 중): 기체 → 적 · 팽팽함(ten) 높을수록 가늘고 떨림 · crack이면 금 */
+function thread(g, sx, sy, tx, ty, t, ten, style, crack) {
+  const dx = tx - sx, dy = ty - sy, L = Math.hypot(dx, dy), nx = -dy / L, ny = dx / L;
+  g.save(); g.lineCap = 'round';
+  if (style === 'B') {   /* 거울에 꺾여 반사되는 빛: 가운데에서 한 번 꺾임 */
+    const mx = sx + dx * .5 + nx * 26 * Math.sin(t * 1.2), my = sy + dy * .5 + ny * 26 * Math.sin(t * 1.2);
+    for (let k = 0; k < 3; k++) { g.strokeStyle = hue(t * 60 + k * 120, 70, .5 - ten * .25); g.lineWidth = 1.6; g.beginPath(); g.moveTo(sx + nx * (k - 1) * 1.5, sy + ny * (k - 1) * 1.5); g.lineTo(mx, my); g.lineTo(tx + nx * (k - 1) * 1.5, ty + ny * (k - 1) * 1.5); g.stroke(); }
+    g.fillStyle = 'rgba(255,255,255,.9)'; g.beginPath(); g.arc(mx, my, 2.5, 0, TAU); g.fill();
+  } else if (style === 'C') {   /* 흘러가는 빛 점 */
+    for (let i = 0; i < 26; i++) { const u = (i / 26 + t * .45) % 1, w = Math.sin(u * TAU * 2 + t * 6) * ten * 4; g.fillStyle = hue(u * 360 + t * 40, 72, .85 * Math.sin(u * Math.PI)); g.beginPath(); g.arc(sx + dx * u + nx * w, sy + dy * u + ny * w, 1.8, 0, TAU); g.fill(); }
+  } else {
+    const N = 24, pts = []; for (let i = 0; i <= N; i++) { const u = i / N, w = Math.sin(u * Math.PI) * Math.sin(u * 30 - t * 30) * ten * 3.5; pts.push([sx + dx * u + nx * w, sy + dy * u + ny * w]); }
+    const seg = (a, b, col, lw) => { g.strokeStyle = col; g.lineWidth = lw; g.beginPath(); g.moveTo(...pts[a]); for (let i = a + 1; i <= b; i++) g.lineTo(...pts[i]); g.stroke(); };
+    const cut = crack ? Math.floor(N * .55) : -1;
+    for (const [a, b] of crack ? [[0, cut - 1], [cut + 1, N]] : [[0, N]]) { seg(a, b, 'rgba(255,90,110,.25)', 5 - ten * 2); seg(a, b, hue(t * 80, 85, .9), 1.4); }
+    if (crack) { const [cx, cy] = pts[cut]; for (let k = 0; k < 5; k++) { const a = k * 1.3 + t * 3; g.strokeStyle = 'rgba(255,255,255,.8)'; g.lineWidth = 1; g.beginPath(); g.moveTo(cx, cy); g.lineTo(cx + Math.cos(a) * 7, cy + Math.sin(a) * 7); g.stroke(); } }
+    if (style === 'D') { g.fillStyle = 'rgba(255,255,255,.0)'; }
+  }
+  g.restore();
+}
+
+/* ── 시안별 표시 ── */
+const DRAW = {
+  A: { /* 프리즘 조각 */
+    auto(g, x, y, r, t, fire) { for (let i = 0; i < 3; i++) { const a = t * .9 + i * TAU / 3, d = r * (1.35 - fire * .25), px = x + Math.cos(a) * d, py = y + Math.sin(a) * d, face = Math.atan2(y - py, x - px);
+        g.save(); g.translate(px, py); g.rotate(face + Math.sin(t * 2 + i) * .25 * (1 - fire)); prism(g, r * .32, t + i, .85); g.restore(); } },
+    lock(g, x, y, r, t, snap, ten, blink) { const a0 = t * .5, rr = r * (1.25 + (1 - snap) * .5), vis = blink ? (Math.sin(t * 22) > 0 ? 1 : .25) : 1;
+      for (let i = 0; i < 6; i++) { const a = a0 + i * TAU / 6, a2 = a0 + (i + 1) * TAU / 6, gap = (1 - snap) * .2 + .03 + ten * .05;
+        g.strokeStyle = hue(i * 60 + t * 120, 72, .95 * vis); g.lineWidth = 2.6; g.beginPath(); g.moveTo(x + Math.cos(a + gap) * rr, y + Math.sin(a + gap) * rr); g.lineTo(x + Math.cos(a2 - gap) * rr, y + Math.sin(a2 - gap) * rr); g.stroke();
+        g.fillStyle = `rgba(255,255,255,${.9 * vis})`; g.beginPath(); g.arc(x + Math.cos(a) * rr, y + Math.sin(a) * rr, 2.2, 0, TAU); g.fill(); }
+      const sw = (t * 1.6) % 1; g.strokeStyle = `rgba(255,255,255,${.7 * vis})`; g.lineWidth = 4; g.beginPath(); g.arc(x, y, rr, sw * TAU, sw * TAU + .35); g.stroke();   /* 고리를 따라 도는 무지개 빛 */
+      if (snap < 1) { g.strokeStyle = `rgba(255,255,255,${(1 - snap) * .8})`; g.lineWidth = 1; g.beginPath(); g.arc(x, y, rr + (1 - snap) * 20, 0, TAU); g.stroke(); } },
+    brk(g, x, y, r, p, t, v) { for (let i = 0; i < 12; i++) { const a = i * TAU / 12 + i, d = r * 1.3 + p * r * 2.4 * (.6 + (i % 3) * .3); g.save(); g.translate(x + Math.cos(a) * d, y + Math.sin(a) * d + p * p * 30); g.rotate(a + p * 8 * (i % 2 ? 1 : -1)); prism(g, r * .18 * (1 - p * .5), t + i, 1 - p); g.restore(); } },
+    arrow(g, x, y, a, t, ten) { g.save(); g.translate(x, y); g.rotate(a); prism(g, 11, t, .95); g.restore(); },
+  },
+  B: { /* 반사 거울 모서리 */
+    auto(g, x, y, r, t, fire) { const d = r * (1.35 - fire * .2); for (let i = 0; i < 4; i++) { const a = i * TAU / 4 + Math.PI / 4 + Math.sin(t) * .05; mirror(g, x + Math.cos(a) * d, y + Math.sin(a) * d, a + Math.PI * .75, r * .42, t + i, .85); }
+      const u = (t * .6) % 1, ia = Math.floor(u * 4), f = (u * 4) % 1, a1 = ia * TAU / 4 + Math.PI / 4, a2 = (ia + 1) * TAU / 4 + Math.PI / 4;
+      g.strokeStyle = hue(t * 90, 80, .6); g.lineWidth = 1.2; g.beginPath(); g.moveTo(x + Math.cos(a1) * d, y + Math.sin(a1) * d); g.lineTo(x + (Math.cos(a1) + (Math.cos(a2) - Math.cos(a1)) * f) * d, y + (Math.sin(a1) + (Math.sin(a2) - Math.sin(a1)) * f) * d); g.stroke(); },
+    lock(g, x, y, r, t, snap, ten, blink) { const vis = blink ? (Math.sin(t * 22) > 0 ? 1 : .25) : 1, d = r * (1.15 + (1 - snap) * .5), rot = eob(snap) * Math.PI / 4 + t * .3;
+      g.save(); g.globalAlpha = vis; for (let i = 0; i < 4; i++) { const a = i * TAU / 4 + rot; mirror(g, x + Math.cos(a) * d, y + Math.sin(a) * d, a + Math.PI * .75, r * .62, t + i, 1); }
+      g.strokeStyle = hue(t * 100, 75, .55); g.lineWidth = 1; g.beginPath(); for (let i = 0; i <= 4; i++) { const a = i * TAU / 4 + rot; g[i ? 'lineTo' : 'moveTo'](x + Math.cos(a) * d * 1.02, y + Math.sin(a) * d * 1.02); } g.stroke(); g.restore(); },
+    brk(g, x, y, r, p, t) { for (let i = 0; i < 8; i++) { const a = i * TAU / 8 + .3, d = r * 1.2 + p * r * 2.6; g.save(); g.globalAlpha = 1 - p; mirror(g, x + Math.cos(a) * d, y + Math.sin(a) * d + p * p * 25, a + p * 6, r * .3, t + i, 1, true); g.restore(); } },
+    arrow(g, x, y, a, t) { g.save(); g.translate(x, y); g.rotate(a); mirror(g, -4, 0, Math.PI * .75, 14, t, 1); g.fillStyle = hue(t * 90, 80, .9); g.beginPath(); g.moveTo(10, 0); g.lineTo(2, -5); g.lineTo(2, 5); g.fill(); g.restore(); },
+  },
+  C: { /* 무지개 궤도 고리 */
+    auto(g, x, y, r, t, fire) { const rr = r * (1.35 - fire * .15); for (let k = 0; k < 3; k++) { const a = t * (.8 + k * .2) + k * 2.1; for (let i = 0; i < 18; i++) { const u = i / 18; g.strokeStyle = hue(u * 360 + t * 60, 70, .8 * Math.sin(u * Math.PI)); g.lineWidth = 2.2; g.beginPath(); g.arc(x, y, rr, a + u * 1.2, a + (u + 1 / 18) * 1.2); g.stroke(); } } },
+    lock(g, x, y, r, t, snap, ten, blink) { const vis = blink ? (Math.sin(t * 22) > 0 ? 1 : .25) : 1, rr = r * (1.3 + (1 - snap) * .4), span = TAU * ease(snap);
+      for (let i = 0; i < 60; i++) { const u = i / 60; if (u * TAU > span) break; g.strokeStyle = hue(u * 360 + t * 90, 70, .95 * vis); g.lineWidth = 2.6; g.beginPath(); g.arc(x, y, rr, t * .4 + u * TAU, t * .4 + (u + 1 / 60) * TAU + .01); g.stroke(); }
+      const ri = rr * (.78 - ten * .1); for (let i = 0; i < 12; i++) { const a = -t * .9 + i * TAU / 12; g.strokeStyle = `rgba(255,255,255,${.75 * vis * snap})`; g.lineWidth = i % 3 ? 1 : 2; g.beginPath(); g.moveTo(x + Math.cos(a) * ri, y + Math.sin(a) * ri); g.lineTo(x + Math.cos(a) * (ri - (i % 3 ? 4 : 8)), y + Math.sin(a) * (ri - (i % 3 ? 4 : 8))); g.stroke(); } },
+    brk(g, x, y, r, p, t) { const rr = r * 1.3, L = TAU * rr; for (let i = 0; i < 40; i++) { const u = i / 40, a = u * TAU, cx = x + Math.cos(a) * rr * (1 - p), cy = y + Math.sin(a) * rr * (1 - p), lx = x - L * .5 * p + u * L * p * .9, ly = y + Math.sin(u * 20 + t * 8) * 6 * p;
+        g.fillStyle = hue(u * 360, 72, 1 - p); g.beginPath(); g.arc(cx + (lx - cx) * p, cy + (ly - cy) * p, 2, 0, TAU); g.fill(); } },
+    arrow(g, x, y, a, t) { g.save(); g.translate(x, y); g.rotate(a); for (let i = 0; i < 10; i++) { const u = i / 10; g.strokeStyle = hue(u * 360 + t * 90, 70, .9); g.lineWidth = 2.4; g.beginPath(); g.arc(-6, 0, 10, -1 + u * 2, -1 + (u + .1) * 2); g.stroke(); } g.fillStyle = '#fff'; g.beginPath(); g.moveTo(12, 0); g.lineTo(4, -4); g.lineTo(4, 4); g.fill(); g.restore(); },
+  },
+  D: { /* 조리개 눈 */
+    auto(g, x, y, r, t, fire) { iris(g, x, y, r * 1.4, .55 + Math.sin(t * 1.5) * .05 - fire * .2, t, .8, 0); },
+    lock(g, x, y, r, t, snap, ten, blink) { const vis = blink ? (Math.sin(t * 22) > 0 ? 1 : .25) : 1; iris(g, x, y, r * 1.35, .55 - eob(snap) * .32 + ten * .08, t, vis, snap); },
+    brk(g, x, y, r, p, t) { iris(g, x, y, r * (1.35 + p * 1.2), .23 + p * .8, t + p * 6, 1 - p, 0, p); },
+    arrow(g, x, y, a, t) { g.save(); g.translate(x, y); g.rotate(a); iris(g, 0, 0, 12, .35, t, 1, 1); g.fillStyle = '#fff'; g.beginPath(); g.moveTo(17, 0); g.lineTo(11, -4); g.lineTo(11, 4); g.fill(); g.restore(); },
+  },
+};
+function prism(g, s, t, a) {   /* 유리 삼각 조각: 면마다 다른 밝기 + 가장자리 무지개 번짐 */
+  g.save(); g.globalAlpha = a; g.beginPath(); g.moveTo(s, 0); g.lineTo(-s * .6, -s * .55); g.lineTo(-s * .35, 0); g.lineTo(-s * .6, s * .55); g.closePath();
+  const gr = g.createLinearGradient(-s, -s, s, s); gr.addColorStop(0, 'rgba(180,220,255,.25)'); gr.addColorStop(.5, 'rgba(255,255,255,.85)'); gr.addColorStop(1, 'rgba(150,180,255,.3)'); g.fillStyle = gr; g.fill();
+  g.lineWidth = 1.2; for (let k = 0; k < 3; k++) { g.strokeStyle = hue(t * 70 + k * 120, 65, .6); g.save(); g.translate((k - 1) * .8, 0); g.stroke(); g.restore(); }
+  g.strokeStyle = 'rgba(255,255,255,.9)'; g.lineWidth = .8; g.beginPath(); g.moveTo(s, 0); g.lineTo(-s * .35, 0); g.stroke(); g.restore();
+}
+function mirror(g, x, y, a, s, t, al, cracked) {   /* ㄱ자 거울 모서리: 은빛 면 + 빛이 스치는 반사 */
+  g.save(); g.translate(x, y); g.rotate(a); g.globalAlpha *= al;
+  g.fillStyle = 'rgba(210,225,255,.85)'; g.beginPath(); g.moveTo(0, 0); g.lineTo(s, 0); g.lineTo(s, 3); g.lineTo(3, 3); g.lineTo(3, s); g.lineTo(0, s); g.closePath(); g.fill();
+  const u = (t * .8) % 1; g.fillStyle = hue(t * 80, 85, .9); g.fillRect(u * s, 0, 4, 3); g.fillRect(0, u * s, 3, 4);
+  if (cracked) { g.strokeStyle = '#fff'; g.lineWidth = .8; g.beginPath(); g.moveTo(s * .3, 0); g.lineTo(s * .45, 3); g.moveTo(0, s * .5); g.lineTo(3, s * .6); g.stroke(); }
+  g.restore();
+}
+function iris(g, x, y, R, open, t, al, core, burst = 0) {   /* 조리개: 날개 7장이 겹쳐 돌며 열고 닫힘 · 가운데 프리즘 눈동자 */
+  g.save(); g.globalAlpha = clamp(al, 0, 1); const n = 7, rot = t * .4 + (1 - open) * 1.2;
+  for (let i = 0; i < n; i++) { const a = rot + i * TAU / n; g.save(); g.translate(x, y); g.rotate(a);
+    g.beginPath(); g.moveTo(R * open, 0); g.quadraticCurveTo(R * .9, -R * .45, R, -R * .1 - burst * R * .3); g.lineTo(R * (open + .15), R * .25); g.closePath();
+    g.fillStyle = `rgba(30,40,80,.55)`; g.fill(); g.strokeStyle = hue(i * 50 + t * 60, 72, .85); g.lineWidth = 1.3; g.stroke(); g.restore(); }
+  if (core > .01) { const cr = R * open * .7; const gr = g.createRadialGradient(x, y, 0, x, y, cr); gr.addColorStop(0, `rgba(255,255,255,${core})`); gr.addColorStop(.5, hue(t * 120, 70, core * .7)); gr.addColorStop(1, 'rgba(255,255,255,0)'); g.fillStyle = gr; g.beginPath(); g.arc(x, y, cr, 0, TAU); g.fill(); }
+  g.strokeStyle = 'rgba(255,255,255,.35)'; g.lineWidth = 1; g.beginPath(); g.arc(x, y, R, 0, TAU); g.stroke(); g.restore();
+}
+function tapRing(g, x, y, p) { g.strokeStyle = `rgba(255,255,255,${(1 - p) * .9})`; g.lineWidth = 2; g.beginPath(); g.arc(x, y, 8 + p * 30, 0, TAU); g.stroke(); g.fillStyle = `rgba(255,255,255,${(1 - p) * .35})`; g.beginPath(); g.arc(x, y, 10, 0, TAU); g.fill(); }
+function priBtns(g, W, H, mode, set, t) {   /* 대상 버튼 두 개: 발톱(몬스터) · 기체(플레이어) */
+  const s = Math.min(W, H) * .085, y = H - s * 1.25;
+  [['m', W - s * 3.4], ['p', W - s * 1.2]].forEach(([k, x]) => { const on = k === mode; g.save(); g.translate(x, y);
+    g.fillStyle = on ? 'rgba(185,255,74,.18)' : 'rgba(10,14,30,.6)'; g.strokeStyle = on ? hue(t * 80, 75, .95) : 'rgba(170,185,230,.45)'; g.lineWidth = on ? 2 : 1;
+    g.beginPath(); if (set === 'A') { for (let i = 0; i < 6; i++) { const a = i * TAU / 6 + Math.PI / 6; g[i ? 'lineTo' : 'moveTo'](Math.cos(a) * s, Math.sin(a) * s); } g.closePath(); }
+    else if (set === 'B') { g.moveTo(0, -s); g.lineTo(s, 0); g.lineTo(0, s); g.lineTo(-s, 0); g.closePath(); } else g.arc(0, 0, s * .95, 0, TAU); g.fill(); g.stroke();
+    g.strokeStyle = on ? '#fff' : 'rgba(200,210,240,.7)'; g.fillStyle = g.strokeStyle; g.lineWidth = 1.6; g.lineCap = 'round';
+    if (k === 'm') for (let i = -1; i <= 1; i++) { g.beginPath(); g.moveTo(-s * .35 + i * s * .28, -s * .45); g.quadraticCurveTo(-s * .05 + i * s * .3, 0, s * .2 + i * s * .26, s * .45); g.stroke(); }
+    else { g.beginPath(); g.moveTo(0, -s * .55); g.lineTo(s * .45, s * .4); g.lineTo(0, s * .18); g.lineTo(-s * .45, s * .4); g.closePath(); g.fill(); }
+    g.restore(); });
+}
+
+function frame() {
+  const now = performance.now() / 1000;
+  for (const v of views) {
+    const cv = v.cv, dpr = Math.min(2, devicePixelRatio || 1), W = cv.clientWidth, H = cv.clientHeight; if (!W) continue;
+    if (cv.width !== Math.round(W * dpr)) { cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr); }
+    const g = cv.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0);
+    const D = DRAW[v.S.id], t = now, c = (now % CYC), r = Math.min(W, H) * .1;
+    const sx = W * .2 + Math.sin(t * .7) * 6, sy = H * .62 + Math.cos(t * .9) * 5, sightR = Math.min(W, H) * .78;
+    /* 적 움직임: 8.2초 전엔 몬스터, 그 뒤엔 적 플레이어 */
+    const who = c < 8.2 ? 'monster' : 'player';
+    let tx = W * .62 + Math.sin(t * .6) * W * .05, ty = H * .4 + Math.sin(t * .9) * H * .05;
+    if (c > 5.4 && c < 8.2) { const k = ease(clamp((c - 5.4) / 1.4, 0, 1)); tx += k * W * .55; ty -= k * H * .05; }
+    if (c >= 8.2 && c < 9) { const k = 1 - ease((c - 8.2) / .8); tx += k * W * .55; }
+    const inView = tx < W - 6;
+    bg(g, W, H, v, t);
+    if (who === 'monster') beast(g, tx, ty, r * 1.05, t, 'monster'); else beast(g, tx, ty, r * .8, t, 'player');
+    /* 엉뚱한 몬스터 하나 (플레이어 먼저일 땐 무시됨) */
+    beast(g, W * .78, H * .74, r * .6, t + 2, 'monster');
+    sight(g, W, H, sx, sy, sightR);
+    ship(g, sx, sy, Math.atan2(ty - sy, tx - sx) * .35, r * .6, t);
+    /* 단계 */
+    let label = PH[0][1]; for (const [s, l] of PH) if (c >= s) label = l;
+    if (v.manual) { const e = now - v.manual.t0, tp = v.tap; label = '직접 고정 (다시 누르면 풀림)'; const snap = clamp(e / .3, 0, 1); thread(g, sx + r * .8, sy, tx, ty, t, .2, v.S.id); D.lock(g, tx, ty, r, t, eob(snap), .2, false); if (tp && e < .5) tapRing(g, tp.x * W, tp.y * H, e / .5); }
+    else if (c < 2.4 || c >= 9.6) { const fp = c >= 9.6 ? (c - 9.6) % 1.2 : c % 1.2, fire = fp < .25 ? Math.sin(fp / .25 * Math.PI) : 0; D.auto(g, tx, ty, r, t, fire); if (fp < .6) bolt(g, sx + r * .8, sy, tx, ty, fp / .6); }
+    else if (c < 3.0) { const p = (c - 2.4) / .6; tapRing(g, tx, ty, p); D.lock(g, tx, ty, r, t, eob(clamp(p * 1.6, 0, 1)), 0, false); if (p > .3) thread(g, sx + r * .8, sy, tx, ty, t, 0, v.S.id); }
+    else if (c < 7.3) { const out = c > 6.2 ? (c - 6.2) / 1.1 : 0, ten = clamp((c - 5.4) / 1.6, 0, 1);
+      thread(g, sx + r * .8, sy, Math.min(tx, W - 4), ty, t, ten, v.S.id, out > .6);
+      if (inView) D.lock(g, tx, ty, r, t, 1, ten, out > 0); else { const a = Math.atan2(ty - sy, tx - sx); D.arrow(g, W - 18, clamp(ty, 18, H - 18), a, t, ten);
+        g.strokeStyle = 'rgba(255,255,255,.8)'; g.lineWidth = 2; g.beginPath(); g.arc(W - 18, clamp(ty, 18, H - 18), 17, -Math.PI / 2, -Math.PI / 2 + TAU * (1 - clamp(out, 0, 1))); g.stroke(); }   /* 1.5초 버팀 시계 */
+    }
+    else if (c < 8.2) { const p = (c - 7.3) / .9; D.brk(g, Math.min(tx, W - 30), ty, r, p, t, v); }
+    else { const p = (c - 8.2) / 1.4; if (p < .35) tapRing(g, W - Math.min(W, H) * .085 * 1.2, H - Math.min(W, H) * .085 * 1.25, p / .35); }
+    priBtns(g, W, H, c >= 8.4 ? 'p' : 'm', v.S.id, t);
+    if (v.st.textContent !== label) v.st.textContent = '지금: ' + label;
+  }
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>
