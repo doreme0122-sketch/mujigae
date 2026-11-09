@@ -21,6 +21,9 @@ vec3 fgRRT(vec3 v){ vec3 a = v * (v + .0245786) - .000090537, b = v * (.983729 *
 vec3 fgACES(vec3 c){ const mat3 I = mat3(vec3(.59719,.07600,.02840), vec3(.35458,.90834,.13383), vec3(.04823,.01566,.83777));
   const mat3 O = mat3(vec3(1.60475,-.10208,-.00327), vec3(-.53108,1.10813,-.07276), vec3(-.07367,-.00605,1.07602)); return clamp(O * fgRRT(I * (c / .6)), 0., 1.); }
 vec3 fgOut(vec3 a){ a = clamp(a, 0., 1.); vec3 s = mix(a * 12.92, 1.055 * pow(a, vec3(1. / 2.4)) - .055, step(.0031308, a)), T = pow(s, vec3(2.2)); return T / max(1. - .52 * T, .03); }
+vec3 fgSRGB(vec3 a){ a = clamp(a, 0., 1.); return mix(a * 12.92, 1.055 * pow(a, vec3(1. / 2.4)) - .055, step(.0031308, a)); }
+/* 더하는 빛(후광 · 불꽃 알갱이): 작업대는 화면 색(sRGB)에 투명도만큼 더함 → 그 더한 결과가 같게 투명도까지 넣어 거꾸로 계산 (안 그러면 넓게 납작하고 너무 밝아짐) */
+vec3 fgOutA(vec3 a, float al){ al = clamp(al, 1e-4, 1.); vec3 T = pow(clamp(al * fgSRGB(a), 0., 1.), vec3(2.2)); return T / max(1. - .52 * T, .03) / al; }
 `;
 /* 불빛 계산 (three 원래 계산 그대로 · 맵의 해·하늘빛 대신 작업대 빛만) */
 const LIGHTS = n => `
@@ -58,12 +61,16 @@ let F = null;
 export function forgeList(renderer, camera) { F ||= makeForge(renderer, camera); return F.CATALOG.map((c, i) => ({ i, id: c.id, name: c.kname.split(' · ')[0], theme: c.theme })); }
 
 /* 재질이 '부품 자기 자리' 좌표를 쓰는지
-   · 1: 자기 자리 좌표로 무늬를 그림(불길 · 눈동자) → 합칠 때 원래 자리 좌표를 꼭짓점마다 따로 적어 두고(fgOP) 칠이 그 값을 읽게 바꿈 → 무늬 그대로
-   · 2: 자기 자리 방향으로 꼭짓점을 휨(꼬리 흔들기) → 돌리거나 키운 부품은 같은 자리끼리만 합침 (옮기기만 한 건 휘는 방향이 같아 그대로 합침) */
+   · 1: 자기 자리 좌표를 값으로 넘겨 무늬를 그림(불길 · 눈동자) → 합칠 때 원래 자리 좌표를 꼭짓점마다 따로 적어 두고(fgOP) 칠이 그 값을 읽게 바꿈 → 무늬 그대로
+   · 2: 자기 자리 방향으로 꼭짓점을 휨(꼬리 흔들기) → 돌리거나 키운 부품은 같은 자리끼리만 합침 (옮기기만 한 건 휘는 방향이 같아 그대로 합침)
+   · 4: 자리 좌표를 그 밖의 여러 곳에 씀(불길 효과 알갱이) → 바꿔 끼우지 않고 같은 자리 부품끼리만, 그 자리 그대로 합침 */
 const codeOf = m => (m.isShaderMaterial ? m.vertexShader : '') + (m.onBeforeCompile && m.onBeforeCompile !== THREE.Material.prototype.onBeforeCompile ? m.onBeforeCompile.toString() : '');
 const READS_POS = /=\s*position\b|position\s*\.\s*[xyz]/, BENDS = /transformed\s*\.\s*[xyz]+\s*[+\-*]?=/;
-function spaceBound(m, g) {   /* 둘 다일 수 있음 (꼬리 끝 불빛: 자리 무늬 + 꼬리 휘기) */
-  const src = codeOf(m); let f = READS_POS.test(src) ? 1 : 0;
+const cnt = (s, re) => (s.match(re) || []).length;
+function spaceBound(m, g) {   /* 여러 개일 수 있음 (꼬리 끝 불빛: 자리 무늬 + 꼬리 휘기) */
+  const src = codeOf(m); let f = 0;
+  const all = cnt(src, /\bposition\b/g), ok = cnt(src, /=\s*position\b/g) + cnt(src, /position\s*\.\s*[xyz]/g) + cnt(src, /vec4\s*\(\s*position\s*,\s*1\.?0?\s*\)/g);
+  if (all > ok) f |= 4; else if (READS_POS.test(src)) f |= 1;
   if (BENDS.test(src)) { const at = [...src.matchAll(/attribute\s+float\s+(\w+)/g)].map(a => a[1]); if (at.length === 0 || at.some(a => g.attributes[a])) f |= 2; }
   return f;
 }
@@ -91,12 +98,13 @@ function simplify(g, err) {
   for (const k of Object.keys(g.attributes)) { const a = g.attributes[k], A = new a.array.constructor(m * a.itemSize); for (let i = 0; i < P.count; i++) if (used[i] >= 0) for (let c = 0; c < a.itemSize; c++) A[used[i] * a.itemSize + c] = a.getComponent(i, c); out.setAttribute(k, new THREE.BufferAttribute(A, a.itemSize, a.normalized)); }
   const J = new Uint32Array(I.length); for (let i = 0; i < I.length; i++) J[i] = used[I[i]]; out.setIndex(new THREE.BufferAttribute(J, 1)); return out;
 }
+const outX = (v, a, toned, add) => { const x = toned ? `fgACES(${v})` : v; return add ? `fgOutA(${x}, ${a})` : `fgOut(${x})`; };
 const sig = g => Object.keys(g.attributes).sort().map(k => { const a = g.attributes[k]; return k + a.itemSize + (a.normalized ? 'n' : '') + a.array.constructor.name; }).join(',');
 
 /* fi: 기체 종류(0~8) · size: 게임에서 기체 가장 긴 쪽(날개폭이나 몸길이) */
 export async function makeForgeShip(renderer, camera, fi, { size = 3.6, patch = true } = {}) {   /* patch: false = 칠을 바꾸지 않음 (원본과 비교 시험용) */
   await MO.ready; const t0 = performance.now();
-  F ||= makeForge(renderer, camera); F.setNoFx(true);
+  F ||= makeForge(renderer, camera); F.setNoFx(false);   /* 효과 모두 켬 (사용자 2026-11-09) */
   const C = F.CATALOG[fi], S = F.buildShip(fi, 0, 0); F.scene.remove(S.root);
   /* 몸 전체 흔들림(좌우 기울기 · 위아래 출렁임)은 게임 비행이 따로 줌 → 작업대 것은 끔 (두 번 흔들리면 붕 떠 보임) · 날개짓 · 꼬리 · 턱은 그대로 */
   const upd0 = S.update.bind(S); S.update = (dt, t) => { upd0(dt, t); S.body.position.set(0, 0, 0); S.body.rotation.set(0, 0, 0); };
@@ -110,7 +118,7 @@ export async function makeForgeShip(renderer, camera, fi, { size = 3.6, patch = 
   { let t = 0; for (const [m, fire] of [['cruise', 0], ['boost', 0], ['cruise', 1], ['boost', 1], ['cruise', 0]]) { if (S.mode !== m) S.setMode(m); S.fire = !!fire; for (let i = 0; i < 36; i++) { S.update(1 / 30, t); t += 1 / 30; S.root.updateMatrixWorld(true); watch(); } } S.setMode('cruise'); S.fire = false; }
   const stat0 = { meshes: 0, tris: 0 }; S.root.traverse(o => { if (o.isMesh) { stat0.meshes++; const g = o.geometry; stat0.tris += (g.index ? g.index.count : g.attributes.position.count) / 3; } });
   /* 겉 크기(빛 덩이 빼고 몸만)로 게임 크기 맞춤 */
-  { const bb = new THREE.Box3(); S.root.updateMatrixWorld(true); S.root.traverse(o => { if (o.isMesh) { o.geometry.computeBoundingBox(); bb.union(o.geometry.boundingBox.clone().applyMatrix4(o.matrixWorld)); } });
+  { const bb = new THREE.Box3(); S.root.updateMatrixWorld(true); S.root.traverse(o => { if (!o.isMesh) return; const g = o.geometry; if (!g.attributes.position.array.every(Number.isFinite)) return; g.computeBoundingBox(); bb.union(g.boundingBox.clone().applyMatrix4(o.matrixWorld)); });   /* 아직 자리가 안 정해진 효과 조각(숫자 아님)은 빼고 */
     const sz = bb.getSize(new THREE.Vector3()), c = bb.getCenter(new THREE.Vector3()), k = size / Math.max(sz.x, sz.z); sm.scale.setScalar(k); sm.position.copy(c).multiplyScalar(-k); }
   /* ② 합치기 + ③ 꼭짓점 이어 붙이기 */
   const rigid = o => { for (let q = o.parent; q && q !== S.root; q = q.parent) if (moved.has(q)) return q; return S.root; };
@@ -120,7 +128,7 @@ export async function makeForgeShip(renderer, camera, fi, { size = 3.6, patch = 
   S.root.traverse(o => { if (!o.isMesh || moved.has(o) || o.isInstancedMesh || Array.isArray(o.material) || !first.get(o)?.includes('|true|')) return;
     const R = rigid(o); inv.copy(R.matrixWorld).invert(); rel.multiplyMatrices(inv, o.matrixWorld);
     for (let q = o; q && q !== R; q = q.parent) if (!q.visible) return;
-    const sb = spaceBound(o.material, o.geometry), keep = (sb & 2) && !linIdent(rel), rk = keep ? rel.elements.map(e => e.toFixed(5)).join(',') : '';
+    const sb = spaceBound(o.material, o.geometry), keep = ((sb & 2) && !linIdent(rel)) || ((sb & 4) && !rel.equals(I4)), rk = keep ? rel.elements.map(e => e.toFixed(5)).join(',') : '';
     const k = R.uuid + '|' + o.material.uuid + '|' + o.renderOrder + '|' + rk; if (!groups.has(k)) groups.set(k, { R, list: [], at: keep ? rel.clone() : null }); groups.get(k).list.push(o); });
   /* 자기 자리 좌표로 무늬를 그리는 칠: 그 칠을 쓰는 모든 부품에 원래 자리 좌표(fgOP)를 붙임 (안 합치는 부품은 자리 값 그대로 같이 씀 → 매번 모양이 바뀌는 부품도 그대로 따라감) */
   const opMats = new Set(); S.root.traverse(o => { if (o.isMesh && spaceBound(o.material, o.geometry) & 1) opMats.add(o.material); });
@@ -135,14 +143,14 @@ export async function makeForgeShip(renderer, camera, fi, { size = 3.6, patch = 
       for (const i of ids) list[i].parent.remove(list[i]); }
     parts.forEach(g => g.dispose()); }
   /* ④ 빛 덩이 한 번에 그리기 */
-  const batches = []; { const byK = new Map(); S.root.traverse(o => { if (!o.isSprite) return; const m = o.material, k = (m.map?.uuid || '') + m.blending + m.depthTest + m.depthWrite + o.renderOrder + m.toneMapped; if (!byK.has(k)) byK.set(k, []); byK.get(k).push(o); });
+  const batches = []; if (patch) { const byK = new Map(); S.root.traverse(o => { if (!o.isSprite) return; const m = o.material, k = (m.map?.uuid || '') + m.blending + m.depthTest + m.depthWrite + o.renderOrder + m.toneMapped; if (!byK.has(k)) byK.set(k, []); byK.get(k).push(o); });
     for (const list of byK.values()) { const n = list.length, m0 = list[0].material, toned = C.fireFX || m0.toneMapped !== false;
       const g = new THREE.InstancedBufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute([-.5, -.5, 0, .5, -.5, 0, .5, .5, 0, -.5, .5, 0], 3)); g.setAttribute('uv', new THREE.Float32BufferAttribute([0, 0, 1, 0, 1, 1, 0, 1], 2)); g.setIndex([0, 1, 2, 0, 2, 3]);
       const iP = new THREE.InstancedBufferAttribute(new Float32Array(n * 3), 3), iS = new THREE.InstancedBufferAttribute(new Float32Array(n * 2), 2), iC = new THREE.InstancedBufferAttribute(new Float32Array(n * 4), 4); [iP, iS, iC].forEach(a => a.setUsage(THREE.DynamicDrawUsage));
       g.setAttribute('iP', iP); g.setAttribute('iS', iS); g.setAttribute('iC', iC); g.instanceCount = n;
       const mat = new THREE.ShaderMaterial({ uniforms: { map: { value: m0.map } }, transparent: true, blending: m0.blending, depthTest: m0.depthTest, depthWrite: m0.depthWrite,
         vertexShader: 'attribute vec3 iP; attribute vec2 iS; attribute vec4 iC; varying vec2 vU; varying vec4 vC; void main(){ vU = uv; vC = iC; vec4 mv = modelViewMatrix * vec4(iP, 1.); mv.xy += position.xy * iS; gl_Position = projectionMatrix * mv; }',
-        fragmentShader: TONE + `uniform sampler2D map; varying vec2 vU; varying vec4 vC; void main(){ vec4 c = vC; ${m0.map ? 'c *= texture2D(map, vU);' : ''} gl_FragColor = vec4(fgOut(${toned ? 'fgACES(c.rgb)' : 'c.rgb'}), c.a); }` });
+        fragmentShader: TONE + `uniform sampler2D map; varying vec2 vU; varying vec4 vC; void main(){ vec4 c = vC; ${m0.map ? 'c *= texture2D(map, vU);' : ''} gl_FragColor = vec4(${outX('c.rgb', 'c.a', toned, m0.blending === THREE.AdditiveBlending)}, c.a); }` });
       const me = new THREE.Mesh(g, mat); me.frustumCulled = false; me.renderOrder = list[0].renderOrder; me.name = 'fgSprites'; sm.add(me);
       const rec = list.map(s => { const p = s.parent; p.remove(s); return { s, p }; }); batches.push({ me, rec, iP, iS, iC }); } }
   const mw = new THREE.Matrix4(), vp = new THREE.Vector3(), vq = new THREE.Quaternion(), vs = new THREE.Vector3(), mi = new THREE.Matrix4();
@@ -151,23 +159,33 @@ export async function makeForgeShip(renderer, camera, fi, { size = 3.6, patch = 
       vp.applyMatrix4(mi); b.iP.setXYZ(i, vp.x, vp.y, vp.z); b.iS.setXY(i, vs.x, vs.y); const c = s.material.color, a = on ? s.material.opacity : 0; b.iC.setXYZW(i, c.r, c.g, c.b, a); });
     b.iP.needsUpdate = b.iS.needsUpdate = b.iC.needsUpdate = true; } };
   /* ⑤ ⑥ 칠마다 불빛 · 색 곡선 끼우기 */
+  /* 효과가 '맵 방향'으로 흐르던 것 → '기체 방향'으로 (사용자 2026-11-09: 남쪽으로 내려오면 냉기가 기체 앞으로 나옴)
+     작업대는 기체가 늘 한쪽을 보고 서 있어서 바람 방향을 맵 기준으로 적어 둠 · 게임에선 기체가 돌므로 그 방향을 기체가 돈 만큼 같이 돌림
+     (스스로 기체 방향을 따라가는 효과는 그대로 둠: 기체를 잠깐 돌려 보고 방향 값이 따라 바뀌는지로 가려냄) */
+  const ROT = { value: new THREE.Matrix4() }, WDIR = /viewMatrix\s*\*\s*vec4\(\s*(\w+)\s*,\s*0\.0?\s*\)/g;
+  { const sms = []; S.root.traverse(o => { for (const m of [].concat(o.material || [])) if (m && m.isShaderMaterial && WDIR.test(m.vertexShader) && !sms.includes(m)) sms.push(m); WDIR.lastIndex = 0; });
+    const names = m => [...m.vertexShader.matchAll(WDIR)].map(x => x[1]).filter(n => m.uniforms[n]);   /* 바람 방향 값만 봄 (다른 값은 매번 바뀌어도 상관없음) */
+    const snap = () => sms.map(m => names(m).map(n => m.uniforms[n].value.toArray().map(v => v.toFixed(4)).join()).join('|'));
+    const a = snap(); S.root.rotation.y = 1.3; S.root.updateMatrixWorld(true); S.update(1 / 60, 50); const b = snap(); S.root.rotation.y = 0; S.root.updateMatrixWorld(true); S.update(1 / 60, 50.02);
+    sms.forEach((m, i) => { if (a[i] !== b[i]) return; m.vertexShader = 'uniform mat4 fgRot;\n' + m.vertexShader.replace(WDIR, 'viewMatrix * (fgRot * vec4($1, 0.))'); m.uniforms.fgRot = ROT; m.needsUpdate = true; }); }
   const NP = PL.length, U = { fgDD: { value: KEYL.map(() => new THREE.Vector3()) }, fgDC: { value: KEYL.map(l => new THREE.Color(l[3]).multiplyScalar(l[4])) }, fgK: { value: 1 } };
   if (NP) Object.assign(U, { fgPP: { value: PL.map(() => new THREE.Vector3()) }, fgPC: { value: PL.map(() => new THREE.Color()) }, fgPD: { value: PL.map(p => new THREE.Vector2(p.L.distance, p.L.decay)) } });
   const DECL = `uniform vec3 fgDD[3]; uniform vec3 fgDC[3]; uniform float fgK;${NP ? ` uniform vec3 fgPP[${NP}]; uniform vec3 fgPC[${NP}]; uniform vec2 fgPD[${NP}];` : ''}\n`;
   const seen = new Set(); if (patch) sm.traverse(o => { if (!(o.isMesh || o.isPoints || o.isLine) || o.name === 'fgSprites') return; for (const m of [].concat(o.material)) { if (!m || seen.has(m)) continue; seen.add(m);
     if (m.isShaderMaterial) { const toned = C.fireFX || m.fragmentShader.includes('#include <tonemapping_fragment>');
-      if (m.fragmentShader.includes('#include <tonemapping_fragment>')) m.fragmentShader = m.fragmentShader.replace('#include <tonemapping_fragment>', 'gl_FragColor.rgb = fgOut(fgACES(gl_FragColor.rgb));');
-      else { const e = m.fragmentShader.lastIndexOf('}'); m.fragmentShader = m.fragmentShader.slice(0, e) + `\n gl_FragColor.rgb = fgOut(${toned ? 'fgACES(gl_FragColor.rgb)' : 'gl_FragColor.rgb'});\n}`; }
+      const ex = `gl_FragColor.rgb = ${outX('gl_FragColor.rgb', 'gl_FragColor.a', toned, m.blending === THREE.AdditiveBlending)};`;
+      if (m.fragmentShader.includes('#include <tonemapping_fragment>')) m.fragmentShader = m.fragmentShader.replace('#include <tonemapping_fragment>', ex);
+      else { const e = m.fragmentShader.lastIndexOf('}'); m.fragmentShader = m.fragmentShader.slice(0, e) + `\n ${ex}\n}`; }
       m.fragmentShader = TONE + m.fragmentShader; m.needsUpdate = true; continue; }
     const lit = 'envMap' in m && !m.isMeshBasicMaterial, toned = C.fireFX || m.toneMapped !== false;
     if (lit && !m.envMap) { m.envMap = F.ENV; m.envMapIntensity = (m.envMapIntensity ?? 1) * .75; }   /* 작업대 방 빛(장면 빛 .75)과 같게 */
     const prev = m.onBeforeCompile, pk = m.customProgramCacheKey;
     m.onBeforeCompile = (sh, r) => { prev.call(m, sh, r); Object.assign(sh.uniforms, U); if (m.userData.fgOP) sh.vertexShader = 'attribute vec3 fgOP;\n' + fgOPize(sh.vertexShader);
-      let f = sh.fragmentShader.replace('void main() {', TONE + DECL + 'void main() {').replace('#include <tonemapping_fragment>', `gl_FragColor.rgb = fgOut(${toned ? 'fgACES(gl_FragColor.rgb)' : 'gl_FragColor.rgb'});`);
+      let f = sh.fragmentShader.replace('void main() {', TONE + DECL + 'void main() {').replace('#include <tonemapping_fragment>', `gl_FragColor.rgb = ${outX('gl_FragColor.rgb', 'gl_FragColor.a', toned, m.blending === THREE.AdditiveBlending)};`);
       if (lit) f = f.replace('#include <lights_fragment_begin>', LIGHTS(NP)); sh.fragmentShader = f; };
     m.customProgramCacheKey = () => pk.call(m) + '|fg' + NP + (toned ? 't' : 'u'); m.needsUpdate = true; } });
   const lv = new THREE.Vector3(), wq = new THREE.Vector3();
-  const preRender = cam => { sm.updateMatrixWorld(true); const V = cam.matrixWorldInverse, k = sm.matrixWorld.getMaxScaleOnAxis(); U.fgK.value = 1 / k;
+  const preRender = cam => { sm.updateMatrixWorld(true); ROT.value.extractRotation(S.root.matrixWorld); const V = cam.matrixWorldInverse, k = sm.matrixWorld.getMaxScaleOnAxis(); U.fgK.value = 1 / k;
     KEYL.forEach((l, i) => U.fgDD.value[i].set(l[0], l[1], l[2]).normalize().transformDirection(V));
     PL.forEach((p, i) => { p.L.updateMatrix(); lv.setFromMatrixPosition(mw.multiplyMatrices(p.parent.matrixWorld, p.L.matrix)).applyMatrix4(V); U.fgPP.value[i].copy(lv); U.fgPC.value[i].copy(p.L.color).multiplyScalar(p.L.intensity); });
     syncSprites(); };
@@ -175,7 +193,7 @@ export async function makeForgeShip(renderer, camera, fi, { size = 3.6, patch = 
   const stats = () => { let d = 0, t = 0; sm.traverse(o => { if (!o.isMesh || o.name === 'xray') return; let on = true; for (let q = o; q && on; q = q.parent) on = q.visible; if (!on) return; d++; const g = o.geometry; t += (g.index ? g.index.count : g.attributes.position.count) / 3 * (g.isInstancedBufferGeometry ? g.instanceCount : 1); }); return { draws: d, tris: Math.round(t) }; };
   /* 벽 너머 비침: 같이 움직이는 덩어리마다 윤곽 하나 (모양이 매 장면 바뀌는 부품은 그 모양을 그대로 씀) */
   const buildXray = mat => { const by = new Map(), out = []; S.root.updateMatrixWorld(true);
-    S.root.traverse(o => { if (!o.isMesh || o.name === 'fgSprites' || o.name === 'xray' || o.material.blending === THREE.AdditiveBlending) return;   /* 빛 껍질(더하는 빛)은 윤곽에서 뺌 */
+    S.root.traverse(o => { if (!o.isMesh || o.name === 'fgSprites' || o.name === 'xray' || o.material.blending === THREE.AdditiveBlending || (o.material.isShaderMaterial && o.material.transparent)) return;   /* 빛 껍질 · 효과 알갱이는 윤곽에서 뺌 */
       if (moved.has(o) && first.get(o) && keyOf(o).split('|').pop() !== first.get(o).split('|').pop()) { const x = new THREE.Mesh(o.geometry, mat); x.renderOrder = 60; x.frustumCulled = false; x.name = 'xray'; o.add(x); out.push(x); return; }   /* 날개 안쪽 막 · 볼 살처럼 매번 모양이 바뀜 */
       const R = moved.has(o) ? o : rigid(o); if (!by.has(R)) by.set(R, []); by.get(R).push(o); });
     for (const [R, list] of by) { inv.copy(R.matrixWorld).invert();
@@ -188,5 +206,9 @@ export async function makeForgeShip(renderer, camera, fi, { size = 3.6, patch = 
   let tA = 0; const step = (dt, t, { moving = false, fire = false } = {}) => { const m = moving ? C.moving : 'cruise'; if (S.mode !== m) S.setMode(m); S.fire = fire; S.update(Math.min(dt, .05), t); F.PRISM_U.uT.value = t; };
   const s1 = stats(); console.log(`[스킨] ${C.kname} · 원본 그리기 ${stat0.meshes}번 · 삼각형 ${(stat0.tris / 1000).toFixed(0)}k → 게임판 그리기 ${s1.draws}번 · 삼각형 ${(s1.tris / 1000).toFixed(0)}k · 빛 ${NP} · ${(performance.now() - t0).toFixed(0)}ms`);
   root.userData.forge = true;
-  return { root, sm, S, C, step, preRender, stats, before: stat0, buildXray, engines: [] };
+  /* 효과(불길 · 연기 · 번개 · 서리 알갱이)만 끄고 켜기 — 폰 무게 재기용 */
+  const isFx = o => o.isPoints || (o.isMesh && o.name !== 'xray' && o.name !== 'fgSprites' && ['aC', 'aS', 'iP', 'iV'].some(a => o.geometry.attributes[a]));
+  const FX = []; sm.traverse(o => { if (isFx(o)) FX.push(o); }); let fxOn = true;
+  const setFx = v => { fxOn = v; FX.forEach(o => o.visible = v); }, getFx = () => fxOn;
+  return { root, sm, S, C, step, preRender, stats, before: stat0, buildXray, engines: [], setFx, getFx, fxCount: FX.length };
 }

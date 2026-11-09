@@ -5,18 +5,18 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
-import { makeBloom } from '../core/hangar/bloom.js?v=11092314';
-import { makePad } from '../core/hangar/pad.js?v=11092314';
-import { makeMag } from '../core/hangar/mag.js?v=11092314';
-import { makeForgeShip, forgeList } from './forgeship.js?v=11092314';
-import { makeGoldStar } from './goldstar.js?v=11092314';
-import { makeArena, SPEED, WAVE_R0 } from './arena.js?v=11092314';
-import { makeGuardians, GUARD } from './guardian.js?v=11092314';
-import { makeBirth, BIRTH } from './birth.js?v=11092314';
-import { makePerf } from './perf.js?v=11092314';
-import { autoMerge } from './automerge.js?v=11092314';
+import { makeBloom } from '../core/hangar/bloom.js?v=11092348';
+import { makePad } from '../core/hangar/pad.js?v=11092348';
+import { makeMag } from '../core/hangar/mag.js?v=11092348';
+import { makeForgeShip, forgeList } from './forgeship.js?v=11092348';
+import { makeGoldStar } from './goldstar.js?v=11092348';
+import { makeArena, SPEED, WAVE_R0 } from './arena.js?v=11092348';
+import { makeGuardians, GUARD } from './guardian.js?v=11092348';
+import { makeBirth, BIRTH } from './birth.js?v=11092348';
+import { makePerf } from './perf.js?v=11092348';
+import { autoMerge } from './automerge.js?v=11092348';
 import { makeGlow } from '../preview/glow.js';
-import { makeFlight, FLY, PADZ, padZone } from './flight.js?v=11092314';
+import { makeFlight, FLY, PADZ, padZone } from './flight.js?v=11092348';
 
 const $ = s => document.querySelector(s), clamp = THREE.MathUtils.clamp, HOVER = FLY.HOVER;
 const R = 240, NB = 10, GAPH = 5.6, BASE_D = 0;     /* 맵 반지름 · 기지 수 · 벽 틈 반 폭(= 기지 반지름) · 기지 가운데는 벽 선 위 (앞 절반은 맵 안, 뒤 절반은 맵 밖 · 사용자 2026-11-06) */
@@ -238,7 +238,7 @@ export async function start(canvas, onProgress = () => {}) {
       const xr = () => { const o = []; bsm.traverse(q => { if (q.name === 'xray') o.push(q); }); return o; };
       const vis = (L, v) => L.forEach(o => o.visible = v), others = () => BASES.filter(b => b !== B0).map(b => b.root || b.w.parent || b.w);
       const T = [['출발 기지', () => B0.w.visible, v => { B0.w.visible = v; }], ['다른 기지', () => others().every(o => o.visible), v => vis(others(), v)], ['무지개 벽', () => wall.visible, v => { wall.visible = v; }],
-        ['우주', () => space.visible, v => { space.visible = v; }], ['빛 번짐', () => !!perf.st.bloom, v => { perf.st.bloom = v; }], ['기체 비침', () => xr().every(o => o.visible), v => xr().forEach(o => o.visible = v)], ['시야 어둠', () => sight.visible, v => { sight.visible = v; }]];
+        ['우주', () => space.visible, v => { space.visible = v; }], ['빛 번짐', () => !!perf.st.bloom, v => { perf.st.bloom = v; }], ['기체 비침', () => xr().every(o => o.visible), v => xr().forEach(o => o.visible = v)], ['기체 효과', () => FG.getFx(), v => FG.setFx(v)], ['시야 어둠', () => sight.visible, v => { sight.visible = v; }]];
       /* 부분마다 끄고 켜며 오른쪽 위 프레임 숫자를 봄 (새 맵 2026-11-09) */
       for (const [label, get, set] of T) { const b = document.createElement('button'); b.type = 'button'; b.style.cssText = BS; const draw = () => { b.textContent = `${label} ${get() ? '켬' : '끔'}`; b.style.opacity = get() ? 1 : .5; }; b.onclick = () => { set(!get()); draw(); }; draw(); inner.append(b); }
       { const st = document.createElement('div'); st.style.cssText = 'font-size:10.5px;color:#e8ffd0;line-height:1.5;width:100%'; const n = o => o.toLocaleString();
