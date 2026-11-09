@@ -17,12 +17,18 @@ html,body{margin:0;height:100%;background:#05060f;overflow:hidden;touch-action:n
 #ld{position:fixed;inset:0;display:grid;place-items:center;color:#bdbad6;background:#05060f;transition:opacity .5s;z-index:9}
 #ld i{display:block;width:140px;height:1px;margin-top:12px;background:#22203a}#ld b{display:block;height:100%;width:0;background:#e8cfa0;transition:width .3s}
 </style>
+<script>
+window.__ver = fetch('ver.json?t=' + Date.now(), { cache: 'no-store' }).then(r => r.json()).then(j => {
+  const f = location.pathname.split('/').pop() || 'index.html', want = j[f], mine = window.__mine = '11091256';
+  if (want && +want > +mine) { location.replace(f + '?v=' + want + '&r=' + Date.now() + location.hash); return new Promise(() => {}); } }).catch(() => {});
+</script>
 <script type="importmap">{"imports":{"three":"./vendor/three.module.js","three/addons/":"./vendor/addons/"}}</script>
 </head><body>
 <canvas id="cv"></canvas><div id="ui"></div>
 <div id="ld"><div>디자인 시안 불러오는 중<i><b id="lb"></b></i></div></div>
 <script type="module">
-const { start } = await import('./src/proto/tdesign.js?v=11091105');
+await window.__ver;
+const { start } = await import('./src/proto/tdesign.js?v=11091256');
 const lb = document.getElementById('lb'), ld = document.getElementById('ld');
 try { await start(document.getElementById('cv'), p => lb.style.width = (p * 100) + '%'); ld.style.opacity = 0; setTimeout(() => ld.remove(), 600); }
 catch (e) { ld.textContent = '오류: ' + e.message; console.error(e); }
