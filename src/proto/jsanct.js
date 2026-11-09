@@ -371,13 +371,13 @@ function frondGeo(){const g=new THREE.PlaneGeometry(1,1,1,7),p=g.attributes.posi
 function broadGeo(){const g=new THREE.PlaneGeometry(1,1,3,4),p=g.attributes.position;for(let i=0;i<p.count;i++){const x=p.getX(i),t=p.getY(i)+.5;p.setXYZ(i,x,.18*Math.sin(t*Math.PI)-.25*t*t+x*x*.5,t);}g.computeVertexNormals();return g;}
 function bladeGeo(){const g=new THREE.PlaneGeometry(1,1,1,3),p=g.attributes.position;for(let i=0;i<p.count;i++){const x=p.getX(i),t=p.getY(i)+.5;p.setXYZ(i,x,t,.25*t*t);}g.computeVertexNormals();return g;}
 function podGeo(){const pts=[];for(let i=0;i<=7;i++){const t=i/7;pts.push(new THREE.Vector2(Math.sin(t*Math.PI)*(.55-.3*t)+.001,-t*1.6));}return new THREE.LatheGeometry(pts,6);}
-const FOL={frondA:[],frondB:[],fern:[],broad:[],broadS:[],blade:[],pod:[],pod2:[]};
+const FOL={frondA:[],frondB:[],fern:[],broad:[],broadS:[],blade:[],pod:[],pod2:[]};let FLSPEC=null;
 const _q=new THREE.Quaternion();
 function inst(kind,pos,rot,scl,col){FOL[kind].push({m:new THREE.Matrix4().compose(pos,_q.setFromEuler(rot).clone(),scl),c:col});}
 function flushFoliage(){const fA=frondTex('#0f3d40','#2c8a90','#7affe0','#ff8ae8'),fB=frondTex('#1a1d48','#5a4aa8','#ff9af0','#8ad8ff'),fern=frondTex('#123a2c','#3a9a70','#b0ff9a','#7affe0'),
     br=broadTex('#1a4048','#2a2050','#6affd8'),bl=bladeTex();
   const leafMat=t=>new THREE.MeshPhongMaterial({map:t.map,emissiveMap:t.em,emissive:new THREE.Color(1,1,1),emissiveIntensity:.8,alphaTest:.5,alphaToCoverage:true,side:THREE.DoubleSide,shininess:30,specular:C('#3a5a5a')});
-  const spec={frondA:[frondGeo(),leafMat(fA)],frondB:[frondGeo(),leafMat(fB)],fern:[frondGeo(),leafMat(fern)],broad:[broadGeo(),leafMat(br)],broadS:[broadGeo(),leafMat(br)],blade:[bladeGeo(),leafMat(bl)],
+  const spec=FLSPEC={frondA:[frondGeo(),leafMat(fA)],frondB:[frondGeo(),leafMat(fB)],fern:[frondGeo(),leafMat(fern)],broad:[broadGeo(),leafMat(br)],broadS:[broadGeo(),leafMat(br)],blade:[bladeGeo(),leafMat(bl)],
     pod:[podGeo(),new THREE.MeshBasicMaterial({color:'#7affd0'})],pod2:[podGeo(),new THREE.MeshBasicMaterial({color:'#ffa8ee'})]};
   Object.keys(FOL).forEach(k=>{const L=FOL[k];if(!L.length)return;const[g,m]=spec[k];const im=new THREE.InstancedMesh(g,m,L.length);
     L.forEach((o,i)=>{im.setMatrixAt(i,o.m);im.setColorAt(i,o.c||new THREE.Color(1,1,1));});im.frustumCulled=false;im.userData.kind=k;im.instanceMatrix.needsUpdate=true;if(im.instanceColor)im.instanceColor.needsUpdate=true;root.add(im);});}
@@ -494,7 +494,10 @@ root.traverse(o=>{if(o.isMesh&&!o.isInstancedMesh&&[marbleM,pillarM,rockOM].incl
       gyro[0].rotation.set(t * .42, 0, 0); gyro[1].rotation.set(1.05, t * .3, 0); gyro[2].rotation.set(t * .13, 0, t * .24); });
     LU.uHS.value.copy(C('#9aa8e8')).multiplyScalar(1.05); LU.uHG.value.copy(C('#3a2c48')).multiplyScalar(1.05); LU.uAmb.value.copy(C('#4a4a6a')).multiplyScalar(.45);
     LU.uMC.value.copy(C('#dfe6ff')).multiplyScalar(1.7); LU.uWC.value.copy(C('#ffd49a')).multiplyScalar(.6); LU.uEB.value.copy(C('#a8d8ff'));
-    return { anim, egg, eggLight, outline }; })();
+    /* 정글 섬 식물로도 씀 (사용자 2026-11-09: 정글 식물을 보물 성소 식물로) — 원본 함수를 그대로 불러 잎 자리·나무껍질 모양만 받아 감 */
+    const floraGen = f => { Object.keys(FOL).forEach(k => FOL[k] = []); BARKL.length = 0; f(); const out = { inst: {}, bark: BARKL.splice(0) }; Object.keys(FOL).forEach(k => { out.inst[k] = FOL[k]; FOL[k] = []; }); return out; };
+    const flora = { gen: floraGen, tree: (p, sc) => alienTree(p, sc), fern: (p, sc, k) => fernCluster(p, sc, k), broad: (p, sc) => broadCluster(p, sc), grass: (p, r, n) => grassPatch(p, r, n), vine: () => 0, spec: FLSPEC, bark: barkTexM };
+    return { anim, egg, eggLight, outline, flora }; })();
   } finally { THREE.ColorManagement.enabled = CMp; }
   root.scale.setScalar(K);
   const cache = new Map(); root.traverse(o => { if (!o.isMesh || !o.material || o.material.isShaderMaterial) return; const m = o.material; if (!(m.isMeshPhongMaterial || m.isMeshStandardMaterial)) return; if (!cache.has(m)) cache.set(m, litOf(m)); o.material = cache.get(m); });
@@ -514,7 +517,13 @@ root.traverse(o=>{if(o.isMesh&&!o.isInstancedMesh&&[marbleM,pillarM,rockOM].incl
     drop.forEach(o => { o.parent.remove(o); }); }
   flat.length = 0; root.traverse(o => flat.push(o)); const mv2 = moving.map(i => TPLM[i]); moving.length = 0; mv2.forEach(o => moving.push(flat.indexOf(o)));
   let lastT = -1; const tick = (t, dt) => { if (t === lastT) return; lastT = t; O.anim.forEach(f => f(t, dt)); LU.uEC.value.copy(LU.uEB.value).multiplyScalar(O.eggLight.intensity); LITM.forEach(s => { s.uniforms.uEmI.value = s.userData.src.emissiveIntensity ?? 1; }); };
-  return (TPL = { root, flat, moving, eggIdx: flat.indexOf(O.egg), tick, outline: O.outline }); }
+  const litFor = m => { if (!(m.isMeshPhongMaterial || m.isMeshStandardMaterial)) return m; if (!cache.has(m)) cache.set(m, litOf(m)); return cache.get(m); };
+  return (TPL = { root, flat, moving, eggIdx: flat.indexOf(O.egg), tick, outline: O.outline, flora: { ...O.flora, litFor } }); }
+/* 성소 식물 꾸러미 (정글 섬 꾸미기용): 미터 단위로 자리를 주면 잎(종류별 자리·색)과 나무껍질 모양을 돌려줌 */
+export function sanctFlora() { const T = template(), F = T.flora, S = new THREE.Matrix4().makeScale(K, K, K);
+  const run = f => { const cm = THREE.ColorManagement.enabled; THREE.ColorManagement.enabled = false; try { const o = F.gen(f); for (const k of Object.keys(o.inst)) for (const q of o.inst[k]) q.m.premultiply(S); o.bark.forEach(g => g.applyMatrix4(S)); return o; } finally { THREE.ColorManagement.enabled = cm; } };
+  const P = (x, y, z) => new THREE.Vector3(x / K, y / K, z / K);
+  return { K, run, P, tree: F.tree, fern: F.fern, broad: F.broad, grass: F.grass, geo: k => F.spec[k][0], mat: k => F.litFor(F.spec[k][1]), barkMat: () => F.litFor(F.bark) }; }
 
 /* 성소 하나 놓기: 원본을 복사해 돌려 놓음 · clearA(조각 안 각도)에 빛 폭포 통로가 오게 */
 export function buildSanctum({ clearA = null } = {}) {

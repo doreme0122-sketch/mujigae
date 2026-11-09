@@ -5,7 +5,7 @@
    · 도착한 섬: 그 섬 땅 위만 날 수 있음(땅 밖은 막힘) · 섬 가장자리에 돌아가는 문(받침 섬 위) — 같은 방법으로 돌아감
    · 돌아가는 문과 도착 섬의 땅 지도는 '갈 때만' 만들고 돌아오면 비움 (지금 쓰는 것만 올림 · 설계 원칙) */
 import * as THREE from 'three';
-import { gate4, pedestal } from './gates.js?v=11091550';
+import { gate4, pedestal } from './gates.js?v=11091617';
 
 const clamp = THREE.MathUtils.clamp, smooth = (a, b, x) => { const k = clamp((x - a) / (b - a), 0, 1); return k * k * (3 - 2 * k); };
 const AB = { transparent: true, depthWrite: false, blending: THREE.AdditiveBlending };
@@ -94,13 +94,18 @@ export function makeTravel({ scene, gates, meadow, jungle, fly, ship, FS, HOVER,
     else for (const p of meadow.place) { if (p.layer !== Gd.layer || Math.hypot(p.x - Gd.tx, p.z - Gd.tz) > 2) continue;   /* 보물 섬 = 넓은 땅 + 가운데 보물 섬 (같은 자리) */
       for (const pr of meadow.KIT[p.k].prims) if (pr.mat !== 'Foliage' && pr.mat !== 'Water') out.push({ geo: pr.geo, mat: p.m, solid: p.k.startsWith('land_') ? null : 'stone' }); }   /* 넓은 땅(언덕)은 통과 · 가운데 보물 섬은 기체 높이에 닿는 돌(유적·바위)을 막음 · 초록(나무)은 통과 */
     return out; };
+  const rcG = new THREE.Raycaster(), dn = new THREE.Vector3(0, -1, 0);
+  const groundAt = (ms, x, z, ty) => { const objs = ms.map(q => { const m = new THREE.Mesh(q.geo); m.matrixAutoUpdate = false; m.matrixWorld.copy(q.mat); return m; }); rcG.set(new THREE.Vector3(x, ty + 8, z), dn); rcG.far = 16;
+    const h = rcG.intersectObjects(objs, false); return h.length ? h[0].point.y : null; };   /* 섬 윗면 높이 (위에서 아래로 쏴서 처음 닿는 곳) */
   /* 돌아가는 문: 빛의 길 끝(섬 가장자리 바로 밖) · 받침 섬 위 · 길 쪽을 바라봄 */
   const openDest = g => {
     const ms = destMeshes(g), isle = footprint(ms, g.Gd.tx, g.Gd.tz, g.Gd.rad * 1.6 + 4), solid = null;   /* 섬 위 바위·뼈는 통과 (사용자 2026-11-08) → 막힘 지도 안 만듦 */
     /* 섬 가장자리는 들쭉날쭉 → 길 쪽 실제 가장자리를 재서, 받침 섬이 섬 가장자리에 닿게 크기를 맞춤 (사이 빈 하늘에 갇히지 않게) */
     const D = Math.hypot(g.ex - g.Gd.tx, g.ez - g.Gd.tz); let edge = 0; for (let s = 0; s <= D + 6; s += .25) if (isle(g.Gd.tx + (g.ex - g.Gd.tx) / D * s, g.Gd.tz + (g.ez - g.Gd.tz) / D * s)) edge = s;
-    const pr = Math.max(3.6, D - edge + 1.8), G = gate4(GATE_H / .8); G.g.scale.setScalar(.8); const root = new THREE.Group(), ped = pedestal(91 + gates.indexOf(g) * 7); ped.scale.setScalar(pr / 7.2); root.add(ped); root.add(G.g);
-    root.position.set(g.ex, g.y1 - GATE_H, g.ez); root.rotation.y = Math.atan2(-g.eax, -g.eaz); scene.add(root);   /* 길이 들어오는 쪽을 바라봄 */
+    /* 도착 문은 섬 땅 높이에 딱 맞춤 (사용자 2026-11-09: 엘리베이터가 땅 위에 정확히) — 길 쪽 섬 가장자리 안쪽 땅을 재서 받침 윗면을 그 높이로 · 고리는 기체 높이에 */
+    const gy = groundAt(ms, g.Gd.tx + (g.ex - g.Gd.tx) / D * Math.max(0, edge - 1.2), g.Gd.tz + (g.ez - g.Gd.tz) / D * Math.max(0, edge - 1.2), g.Gd.ty) ?? g.Gd.ty, gh = Math.max(1.2, g.y1 - gy);
+    const pr = Math.max(3.6, D - edge + 1.8), G = gate4(gh / .8); G.g.scale.setScalar(.8); const root = new THREE.Group(), ped = pedestal(91 + gates.indexOf(g) * 7); ped.scale.setScalar(pr / 7.2); root.add(ped); root.add(G.g);
+    root.position.set(g.ex, gy, g.ez); root.rotation.y = Math.atan2(-g.eax, -g.eaz); scene.add(root);   /* 길이 들어오는 쪽을 바라봄 */
     const exitG = { G, root, x: g.ex, z: g.ez, ax: g.eax, az: g.eaz, col: g.col, ch: 0, stay: 0, back: true, from: g };
     dest = { g, exitG, isle, solid, onPed: (x, z) => Math.hypot(x - g.ex, z - g.ez) < pr - .4 }; };
   const closeDest = () => { if (!dest) return; const r = dest.exitG.root; scene.remove(r); r.traverse(o => { if (o.geometry) o.geometry.dispose(); if (o.material) (Array.isArray(o.material) ? o.material : [o.material]).forEach(m => m.dispose()); }); dest = null; };

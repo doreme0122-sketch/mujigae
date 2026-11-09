@@ -5,7 +5,9 @@
    ④ 화석(막힘): 엎드려 죽은 큰 짐승 — 척추가 기체보다 높게 아치를 이루고 갈비가 양옆 땅에 박힘 → 갈비 사이(약 3m)로 들락날락 · 벌어진 입으로 들어가 목 아래를 지나 갈비 굴로
    모든 크기는 실제 미터 (섬 크기와 상관없이 기체 기준으로 맞춤) */
 import * as THREE from 'three';
-import { HC, RIBP, TEETH, boneGeo } from './jbones.js?v=11091550';
+import { HC, RIBP, TEETH, boneGeo } from './jbones.js?v=11091617';
+import { sanctFlora } from './jsanct.js';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 
 export const V = (x, y, z) => new THREE.Vector3(x, y, z);
 export const rng = seed => { let s = seed >>> 0 || 1; return () => (s = (s * 1664525 + 1013904223) >>> 0) / 4294967296; };
@@ -236,6 +238,21 @@ export function makeDresser(scene, KL) {
   const T = { value: 0 }, mat = dressMat(KL, T, false), matS = dressMat(KL, T, true), matB = dressMat(KL, T, false, .35), solids = [];
   const P = { tuft: [0, 1, 2].map(i => makeTuft(11 + i * 7)), shroom: [0, 1, 2].map(i => makeShrooms(31 + i * 5)), fern: [0, 1].map(i => makeFern(51 + i * 9)), pebble: [0, 1, 2].map(i => makePebble(71 + i * 3)), glint: [0, 1].map(i => makeGlints(81 + i)) };
   const TREES = [0, 1, 2].map(i => makeTree(91 + i * 13).geo), SWAY = new Set([...P.tuft, ...P.fern, ...TREES]), matOf = g => SWAY.has(g) ? matS : mat, isles = [];
+
+  /* ── 성소 식물 (사용자 2026-11-09: 정글 식물을 보물 성소에 있는 식물로 · 기존은 퀄리티가 낮음) ──
+     성소 원본의 외계 나무(꼬인 줄기 + 층층 고사리 잎 지붕 + 꼬투리) · 고사리 무리 · 넓은 잎 · 풀잎을 그대로 불러 씀
+     묶음(칸)마다 잎 종류별로 한 번에 그림 · 풀잎·작은 잎·꼬투리는 가까이에서만 */
+  const FLO = sanctFlora(), FL_NEAR = new Set(['blade', 'fern', 'broadS', 'pod', 'pod2']);
+  const Flo = () => ({ inst: {}, bark: [] });
+  const floAdd = (acc, out) => { for (const k of Object.keys(out.inst)) { if (!out.inst[k].length) continue; (acc.inst[k] = acc.inst[k] || []).push(...out.inst[k]); } acc.bark.push(...out.bark); };
+  const floTree = (acc, x, y, z, sc) => floAdd(acc, FLO.run(() => FLO.tree(FLO.P(x, y, z), sc)));
+  const floFern = (acc, x, y, z, sc, k) => floAdd(acc, FLO.run(() => FLO.fern(FLO.P(x, y, z), sc, k)));
+  const floBroad = (acc, x, y, z, sc) => floAdd(acc, FLO.run(() => FLO.broad(FLO.P(x, y, z), sc)));
+  const floGrass = (acc, x, y, z, r, n) => floAdd(acc, FLO.run(() => FLO.grass(FLO.P(x, y, z), r / FLO.K, n)));
+  const floBuild = (acc, near, far) => { for (const k of Object.keys(acc.inst)) { const L = acc.inst[k]; if (!L.length) continue; const im = new THREE.InstancedMesh(FLO.geo(k), FLO.mat(k), L.length);
+      L.forEach((o, i) => { im.setMatrixAt(i, o.m); im.setColorAt(i, o.c || new THREE.Color(1, 1, 1)); }); im.instanceMatrix.needsUpdate = true; if (im.instanceColor) im.instanceColor.needsUpdate = true; im.computeBoundingSphere(); (FL_NEAR.has(k) ? near : far).add(im); }
+    if (acc.bark.length) { const parts = acc.bark.map(g => { for (const k of Object.keys(g.attributes)) if (!['position', 'normal', 'uv'].includes(k)) g.deleteAttribute(k); if (!g.attributes.normal) g.computeVertexNormals(); if (!g.attributes.uv) g.setAttribute('uv', new THREE.BufferAttribute(new Float32Array(g.attributes.position.count * 2), 2)); return g.index ? g : g.toNonIndexed(); });
+      const ix = parts.filter(g => g.index), nx = parts.filter(g => !g.index), add = L => { if (!L.length) return; const mg = mergeGeometries(L, false); if (mg) { const m = new THREE.Mesh(mg, FLO.barkMat()); far.add(m); } }; add(ix); add(nx); } };
   const fossilGeo = makeFossil(7), fossilS = makeFossil(13, 3);   /* 큰 것(갈비 4쌍) · 작은 섬용(3쌍) */
   /* piece: 놓인 정글 조각 (x,y,z 땅 높이 · yaw) · outlineK: 조각 바깥선(키트 단위 함수) · s: 조각 배율 · opt.block: 조각 위 막히는 것 [x,z,반지름](키트 단위) */
   const hunt = (piece, outlineK, s, seed, opt = {}) => {
@@ -257,17 +274,18 @@ export function makeDresser(scene, KL) {
     const nearB = (x, z, m) => blocks.some(b => (x - b[0]) ** 2 + (z - b[1]) ** 2 < (b[2] + m) ** 2);
     const plant = (pl, lx, lz, sc, tilt = 0) => { if (inFossil(lx, lz) || nearB(lx, lz, 0)) return; const [wx, wz] = toW(lx, lz); bag.add(pl[Math.floor(R() * pl.length)], wx, ground(lx, lz) - .03, wz, R() * 6.28, sc, tilt); };
     const area = Math.PI * Rm * Rm;
-    for (let i = 0, n = Math.round(area / 5); i < n; i++) { const [x, z, f] = spot(.05, .93); if (f < .28 && R() < .7) continue; plant(P.tuft, x, z, .8 + R() * .7, (R() - .5) * .3); }   /* 풀포기: 싸울 자리 가운데는 드문드문 */
-    for (let i = 0, n = Math.round(area / 40); i < n; i++) { const [x, z, f] = spot(.3, .9); if (inFossil(x, z)) continue; plant(P.shroom, x, z, .9 + R() * 1.3); }
-    for (let i = 0, n = Math.round(area / 30); i < n; i++) { const [x, z] = spot(.35, .92); plant(P.fern, x, z, .8 + R() * .8); }
+    const flo = Flo(), okF = (x, z) => !inFossil(x, z) && !nearB(x, z, 0), wy = (x, z) => ground(x, z) - .03, at = (x, z, f) => { const [wx, wz] = toW(x, z); f(wx, wy(x, z), wz); };
+    for (let i = 0, n = Math.round(area / 14); i < n; i++) { const [x, z, f] = spot(.05, .93); if ((f < .28 && R() < .7) || !okF(x, z)) continue; at(x, z, (a, b, c) => floGrass(flo, a, b, c, .7 + R() * .5, 10)); }   /* 풀잎: 싸울 자리 가운데는 드문드문 */
+    for (let i = 0, n = Math.round(area / 45); i < n; i++) { const [x, z] = spot(.3, .9); if (!okF(x, z)) continue; at(x, z, (a, b, c) => floBroad(flo, a, b, c, .55 + R() * .45)); }
+    for (let i = 0, n = Math.round(area / 30); i < n; i++) { const [x, z] = spot(.35, .92); if (!okF(x, z)) continue; at(x, z, (a, b, c) => floFern(flo, a, b, c, .7 + R() * .6, R() < .5 ? 'fern' : 'frondA')); }
     for (let i = 0, n = Math.round(area / 9); i < n; i++) { const [x, z] = spot(.08, .93); if (fbm(x * .18 + (seed % 97) * .37 + 9, z * .18 + (seed % 97) * .61) > .55) plant(P.glint, x, z, .8 + R() * .8); }   /* 이끼 자리에만 빛 알갱이 */
     for (let i = 0, n = Math.round(area / 45); i < n; i++) { const [x, z] = spot(.1, .95); plant(P.pebble, x, z, .6 + R() * 1.1, (R() - .5) * .5); }
     /* 가장자리 숲: 몇 군데에 몰려 자람 (숲 사이로 하늘이 트이게) */
     const groves = 4 + Math.floor(Rm / 8); for (let g = 0; g < groves; g++) { const ga = R() * 6.28, gf = .68 + R() * .2, [gx, gz] = [Math.cos(ga) * outlineK(ga) * s * gf, Math.sin(ga) * outlineK(ga) * s * gf], nT = 6 + Math.floor(R() * 4);   /* 숲 덩이를 더 빽빽이 → 그 안은 숨을 곳 (사용자 2026-11-08) */
       { const [hx, hz] = toW(gx, gz), m = new THREE.Object3D(); m.position.set(hx, ground(gx, gz), hz); m.userData.hideR = 3.4; m.name = 'hide'; grp.add(m); }
-      for (let t = 0; t < nT; t++) { const x = gx + (R() - .5) * 4.6, z = gz + (R() - .5) * 4.6; if (Math.hypot(x, z) > outlineK(Math.atan2(z, x)) * s * .9 || inFossil(x, z) || nearB(x, z, 1.5)) continue; const [wx, wz] = toW(x, z); bag.add(TREES[Math.floor(R() * TREES.length)], wx, ground(x, z) - .05, wz, R() * 6.28, .85 + R() * .3, (R() - .5) * .15); }
-      for (let k = 0; k < 14; k++) { const x = gx + (R() - .5) * 7, z = gz + (R() - .5) * 7; if (Math.hypot(x, z) < outlineK(Math.atan2(z, x)) * s * .92) plant(R() < .5 ? P.fern : P.shroom, x, z, .9 + R() * .8); } }
-    bag.build(grp, matOf); };
+      for (let t = 0; t < Math.max(3, nT - 4); t++) { const x = gx + (R() - .5) * 4.6, z = gz + (R() - .5) * 4.6; if (Math.hypot(x, z) > outlineK(Math.atan2(z, x)) * s * .9 || inFossil(x, z) || nearB(x, z, 1.5)) continue; at(x, z, (a, b, c) => floTree(flo, a, b - .03, c, 1 + R() * .5)); }   /* 성소 외계 나무 */
+      for (let k = 0; k < 8; k++) { const x = gx + (R() - .5) * 7, z = gz + (R() - .5) * 7; if (Math.hypot(x, z) < outlineK(Math.atan2(z, x)) * s * .92 && okF(x, z)) at(x, z, (a, b, c) => R() < .6 ? floFern(flo, a, b, c, .8 + R() * .5, R() < .5 ? 'fern' : 'frondB') : floBroad(flo, a, b, c, .6 + R() * .4)); } }
+    bag.build(grp, matOf); { const near = new THREE.Group(), far = new THREE.Group(); grp.add(near, far); floBuild(flo, near, far); } };
   /* ─────────── 다른 정글 섬 전부 꾸미기 (사용자 2026-11-08) ───────────
      섬 종류마다 그 섬다운 식물: 뿌리섬=버섯·고사리 · 산호 숲=산호 덤불 · 촉수 숲=버섯 · 늪=가장자리 갈대 + 물 위 잎 · 꽃=꽃 무리 · 해파리=수정 조각 · 문 섬=가장자리 풀 · 작은 조각=빛 알갱이 조금
      + 가까운 섬끼리 늘어진 덩굴(땅보다 아래로 처져 기체를 막지 않음) + 그 아래 옅은 안개
@@ -275,7 +293,7 @@ export function makeDresser(scene, KL) {
   const Q = { coral: [0, 1].map(i => makeCoralBush(201 + i * 7)), reed: [0, 1].map(i => makeReeds(221 + i * 5)), lily: [0, 1].map(i => makeLily(241 + i * 3)), bloom: [0, 1].map(i => makeBloom(261 + i * 11)), shard: [0, 1].map(i => makeShards(281 + i * 13)) };
   [...Q.reed, ...Q.bloom].forEach(g => SWAY.add(g));
   const CELL = 48, cells = new Map(), LIST = [];
-  const cellAt = (x, y, z) => { const k = Math.floor(x / CELL) + ',' + Math.floor(z / CELL) + ',' + Math.round(y / 20); if (!cells.has(k)) cells.set(k, { y, x: 0, z: 0, n: 0, caps: [], near: Bag(), far: Bag(), vine: Builder(), nv: 0, mist: [] }); return cells.get(k); };
+  const cellAt = (x, y, z) => { const k = Math.floor(x / CELL) + ',' + Math.floor(z / CELL) + ',' + Math.round(y / 20); if (!cells.has(k)) cells.set(k, { y, x: 0, z: 0, n: 0, caps: [], near: Bag(), far: Bag(), vine: Builder(), nv: 0, mist: [], flo: Flo() }); return cells.get(k); };
   const KIND = ['root', 'coral', 'tent', 'swamp', 'flower', 'jelly', 'vine'];
   const isle = o => { const t = o.top; if (!t) return; const R = rng(o.seed || 1), s = o.s, Rm = t.r * s, yaw = o.yaw || 0, cy = Math.cos(yaw), sy = Math.sin(yaw), y0 = o.y + t.y * (o.sy || s);
     const OL = a => t.fn(a) * s, hole = t.hole ? a => t.hole(a) * s : null, kind = o.gate ? 'gate' : o.single ? 'single' : KIND[o.kind] || 'root';
@@ -289,10 +307,12 @@ export function makeDresser(scene, KL) {
     if (kind === 'gate') { rep(n(9), () => put(N, P.tuft, .55, .93, 1, .3)); rep(n(10), () => put(N, P.glint, .6, .95, 1)); rep(n(45), () => put(N, P.pebble, .5, .95, 1, .5)); }
     else if (kind === 'single') { rep(n(8), () => put(N, P.glint, .2, .85, .9)); rep(n(10), () => put(N, P.tuft, .2, .85, .8, .3)); }
     else {
-      if (!o.lite) { rep(n(kind === 'coral' || kind === 'jelly' ? 14 : 6), () => put(N, P.tuft, .05, .93, 1.3, .3)); rep(n(10), () => put(N, P.glint, .05, .95, 1)); rep(n(45), () => put(N, P.pebble, .1, .95, 1, .5)); }
-      if (kind === 'root' || kind === 'tent' || kind === 'vine') { rep(n(26), () => put(F, P.shroom, .25, .9, 1.5)); if (!o.lite) rep(n(32), () => put(N, P.fern, .3, .92, 1)); }
+      const fl = C.flo, fput = (f0, f1, fn) => { const [lx, lz] = spot(f0, f1), [wx, wz] = toW(lx, lz); fn(wx, y0 + cap.hAt(lx, lz) - .03, wz); };   /* 성소 식물 */
+      if (!o.lite) { rep(n(kind === 'coral' || kind === 'jelly' ? 30 : 14), () => fput(.05, .93, (a, b, c) => floGrass(fl, a, b, c, .6 + R() * .5, 9))); rep(n(10), () => put(N, P.glint, .05, .95, 1)); rep(n(45), () => put(N, P.pebble, .1, .95, 1, .5)); }
+      if (kind === 'root' || kind === 'tent' || kind === 'vine') { rep(n(34), () => fput(.25, .9, (a, b, c) => floBroad(fl, a, b, c, .55 + R() * .45))); if (!o.lite) rep(n(30), () => fput(.3, .92, (a, b, c) => floFern(fl, a, b, c, .7 + R() * .6, R() < .5 ? 'fern' : 'frondA'))); }
+      if (!o.lite && (kind === 'root' || kind === 'tent' || kind === 'vine' || kind === 'flower') && area > 40) rep(Math.max(1, n(70)), () => fput(.35, .8, (a, b, c) => floTree(fl, a, b, c, .9 + R() * .55)));   /* 큰 섬엔 외계 나무 몇 그루 */
       if (kind === 'coral') rep(n(7), () => put(F, Q.coral, .1, .9, 1.9, .2));
-      if (kind === 'flower') { rep(n(5), () => put(F, Q.bloom, .3, .92, 1.9)); if (!o.lite) rep(n(35), () => put(N, P.fern, .4, .92, 1)); }
+      if (kind === 'flower') { rep(n(5), () => put(F, Q.bloom, .3, .92, 1.9)); if (!o.lite) rep(n(35), () => fput(.4, .92, (a, b, c) => floFern(C.flo, a, b, c, .7 + R() * .5, 'fern'))); }
       if (kind === 'jelly') { rep(n(5), () => put(F, Q.shard, .1, .9, 1.9, .2)); }
       if (kind === 'swamp') { rep(Math.max(3, n(2)), () => put(F, Q.reed, .1, .9, 1.4)); const py = o.y + t.pool * s;   /* 늪 물 위 잎: 물가 쪽에 몰려 떠 있음 */
         rep(Math.floor(Math.PI * (16 * s) ** 2 / 9 * k), () => { const a = R() * 6.2832, r = t.poolR(a) * s * Math.sqrt(.25 + R() * .75), [wx, wz] = toW(Math.cos(a) * r, Math.sin(a) * r); F.add(Q.lily[Math.floor(R() * 2)], wx, py + .03, wz, R() * 6.28, 1.4 + R() * .8); }); } }
@@ -328,7 +348,7 @@ export function makeDresser(scene, KL) {
     for (const [k, sz] of [['position', 3], ['normal', 3], ['color', 3], ['aGlow', 1], ['aSway', 1]]) { const A = new Float32Array(nv * sz); let o = 0; L.forEach(q => { A.set(q.attributes[k].array, o); o += q.attributes[k].array.length; }); g.setAttribute(k, new THREE.BufferAttribute(A, sz)); }
     let o = 0, b = 0; L.forEach(q => { const ix = q.index.array; for (let i = 0; i < ix.length; i++) I[o + i] = ix[i] + b; o += ix.length; b += q.attributes.position.count; q.dispose(); }); g.setIndex(new THREE.BufferAttribute(I, 1)); g.computeBoundingSphere(); return g; };
   const finish = () => { for (const C of cells.values()) { if (!C.n) continue; const all = new THREE.Group(), near = new THREE.Group(), far = new THREE.Group(); scene.add(all); all.add(near, far);
-      all.add(new THREE.Mesh(mergeGeos(C.caps), mat)); C.near.build(near, matOf); C.far.build(far, matOf); if (C.nv) all.add(new THREE.Mesh(C.vine.done(), mat));
+      all.add(new THREE.Mesh(mergeGeos(C.caps), mat)); C.near.build(near, matOf); C.far.build(far, matOf); floBuild(C.flo, near, far); if (C.nv) all.add(new THREE.Mesh(C.vine.done(), mat));
       if (C.mist.length) { const m = new THREE.InstancedMesh(new THREE.PlaneGeometry(1, 1), mistMat, C.mist.length); C.mist.forEach((q, i) => { m.setMatrixAt(i, _m.makeScale(q[3], q[3], q[3]).setPosition(q[0], q[1], q[2])); m.setColorAt(i, MISTC[q[4]]); }); m.computeBoundingSphere(); m.renderOrder = 2; all.add(m); }
       CELLS.push({ x: C.x / C.n, y: C.y, z: C.z / C.n, all, near, far }); } cells.clear(); };
   /* 먼 섬(130m 밖)은 통째로 안 그림 · 화면 밖은 묶음마다 알아서 빠짐 */
