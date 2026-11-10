@@ -2,19 +2,22 @@
    · 카메라 · 화면 밝기 처리 · 기체 · 조종은 새 맵(map2)과 같은 것 · 섬만 새것 */
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
-import { makeBloom } from '../core/hangar/bloom.js?v=11102312';
-import { makeForgeShip, forgeList } from './forgeship.js?v=11102312';
-import { makePerf } from './perf.js?v=11102312';
-import { makeFlight, FLY, padZone } from './flight.js?v=11102312';
-import { buildIsle } from './isle.js?v=11102312';
-import { makeInputBuffer } from './inbuf.js?v=11102312';
-import { makeLiftFx } from './liftfx.js?v=11102312';
+import { makeBloom } from '../core/hangar/bloom.js?v=11102323';
+import { makeForgeShip, forgeList } from './forgeship.js?v=11102323';
+import { makePerf } from './perf.js?v=11102323';
+import { makeFlight, FLY, padZone } from './flight.js?v=11102323';
+import { buildIsle } from './isle.js?v=11102323';
+import { makeInputBuffer } from './inbuf.js?v=11102323';
+import { makeLiftFx } from './liftfx.js?v=11102323';
 
 const $ = s => document.querySelector(s);
+/* 카메라 (사용자 2026-11-10: 롤처럼 — 벽 · 기둥 뒤가 그냥 보이고 원근감이 거의 없게)
+   · 거의 위에서 내려다봄(56°) · 아주 좁은 화각(10°)으로 멀리서 봄 → 높은 것이 뒤로 길게 드리워지지 않아 뒤가 가려지지 않음 · 보이는 넓이는 그대로 */
+const FOV = 10, ANG = 56;
 export async function start(canvas, onProgress = () => {}) {
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: false, powerPreference: 'high-performance' });
   renderer.toneMapping = THREE.NoToneMapping; renderer.autoClear = false; renderer.setClearColor(0x9fc3e0, 1);
-  const scene = new THREE.Scene(), camera = new THREE.PerspectiveCamera(20, 1, .5, 2000), bloom = makeBloom(renderer, { samples: 0 });
+  const scene = new THREE.Scene(), camera = new THREE.PerspectiveCamera(FOV, 1, 4, 2400), bloom = makeBloom(renderer, { samples: 0 });
   { const pm = new THREE.PMREMGenerator(renderer); scene.environment = pm.fromScene(new RoomEnvironment(), .04).texture; scene.environmentIntensity = .7; pm.dispose(); }
   onProgress(.1); await new Promise(r => setTimeout(r, 30));
   const K = .5;   /* 섬 크기: 0.5배 (사용자 2026-11-10 · 기체에 비해 땅이 너무 컸음) */
@@ -121,9 +124,9 @@ export async function start(canvas, onProgress = () => {}) {
     if (D.L === 0 && inBush(x, z) && dist > 2.2) return false;                  /* 부쉬 안: 바로 옆이 아니면 어느 층에서도 안 보임 */
     if (dist > VR[L]) return false; if (L === 2) return true; return ray(L, FS.x, FS.z, dx / dist, dz / dist, dist, me) >= dist - .3; };
   /* 카메라 (새 맵과 같은 롤 방식: 좁은 시야 · 멀리서) + 둘러보기 */
-  const cfg = { ang: 45, dist: 25 }; const bind = (id, key, fmt) => { const el = $('#' + id), out = $('#' + id + 'v'); if (!el) return; const rd = () => { cfg[key] = +el.value; out.textContent = fmt(+el.value); }; el.addEventListener('input', rd); rd(); };
+  const cfg = { ang: ANG, dist: 25 }; const bind = (id, key, fmt) => { const el = $('#' + id), out = $('#' + id + 'v'); if (!el) return; const rd = () => { cfg[key] = +el.value; out.textContent = fmt(+el.value); }; el.addEventListener('input', rd); rd(); };
   bind('ang', 'ang', v => v + '°'); bind('dist', 'dist', v => v + 'm');
-  const CAMK = Math.tan(20 * Math.PI / 180) / Math.tan(10 * Math.PI / 180); let camD = cfg.dist * CAMK; const cam = { x: START[0], z: START[1] };
+  const CAMK = Math.tan(20 * Math.PI / 180) / Math.tan(FOV / 2 * Math.PI / 180);   /* 거리 칸(시야각 40° 기준 거리)을 실제 거리로: 화각이 좁은 만큼 멀리 → 보이는 넓이는 같고 원근감만 줄어듦 */ let camD = cfg.dist * CAMK; const cam = { x: START[0], z: START[1] };
   const look = { x: 0, z: 0, id: null, px: 0, py: 0 };
   addEventListener('pointerdown', e => { if (look.id !== null || e.target.closest('#ui') || padZone(e.clientX, e.clientY) || inZone(e.clientX, e.clientY)) return; look.id = e.pointerId; look.px = e.clientX; look.py = e.clientY; });
   addEventListener('pointermove', e => { if (e.pointerId !== look.id) return; const r = canvas.getBoundingClientRect(), mpp = 2 * camD * Math.tan(camera.fov * Math.PI / 360) / Math.max(1, r.height), a = cfg.ang * Math.PI / 180;

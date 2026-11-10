@@ -8,7 +8,7 @@
    지나간 길엔 짧은 엔진 빛 꼬리가 남았다 빠르게 사라짐. 적 탄이 막에 맞아 물결치는 것·실제 이동 속도는 맵이 생기면 연결
    무게: 불꽃·꼬리는 띠 몇 장, 막은 구 하나, 방울은 점 묶음 하나, 충격파 일그러짐은 빛 번짐 마무리 단계에 얹음 */
 import * as THREE from 'three';
-import { filmMaterial } from '../preview/fxmat.js?v=11102312';
+import { filmMaterial } from '../preview/fxmat.js?v=11102323';
 
 export const SORTIE = { IGN: .55, SHIELD: 3, BOOST: 5 };
 const AB = { transparent: true, depthWrite: false, blending: THREE.AdditiveBlending };
