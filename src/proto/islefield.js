@@ -28,7 +28,9 @@ export const SPOT = {
   plateau: [[-20, -16, 14], [-9, -25, 9], [-29, -6, 8]],
   spires: [[10, -16, 4.6, 7], [22, -3, 2.5, 6], [-1, -9, 2.1, 5.4], [-31, 19, 2.4, 6.2], [18, -27, 2.6, 6.6], [4, 31, 2.2, 5.6]],   /* 2층 장애물: 돌탑 (자리 x, z · 반지름 · 꼭대기) */
   arches: [[-8, 13, 3, 18, 5.4], [24, -16, 32, -6, 5]],   /* 2층 장애물: 돌 아치 (양 끝 · 꼭대기) — 2층은 밑으로 빠져나감 */
-  brush: [[13, 0, 8.5], [-3, 21, 6.5], [-24, -20, 6], [-26, 14, 4], [24, 22, 4.5], [2, 6, 3.5]],   /* 부쉬 덩이 (1층 숨는 곳) */
+  /* 부쉬 (1층 숨는 곳 · 사용자 2026-11-10: 경계가 정확해야 · 띄엄띄엄이면 개념이 어설픔) — 동그라미 몇 개를 합친 덩이 하나하나가 빈틈없는 덤불 무리.
+     이 모양 하나로 보이는 덤불 가장자리 = 숨는 판정 = 시야 가림이 꼭 같음 */
+  brush: [[[12, 2, 5], [16, 6, 3.5], [8, -1, 3]], [[-4, 22, 4.5], [0, 25, 3.5], [-8, 25, 3]], [[-27, 16, 3.8], [-23, 19, 3]], [[3, 11, 3.2], [6, 14, 2.6]], [[16, -9, 3], [19, -12, 2.4]]],
   low: [[27, 13, 13], [18, 23, 8]],
   pond: [-17, 1.6, 6.6],
   channel: [-17, 1.6, -40, 10],
@@ -83,5 +85,6 @@ export function makeField() {
     if (Y.PLATEAU > y - CLEAR && plateau(x, z) > 0) return true;
     for (const S of SPOT.spires) if (S[3] > y - CLEAR && spire(x, z, S) > 0) return true;
     for (const o of obstacles) { const dx = x - o[0], dz = z - o[2]; if (dx * dx + dz * dz < o[3] * o[3] && Math.abs(y - o[1]) < o[3] + CLEAR * .5) return true; } return false; };
-  return { mask, plateau, pond, chan, top, bottom, blocked, sightBlock, obstacles };
+  const brush = (x, z) => { let d = -99; for (const Z of SPOT.brush) { let e = -99; for (const [cx, cz, r] of Z) e = smax(e, circ(x, z, cx, cz, r), 2); d = Math.max(d, e); } return d + .5 * fbm(x * .6, z * .6, 2) + .2 * fbm(x * 1.7, z * 1.7, 2); };   /* 부쉬 안 + (가장자리가 덤불 뭉치처럼 물결) */
+  return { mask, plateau, pond, chan, brush, top, bottom, blocked, sightBlock, obstacles };
 }

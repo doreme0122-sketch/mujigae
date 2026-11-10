@@ -2,11 +2,11 @@
    · 카메라 · 화면 밝기 처리 · 기체 · 조종은 새 맵(map2)과 같은 것 · 섬만 새것 */
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
-import { makeBloom } from '../core/hangar/bloom.js?v=11101508';
-import { makeForgeShip, forgeList } from './forgeship.js?v=11101508';
-import { makePerf } from './perf.js?v=11101508';
-import { makeFlight, FLY, padZone } from './flight.js?v=11101508';
-import { buildIsle } from './isle.js?v=11101508';
+import { makeBloom } from '../core/hangar/bloom.js?v=11101517';
+import { makeForgeShip, forgeList } from './forgeship.js?v=11101517';
+import { makePerf } from './perf.js?v=11101517';
+import { makeFlight, FLY, padZone } from './flight.js?v=11101517';
+import { buildIsle } from './isle.js?v=11101517';
 
 const $ = s => document.querySelector(s);
 export async function start(canvas, onProgress = () => {}) {
@@ -95,9 +95,10 @@ export async function start(canvas, onProgress = () => {}) {
   /* ── 시야 (사용자 2026-11-10): 내 층 높이에 걸리는 것이 시야를 가림 · 보이는 쪽은 다른 층 기체도 보임 · 3층은 다 보임 · 부쉬 안은 어디서든 안 보임 ──
      · 1층: 고원 · 돌탑 · 아치 기둥에 더해 나무숲 · 키 큰 덤불도 가림 (숲 속을 나는 높이라 사방이 막힘)
      · 2층: 고원 · 돌탑 · 아치 기둥만 가림 · 3층: 가리는 것 없음
-     · 가림 지도는 로딩 때 층마다 한 번 굽고, 화면에서는 내 자리에서 사방으로 빛줄기 256개를 쏴 닿는 거리만 잼 → 바닥에 어둠 덮개 한 장 */
+     · 가림 지도는 로딩 때 층마다 한 번 굽고, 화면에서는 내 자리에서 사방으로 빛줄기 256개를 쏴 닿는 거리만 잼
+     · 어둠은 2D 좌표로 (사용자 2026-11-10): 섬의 모든 것이 높이와 상관없이 자기 x, z로 밝고 어두움이 정해짐 (기울어진 덮개 한 장이 아니라) */
   const VR = [9, 12, 22], VC = .5, VX0 = -30, VZ0 = -28, VN = Math.ceil(60 / VC) + 1, VM = Math.ceil(56 / VC) + 1;
-  const inBush = (x, z) => isle.bushes.some(b => (b.x - x) ** 2 + (b.z - z) ** 2 < b.r * b.r);
+  const inBush = isle.inBrush;   /* 부쉬 덩이 모양 그대로 (보이는 가장자리 = 숨는 경계) */
   const occ = [0, 1, 2].map(L => { const A = new Uint8Array(VN * VM); if (L === 2) return A;
     for (let j = 0; j < VM; j++) for (let i = 0; i < VN; i++) { const x = VX0 + i * VC, z = VZ0 + j * VC; let b = isle.sightBlock(x, z, L);
       if (!b && L === 0) b = isle.trees.some(t => (t.x - x) ** 2 + (t.z - z) ** 2 < t.r * t.r * .55) || inBush(x, z);
@@ -105,17 +106,8 @@ export async function start(canvas, onProgress = () => {}) {
   const occAt = (A, x, z) => { const i = Math.round((x - VX0) / VC), j = Math.round((z - VZ0) / VC); return i < 0 || j < 0 || i >= VN || j >= VM ? 0 : A[j * VN + i]; };
   const NR = 256, rayTex = new THREE.DataTexture(new Uint8Array(NR * 4), NR, 1, THREE.RGBAFormat); rayTex.wrapS = THREE.RepeatWrapping; rayTex.magFilter = rayTex.minFilter = THREE.LinearFilter; rayTex.needsUpdate = true;
   const ray = (L, x0, z0, dx, dz, R) => { const A = occ[L]; let inside = occAt(A, x0, z0); for (let d = .25; d < R; d += .25) { const o = occAt(A, x0 + dx * d, z0 + dz * d); if (inside) { if (!o) inside = 0; continue; } if (o) return d; } return R; };   /* 처음 서 있는 덤불·숲 안은 건너뜀 (안에서는 밖이 보임) */
-  const sightU = { uRay: { value: rayTex }, uC: { value: new THREE.Vector2() }, uR: { value: 12 }, uT: { value: 0 } };
-  const sight = new THREE.Mesh(new THREE.PlaneGeometry(400, 400).rotateX(-Math.PI / 2), new THREE.ShaderMaterial({ uniforms: sightU, transparent: true, depthTest: false, depthWrite: false,
-    vertexShader: 'varying vec2 vP; void main(){ vec4 w = modelMatrix * vec4(position, 1.); vP = w.xz; gl_Position = projectionMatrix * viewMatrix * w; }',
-    fragmentShader: `uniform sampler2D uRay; uniform vec2 uC; uniform float uR, uT; varying vec2 vP;
-      void main(){ vec2 d = vP - uC; float r = length(d), a = atan(d.y, d.x) / 6.2831853 + .5, reach = texture2D(uRay, vec2(a, .5)).r * uR;
-        float wob = sin(atan(d.y, d.x) * 5. + uT * .4) * .25;
-        float v = smoothstep(reach + .7 + wob, reach - .25, r);                       /* 가려진 쪽 · 시야 밖은 어둠 (가장자리는 부드럽게) */
-        gl_FragColor = vec4(vec3(.01, .015, .04), (1. - v) * .78); }` }));
-  sight.renderOrder = 5000; sight.frustumCulled = false; scene.add(sight);
   const castSight = () => { const L = LV.f < .5 ? LV.cur : LV.to, R = VR[L], d = rayTex.image.data; for (let k = 0; k < NR; k++) { const an = (k / NR - .5) * 6.2831853; d[k * 4] = Math.round(ray(L, FS.x, FS.z, Math.cos(an), Math.sin(an), R) / R * 255); }
-    rayTex.needsUpdate = true; sightU.uC.value.set(FS.x, FS.z); sightU.uR.value += (R - sightU.uR.value) * .2; sight.position.y = LV.y - .3; };
+    rayTex.needsUpdate = true; VRs += (R - VRs) * .2; isle.setSight(rayTex, FS.x, FS.z, VRs, 1); }; let VRs = VR[1];
   /* 연습 표적 4대: 1층 부쉬 안 · 1층 트인 풀밭 · 2층 돌탑 둘레 · 3층 하늘 — 보이는지 시험용 (안 보이면 스르륵 사라짐) */
   const dummies = [[0, 6.5, 0, 0], [0, -2, 6, 3], [1, 11, -1.5, 4.5], [2, 0, 0, 11]].map(([L, cx, cz, r], k) => {
     const g = new THREE.Group(), c = LC[L], m = new THREE.MeshBasicMaterial({ color: new THREE.Color(...c).multiplyScalar(1.3), transparent: true });
@@ -142,6 +134,7 @@ export async function start(canvas, onProgress = () => {}) {
   const info = document.createElement('div'); info.style.cssText = 'position:absolute;top:calc(env(safe-area-inset-top,0px) + 50px);left:max(18px,env(safe-area-inset-left,0px));font-size:11px;color:rgba(185,255,74,.85);pointer-events:none;font-family:monospace;line-height:1.5'; $('#ui').append(info);
   const say = $('#where'), n = o => o.toLocaleString();
 
+  castSight();
   /* 로딩 때 한 번 그려 칠 계산법 · 모양을 미리 올려 둠 */
   { const cull = []; scene.traverse(o => { if (o.frustumCulled) { cull.push(o); o.frustumCulled = false; } }); renderer.setRenderTarget(bloom.scene); renderer.compile(scene, camera); renderer.render(scene, camera); renderer.clear(); renderer.setRenderTarget(null); cull.forEach(o => o.frustumCulled = true); }
 
@@ -171,7 +164,7 @@ export async function start(canvas, onProgress = () => {}) {
       LV.ring = Math.min(9, LV.ring + dt / .6); ringU.uP.value = LV.ring < 1 ? LV.ring : 0; ringU.uT.value = t; ring.position.set(FS.x, LV.y - .35, FS.z); }
     { const gh = isle.H(FS.x, FS.z), inIsle = isle.mask(FS.x, FS.z) > 0, d = LV.y - gh; shadow.visible = inIsle; shadow.position.set(FS.x + .4, gh + .06, FS.z + .3); const s = 2.2 + d * .12; shadow.scale.set(s, 1, s); shadow.rotation.y = FS.head; shU.uA.value = .5 * Math.exp(-d * .05);
       say.textContent = LN[LV.f < .5 ? LV.cur : LV.to] + (inIsle ? ` · 땅까지 ${d.toFixed(1)}m` : ' · 섬 밖'); }
-    if ((acc.n & 1) === 0 || LV.f < 1) castSight(); sightU.uT.value = t;
+    if ((acc.n & 1) === 0 || LV.f < 1) castSight();
     for (const D of dummies) { const a = t * .25 + D.k * 1.7; D.g.position.set(D.cx + Math.cos(a) * D.r, LY[D.L] + Math.sin(t * 1.3 + D.k) * .08, D.cz + Math.sin(a) * D.r); D.g.rotation.y = -a; D.a += ((seeDummy(D) ? 1 : 0) - D.a) * Math.min(1, dt * 6); D.m.opacity = D.a; D.g.visible = D.a > .02; }
     { const hid = LV.cur === 0 && LV.f >= 1 && inBush(FS.x, FS.z); fly.userData.setGhost(hid); if (hid) say.textContent = '1층 · 부쉬에 숨는 중'; }   /* 내가 부쉬에 숨으면 내 화면에서만 반투명 */
     FG.preRender(camera);
