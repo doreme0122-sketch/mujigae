@@ -2,11 +2,11 @@
    · 카메라 · 화면 밝기 처리 · 기체 · 조종은 새 맵(map2)과 같은 것 · 섬만 새것 */
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
-import { makeBloom } from '../core/hangar/bloom.js?v=11101451';
-import { makeForgeShip, forgeList } from './forgeship.js?v=11101451';
-import { makePerf } from './perf.js?v=11101451';
-import { makeFlight, FLY, padZone } from './flight.js?v=11101451';
-import { buildIsle } from './isle.js?v=11101451';
+import { makeBloom } from '../core/hangar/bloom.js?v=11101508';
+import { makeForgeShip, forgeList } from './forgeship.js?v=11101508';
+import { makePerf } from './perf.js?v=11101508';
+import { makeFlight, FLY, padZone } from './flight.js?v=11101508';
+import { buildIsle } from './isle.js?v=11101508';
 
 const $ = s => document.querySelector(s);
 export async function start(canvas, onProgress = () => {}) {
@@ -25,7 +25,7 @@ export async function start(canvas, onProgress = () => {}) {
   { const sel = $('#skin'); if (sel) { for (const k of SKINS) { const o = document.createElement('option'); o.value = k.id; o.textContent = k.name; o.selected = k.id === FG.C.id; sel.append(o); }
       sel.onchange = () => { try { localStorage.setItem('mj-skin', sel.value); } catch (e) {} location.reload(); }; } }
   /* 세 높이 (사용자 2026-11-10): 1층 땅 가까이(부쉬 · 낮은 벽) · 2층 지형물 사이 · 3층 탁 트임 — 층마다 막히는 것이 다름 */
-  const LY = isle.layers, LN = ['1층 · 숨기와 낮은 벽', '2층 · 돌탑과 아치 사이', '3층 · 탁 트인 하늘'], LC = [[.45, 1., .38], [.42, .82, 1.], [1., .8, .32]];
+  const LY = isle.layers, LN = ['1층 · 숲과 부쉬 사이', '2층 · 돌탑과 아치 사이', '3층 · 탁 트인 하늘'], LC = [[.45, 1., .38], [.42, .82, 1.], [1., .8, .32]];
   const LV = { cur: 1, to: 1, f: 1, dir: 0, y: LY[1], flash: 0, puff: 9, puffX: 0, puffZ: 0, ring: 9 };
   const B = { blocked: (x, z) => Math.hypot(x, z) > 78 * K || isle.blocked(x, z, LV.cur) || (LV.to !== LV.cur && isle.blocked(x, z, LV.to)), region: () => 0 };
   const START = [8 * K, 8 * K];   /* 트인 풀밭 (세 높이 모두 비어 있는 자리) */
@@ -69,23 +69,61 @@ export async function start(canvas, onProgress = () => {}) {
       float off = -uD * (fract(uF * 1.6 + iA.z) - .5) * 3.2; c.y += off; vec4 mv = viewMatrix * vec4(c, 1.); mv.x += position.x * .05; mv.y += (position.y - .5) * 1.3; vY = position.y; vK = iA.z; gl_Position = projectionMatrix * mv; }`,
     fragmentShader: 'uniform float uA; varying float vY, vK; void main(){ float k = sin(vY * 3.1416); gl_FragColor = vec4(vec3(.85, .95, 1.) * k * uA * (.5 + .5 * vK), 1.); }' }));
   streak.frustumCulled = false; streak.renderOrder = 8; scene.add(streak);
-  /* 높이 바꾸기: 조이스틱과 오른쪽 버튼 사이(아래 가운데)에서 위로 끌면 올라가고 아래로 끌면 내려감 · 컴퓨터는 E(위) · Q(아래) */
-  const ZONE = { x0: .42, x1: .8, y0: .64 };
-  const inZone = (x, y) => x > innerWidth * ZONE.x0 && x < innerWidth * ZONE.x1 && y > innerHeight * ZONE.y0;
-  const zone = document.createElement('div'); zone.style.cssText = `position:absolute;left:${ZONE.x0 * 100}%;width:${(ZONE.x1 - ZONE.x0) * 100}%;top:${ZONE.y0 * 100}%;bottom:calc(env(safe-area-inset-bottom,0px) + 6px);border:1.5px dashed rgba(200,230,255,.28);border-radius:16px;display:flex;align-items:center;justify-content:center;gap:12px;pointer-events:none;color:rgba(230,242,255,.75);font-size:11px;letter-spacing:.04em;text-shadow:0 0 4px rgba(0,0,0,.6)`;
-  zone.innerHTML = '<span>위로 끌기 ↑</span><span id="pips" style="display:flex;flex-direction:column-reverse;gap:4px"><i></i><i></i><i></i></span><span>↓ 아래로 끌기</span>'; $('#ui').append(zone);
-  const pips = [...zone.querySelectorAll('#pips i')]; pips.forEach(p => p.style.cssText = 'display:block;width:22px;height:6px;border-radius:3px;background:rgba(255,255,255,.18)');
+  /* 설정창은 오른쪽 위 톱니 단추로 접어 둠 (그 자리를 높이 바꾸는 칸이 씀 · 사용자 2026-11-10) */
+  { const view = $('#view'), gear = document.createElement('button'); gear.type = 'button'; gear.textContent = '⚙'; gear.setAttribute('aria-label', '설정');
+    gear.style.cssText = 'position:absolute;top:calc(env(safe-area-inset-top,0px) + 30px);right:max(12px,env(safe-area-inset-right,0px));width:34px;height:34px;border-radius:50%;border:1px solid rgba(185,255,74,.35);background:rgba(4,8,14,.6);color:#d9f7b0;font-size:17px;line-height:1';
+    $('#ui').append(gear); if (view) { view.hidden = true; view.style.top = 'calc(env(safe-area-inset-top,0px) + 70px)'; view.style.zIndex = 4; const tog = $('#tog'); if (tog) tog.remove(); gear.onclick = () => { view.hidden = !view.hidden; }; } }
+  /* 높이 바꾸기: 오른쪽 위 세로 칸(스킬 단추들 위)에서 위로 끌면 올라가고 아래로 끌면 내려감 · 컴퓨터는 E(위) · Q(아래) */
+  const zone = document.createElement('div'); zone.style.cssText = 'position:absolute;right:max(12px,env(safe-area-inset-right,0px));top:calc(env(safe-area-inset-top,0px) + 76px);width:min(120px,20vw);height:42%;border:1.5px dashed rgba(200,230,255,.28);border-radius:18px;display:flex;flex-direction:column;align-items:center;justify-content:space-between;padding-block:10px;pointer-events:none;color:rgba(230,242,255,.78);font-size:11px;letter-spacing:.04em;text-shadow:0 0 4px rgba(0,0,0,.6)';
+  zone.innerHTML = '<span>↑ 위로</span><span id="pips" style="display:flex;flex-direction:column-reverse;gap:6px"><i></i><i></i><i></i></span><span>아래로 ↓</span>'; $('#ui').append(zone);
+  const inZone = (x, y) => { const r = zone.getBoundingClientRect(); return x > r.left && x < r.right && y > r.top && y < r.bottom && ($('#view')?.hidden ?? true); };
+  const pips = [...zone.querySelectorAll('#pips i')]; pips.forEach(p => p.style.cssText = 'display:block;width:28px;height:7px;border-radius:4px;background:rgba(255,255,255,.18)');
   const drawPips = () => pips.forEach((p, k) => { const c = LC[k]; p.style.background = k === LV.to ? `rgb(${c.map(v => v * 255 | 0)})` : 'rgba(255,255,255,.18)'; p.style.boxShadow = k === LV.to ? `0 0 8px rgb(${c.map(v => v * 255 | 0)})` : 'none'; }); drawPips();
+  /* 층 바꾸기는 너그럽게 (사용자: 걸려서 멈추는 일이 없어야): 그 자리 위·아래에 돌탑·다리가 있으면 거절하지 않고 가까운 빈 곳(2m 안)으로 비켜 주며 바꿈 · 빈 곳이 없을 때만 빨갛게 깜빡 */
+  const bodyFree = (x, z, L) => { if (isle.blocked(x, z, L)) return false; for (let k = 0; k < 8; k++) if (isle.blocked(x + Math.cos(k * .785) * FLY.R * .55, z + Math.sin(k * .785) * FLY.R * .55, L)) return false; return true; };
   const tryLayer = d => { if (LV.cur !== LV.to) return; const to = LV.cur + d; if (to < 0 || to > 2) { LV.flash = 1; return; }
-    const pts = [[0, 0]]; for (let k = 0; k < 8; k++) pts.push([Math.cos(k * .785) * FLY.R, Math.sin(k * .785) * FLY.R]);
-    if (pts.some(([ox, oz]) => isle.blocked(FS.x + ox, FS.z + oz, to))) { LV.flash = 1; return; }   /* 가려는 높이에 돌탑·다리가 있으면 못 감 */
-    LV.to = to; LV.f = 0; LV.dir = d; LV.y0 = LV.y; drawPips(); if (d > 0) { LV.puff = 0; LV.puffX = FS.x; LV.puffZ = FS.z; } };
+    let spot = bodyFree(FS.x, FS.z, to) ? [FS.x, FS.z] : null;
+    for (let r = .3; !spot && r <= 2; r += .3) for (let k = 0; k < 16; k++) { const x = FS.x + Math.cos(k * .3927) * r, z = FS.z + Math.sin(k * .3927) * r; if (bodyFree(x, z, to) && bodyFree(x, z, LV.cur)) { spot = [x, z]; break; } }
+    if (!spot) { LV.flash = 1; return; }
+    LV.to = to; LV.f = 0; LV.dir = d; LV.y0 = LV.y; LV.sx = FS.x; LV.sz = FS.z; LV.nx = spot[0]; LV.nz = spot[1]; drawPips(); if (d > 0) { LV.puff = 0; LV.puffX = FS.x; LV.puffZ = FS.z; } };
   const zd = { id: null, y: 0, done: false };
   addEventListener('pointerdown', e => { if (zd.id !== null || !inZone(e.clientX, e.clientY)) return; zd.id = e.pointerId; zd.y = e.clientY; zd.done = false; }, true);
   addEventListener('pointermove', e => { if (e.pointerId !== zd.id || zd.done) return; const dy = e.clientY - zd.y; if (Math.abs(dy) > 34) { zd.done = true; tryLayer(dy < 0 ? 1 : -1); } });
   const zUp = e => { if (e.pointerId === zd.id) zd.id = null; }; addEventListener('pointerup', zUp); addEventListener('pointercancel', zUp);
   addEventListener('keydown', e => { if (e.repeat) return; const k = e.key.toLowerCase(); if (k === 'e') tryLayer(1); if (k === 'q') tryLayer(-1); });
 
+  /* ── 시야 (사용자 2026-11-10): 내 층 높이에 걸리는 것이 시야를 가림 · 보이는 쪽은 다른 층 기체도 보임 · 3층은 다 보임 · 부쉬 안은 어디서든 안 보임 ──
+     · 1층: 고원 · 돌탑 · 아치 기둥에 더해 나무숲 · 키 큰 덤불도 가림 (숲 속을 나는 높이라 사방이 막힘)
+     · 2층: 고원 · 돌탑 · 아치 기둥만 가림 · 3층: 가리는 것 없음
+     · 가림 지도는 로딩 때 층마다 한 번 굽고, 화면에서는 내 자리에서 사방으로 빛줄기 256개를 쏴 닿는 거리만 잼 → 바닥에 어둠 덮개 한 장 */
+  const VR = [9, 12, 22], VC = .5, VX0 = -30, VZ0 = -28, VN = Math.ceil(60 / VC) + 1, VM = Math.ceil(56 / VC) + 1;
+  const inBush = (x, z) => isle.bushes.some(b => (b.x - x) ** 2 + (b.z - z) ** 2 < b.r * b.r);
+  const occ = [0, 1, 2].map(L => { const A = new Uint8Array(VN * VM); if (L === 2) return A;
+    for (let j = 0; j < VM; j++) for (let i = 0; i < VN; i++) { const x = VX0 + i * VC, z = VZ0 + j * VC; let b = isle.sightBlock(x, z, L);
+      if (!b && L === 0) b = isle.trees.some(t => (t.x - x) ** 2 + (t.z - z) ** 2 < t.r * t.r * .55) || inBush(x, z);
+      A[j * VN + i] = b ? 1 : 0; } return A; });
+  const occAt = (A, x, z) => { const i = Math.round((x - VX0) / VC), j = Math.round((z - VZ0) / VC); return i < 0 || j < 0 || i >= VN || j >= VM ? 0 : A[j * VN + i]; };
+  const NR = 256, rayTex = new THREE.DataTexture(new Uint8Array(NR * 4), NR, 1, THREE.RGBAFormat); rayTex.wrapS = THREE.RepeatWrapping; rayTex.magFilter = rayTex.minFilter = THREE.LinearFilter; rayTex.needsUpdate = true;
+  const ray = (L, x0, z0, dx, dz, R) => { const A = occ[L]; let inside = occAt(A, x0, z0); for (let d = .25; d < R; d += .25) { const o = occAt(A, x0 + dx * d, z0 + dz * d); if (inside) { if (!o) inside = 0; continue; } if (o) return d; } return R; };   /* 처음 서 있는 덤불·숲 안은 건너뜀 (안에서는 밖이 보임) */
+  const sightU = { uRay: { value: rayTex }, uC: { value: new THREE.Vector2() }, uR: { value: 12 }, uT: { value: 0 } };
+  const sight = new THREE.Mesh(new THREE.PlaneGeometry(400, 400).rotateX(-Math.PI / 2), new THREE.ShaderMaterial({ uniforms: sightU, transparent: true, depthTest: false, depthWrite: false,
+    vertexShader: 'varying vec2 vP; void main(){ vec4 w = modelMatrix * vec4(position, 1.); vP = w.xz; gl_Position = projectionMatrix * viewMatrix * w; }',
+    fragmentShader: `uniform sampler2D uRay; uniform vec2 uC; uniform float uR, uT; varying vec2 vP;
+      void main(){ vec2 d = vP - uC; float r = length(d), a = atan(d.y, d.x) / 6.2831853 + .5, reach = texture2D(uRay, vec2(a, .5)).r * uR;
+        float wob = sin(atan(d.y, d.x) * 5. + uT * .4) * .25;
+        float v = smoothstep(reach + .7 + wob, reach - .25, r);                       /* 가려진 쪽 · 시야 밖은 어둠 (가장자리는 부드럽게) */
+        gl_FragColor = vec4(vec3(.01, .015, .04), (1. - v) * .78); }` }));
+  sight.renderOrder = 5000; sight.frustumCulled = false; scene.add(sight);
+  const castSight = () => { const L = LV.f < .5 ? LV.cur : LV.to, R = VR[L], d = rayTex.image.data; for (let k = 0; k < NR; k++) { const an = (k / NR - .5) * 6.2831853; d[k * 4] = Math.round(ray(L, FS.x, FS.z, Math.cos(an), Math.sin(an), R) / R * 255); }
+    rayTex.needsUpdate = true; sightU.uC.value.set(FS.x, FS.z); sightU.uR.value += (R - sightU.uR.value) * .2; sight.position.y = LV.y - .3; };
+  /* 연습 표적 4대: 1층 부쉬 안 · 1층 트인 풀밭 · 2층 돌탑 둘레 · 3층 하늘 — 보이는지 시험용 (안 보이면 스르륵 사라짐) */
+  const dummies = [[0, 6.5, 0, 0], [0, -2, 6, 3], [1, 11, -1.5, 4.5], [2, 0, 0, 11]].map(([L, cx, cz, r], k) => {
+    const g = new THREE.Group(), c = LC[L], m = new THREE.MeshBasicMaterial({ color: new THREE.Color(...c).multiplyScalar(1.3), transparent: true });
+    const body = new THREE.Mesh(new THREE.ConeGeometry(.5, 1.6, 6).rotateX(-Math.PI / 2), m), ring = new THREE.Mesh(new THREE.RingGeometry(.9, 1.05, 32).rotateX(-Math.PI / 2), m); ring.position.y = -.3; g.add(body, ring); scene.add(g);
+    return { g, m, L, cx, cz, r, k, a: 1 }; });
+  const seeDummy = D => { const L = LV.f < .5 ? LV.cur : LV.to, x = D.g.position.x, z = D.g.position.z, dx = x - FS.x, dz = z - FS.z, dist = Math.hypot(dx, dz);
+    if (D.L === 0 && inBush(x, z) && dist > 2.2) return false;                  /* 부쉬 안: 바로 옆이 아니면 어느 층에서도 안 보임 */
+    if (dist > VR[L]) return false; if (L === 2) return true; return ray(L, FS.x, FS.z, dx / dist, dz / dist, dist) >= dist - .3; };
   /* 카메라 (새 맵과 같은 롤 방식: 좁은 시야 · 멀리서) + 둘러보기 */
   const cfg = { ang: 45, dist: 25 }; const bind = (id, key, fmt) => { const el = $('#' + id), out = $('#' + id + 'v'); if (!el) return; const rd = () => { cfg[key] = +el.value; out.textContent = fmt(+el.value); }; el.addEventListener('input', rd); rd(); };
   bind('ang', 'ang', v => v + '°'); bind('dist', 'dist', v => v + 'm');
@@ -113,16 +151,17 @@ export async function start(canvas, onProgress = () => {}) {
     /* 높이 바꾸는 중 (0.55초): 오를 땐 기수를 들고 조금 커지며 · 내릴 땐 숙이고 작아짐 · 카메라는 높을수록 물러나 넓게 */
     if (LV.f < 1) { LV.f = Math.min(1, LV.f + dt / .55); const e = LV.f * LV.f * (3 - 2 * LV.f); LV.y = LV.y0 + (LY[LV.to] - LV.y0) * e;
       if (LV.dir < 0 && LV.f > .72 && LV.puff > 1) { LV.puff = 0; LV.puffX = FS.x; LV.puffZ = FS.z; }   /* 내려앉는 순간 아래가 눌림 */
+      if (LV.f < .45 && (LV.nx !== LV.sx || LV.nz !== LV.sz)) { const k = Math.min(1, dt / Math.max(.02, (.45 - LV.f) * .55)); FS.x += (LV.nx - FS.x) * k; FS.z += (LV.nz - FS.z) * k; }   /* 비켜 주기 */
       if (LV.f >= 1) { LV.cur = LV.to; LV.ring = 0; } }
     fly.position.y = LV.y - FLY.HOVER;
     fly.updateMatrixWorld(true); fly.userData.update(t, dt);
-    { const S = fly.children[0], e = LV.f < 1 ? Math.sin(LV.f * Math.PI) : 0; S.rotateX(LV.dir * .3 * e);
-      const sc = [.93, 1, 1.08], a0 = sc[LV.cur], a1 = sc[LV.to], k = LV.f * LV.f * (3 - 2 * LV.f); S.scale.setScalar(a0 + (a1 - a0) * k); S.updateMatrixWorld(true);
+    { const S = fly.children[0], e = LV.f < 1 ? Math.sin(LV.f * Math.PI) : 0; S.rotateX(LV.dir * .52 * e);   /* 오르내릴 때 기수를 크게 들고 숙임 (사용자 2026-11-10: 높이감이 더 보이게 · 약 30°) */
+      const sc = [.92, 1, 1.1], a0 = sc[LV.cur], a1 = sc[LV.to], k = LV.f * LV.f * (3 - 2 * LV.f); S.scale.setScalar(a0 + (a1 - a0) * k); S.updateMatrixWorld(true);
       stU.uA.value = e * .9; stU.uD.value = LV.dir; stU.uF.value = LV.f; stU.uC.value.set(FS.x, LV.y - .6, FS.z); }
     FG.step(dt, t, { moving: Math.hypot(FS.vx, FS.vz) > 1.5, fire: false });
     if (look.id === null) { const k = Math.min(1, dt * 3.5); look.x -= look.x * k; look.z -= look.z * k; }
     const sp = fly.children[0].position; { const k = Math.min(1, dt * 4); cam.x += (sp.x + FS.vx * .25 - cam.x) * k; cam.z += (sp.z + FS.vz * .25 - cam.z) * k; }
-    { const cf = [.88, 1, 1.2], k = LV.f * LV.f * (3 - 2 * LV.f), f = cf[LV.cur] + (cf[LV.to] - cf[LV.cur]) * k; camD += (cfg.dist * CAMK * f - camD) * Math.min(1, dt * 3); }
+    { const cf = [.85, 1, 1.3], k = LV.f * LV.f * (3 - 2 * LV.f), f = cf[LV.cur] + (cf[LV.to] - cf[LV.cur]) * k; camD += (cfg.dist * CAMK * f - camD) * Math.min(1, dt * 3); }
     const a = cfg.ang * Math.PI / 180, vx = cam.x + look.x, vz = cam.z + look.z, cy = LV.y; camera.position.set(vx, cy + camD * Math.sin(a), vz + camD * Math.cos(a)); camera.lookAt(vx, cy, vz); camera.updateMatrixWorld();
     isle.sky.position.copy(camera.position); isle.update(t); xrayM.uniforms.uT.value = t;
     /* 땅을 미는 바람 · 땅 바람 고리 · 발밑 층 고리 */
@@ -132,6 +171,9 @@ export async function start(canvas, onProgress = () => {}) {
       LV.ring = Math.min(9, LV.ring + dt / .6); ringU.uP.value = LV.ring < 1 ? LV.ring : 0; ringU.uT.value = t; ring.position.set(FS.x, LV.y - .35, FS.z); }
     { const gh = isle.H(FS.x, FS.z), inIsle = isle.mask(FS.x, FS.z) > 0, d = LV.y - gh; shadow.visible = inIsle; shadow.position.set(FS.x + .4, gh + .06, FS.z + .3); const s = 2.2 + d * .12; shadow.scale.set(s, 1, s); shadow.rotation.y = FS.head; shU.uA.value = .5 * Math.exp(-d * .05);
       say.textContent = LN[LV.f < .5 ? LV.cur : LV.to] + (inIsle ? ` · 땅까지 ${d.toFixed(1)}m` : ' · 섬 밖'); }
+    if ((acc.n & 1) === 0 || LV.f < 1) castSight(); sightU.uT.value = t;
+    for (const D of dummies) { const a = t * .25 + D.k * 1.7; D.g.position.set(D.cx + Math.cos(a) * D.r, LY[D.L] + Math.sin(t * 1.3 + D.k) * .08, D.cz + Math.sin(a) * D.r); D.g.rotation.y = -a; D.a += ((seeDummy(D) ? 1 : 0) - D.a) * Math.min(1, dt * 6); D.m.opacity = D.a; D.g.visible = D.a > .02; }
+    { const hid = LV.cur === 0 && LV.f >= 1 && inBush(FS.x, FS.z); fly.userData.setGhost(hid); if (hid) say.textContent = '1층 · 부쉬에 숨는 중'; }   /* 내가 부쉬에 숨으면 내 화면에서만 반투명 */
     FG.preRender(camera);
     const c1 = performance.now(); renderer.setRenderTarget(bloom.scene); renderer.clear(); renderer.render(scene, camera); acc.calls = renderer.info.render.calls; acc.tris = renderer.info.render.triangles;
     bloom.render(Wd, Hd, !perf.st.bloom); perf.tick(dt);
