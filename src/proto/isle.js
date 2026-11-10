@@ -2,13 +2,13 @@
    느낌: 신비로움(안개 사이 작은 빛) · 풍성함(이끼 · 나무 · 물) · 깊이(위아래 겹겹) · 맑은 낮빛
    가볍게 만드는 법:
    · 진짜 불빛 없음 — 해 · 하늘빛 · 그늘(오목한 곳 · 나무 밑 · 해 가림)을 로딩 때 꼭짓점마다 구워 두고 화면 칸에서는 무늬만 그림
-   · 같은 것끼리 한 번에 그림 (부쉬 그룹 다섯 곳 한 번 · 낮은 식물 종류마다 한 번 · 풀 한 번 · 안개 한 번 · 빛 알갱이 한 번)
+   · 같은 것끼리 한 번에 그림 (갈대 부쉬 다섯 곳 한 번 · 낮은 식물 종류마다 한 번 · 풀 한 번 · 안개 한 번 · 빛 알갱이 한 번)
    · 땅은 촘촘히 만든 뒤 평평한 곳만 줄임 (절벽 · 가장자리 모양은 그대로) */
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { MeshoptSimplifier as MO } from '../../vendor/meshopt_simplifier.module.js';
-import { makeField, Y, SPOT, LAYERS, fbm, noise2, smoothstep } from './islefield.js?v=11101813';
-import { bushGroup, vegShader } from './flora.js?v=11101813';
+import { makeField, Y, SPOT, LAYERS, fbm, noise2, smoothstep } from './islefield.js?v=11101821';
+import { reedBush, vegShader } from './flora.js?v=11101821';
 
 const SUN = new THREE.Vector3(-.45, .78, .44).normalize();   /* 왼쪽 위 앞에서 (카메라 쪽 절벽 면이 비스듬히 빛을 받아 결이 드러남) */
 const rngOf = s => () => (s = (s * 16807) % 2147483647) / 2147483647;
@@ -57,16 +57,10 @@ export async function buildIsle({ K = 1 } = {}) {   /* K: 섬 전체 크기 (기
     if (!nearCliff(x, z) && rnd() > .25) continue; if (!farFrom(plants, x, z, 1)) continue;
     plants.push({ x, z, y: hAt(x, z), s: .35 + rnd() * rnd() * .9, r: rnd() * 6.283, v: 'stone' }); }
 
-  /* ②-2 부쉬 그룹: 고사리 수풀 + 나무 두 그루 (사용자 2026-11-10 · 부쉬 비교 화면과 같은 것 · flora.js)
-     m 단위로 만들고 섬 안 단위로 바꿈(÷K) · 바닥 모양 = 숨는 판정 = 시야 가림 (나무는 꾸밈 · 판정에 안 넣음) · 땅 그늘을 굽기 위해 먼저 만듦 */
+  /* ②-2 갈대 부쉬 (사용자 2026-11-10 · 부쉬 보기 화면과 같은 것 · flora.js) — m 단위로 만들고 섬 안 단위로 바꿈(÷K) · 바닥 모양 = 숨는 판정 = 시야 가림 */
   const BUSH = SPOT.brush.map((Z, k) => { let x0 = 1e9, z0 = 1e9, x1 = -1e9, z1 = -1e9, cx = 0, cz = 0, w = 0; for (const [x, z, r] of Z) { x0 = Math.min(x0, x - r - 1.5); z0 = Math.min(z0, z - r - 1.5); x1 = Math.max(x1, x + r + 1.5); z1 = Math.max(z1, z + r + 1.5); cx += x * r; cz += z * r; w += r; }
-    const BG = bushGroup({ foot: (x, z) => F.brushZ(k, x / K, z / K) * K, box: [x0 * K, z0 * K, x1 * K, z1 * K], cx: cx / w * K, cz: cz / w * K, seed: 41 + k * 17, HB: 1.7, gy: (x, z) => hAt(x / K, z / K) * K });
-    BG.geo.scale(1 / K, 1 / K, 1 / K); return BG; });
-  /* 나무 그늘(섬 안 단위): 잎 지붕은 해 반대쪽으로 비켜 드리운 얼룩 그늘 · 몸통은 긴 그림자 */
-  const SHX = -SUN.x / SUN.y, SHZ = -SUN.z / SUN.y, TSH = BUSH.flatMap(B => B.trees.map(T => { const c = T.canopy, t = T.trunk;
-    return { ex: (c.x + SHX * c.y) / K, ez: (c.z + SHZ * c.y) / K, rx: c.rx * 1.1 / K, rz: c.rz * 1.1 / K, ax: t.x / K, az: t.z / K, bx: (t.x + SHX * t.h) / K, bz: (t.z + SHZ * t.h) / K, w: t.w / K }; }));
-  const treeCast = (x, z) => { let s = 1; for (const T of TSH) { const d = Math.hypot((x - T.ex) / T.rx, (z - T.ez) / T.rz); if (d < 1.1) s *= 1 - .6 * smoothstep(1.05, .55, d) * (.45 + .55 * smoothstep(-.15, .2, fbm(x * .95, z * .95, 2)));   /* 잎 사이로 햇빛이 새는 얼룩 */
-      const abx = T.bx - T.ax, abz = T.bz - T.az, h = Math.min(1, Math.max(0, ((x - T.ax) * abx + (z - T.az) * abz) / (abx * abx + abz * abz))), dd = Math.hypot(x - T.ax - abx * h, z - T.az - abz * h); s *= 1 - .5 * smoothstep(T.w * (1 - .5 * h), T.w * .3, dd); } return s; };
+    const R = reedBush({ foot: (x, z) => F.brushZ(k, x / K, z / K) * K, box: [x0 * K, z0 * K, x1 * K, z1 * K], cx: cx / w * K, cz: cz / w * K, seed: 11 + k * 17, HB: 1.7, gy: (x, z) => hAt(x / K, z / K) * K });
+    R.geo.scale(1 / K, 1 / K, 1 / K); return R; });
 
   /* ③ 빛 굽기: 오목한 곳(사방 땅이 얼마나 막는지) · 해 가림(해 쪽으로 걸어가며 땅에 막히는지) · 나무 밑 그늘 */
   const AOg = new Float32Array(NX * NZ), SHg = new Float32Array(NX * NZ);
@@ -76,7 +70,7 @@ export async function buildIsle({ K = 1 } = {}) {   /* K: 섬 전체 크기 (기
     AOg[k] = 1 - .62 * oc / DIRS.length;
     let s = 1; for (let d = .6; d < 26; d += .6) { const hx = x + sx * d, hz = z + sz * d; if (F.mask(hx, hz) < -.5) break; const hh = hAt(hx, hz); if (hh > h + d * slope + .25) { s = Math.max(.12, 1 - (d < 3 ? .6 : .85)); break; } }
     SHg[k] = s; }
-  const treeShade = (x, z) => (1 - .4 * smoothstep(-1.6, .2, F.brush(x, z))) * treeCast(x, z);   /* 부쉬 가장자리 밑 그늘 · 나무 그늘 */
+  const treeShade = (x, z) => 1 - .4 * smoothstep(-1.6, .2, F.brush(x, z));   /* 부쉬 가장자리 밑 그늘 */
 
   /* ④ 땅 그물: 칸을 삼각형으로 나누고, 섬 밖에 걸친 삼각형은 가장자리에서 잘라 매끈한 테두리 */
   const P = [], key = new Map(), isEdge = [];
@@ -210,7 +204,7 @@ export async function buildIsle({ K = 1 } = {}) {   /* K: 섬 전체 크기 (기
     [lin(0xf4f0e6), lin(0xffd24a), lin(0xc49bff)].forEach((c, k) => inst(flower(c), plants.filter(p => p.v === 'fl' + k), 'flowers' + k));
     inst(stone, plants.filter(p => p.v === 'stone'), 'stones'); }
 
-  /* ⑧-2 부쉬 그룹 그리기: 다섯 곳을 한 번에 (②-2에서 만든 것) */
+  /* ⑧-2 갈대 부쉬 그리기: 다섯 곳을 한 번에 (②-2에서 만든 것 · 기체가 들어가거나 오르내려도 잎이 밀리지 않음) */
   { const m = new THREE.Mesh(mergeGeometries(BUSH.map(B => B.geo)), new THREE.ShaderMaterial({ uniforms: U, ...vegShader(GL, 'fogged(c, vL)'), side: THREE.DoubleSide })); m.name = 'brush'; G.add(m); }
 
   /* ⑨ 풀 포기: 가장자리 · 절벽 턱 · 나무 밑에 모여 남 (평평한 풀밭은 칠로 충분) */

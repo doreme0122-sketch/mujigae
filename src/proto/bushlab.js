@@ -1,11 +1,11 @@
-/* 부쉬 그룹 보기 (2026-11-10 · 사용자: 고사리 수풀 + 나무 두 그루를 합쳐 부쉬 그룹 하나로)
-   모양 · 칠은 flora.js (초원 섬과 똑같은 것) · 바닥 모양 가로 약 4.6m · 세로 약 3.4m · 덤불 높이 1.7m(1층 기체가 묻힘) · 게임과 같은 시점 */
+/* 갈대 부쉬 보기 (2026-11-10 · 사용자: 갈대로 · 잎을 넓게 하고 더 줄여 · 부쉬에 들어가도 잎이 반응 안 하게)
+   모양 · 칠은 flora.js (초원 섬과 똑같은 것) · 바닥 모양 가로 약 4.6m · 세로 약 3.4m · 높이 1.7m(1층 기체가 묻힘) · 게임과 같은 시점 */
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
-import { makeBloom } from '../core/hangar/bloom.js?v=11101813';
-import { makePerf } from './perf.js?v=11101813';
-import { makeForgeShip, forgeList } from './forgeship.js?v=11101813';
-import { SUN, bushGroup, vegShader } from './flora.js?v=11101813';
+import { makeBloom } from '../core/hangar/bloom.js?v=11101821';
+import { makePerf } from './perf.js?v=11101821';
+import { makeForgeShip, forgeList } from './forgeship.js?v=11101821';
+import { SUN, reedBush, vegShader } from './flora.js?v=11101821';
 
 const $ = s => document.querySelector(s);
 const hash2 = (i, j) => { let h = (i * 374761393 + j * 668265263) | 0; h = (h ^ (h >>> 13)) * 1274126177 | 0; return ((h ^ (h >>> 16)) >>> 0) / 4294967296; };
@@ -27,7 +27,7 @@ uniform vec3 uSun; uniform float uT;
 const vec3 SUNC = vec3(1.55, 1.45, 1.28), SKYC = vec3(.50, .62, .80), GNDC = vec3(.20, .22, .12);
 vec3 lit(vec3 al, vec3 n, float sh, float ao){ float d = max(dot(n, uSun), 0.); return al * (SUNC * d * sh + mix(GNDC, SKYC, .5 + .5 * n.y) * ao + .05); }
 `;
-const U = { uSun: { value: SUN }, uT: { value: 0 }, uPush: { value: new THREE.Vector4(0, 0, 1, 0) } };
+const U = { uSun: { value: SUN }, uT: { value: 0 } };
 const vegM = new THREE.ShaderMaterial({ uniforms: U, ...vegShader(GL), side: THREE.DoubleSide });
 
 export async function start(canvas, onProgress = () => {}) {
@@ -35,33 +35,22 @@ export async function start(canvas, onProgress = () => {}) {
   renderer.toneMapping = THREE.NoToneMapping; renderer.autoClear = false; renderer.setClearColor(0x9fc3e0, 1);
   const scene = new THREE.Scene(), camera = new THREE.PerspectiveCamera(20, 1, .5, 2000), bloom = makeBloom(renderer, { samples: 0 });
   { const pm = new THREE.PMREMGenerator(renderer); scene.environment = pm.fromScene(new RoomEnvironment(), .04).texture; scene.environmentIntensity = .7; pm.dispose(); }
-  /* 바닥: 초원 섬과 같은 풀밭 (풀결 · 들꽃 · 덤불 밑 그늘) */
-  /* 땅 그늘: 덤불 · 나무 지붕(잎 사이로 햇빛이 새는 얼룩 그늘) · 나무 몸통 — 해 방향으로 비켜 드리움 */
-  const NE = 8, NC = 4, uE = { value: Array.from({ length: NE }, () => new THREE.Vector4(0, 0, 1, 1)) }, uEk = { value: new Array(NE).fill(0) }, uC = { value: Array.from({ length: NC }, () => new THREE.Vector4()) }, uCw = { value: new Array(NC).fill(0) };
-  const SX = -SUN.x / SUN.y, SZ = -SUN.z / SUN.y; let ne = 0, nc = 0;
-  const addBushShade = x => { uE.value[ne].set(x + .25, -.25, 3.1, 2.4); uEk.value[ne++] = .45; };
-  const addTreeShade = (x, T) => { const c = T.canopy; uE.value[ne].set(x + c.x + SX * c.y, c.z + SZ * c.y, c.rx * 1.1, c.rz * 1.1); uEk.value[ne++] = -.6;
-    const t = T.trunk; uC.value[nc].set(x + t.x, t.z, x + t.x + SX * t.h, t.z + SZ * t.h); uCw.value[nc++] = t.w; };
-  const ground = new THREE.Mesh(new THREE.PlaneGeometry(90, 34, 1, 1).rotateX(-Math.PI / 2), new THREE.ShaderMaterial({ uniforms: { ...U, uE, uEk, uC, uCw },
+  /* 바닥: 초원 섬과 같은 풀밭 (풀결 · 들꽃 · 덤불 밑 그늘 — 해 반대쪽으로 살짝 비켜 드리움) */
+  const ground = new THREE.Mesh(new THREE.PlaneGeometry(90, 34, 1, 1).rotateX(-Math.PI / 2), new THREE.ShaderMaterial({ uniforms: U,
     vertexShader: 'varying vec3 vP; void main(){ vP = (modelMatrix * vec4(position, 1.)).xyz; gl_Position = projectionMatrix * viewMatrix * vec4(vP, 1.); }',
-    fragmentShader: GL + `uniform vec4 uE[${NE}], uC[${NC}]; uniform float uEk[${NE}], uCw[${NC}]; varying vec3 vP; void main(){ vec2 q = vP.xz; float g1 = fb(q * .14), g2 = fb(q * .8 + 4.), g3 = vn(q * 6.6);
+    fragmentShader: GL + `varying vec3 vP; void main(){ vec2 q = vP.xz; float g1 = fb(q * .14), g2 = fb(q * .8 + 4.), g3 = vn(q * 6.6);
       vec3 c = mix(vec3(.16, .36, .07), vec3(.40, .58, .12), g1); c = mix(c, vec3(.10, .27, .06), smoothstep(.5, .78, g2) * .55) * (.82 + .3 * g3);
       vec2 fc = q * 3.8, id = floor(fc), f = fract(fc) - .5, o = vec2(h21(id + 1.7), h21(id + 3.3)) - .5; float on = step(h21(id), .12 * smoothstep(.45, .72, fb(q * .1 + 9.))) * smoothstep(.13, .05, length(f - o * .6));
       c = mix(c, h21(id + 5.) < .5 ? vec3(1.1, 1.05, .95) : vec3(1.1, .9, .3), on);
-      float sh = 1.;
-      for (int i = 0; i < ${NE}; i++) { float k = uEk[i]; if (k == 0.) continue; float d = length((q - uE[i].xy) / uE[i].zw);
-        float m = k > 0. ? smoothstep(1.1, .35, d) : smoothstep(1.05, .55, d) * mix(.45, 1., smoothstep(.35, .62, fb(q * 1.9 + vec2(sin(uT * .5), cos(uT * .4)) * .08)));   /* 나무 그늘은 잎 사이로 새는 햇빛 얼룩 · 바람에 살짝 일렁 */
-        sh *= 1. - abs(k) * m; }
-      for (int i = 0; i < ${NC}; i++) { if (uCw[i] == 0.) continue; vec2 a = uC[i].xy, ab = uC[i].zw - a; float h = clamp(dot(q - a, ab) / dot(ab, ab), 0., 1.); float d = length(q - a - ab * h);
-        sh *= 1. - .5 * smoothstep(uCw[i] * (1. - .5 * h), uCw[i] * .3, d); }
+      float sh = 1. - .45 * smoothstep(1.1, .35, length((q - vec2(.25, -.25)) / vec2(3.1, 2.4)));
       gl_FragColor = vec4(lit(c, vec3(0., 1., 0.), sh, sh), 1.); }` }));
   scene.add(ground);
   const sky = new THREE.Mesh(new THREE.SphereGeometry(800, 32, 16), new THREE.ShaderMaterial({ side: THREE.BackSide, depthWrite: false, vertexShader: 'varying vec3 vD; void main(){ vD = normalize(position); vec4 p = projectionMatrix * modelViewMatrix * vec4(position, 1.); gl_Position = p.xyww; }',
     fragmentShader: 'varying vec3 vD; void main(){ gl_FragColor = vec4(mix(vec3(.66, .78, .9), vec3(.32, .54, .84), smoothstep(-.1, .6, vD.y)), 1.); }' })); sky.renderOrder = -10; sky.frustumCulled = false; scene.add(sky);
   onProgress(.2); await new Promise(r => setTimeout(r, 20));
-  const NAMES = ['부쉬 그룹 · 고사리 + 나무 두 그루'], X = () => 0, info = [];
-  { const t0 = performance.now(), BG = bushGroup({ foot: shape, box: [-3.2, -2.5, 3.2, 2.5], cx: 0, cz: 0, seed: 33, HB }); scene.add(new THREE.Mesh(BG.geo, vegM)); addBushShade(0); BG.trees.forEach(T => addTreeShade(0, T));
-    info.push({ tris: BG.geo.index.count / 3, top: BG.top, ms: Math.round(performance.now() - t0) }); onProgress(.8); }
+  const NAMES = ['갈대 부쉬'], X = () => 0, info = [];
+  { const t0 = performance.now(), R = reedBush({ foot: shape, box: [-3.2, -2.5, 3.2, 2.5], cx: 0, cz: 0, seed: 11, HB }); scene.add(new THREE.Mesh(R.geo, vegM));
+    info.push({ tris: R.tris, top: R.top, clumps: R.clumps, ms: Math.round(performance.now() - t0) }); onProgress(.8); }
   /* 크기 비교용 기체 (지금 고른 스킨) — 1층 높이(땅 위 1.2m)에서 덤불 옆에 떠 있음 */
   const SKINS = forgeList(renderer, camera); let skinId = 'blazedrake'; try { skinId = localStorage.getItem('mj-skin') || skinId; } catch (e) {}
   const FG = await makeForgeShip(renderer, camera, Math.max(0, SKINS.findIndex(s => s.id === skinId))); scene.add(FG.root); FG.root.position.set(-3.2, 1.2, 2.7); FG.root.rotation.y = .4;
@@ -84,9 +73,9 @@ export async function start(canvas, onProgress = () => {}) {
     const tx = drag.off, td = cfg.focus < 0 ? 34 : cfg.dist; cam.x += (tx - cam.x) * .08; cam.d += (td - cam.d) * .08;
         const a = cfg.ang * Math.PI / 180; camera.position.set(cam.x, 1.6 + cam.d * Math.sin(a), cam.z + cam.d * Math.cos(a)); camera.lookAt(cam.x, 1.6, cam.z); camera.updateMatrixWorld(); sky.position.copy(camera.position);
     info.forEach((I, k) => { v.set(X(k), I.top + .4, 0).project(camera); const L = labels[k]; L.style.left = ((v.x * .5 + .5) * 100) + '%'; L.style.top = ((-v.y * .5 + .5) * 100) + '%'; L.style.display = v.z < 1 ? '' : 'none'; });
-    if (say) say.style.display = 'none'; labels.forEach((L, k) => { L.textContent = `${NAMES[k]} · 삼각형 ${info[k].tris.toLocaleString()}개`; });
+    if (say) say.style.display = 'none'; labels.forEach((L, k) => { L.textContent = `${NAMES[k]} · 포기 ${info[k].clumps}개 · 삼각형 ${info[k].tris.toLocaleString()}개`; });
     FG.step(.016, t, { moving: false, fire: false }); FG.preRender(camera);
     renderer.setRenderTarget(bloom.scene); renderer.clear(); renderer.render(scene, camera); bloom.render(Wd, Hd, false); perf.tick(1 / 60); });
-  onProgress(1); console.log('[부쉬 그룹]', JSON.stringify(info.map(I => ({ tris: I.tris, ms: I.ms }))));
+  onProgress(1); console.log('[갈대 부쉬]', JSON.stringify(info.map(I => ({ tris: I.tris, clumps: I.clumps, ms: I.ms }))));
   window.__bush = { cfg, info, camera, THREE };
 }
