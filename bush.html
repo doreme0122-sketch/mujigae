@@ -48,22 +48,22 @@ input[type=range]{flex:1;min-width:0;accent-color:#b9ff4a;height:18px;margin:0}
 </style>
 <script>
 window.__ver = fetch('ver.json?t=' + Date.now(), { cache: 'no-store' }).then(r => r.json()).then(j => {
-  const f = location.pathname.split('/').pop() || 'index.html', want = j[f], mine = window.__mine = '11101629';
+  const f = location.pathname.split('/').pop() || 'index.html', want = j[f], mine = window.__mine = '11101813';
   if (want && +want > +mine) { location.replace(f + '?v=' + want + '&r=' + Date.now() + location.hash); return new Promise(() => {}); } }).catch(() => {});
 </script>
 <script type="importmap">{"imports":{"three":"./vendor/three.module.js","three/addons/":"./vendor/addons/"}}</script>
 </head><body>
 <canvas id="cv"></canvas>
 <div id="ui">
-  <div id="head"><b>고사리 수풀 + 나무</b><span>나무 혼자 · 고사리와 한 그루 · 고사리와 두 그루 · 게임과 같은 시점 · 옆의 기체는 크기 비교용(1층 높이)</span></div>
+  <div id="head"><b>부쉬 그룹</b><span>고사리 수풀 + 나무 두 그루 · 게임과 같은 시점 · 옆의 기체는 크기 비교용(1층 높이)</span></div>
   <div id="fps"></div>
   <div id="where"></div>
 </div>
-<div id="load"><p>덤불과 나무를 만들고 있어요</p><div class="b"><i></i></div></div>
+<div id="load"><p>부쉬 그룹을 만들고 있어요</p><div class="b"><i></i></div></div>
 <div id="rot">기기를 가로로 돌려 주세요</div>
 <script type="module">
 await window.__ver;
-const { start } = await import('./src/proto/bushlab.js?v=11101629');
+const { start } = await import('./src/proto/bushlab.js?v=11101813');
 const bar = document.querySelector('#load i');
 start(document.querySelector('#cv'), p => { bar.style.transform = `scaleX(${p})`; })
   .then(() => setTimeout(() => document.querySelector('#load').classList.add('done'), 300))

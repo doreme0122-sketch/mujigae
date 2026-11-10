@@ -89,5 +89,5 @@ export function makeField() {
   const brushZ = (k, x, z) => { let e = -99; for (const [cx, cz, r] of SPOT.brush[k]) e = smax(e, circ(x, z, cx, cz, r), 2); return e + .5 * fbm(x * .6, z * .6, 2) + .2 * fbm(x * 1.7, z * 1.7, 2); };
   const brush = (x, z) => { let d = -99; for (let k = 0; k < SPOT.brush.length; k++) d = Math.max(d, brushZ(k, x, z)); return d; };
   const brushZone = (x, z) => { for (let k = 0; k < SPOT.brush.length; k++) if (brushZ(k, x, z) > 0) return k; return -1; };   /* 몇 번째 부쉬 안인지 (밖이면 −1) */   /* 부쉬 안 + (가장자리가 덤불 뭉치처럼 물결) */
-  return { mask, plateau, pond, chan, brush, brushZone, top, bottom, blocked, sightBlock, obstacles, archLegs };
+  return { mask, plateau, pond, chan, brush, brushZ, brushZone, top, bottom, blocked, sightBlock, obstacles, archLegs };
 }
