@@ -4,7 +4,7 @@
    · 떼 경보 신호: 맞은 해파리에서 떼 동무에게 빛 알갱이가 둥글게 날아가 닿음 (신호가 어디서 어디로 퍼지는지 보임)
    무게: 빛 방울 한 장 · 알갱이(경험치+신호) 한 장 */
 import * as THREE from 'three';
-import { JCOL } from './jelly.js?v=11101449';
+import { JCOL } from './jelly.js?v=11101451';
 import * as A from '../core/audio.js';
 
 const AB = { transparent: true, depthWrite: false, blending: THREE.AdditiveBlending };

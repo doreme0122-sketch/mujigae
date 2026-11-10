@@ -7,7 +7,7 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { MeshoptSimplifier as MO } from '../../vendor/meshopt_simplifier.module.js';
-import { makeField, Y, SPOT, LAYERS, fbm, noise2, smoothstep } from './islefield.js?v=11101449';
+import { makeField, Y, SPOT, LAYERS, fbm, noise2, smoothstep } from './islefield.js?v=11101451';
 
 const SUN = new THREE.Vector3(-.45, .78, .44).normalize();   /* 왼쪽 위 앞에서 (카메라 쪽 절벽 면이 비스듬히 빛을 받아 결이 드러남) */
 const rngOf = s => () => (s = (s * 16807) % 2147483647) / 2147483647;
@@ -238,8 +238,8 @@ export async function buildIsle({ K = 1 } = {}) {   /* K: 섬 전체 크기 (기
       fragmentShader: GL + `varying vec3 vC, vN, vP; void main(){ vec3 n = normalize(vN); n *= sign(dot(n, uSun) + .3); gl_FragColor = vec4(fogged(lit(vC, n, 1., .9), vP), 1.); }` })); m.name = 'roots'; G.add(m); }
 
   /* ⑪ 다리: 고원 끝에서 돌탑까지 (기체가 그 밑으로 날아 지나감) · 널빤지 하나하나 다르게 · 밧줄 */
-  { const edgePt = (fn, from, to) => { const d = new THREE.Vector3().subVectors(to, from); for (let t = 0; t <= 1; t += .01) { const x = from.x + d.x * t, z = from.z + d.z * t; if (fn(x, z) < -.3) return new THREE.Vector3(x, 0, z); } return from.clone(); };
-    const A0 = new THREE.Vector3(-14, 0, -20), B0 = new THREE.Vector3(SPOT.pillar[0], 0, SPOT.pillar[1]);
+  {
+    const A0 = new THREE.Vector3(-14, 0, -20), B0 = new THREE.Vector3(SPOT.spires[0][0], 0, SPOT.spires[0][1]);
     const rim = (from, to, minH) => { const d = new THREE.Vector3().subVectors(to, from); let q = from.clone(); for (let t = 0; t <= 1; t += .005) { const x = from.x + d.x * t, z = from.z + d.z * t; if (hAt(x, z) < minH) break; q.set(x, 0, z); } return q; };   /* 꼭대기 가장자리 (절벽 밑이 아니라) */
     const A = rim(A0, B0, Y.PLATEAU - .7), B = rim(B0, A0, SPOT.spires[0][3] - 1.6); A.y = hAt(A.x, A.z) + .02; B.y = Math.min(hAt(B.x, B.z), A.y + 1.4) + .02;
     const parts = [], WOOD = lin(0x7a5a38), ROPE = lin(0x8a7350), r = rngOf(77), dir = new THREE.Vector3().subVectors(B, A), len = dir.length(); dir.normalize(); const side = new THREE.Vector3(-dir.z, 0, dir.x);

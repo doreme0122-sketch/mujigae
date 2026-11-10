@@ -26,7 +26,6 @@ export const CLEAR = 1.2;               /* 위아래로 이만큼 안에 무언�
 /* 자리 (북쪽 = −z = 화면 위쪽) */
 export const SPOT = {
   plateau: [[-20, -16, 14], [-9, -25, 9], [-29, -6, 8]],
-  pillar: [10, -16, 4.6],
   spires: [[10, -16, 4.6, 7], [22, -3, 2.5, 6], [-1, -9, 2.1, 5.4], [-31, 19, 2.4, 6.2], [18, -27, 2.6, 6.6], [4, 31, 2.2, 5.6]],   /* 2층 장애물: 돌탑 (자리 x, z · 반지름 · 꼭대기) */
   ridges: [[[-9, -3], [-3, -1], [3, -4]], [[7, 26], [13, 23], [17, 17]], [[-21, 19], [-13, 23], [-7, 29]], [[26, -12], [30, -18]]],   /* 1층 벽: 낮은 바위 등성이 (2층은 위로 넘어감) */
   arches: [[-8, 13, 3, 18, 5.4], [24, -16, 32, -6, 5]],   /* 2층 장애물: 돌 아치 (양 끝 · 꼭대기) — 2층은 밑으로 빠져나감 */
@@ -34,7 +33,6 @@ export const SPOT = {
   low: [[27, 13, 13], [18, 23, 8]],
   pond: [-17, 1.6, 6.6],
   channel: [-17, 1.6, -40, 10],
-  fall: null,             /* 폭포 자리는 모양에서 찾음 (아래 findFall) */
   forest: [[13, 0, 8.5], [-3, 21, 6.5], [-24, -20, 6]],
 };
 
@@ -46,7 +44,6 @@ export function makeField() {
     return d + 2.2 * fbm(x * .09, z * .09, 3) + .7 * fbm(x * .35, z * .35, 2); };
   const plateau = (x, z) => { const [u, w] = warp(x * 1.1, z * 1.1); let d = -99; for (const [cx, cz, r] of SPOT.plateau) d = smax(d, circ(u, w, cx * 1.1, cz * 1.1, r * 1.1), 5); return d / 1.1 + .9 * fbm(x * .21, z * .21, 3); };
   const spire = (x, z, [cx, cz, r]) => { const an = Math.atan2(z - cz, x - cx); return circ(x, z, cx, cz, r) + .6 * fbm(x * .45, z * .45, 3) * r / 4 + .3 * Math.sin(an * 7 + cx) * r / 4.6 + .12 * Math.sin(an * 13 + cz) * r / 4.6; };   /* 기둥 바위가 엮인 결 */
-  const pillar = (x, z) => spire(x, z, SPOT.spires[0]);
   const ridge = (x, z) => { let d = -99; for (const L of SPOT.ridges) for (let k = 0; k + 1 < L.length; k++) d = smax(d, capsule(x, z, ...L[k], ...L[k + 1], 1.3 + .4 * fbm(x * .25 + k, z * .25, 2)), 1.2); return d + .5 * fbm(x * .5, z * .5, 2); };
   const low = (x, z) => { const [u, w] = warp(x, z); let d = -99; for (const [cx, cz, r] of SPOT.low) d = smax(d, circ(u, w, cx, cz, r), 5); return d + .8 * fbm(x * .17, z * .17, 3); };
   const pond = (x, z) => circ(x, z, SPOT.pond[0], SPOT.pond[1], SPOT.pond[2]) + 1.1 * fbm(x * .19, z * .19, 3);
@@ -74,11 +71,10 @@ export function makeField() {
   function bottom(x, z, h, m) {
     const d = 1.6 * smoothstep(0, .7, m) + 36 * Math.pow(smoothstep(0, 30, m), .85) + 5 * smoothstep(4, 20, m) * fbm(x * .06, z * .06, 3) + 1.4 * fbm(x * .3, z * .3, 2) * smoothstep(0, 3, m);
     return h - d; }
-  const H = (x, z) => top(x, z);
   /* 땅 말고 공중에 걸친 것(아치 · 다리): 구슬 여럿 (x, y, z, 반지름) — 그 높이를 지나는 층만 막힘 */
   const obstacles = [];
   /* 기체를 막는 곳: 그 층 높이 근처까지 솟은 땅 · 그 층 높이를 지나는 아치·다리 */
   const blocked = (x, z, L = 1) => { const y = LAYERS[L]; if (mask(x, z) > -1 && top(x, z) > y - CLEAR) return true;
     for (const o of obstacles) { const dx = x - o[0], dz = z - o[2]; if (dx * dx + dz * dz < o[3] * o[3] && Math.abs(y - o[1]) < o[3] + CLEAR * .6) return true; } return false; };
-  return { mask, plateau, pillar, ridge, spire, low, pond, chan, top, bottom, H, blocked, obstacles };
+  return { mask, plateau, pond, chan, top, bottom, blocked, obstacles };
 }
