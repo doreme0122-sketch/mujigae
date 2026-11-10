@@ -2,11 +2,12 @@
    · 카메라 · 화면 밝기 처리 · 기체 · 조종은 새 맵(map2)과 같은 것 · 섬만 새것 */
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
-import { makeBloom } from '../core/hangar/bloom.js?v=11101821';
-import { makeForgeShip, forgeList } from './forgeship.js?v=11101821';
-import { makePerf } from './perf.js?v=11101821';
-import { makeFlight, FLY, padZone } from './flight.js?v=11101821';
-import { buildIsle } from './isle.js?v=11101821';
+import { makeBloom } from '../core/hangar/bloom.js?v=11101828';
+import { makeForgeShip, forgeList } from './forgeship.js?v=11101828';
+import { makePerf } from './perf.js?v=11101828';
+import { makeFlight, FLY, padZone } from './flight.js?v=11101828';
+import { buildIsle } from './isle.js?v=11101828';
+import { makeInputBuffer } from './inbuf.js?v=11101828';
 
 const $ = s => document.querySelector(s);
 export async function start(canvas, onProgress = () => {}) {
@@ -86,18 +87,22 @@ export async function start(canvas, onProgress = () => {}) {
     for (let r = .3; !spot && r <= 2; r += .3) for (let k = 0; k < 16; k++) { const x = FS.x + Math.cos(k * .3927) * r, z = FS.z + Math.sin(k * .3927) * r; if (bodyFree(x, z, to) && bodyFree(x, z, LV.cur)) { spot = [x, z]; break; } }
     if (!spot) { LV.flash = 1; return; }
     LV.to = to; LV.f = 0; LV.dir = d; LV.y0 = LV.y; LV.sx = FS.x; LV.sz = FS.z; LV.nx = spot[0]; LV.nz = spot[1]; drawPips(); if (d > 0) { LV.puff = 0; LV.puffX = FS.x; LV.puffZ = FS.z; } };
+  /* 선입력: 오르내리는 중(0.55초)에 한 번 더 쓸면 기억했다가 닿는 순간 이어서 바꿈 → 두 번 연달아 쓸면 3층에서 1층까지 멈춤 없이
+     층 바꾸기는 손가락으로 두 번 쓸어내리는 간격이 짧아서, 오르내리는 동안 언제든 받음 (스킬은 끝나기 0.3초 전부터) */
+  const LT = .55, buf = makeInputBuffer(), lvRemain = () => LV.cur !== LV.to ? (1 - LV.f) * LT : 0;
+  const askLayer = d => buf.press(() => tryLayer(d), lvRemain(), LT);
   const zd = { id: null, y: 0, done: false };
   addEventListener('pointerdown', e => { if (zd.id !== null || !inZone(e.clientX, e.clientY)) return; zd.id = e.pointerId; zd.y = e.clientY; zd.done = false; }, true);
-  addEventListener('pointermove', e => { if (e.pointerId !== zd.id || zd.done) return; const dy = e.clientY - zd.y; if (Math.abs(dy) > 34) { zd.done = true; tryLayer(dy < 0 ? 1 : -1); } });
+  addEventListener('pointermove', e => { if (e.pointerId !== zd.id || zd.done) return; const dy = e.clientY - zd.y; if (Math.abs(dy) > 34) { zd.done = true; askLayer(dy < 0 ? 1 : -1); } });
   const zUp = e => { if (e.pointerId === zd.id) zd.id = null; }; addEventListener('pointerup', zUp); addEventListener('pointercancel', zUp);
-  addEventListener('keydown', e => { if (e.repeat) return; const k = e.key.toLowerCase(); if (k === 'e') tryLayer(1); if (k === 'q') tryLayer(-1); });
+  addEventListener('keydown', e => { if (e.repeat) return; const k = e.key.toLowerCase(); if (k === 'e') askLayer(1); if (k === 'q') askLayer(-1); });
 
   /* ── 시야 (사용자 2026-11-10): 내 층 높이에 걸리는 것이 시야를 가림 · 보이는 쪽은 다른 층 기체도 보임 · 3층은 다 보임 · 부쉬 안은 어디서든 안 보임 ──
      · 1층: 고원 · 돌탑 · 아치 기둥에 더해 부쉬 덩이가 가림 — 부쉬 안에선 밖이 다 보이고, 밖에선 부쉬 뒤가 안 보임
      · 2층: 고원 · 돌탑 · 아치 기둥만 가림 · 3층: 가리는 것 없음
      · 가림 지도는 로딩 때 층마다 한 번 굽고, 화면에서는 내 자리에서 사방으로 빛줄기 256개를 쏴 닿는 거리만 잼
      · 어둠은 2D 좌표로 (사용자 2026-11-10): 섬의 모든 것이 높이와 상관없이 자기 x, z로 밝고 어두움이 정해짐 (기울어진 덮개 한 장이 아니라) */
-  const VR = [9, 12, 22], VC = .25, VX0 = -30, VZ0 = -28, VN = Math.ceil(60 / VC) + 1, VM = Math.ceil(56 / VC) + 1;
+  const VR = [22, 22, 22], VC = .25, VX0 = -30, VZ0 = -28, VN = Math.ceil(60 / VC) + 1, VM = Math.ceil(56 / VC) + 1;   /* VR 시야 넓이: 세 층 모두 같게 (사용자 2026-11-10: 1층이 너무 불리 · 3층 범위로) — 층마다 다른 건 가리는 구조물뿐 */
   const inBush = isle.inBrush;   /* 부쉬 덩이 모양 그대로 (보이는 가장자리 = 숨는 경계) */
   /* 가림 지도 (0.25m 칸): 0 = 트임 · 1 = 고원·돌탑·아치 다리 · 2+k = k번째 부쉬 (1층만) */
   const occ = [0, 1, 2].map(L => { const A = new Uint8Array(VN * VM); if (L === 2) return A;
@@ -154,10 +159,11 @@ export async function start(canvas, onProgress = () => {}) {
   const v3 = new THREE.Vector3();
   renderer.setAnimationLoop(now => { try { const c0 = performance.now(); const dt = THREE.MathUtils.clamp((now - last) / 1000, 0, .05); last = now; t += dt;
     /* 높이 바꾸는 중 (0.55초): 오를 땐 기수를 들고 조금 커지며 · 내릴 땐 숙이고 작아짐 · 카메라는 높을수록 물러나 넓게 */
-    if (LV.f < 1) { LV.f = Math.min(1, LV.f + dt / .55); const e = LV.f * LV.f * (3 - 2 * LV.f); LV.y = LV.y0 + (LY[LV.to] - LV.y0) * e;
+    if (LV.f < 1) { LV.f = Math.min(1, LV.f + dt / LT); const e = LV.f * LV.f * (3 - 2 * LV.f); LV.y = LV.y0 + (LY[LV.to] - LV.y0) * e;
       if (LV.dir < 0 && LV.f > .72 && LV.puff > 1) { LV.puff = 0; LV.puffX = FS.x; LV.puffZ = FS.z; }   /* 내려앉는 순간 아래가 눌림 */
       if (LV.f < .45 && (LV.nx !== LV.sx || LV.nz !== LV.sz)) { const k = Math.min(1, dt / Math.max(.02, (.45 - LV.f) * .55)); FS.x += (LV.nx - FS.x) * k; FS.z += (LV.nz - FS.z) * k; }   /* 비켜 주기 */
       if (LV.f >= 1) { LV.cur = LV.to; LV.ring = 0; } }
+    buf.tick(lvRemain());   /* 기억해 둔 다음 입력: 닿자마자 이어서 */
     fly.position.y = LV.y - FLY.HOVER;
     fly.updateMatrixWorld(true); fly.userData.update(t, dt);
     { const S = fly.children[0], e = LV.f < 1 ? Math.sin(LV.f * Math.PI) : 0; S.rotateX(LV.dir * .52 * e);   /* 오르내릴 때 기수를 크게 들고 숙임 (사용자 2026-11-10: 높이감이 더 보이게 · 약 30°) */
@@ -185,5 +191,5 @@ export async function start(canvas, onProgress = () => {}) {
     acc.n++; acc.ms += c1 - c0; acc.tt += dt; if (acc.tt > .5) { info.textContent = `그리기 ${acc.calls}번 · 삼각형 ${n(acc.tris)}개 · 계산 ${(acc.ms / acc.n).toFixed(1)}ms\n섬: 낮은 식물 ${isle.stats.plants} · 땅 삼각형 ${n(isle.stats.ground.full)} → ${n(isle.stats.ground.kept)}`; info.style.whiteSpace = 'pre'; acc.n = acc.ms = acc.tt = 0; }
   } catch (e) { console.error('[초원 섬]', e); } });
   onProgress(1);
-  window.__isle = { THREE, scene, renderer, camera, FS, fly, isle, cfg, look, LV, tryLayer, FG, get t() { return t; } };
+  window.__isle = { THREE, scene, renderer, camera, FS, fly, isle, cfg, look, LV, tryLayer, askLayer, FG, get t() { return t; } };
 }
