@@ -2,10 +2,10 @@
    모양 · 칠은 flora.js (초원 섬과 똑같은 것) · 바닥 모양 가로 약 4.6m · 세로 약 3.4m · 높이 1.7m(1층 기체가 묻힘) · 게임과 같은 시점 */
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
-import { makeBloom } from '../core/hangar/bloom.js?v=11102100';
-import { makePerf } from './perf.js?v=11102100';
-import { makeForgeShip, forgeList } from './forgeship.js?v=11102100';
-import { SUN, reedBush, vegShader } from './flora.js?v=11102100';
+import { makeBloom } from '../core/hangar/bloom.js?v=11102116';
+import { makePerf } from './perf.js?v=11102116';
+import { makeForgeShip, forgeList } from './forgeship.js?v=11102116';
+import { SUN, reedBush, vegShader } from './flora.js?v=11102116';
 
 const $ = s => document.querySelector(s);
 const hash2 = (i, j) => { let h = (i * 374761393 + j * 668265263) | 0; h = (h ^ (h >>> 13)) * 1274126177 | 0; return ((h ^ (h >>> 16)) >>> 0) / 4294967296; };

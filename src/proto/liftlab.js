@@ -6,10 +6,10 @@
    기체는 1층 → 2층 → 3층 → 2층 → 1층을 쉬어 가며 되풀이 · 카메라는 게임처럼 기체 높이를 따라감 */
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
-import { makeBloom } from '../core/hangar/bloom.js?v=11102100';
-import { makePerf } from './perf.js?v=11102100';
-import { makeForgeShip, forgeList } from './forgeship.js?v=11102100';
-import { SUN, reedBush, vegShader } from './flora.js?v=11102100';
+import { makeBloom } from '../core/hangar/bloom.js?v=11102116';
+import { makePerf } from './perf.js?v=11102116';
+import { makeForgeShip, forgeList } from './forgeship.js?v=11102116';
+import { SUN, reedBush, vegShader } from './flora.js?v=11102116';
 
 const $ = s => document.querySelector(s);
 const hash2 = (i, j) => { let h = (i * 374761393 + j * 668265263) | 0; h = (h ^ (h >>> 13)) * 1274126177 | 0; return ((h ^ (h >>> 16)) >>> 0) / 4294967296; };
@@ -50,20 +50,20 @@ function Streaks(scene, N) {
         vec3 w = iA.xyz + vec3(0., v * iA.w, 0.); vec3 side = normalize(cross(vec3(0., 1., 0.), cameraPosition - w));   /* 세로축은 그대로 두고 카메라 쪽으로 돌림 */
         w += side * (position.x * iB.x * (1.6 + 1.4 * taper) + sin(v * 7. + uT * 17. + iC.x * 31.) * .035 + sin(v * 15. - uT * 23. + iC.x * 17.) * .012);   /* 번짐까지 담는 폭 · 조금씩 흔들림 */
         float ag = clamp(iB.z, 0., 1.);
-        vB = iB.y * sin(ag * 3.14159) * taper; vV = iB.w > 0. ? 1. - v : v; vAg = ag; vF = iB.w; vS = iC.x; vSp = iC.y; vL = iA.w;   /* vV: 0 = 앞(흐르는 쪽 머리) → 1 = 꼬리 */
+        vB = iB.y * sin(ag * 3.14159) * taper; vV = iB.w > 0. ? v : 1. - v; vAg = ag; vF = iB.w; vS = iC.x; vSp = iC.y; vL = iA.w;   /* vV: 0 = 머리(흘러가는 쪽 끝 · 아래로 흐르면 아래 끝) → 1 = 꼬리 */
         vQ = vec2(position.x * (1.6 + 1.4 * taper), v); gl_Position = projectionMatrix * viewMatrix * vec4(w, 1.); }`,
     fragmentShader: `varying vec2 vQ; varying float vB, vV, vAg, vF, vS, vSp, vL;
       float h(float x){ return fract(sin(x * 127.1) * 43758.55); }
       float vn1(float x){ float i = floor(x), f = fract(x); f = f * f * (3. - 2. * f); return mix(h(i), h(i + 1.), f); }
       void main(){ float u = vQ.x, s = vV;
-        float fl = s * vL * 2.2 - vAg * vSp * 3.2;                                                                       /* 조각들이 흐르는 쪽으로 미끄러짐 */
+        float fl = s * vL * 2.2 + vAg * vSp * 3.2;                                                                       /* 조각들이 머리 쪽(흐르는 쪽)으로 미끄러짐 */
         float piece = smoothstep(.32, .62, vn1(fl + vS * 50.)) * (.6 + .4 * vn1(fl * 2.7 + vS * 9.));                     /* 바람에 찢긴 빛 조각 (끊어짐 · 길이 제각각) */
         float tail = pow(1. - s, 1.3) * smoothstep(0., .06, s) + .05;                                                    /* 머리가 밝고 꼬리로 흐려짐 */
         float core = exp(-u * u * 60.) * piece, halo = exp(-u * u * 4.) * (.18 + .3 * piece);
-        float bp = fract(vS * 7.3 + vAg * (1.6 + vSp)), bead = exp(-pow((s - bp) * vL / .09, 2.)) * exp(-u * u * 14.) * 1.8;   /* 줄기를 따라 미끄러지는 빛 알갱이 */
+        float bp = 1. - fract(vS * 7.3 + vAg * (1.6 + vSp)), bead = exp(-pow((s - bp) * vL / .09, 2.)) * exp(-u * u * 14.) * 1.8;   /* 줄기를 따라 미끄러지는 빛 알갱이 */
         vec3 c = vec3(1.) * core * 2.6 + mix(vec3(.45, .66, 1.), vec3(.62, .55, 1.), s) * halo * 1.6 + vec3(.9, .96, 1.) * bead * 1.5;
         gl_FragColor = vec4(c * tail * vB, 1.); }` }));
-  m.frustumCulled = false; m.renderOrder = 9; scene.add(m);
+  m.frustumCulled = false; m.renderOrder = 9; m.layers.set(1); scene.add(m);   /* 기체와 같은 겹: 충격파에 휘지 않음 (사용자 2026-11-10) */
   const L = [];
   return {
     emit(o) { if (L.length >= N) L.shift(); L.push({ ...o, age: 0 }); },
@@ -164,7 +164,7 @@ export async function start(canvas, onProgress = () => {}) {
     FG.preRender(camera);
     camera.layers.set(0); renderer.setRenderTarget(rtW); renderer.clear(); renderer.render(scene, camera);                    /* ① 기체를 뺀 풍경 */
     renderer.setRenderTarget(bloom.scene); renderer.clear(); renderer.render(lensS, lensC);                                   /* ② 기체 둘레만 휘게 옮겨 그림 (깊이 포함) */
-    camera.layers.set(1); renderer.render(scene, camera); camera.layers.set(0);                                                /* ③ 기체는 휘지 않게 그 위에 */
+    camera.layers.set(1); renderer.render(scene, camera); camera.layers.set(0);                                                /* ③ 기체 · 세로 빛줄기는 휘지 않게 그 위에 */
     bloom.render(Wd, Hd, false); perf.tick(dt); });
   onProgress(1); window.__lift = { M, cfg, camera, THREE, lensU };
 }
