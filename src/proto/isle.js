@@ -7,8 +7,8 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { MeshoptSimplifier as MO } from '../../vendor/meshopt_simplifier.module.js';
-import { makeField, Y, SPOT, LAYERS, fbm, noise2, smoothstep } from './islefield.js?v=11110123';
-import { reedBush, vegShader } from './flora.js?v=11110123';
+import { makeField, Y, SPOT, LAYERS, fbm, noise2, smoothstep } from './islefield.js?v=11110142';
+import { reedBush, vegShader } from './flora.js?v=11110142';
 
 const SUN = new THREE.Vector3(-.45, .78, .44).normalize();   /* 왼쪽 위 앞에서 (카메라 쪽 절벽 면이 비스듬히 빛을 받아 결이 드러남) */
 const rngOf = s => () => (s = (s * 16807) % 2147483647) / 2147483647;
@@ -28,9 +28,12 @@ uniform vec4 uCutA, uCutB;   /* 화면 가림 걷기 (사용자 2026-11-11 · �
 float bayer(vec2 f){ vec2 q = mod(floor(f), 4.); float b = mod(q.x * 2. + q.y * 3., 4.) * 4. + mod(q.x + q.y * 2., 4.); return (b + .5) / 16.; }   /* 고른 점 무늬 (지저분한 모래알이 아니게) */
 bool cutAway(vec3 p){ if (uCutA.w <= 0.) return false; vec3 ab = uCutB.xyz - uCutA.xyz; float t = clamp(dot(p - uCutA.xyz, ab) / dot(ab, ab), 0., 1.);
   if (t < .01 || p.y < uCutA.y + 2.5) return false; float r = uCutA.w * (.7 + .3 * smoothstep(0., .25, t)), d = length(p - uCutA.xyz - ab * t); if (d > r) return false;
-  return bayer(gl_FragCoord.xy) < smoothstep(r, r * .8, d); }
+  return bayer(gl_FragCoord.xy) < smoothstep(r, r * .8, d) * uCutB.w; }   /* uCutB.w: 걷어 내는 양 (1 = 다 걷음 · 0.5 = 반쯤 비침) */
 vec3 fogged(vec3 c, vec3 wp){ float k = smoothstep(-16., -64., wp.y); c = mix(c, MIST, k * .85); return mix(c * vec3(.13, .15, .24), c, seen(wp)); }
 `;
+/* 가림 걷기 무게 (꼭짓점 · 칸 공용): 기체 → 카메라 선에서 얼마나 가까운지 (1 = 한가운데) */
+const CUTW = `uniform vec4 uCutA, uCutB; float cutW(vec3 p){ if (uCutA.w <= 0.) return 0.; vec3 ab = uCutB.xyz - uCutA.xyz; float t = clamp(dot(p - uCutA.xyz, ab) / dot(ab, ab), 0., 1.);
+  float r = uCutA.w * (.7 + .3 * smoothstep(0., .25, t)); return smoothstep(r, r * .7, length(p - uCutA.xyz - ab * t)) * step(.01, t); }`;
 const U = { uSun: { value: SUN }, uT: { value: 0 }, uPush: { value: new THREE.Vector4(0, 0, 1, 0) }, uRay: { value: null }, uVC: { value: new THREE.Vector2() }, uVR: { value: 12 }, uK: { value: 1 }, uVOn: { value: 0 }, uCutA: { value: new THREE.Vector4() }, uCutB: { value: new THREE.Vector4() } };   /* uPush: 기체가 오르내릴 때 밑의 풀·덤불을 미는 바람 (x, z, 반지름, 세기 · 섬 안 단위) */
 
 export async function buildIsle({ K = 1, layout = SPOT } = {}) {   /* layout: 섬 배치 (기본 = 섬 하나 시험 · 초원 한 조각 체험판은 meadowsector.js) */
@@ -130,9 +133,11 @@ export async function buildIsle({ K = 1, layout = SPOT } = {}) {   /* layout: �
   const topG = new THREE.BufferGeometry(); topG.setAttribute('position', new THREE.BufferAttribute(pos, 3)); topG.setAttribute('normal', new THREE.BufferAttribute(nrm, 3));
   topG.setAttribute('aW', new THREE.BufferAttribute(W, 4)); topG.setAttribute('aL', new THREE.BufferAttribute(L, 2)); topG.setIndex(new THREE.BufferAttribute(I, 1)); topG.computeBoundingSphere();
   const topM = new THREE.ShaderMaterial({ uniforms: U,
-    vertexShader: `attribute vec4 aW; attribute vec2 aL; varying vec3 vP, vN; varying vec4 vW; varying vec2 vL; void main(){ vP = position; vN = normal; vW = aW; vL = aL; gl_Position = projectionMatrix * viewMatrix * modelMatrix * vec4(position, 1.); }`,
+    vertexShader: CUTW + `attribute vec4 aW; attribute vec2 aL; varying vec3 vP, vN; varying vec4 vW; varying vec2 vL; void main(){ vec3 p = position, n = normal; float w = cutW(p), top = uCutA.y + 2.2;   /* 가림 걷기: 산을 뚫지 않고 기체 바로 위 높이까지 눌러 내림 (속이 빈 산 너머 하늘이 비치지 않게) */
+      if (w > 0. && p.y > top) { p.y = mix(p.y, top + (p.y - top) * .04, w); n = normalize(mix(n, vec3(0., 1., 0.), w)); }
+      vP = p; vN = n; vW = aW; vL = aL; gl_Position = projectionMatrix * viewMatrix * modelMatrix * vec4(p, 1.); }`,
     fragmentShader: GL + `varying vec3 vP, vN; varying vec4 vW; varying vec2 vL;
-      void main(){ if (cutAway(vP)) discard; vec3 n = normalize(vN); vec2 q = vP.xz;
+      void main(){ vec3 n = normalize(vN); vec2 q = vP.xz;
         float g1 = fb(q * .07), g2 = fb(q * .42 + 4.), g3 = vn(q * 3.3), g4 = vn(q * 11.);
         vec3 grass = mix(vec3(.16, .36, .07), vec3(.40, .58, .12), g1);                             /* 넓게 번지는 연두 · 짙은 초록 얼룩 */
         grass = mix(grass, vec3(.10, .27, .06), smoothstep(.5, .78, g2) * .55) * (.82 + .3 * g3) * (.9 + .2 * g4);   /* 풀결 */
@@ -152,6 +157,12 @@ export async function buildIsle({ K = 1, layout = SPOT } = {}) {   /* layout: �
         vec3 c = lit(al, n, vL.y, vL.x);
         gl_FragColor = vec4(fogged(c, vP), 1.); }` });
   const top = new THREE.Mesh(topG, topM); top.name = 'isleTop'; G.add(top);
+  /* 반투명 걷기: 눌러 내린 산의 원래 모양을 유리처럼 희미하게 (가장자리가 조금 더 밝게) — uCutB.w < 1 일 때만 */
+  const ghostM = new THREE.ShaderMaterial({ uniforms: U, transparent: true, depthWrite: false,
+    vertexShader: CUTW + `varying vec3 vP, vN; varying float vW; void main(){ vP = position; vN = normal; vW = cutW(position) * step(uCutA.y + 2.2, position.y); gl_Position = projectionMatrix * viewMatrix * modelMatrix * vec4(position, 1.); }`,
+    fragmentShader: `uniform vec4 uCutB; varying vec3 vP, vN; varying float vW; void main(){ float a = vW * (1. - uCutB.w) * 2.; if (a < .02) discard; vec3 n = normalize(vN); float rim = 1. - abs(n.y);
+      gl_FragColor = vec4(mix(vec3(.62, .78, .7), vec3(.9, 1., .95), rim), a * (.14 + .3 * rim)); }` });
+  if (LO.cut) { const gh = new THREE.Mesh(topG, ghostM); gh.name = 'isleTop'; gh.renderOrder = 8; G.add(gh); }
 
   /* ⑥ 아래 바위 몸통: 같은 꼭짓점 자리에서 아래로 (테두리는 위 땅과 꼭 맞물림) · 거의 안 보이는 안쪽은 줄임
      · 테두리 바로 밑은 흙 띠(위 땅에서 얼마나 내려왔는지 aD로) — 칼로 자른 듯한 단면이 아니라 흙 · 뿌리 · 이끼가 드러난 언덕 끝 (사용자 2026-11-10) */
@@ -167,7 +178,7 @@ export async function buildIsle({ K = 1, layout = SPOT } = {}) {   /* layout: �
   const botM = new THREE.ShaderMaterial({ uniforms: U,
     vertexShader: `attribute float aL, aD; varying vec3 vP, vN; varying float vL, vD; void main(){ vP = position; vN = normal; vL = aL; vD = aD; gl_Position = projectionMatrix * viewMatrix * modelMatrix * vec4(position, 1.); }`,
     fragmentShader: GL + `varying vec3 vP, vN; varying float vL, vD;
-      void main(){ if (cutAway(vP)) discard; vec3 n = normalize(vN); float band = sin(vP.y * 1.7 + fb(vP.xz * .12) * 6.) * .5 + .5, b2 = sin(vP.y * 5.3 + fb(vP.xz * .4) * 3.) * .5 + .5;
+      void main(){ vec3 n = normalize(vN); float band = sin(vP.y * 1.7 + fb(vP.xz * .12) * 6.) * .5 + .5, b2 = sin(vP.y * 5.3 + fb(vP.xz * .4) * 3.) * .5 + .5;
         vec3 rock = mix(vec3(.22, .18, .15), vec3(.46, .40, .33), band) * (.8 + .2 * b2) * (.75 + .4 * fb(vec2(vP.x + vP.z, vP.y) * .6));
         float crack = smoothstep(.035, 0., abs(vn(vec2((vP.x - vP.z) * .9, vP.y * .35)) - .5)) * (.6 + .4 * vn(vP.xz * .7));          /* 아래로 길게 갈라진 틈 */
         float drip = smoothstep(.6, .85, vn(vec2((vP.x + vP.z) * 1.6, vP.y * .09))) * smoothstep(-40., -8., vP.y);                    /* 물이 흘러내린 어두운 얼룩 줄 */
@@ -551,5 +562,5 @@ export async function buildIsle({ K = 1, layout = SPOT } = {}) {   /* layout: �
   G.scale.setScalar(K); U.uK.value = K;   /* 모양 · 무늬 · 안개 높이는 섬 안 좌표로 계산하고 통째로 줄임 → 들꽃 · 잎 무늬까지 같이 작아짐 */
   G.traverse(o => { if (o.isMesh || o.isPoints) { st.draws++; const g = o.geometry, n = (g.index ? g.index.count : g.attributes.position.count) / 3; st.tris += o.isInstancedMesh ? n * o.count : o.isPoints ? 0 : (g.instanceCount ? n * g.instanceCount : n); } });
   st.ground = { full: fullT, kept: I.length / 3, bottom: BI.length / 3 }; st.plants = plants.length;
-  return { group: G, K, field: F, H: (x, z) => hAt(x / K, z / K) * K, mask: (x, z) => F.mask(x / K, z / K) * K, blocked: (x, z, L = 1) => F.blocked(x / K, z / K, L), where: (x, z) => F.where(x / K, z / K), inGorge: (x, z) => F.inGorge(x / K, z / K, .2), layout: LO, setCut: (s, c, R) => { U.uCutA.value.set(s.x / K, s.y / K, s.z / K, R / K); U.uCutB.value.set(c.x / K, c.y / K, c.z / K, 0); }, sightBlock: (x, z, L) => F.sightBlock(x / K, z / K, L), inBrush: (x, z) => F.brush(x / K, z / K) > 0, brushZone: (x, z) => F.brushZone(x / K, z / K), setSight: (tex, x, z, R, on) => { U.uRay.value = tex; U.uVC.value.set(x, z); U.uVR.value = R; U.uVOn.value = on; }, layers: LAYERS.map(y => y * K), push: (x, z, r, k) => U.uPush.value.set(x / K, z / K, r / K, k / K), stats: st, sky, setPx: px => { G.userData.motes.material.uniforms.uPx.value = px; }, update: t => { U.uT.value = t; } };
+  return { group: G, K, field: F, H: (x, z) => hAt(x / K, z / K) * K, mask: (x, z) => F.mask(x / K, z / K) * K, blocked: (x, z, L = 1) => F.blocked(x / K, z / K, L), where: (x, z) => F.where(x / K, z / K), inGorge: (x, z) => F.inGorge(x / K, z / K, .2), layout: LO, setCut: (s, c, R, amt = 1) => { U.uCutA.value.set(s.x / K, s.y / K, s.z / K, R / K); U.uCutB.value.set(c.x / K, c.y / K, c.z / K, amt); }, sightBlock: (x, z, L) => F.sightBlock(x / K, z / K, L), inBrush: (x, z) => F.brush(x / K, z / K) > 0, brushZone: (x, z) => F.brushZone(x / K, z / K), setSight: (tex, x, z, R, on) => { U.uRay.value = tex; U.uVC.value.set(x, z); U.uVR.value = R; U.uVOn.value = on; }, layers: LAYERS.map(y => y * K), push: (x, z, r, k) => U.uPush.value.set(x / K, z / K, r / K, k / K), stats: st, sky, setPx: px => { G.userData.motes.material.uniforms.uPx.value = px; }, update: t => { U.uT.value = t; } };
 }

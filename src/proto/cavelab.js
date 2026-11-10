@@ -16,3 +16,9 @@ export const CAVE = {
   pond: [14, 44, 4],
   start: [0, 48],
 };
+
+/* 6시 방향 (사용자 2026-11-11: 돌려 붙였을 때 산맥이 얼마나 가리는지 보려고): 구역 전체를 180° 돌림 → 동굴 입구가 화면 반대쪽(위)을 보고 산맥이 화면 아래쪽에서 골짜기를 가림 */
+export function turned(L) { const p = ([x, z, ...r]) => [-x, -z, ...r], R = JSON.parse(JSON.stringify(L));
+  R.box = [-L.box[1], -L.box[0], -L.box[3], -L.box[2]]; R.islands = L.islands.map(C => C.map(p)); R.mount.blobs = L.mount.blobs.map(p);
+  R.gorge.pts = L.gorge.pts.map(p); R.gorge.basin = p(L.gorge.basin); R.spires = L.spires.map(([x, z, r, h, k, rot]) => [-x, -z, r, h, k, rot + Math.PI]);
+  R.brush = L.brush.map(Z => Z.map(p)); R.pond = p(L.pond); R.start = p(L.start); return R; }

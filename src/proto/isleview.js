@@ -2,14 +2,14 @@
    · 카메라 · 화면 밝기 처리 · 기체 · 조종은 새 맵(map2)과 같은 것 · 섬만 새것 */
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
-import { makeBloom } from '../core/hangar/bloom.js?v=11110123';
-import { makeForgeShip, forgeList } from './forgeship.js?v=11110123';
-import { makePerf } from './perf.js?v=11110123';
-import { makeFlight, FLY, padZone } from './flight.js?v=11110123';
-import { buildIsle } from './isle.js?v=11110123';
-import { makeInputBuffer } from './inbuf.js?v=11110123';
-import { makeLiftFx } from './liftfx.js?v=11110123';
-import { gate4 } from './gates.js?v=11110123';
+import { makeBloom } from '../core/hangar/bloom.js?v=11110142';
+import { makeForgeShip, forgeList } from './forgeship.js?v=11110142';
+import { makePerf } from './perf.js?v=11110142';
+import { makeFlight, FLY, padZone } from './flight.js?v=11110142';
+import { buildIsle } from './isle.js?v=11110142';
+import { makeInputBuffer } from './inbuf.js?v=11110142';
+import { makeLiftFx } from './liftfx.js?v=11110142';
+import { gate4 } from './gates.js?v=11110142';
 
 const $ = s => document.querySelector(s);
 export async function start(canvas, onProgress = () => {}, opt = {}) {   /* opt.layout: 섬 배치 (없으면 섬 하나 시험 · 초원 한 조각 체험판 = meadowsector.js) */
@@ -151,6 +151,16 @@ export async function start(canvas, onProgress = () => {}, opt = {}) {   /* opt.
     b.onclick = () => { TOP.on = !TOP.on; if (!TOP.on) { camera.up.set(0, 1, 0); camera.updateProjectionMatrix(); size(); } save(); draw(); };
     box.append(b, row); view?.append(box); const lean = row.querySelector('input'), lv = row.querySelector('output'); lean.value = TOP.lean; lv.textContent = TOP.lean.toFixed(2);
     lean.oninput = () => { TOP.lean = +lean.value; lv.textContent = TOP.lean.toFixed(2); save(); }; draw(); }
+  /* 가림 걷기 (사용자 2026-11-11: 둘 다 보고 정함): 지금(작게 · 다 걷음) → 크게(다 걷음) → 크게 반투명(반쯤 비침 — 산 모양은 유리처럼 남고 너머가 보임) · 크기는 막대로 */
+  const CUT = { mode: 0, r: LO.cut || 0 }; try { const o = JSON.parse(localStorage.getItem('mj-isle-cut') || '{}'); if (o.mode >= 0) CUT.mode = o.mode; if (o.r) CUT.r = o.r; } catch (e) {}
+  if (LO.cut) { const view = $('#view'), box = document.createElement('div'); box.style.cssText = 'display:flex;flex-direction:column;gap:4px;margin-top:4px';
+    const b = document.createElement('button'); b.type = 'button'; b.style.cssText = 'font-size:11px;padding:4px 8px;border:1px solid rgba(185,255,74,.4);border-radius:9px;color:#e8ffd0';
+    const row = document.createElement('div'); row.className = 'row'; row.innerHTML = '<label for="cutr">걷기 크기</label><input id="cutr" type="range" min="2" max="25" step="0.5"><output id="cutrv"></output>';
+    const inp = row.querySelector('input'), out2 = row.querySelector('output'), NM = ['지금 (작게)', '크게', '크게 반투명'];
+    const save = () => { try { localStorage.setItem('mj-isle-cut', JSON.stringify({ mode: CUT.mode, r: CUT.r })); } catch (e) {} };
+    const draw = () => { b.textContent = `가림 걷기: ${NM[CUT.mode]} · 눌러서 바꾸기`; inp.value = CUT.r; out2.textContent = CUT.r + 'm'; };
+    b.onclick = () => { CUT.mode = (CUT.mode + 1) % 3; CUT.r = CUT.mode === 0 ? LO.cut : 14; save(); draw(); };
+    inp.oninput = () => { CUT.r = +inp.value; save(); draw(); }; box.append(b, row); view?.append(box); draw(); }
   const look = { x: 0, z: 0, id: null, px: 0, py: 0 };
   addEventListener('pointerdown', e => { if (look.id !== null || e.target.closest('#ui') || padZone(e.clientX, e.clientY) || inZone(e.clientX, e.clientY)) return; look.id = e.pointerId; look.px = e.clientX; look.py = e.clientY; });
   addEventListener('pointermove', e => { if (e.pointerId !== look.id) return; const r = canvas.getBoundingClientRect(), mpp = (TOP.on ? topH() : 2 * camD * Math.tan(camera.fov * Math.PI / 360)) / Math.max(1, r.height), a = TOP.on ? Math.PI / 2 : cfg.ang * Math.PI / 180;
@@ -193,7 +203,7 @@ export async function start(canvas, onProgress = () => {}, opt = {}) {   /* opt.
       camera.projectionMatrix.multiplyMatrices(orthoM, shearM); camera.projectionMatrixInverse.copy(camera.projectionMatrix).invert();
       const ppu = Hd / topH() * H; if (Math.abs(ppu - (TOP.ppu || 0)) > 1) { TOP.ppu = ppu; isle.setPx(ppu); fly.userData.setPx?.(ppu); } }   /* 빛 알갱이 크기: 원근 없이 */
     else { camera.position.set(vx, cy + camD * Math.sin(a), vz + camD * Math.cos(a)); camera.lookAt(vx, cy, vz); camera.updateMatrixWorld(); if (TOP.ppu) { TOP.ppu = 0; size(); } }
-    isle.sky.position.copy(camera.position); isle.update(t); if (LO.cut) isle.setCut(v3.set(FS.x, LV.y, FS.z), TOP.on ? new THREE.Vector3(FS.x, LV.y + 100, FS.z + TOP.lean * 100) : camera.position, LO.cut);   /* 탑뷰: 기체를 가리는 건 바로 남쪽(화면 아래쪽)의 높은 것 */   /* 기체와 카메라 사이 높은 산 · 동굴 천장을 내 화면에서만 걷어 냄 */ xrayM.uniforms.uT.value = t;
+    isle.sky.position.copy(camera.position); isle.update(t); if (LO.cut) isle.setCut(v3.set(FS.x, LV.y, FS.z), TOP.on ? new THREE.Vector3(FS.x, LV.y + 100, FS.z + TOP.lean * 100) : camera.position, CUT.r, CUT.mode === 2 ? .55 : 1);   /* 탑뷰: 기체를 가리는 건 바로 남쪽(화면 아래쪽)의 높은 것 */   /* 기체와 카메라 사이 높은 산 · 동굴 천장을 내 화면에서만 걷어 냄 */ xrayM.uniforms.uT.value = t;
     /* 바람 고리 (1층이면 땅에 닿아 풀 · 꽃을 밂 · 2 · 3층은 그 높이 공중에서만) · 못 바꾸면 층 막대가 빨갛게 깜빡 */
     if (LV.puff < 1) { LV.puff = Math.min(1, LV.puff + dt / .7); const p = LV.puff, onGround = LV.puffL === 0, gh = isle.H(LV.puffX, LV.puffZ);
       puff.visible = !onGround || isle.mask(LV.puffX, LV.puffZ) > 0; puff.position.set(LV.puffX, onGround ? gh + .08 : LY[LV.puffL] - .45, LV.puffZ); puff.scale.setScalar(5.5); puffU.uP.value = p;
