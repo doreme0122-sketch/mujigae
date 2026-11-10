@@ -19,7 +19,7 @@ html,body{margin:0;height:100%;background:#05060f;overflow:hidden;touch-action:n
 </style>
 <script>
 window.__ver = fetch('ver.json?t=' + Date.now(), { cache: 'no-store' }).then(r => r.json()).then(j => {
-  const f = location.pathname.split('/').pop() || 'index.html', want = j[f], mine = window.__mine = '11101834';
+  const f = location.pathname.split('/').pop() || 'index.html', want = j[f], mine = window.__mine = '11101844';
   if (want && +want > +mine) { location.replace(f + '?v=' + want + '&r=' + Date.now() + location.hash); return new Promise(() => {}); } }).catch(() => {});
 </script>
 <script type="importmap">{"imports":{"three":"./vendor/three.module.js","three/addons/":"./vendor/addons/"}}</script>
@@ -28,7 +28,7 @@ window.__ver = fetch('ver.json?t=' + Date.now(), { cache: 'no-store' }).then(r =
 <div id="ld"><div>디자인 시안 불러오는 중<i><b id="lb"></b></i></div></div>
 <script type="module">
 await window.__ver;
-const { start } = await import('./src/proto/tdesign.js?v=11101834');
+const { start } = await import('./src/proto/tdesign.js?v=11101844');
 const lb = document.getElementById('lb'), ld = document.getElementById('ld');
 try { await start(document.getElementById('cv'), p => lb.style.width = (p * 100) + '%'); ld.style.opacity = 0; setTimeout(() => ld.remove(), 600); }
 catch (e) { ld.textContent = '오류: ' + e.message; console.error(e); }
