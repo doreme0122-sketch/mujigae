@@ -4,8 +4,8 @@
    · 평소: 빛나지 않는다. 문양은 어두운 홈으로만 보인다.
    · 맞으면: 맞은 자리에서 가까운 문양부터 하나씩 차례로 금빛으로 켜졌다가(지름 3m 남짓) 0.8초쯤에 꺼진다. */
 import * as THREE from 'three';
-import { HITS } from './rocks.js?v=11101415';
-import { RUIN_TONE } from './ruintone.js?v=11101415';
+import { HITS } from './rocks.js?v=11101440';
+import { RUIN_TONE } from './ruintone.js?v=11101440';
 
 const rng = seed => { let s = seed * 9301 + 49297; return () => (s = (s * 9301 + 49297) % 233280) / 233280; };
 

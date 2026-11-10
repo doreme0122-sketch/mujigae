@@ -1,13 +1,13 @@
-/* 초원 섬 하나의 모양 (2026-11-10 · 새 초원 첫 시험)
-   그림을 그대로 따라 하지 않고 느낌(신비로움 · 풍성함 · 깊이)만 가져옴. 게임 규칙에 맞춘 높낮이:
-   · 세 높이로 나눔 (사용자 2026-11-10): 1층 = 풀밭 바로 위(부쉬에 숨기 · 낮은 바위 벽이 막음) · 2층 = 돌탑 · 아치 · 다리 · 고원 사이를 빠져나감 · 3층 = 위로 탁 트여 다 내려다봄
-   · 높이 기준(섬 안 단위 · 게임에선 0.5배): 풀밭 −6 · 1층 −3.6 · 낮은 바위 벽 꼭대기 −1.2 · 2층 1.4 · 고원 +5 · 돌탑 5~7 · 3층 9
-   · 낮은 단 = −11 → 더 깊이 내려간 땅. 위아래로 겹겹이 깊어 보임
-   · 고원과 큰 돌탑 사이 좁은 틈 = 길목 · 그 위로 다리 (2층은 밑으로, 3층은 위로 지나감)
-   · 고원에서 폭포가 떨어져 연못 → 물길 → 섬 가장자리에서 아래 안개 속으로 다시 떨어짐
-   모든 높이·자리는 이 파일 한 곳에서 정함 (땅 · 물 · 나무 · 막힘이 같은 모양을 씀) */
+/* 초원 섬 하나의 모양 (2026-11-10 · 새 초원 시험) — 땅 · 물 · 나무 · 막힘이 모두 이 모양 하나를 씀
+   그림을 그대로 따라 하지 않고 느낌(신비로움 · 풍성함 · 깊이)만 가져옴.
+   · 세 높이 (사용자 2026-11-10): 1층 = 풀밭 바로 위 — 낮은 벽이 이어져 통로를 만들고 벽 사이로는 못 지나감 · 벽에 둘러싸인 움푹한 자리에 부쉬(숨는 곳)
+                                 2층 = 돌탑 · 아치 · 다리 · 고원 사이를 빠져나감 (비행 장애물을 피하는 기분)
+                                 3층 = 위로 탁 트여 다 내려다봄
+   · 높이 차이를 크게 (사용자: 각 층도 맵도 높이 차이를 더 두기) — 섬 안 단위(게임에선 0.5배):
+       낮은 단 −26 · 풀밭 −16 · 1층 −13 · 1층 벽 꼭대기 −9 · 2층 1.4 · 돌탑 · 고원 8.5~11 · 3층 18
+   · 땅은 층층이 평평한 단 + 단 사이의 진짜 세로 벽 (비탈을 늘인 삼각형이 보이지 않게 · 사용자: 단면의 삼각형 없애기)
+   · 막힘 판정은 너그럽게 (사용자: 걸려서 멈추는 일이 없어야): 보이는 바위보다 안쪽 · 울퉁불퉁함을 뺀 매끈한 모양으로만 막음 */
 
-/* 값 잡음: 같은 씨앗이면 늘 같은 모양 */
 const hash2 = (i, j) => { let h = (i * 374761393 + j * 668265263) | 0; h = (h ^ (h >>> 13)) * 1274126177 | 0; return ((h ^ (h >>> 16)) >>> 0) / 4294967296; };
 const sm = t => t * t * (3 - 2 * t);
 export function noise2(x, z) { const i = Math.floor(x), j = Math.floor(z), fx = x - i, fz = z - j, u = sm(fx), v = sm(fz);
@@ -18,67 +18,76 @@ export const smoothstep = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - 
 const smax = (a, b, k) => { const h = Math.max(0, Math.min(1, .5 + .5 * (a - b) / k)); return b + (a - b) * h + k * h * (1 - h); };
 const circ = (x, z, cx, cz, r) => r - Math.hypot(x - cx, z - cz);
 const capsule = (x, z, ax, az, bx, bz, r) => { const px = x - ax, pz = z - az, dx = bx - ax, dz = bz - az, t = Math.max(0, Math.min(1, (px * dx + pz * dz) / (dx * dx + dz * dz))); return r - Math.hypot(px - dx * t, pz - dz * t); };
+const arcPts = (cx, cz, R, a0, a1, n = 8) => Array.from({ length: n + 1 }, (_, k) => { const a = (a0 + (a1 - a0) * k / n) * Math.PI / 180; return [cx + Math.cos(a) * R, cz + Math.sin(a) * R]; });
 
-/* 높이 기준 */
-export const Y = { MEADOW: -6, LOW: -11, PLATEAU: 5, RIDGE: -1.2, WATER: -7.1 };
-export const LAYERS = [-3.6, 1.4, 9];   /* 1층 · 2층 · 3층 나는 높이 */
-export const CLEAR = 1.2;               /* 위아래로 이만큼 안에 무언가 있으면 막힘 */
-/* 자리 (북쪽 = −z = 화면 위쪽) */
+export const Y = { LOW: -26, MEADOW: -16, WALL: -9, PLATEAU: 10, WATER: -18.2 };
+export const LAYERS = [-13, 1.4, 18];   /* 1층 · 2층 · 3층 나는 높이 */
+export const CLEAR = 2;                 /* 위아래로 이만큼 안에 무언가 있으면 막힘 */
+/* 자리 (북쪽 = −z = 화면 위쪽 · 섬 안 단위) */
 export const SPOT = {
   plateau: [[-20, -16, 14], [-9, -25, 9], [-29, -6, 8]],
-  pillar: [10, -16, 4.6],
-  spires: [[10, -16, 4.6, 7], [22, -3, 2.5, 6], [-1, -9, 2.1, 5.4], [-31, 19, 2.4, 6.2], [18, -27, 2.6, 6.6], [4, 31, 2.2, 5.6]],   /* 2층 장애물: 돌탑 (자리 x, z · 반지름 · 꼭대기) */
-  ridges: [[[-9, -3], [-3, -1], [3, -4]], [[7, 26], [13, 23], [17, 17]], [[-21, 19], [-13, 23], [-7, 29]], [[26, -12], [30, -18]]],   /* 1층 벽: 낮은 바위 등성이 (2층은 위로 넘어감) */
-  arches: [[-8, 13, 3, 18, 5.4], [24, -16, 32, -6, 5]],   /* 2층 장애물: 돌 아치 (양 끝 · 꼭대기) — 2층은 밑으로 빠져나감 */
-  brush: [[13, 0, 8.5], [-3, 21, 6.5], [-24, -20, 6], [-26, 14, 4], [24, 22, 4.5], [2, 6, 3.5]],   /* 부쉬 덩이 (1층 숨는 곳) */
+  spires: [[10, -16, 4.6, 11], [22, -3, 2.8, 9], [-1, -10, 2.4, 8.5], [-33, 21, 2.6, 9.5], [18, -28, 2.8, 10], [6, 33, 2.4, 8.5]],   /* 2층 장애물: 기둥 돌탑 (x, z, 반지름, 꼭대기) */
   low: [[27, 13, 13], [18, 23, 8]],
   pond: [-17, 1.6, 6.6],
   channel: [-17, 1.6, -40, 10],
-  fall: null,             /* 폭포 자리는 모양에서 찾음 (아래 findFall) */
-  forest: [[13, 0, 8.5], [-3, 21, 6.5], [-24, -20, 6]],
+  /* 1층 벽: 이어진 낮은 바위 벽 — 통로와 막다른 곳 · 움푹한 숨는 자리(입구 한두 개) */
+  walls: [
+    arcPts(3, 8, 7, -150, 160, 10),                 /* 가운데 숨는 자리: 북쪽(돌탑 쪽)으로만 열림 */
+    arcPts(-27, 15, 6, 100, 390, 9),                /* 서쪽 숨는 자리: 남동쪽으로 열림 */
+    arcPts(-8, 30, 5.5, -60, 230, 9),               /* 남쪽 숨는 자리: 북서쪽으로 열림 */
+    [[-7, -1], [-2, -4], [5, -6]],                  /* 고원 앞 길목을 좁히는 벽 */
+    [[14, 6], [17, 0], [16, -7]],                   /* 동쪽 통로 벽 */
+    [[-15, 12], [-12, 19], [-16, 25]],              /* 서남쪽 통로 벽 */
+    [[10, 20], [9, 27]],                            /* 남동쪽 짧은 벽 */
+    [[-36, -2], [-34, 6]],                          /* 서쪽 끝 벽 */
+    [[10, 8.5], [14, 6]],                           /* 가운데 자리와 동쪽 벽을 이음 */
+    [[-30, 9], [-33, 1]],                           /* 서쪽 자리와 고원 밑을 이음 */
+    [[-13, 27], [-15, 25]],                         /* 남쪽 자리와 서남쪽 벽을 이음 */
+  ],
+  arches: [[-12, 12.5, -1, 20, 9], [25, -15, 33, -5, 8.5]],   /* 2층 장애물: 돌 아치 (양 끝 · 꼭대기) — 2층은 밑으로 빠져나감 */
+  brush: [[3, 8, 4.6], [-27, 15, 4], [-8, 30, 3.8], [24, 5, 3], [-4, 13, 2.4]],   /* 부쉬 (1층 숨는 곳) — 대부분 벽에 둘러싸인 자리 */
+  forest: [[13, -2, 6], [-24, -20, 6], [2, 24, 4.5]],
 };
 
 export function makeField() {
   const warp = (x, z) => [x + 4.5 * fbm(x * .03, z * .03, 3), z + 4.5 * fbm(x * .03 + 31, z * .03 - 7, 3)];
-  /* 섬 바깥 모양 (안쪽 +, 바깥 −, 대략 가장자리까지 거리) */
-  const mask = (x, z) => { const [u, w] = warp(x, z);
+  const mask = (x, z) => { const [u, w] = warp(x, z);   /* 섬 바깥 모양 (안쪽 +) */
     let d = circ(u, w, 0, 0, 30); for (const [cx, cz, r] of [[-20, -14, 22], [20, -12, 17], [26, 12, 17], [-22, 9, 19], [-4, 21, 16], [8, 16, 14]]) d = smax(d, circ(u, w, cx, cz, r), 6);
     return d + 2.2 * fbm(x * .09, z * .09, 3) + .7 * fbm(x * .35, z * .35, 2); };
-  const plateau = (x, z) => { const [u, w] = warp(x * 1.1, z * 1.1); let d = -99; for (const [cx, cz, r] of SPOT.plateau) d = smax(d, circ(u, w, cx * 1.1, cz * 1.1, r * 1.1), 5); return d / 1.1 + .9 * fbm(x * .21, z * .21, 3); };
-  const spire = (x, z, [cx, cz, r]) => { const an = Math.atan2(z - cz, x - cx); return circ(x, z, cx, cz, r) + .6 * fbm(x * .45, z * .45, 3) * r / 4 + .3 * Math.sin(an * 7 + cx) * r / 4.6 + .12 * Math.sin(an * 13 + cz) * r / 4.6; };   /* 기둥 바위가 엮인 결 */
-  const pillar = (x, z) => spire(x, z, SPOT.spires[0]);
-  const ridge = (x, z) => { let d = -99; for (const L of SPOT.ridges) for (let k = 0; k + 1 < L.length; k++) d = smax(d, capsule(x, z, ...L[k], ...L[k + 1], 1.3 + .4 * fbm(x * .25 + k, z * .25, 2)), 1.2); return d + .5 * fbm(x * .5, z * .5, 2); };
-  const low = (x, z) => { const [u, w] = warp(x, z); let d = -99; for (const [cx, cz, r] of SPOT.low) d = smax(d, circ(u, w, cx, cz, r), 5); return d + .8 * fbm(x * .17, z * .17, 3); };
+  /* 단마다 모양 (안쪽 +) — 보이는 모양은 울퉁불퉁 · 판정(…S)은 매끈한 쪽만 */
+  const plateauS = (x, z) => { const [u, w] = warp(x * 1.1, z * 1.1); let d = -99; for (const [cx, cz, r] of SPOT.plateau) d = smax(d, circ(u, w, cx * 1.1, cz * 1.1, r * 1.1), 5); return d / 1.1; };
+  const plateau = (x, z) => plateauS(x, z) + .9 * fbm(x * .21, z * .21, 3);
+  const spireS = (x, z, S) => circ(x, z, S[0], S[1], S[2]);
+  const spire = (x, z, S) => { const an = Math.atan2(z - S[1], x - S[0]); return spireS(x, z, S) + .6 * fbm(x * .45, z * .45, 3) * S[2] / 4 + .3 * Math.sin(an * 7 + S[0]) * S[2] / 4.6; };
+  const wallS = (x, z) => { let d = -99; for (const L of SPOT.walls) for (let k = 0; k + 1 < L.length; k++) d = Math.max(d, capsule(x, z, ...L[k], ...L[k + 1], 1.7)); return d; };
+  const wall = (x, z) => wallS(x, z) + .55 * fbm(x * .3, z * .3, 3) + .25 * fbm(x * 1.1, z * 1.1, 2);
+  const lowS = (x, z) => { const [u, w] = warp(x, z); let d = -99; for (const [cx, cz, r] of SPOT.low) d = smax(d, circ(u, w, cx, cz, r), 5); return d; };
+  const low = (x, z) => lowS(x, z) + .8 * fbm(x * .17, z * .17, 3);
   const pond = (x, z) => circ(x, z, SPOT.pond[0], SPOT.pond[1], SPOT.pond[2]) + 1.1 * fbm(x * .19, z * .19, 3);
   const chan = (x, z) => { const [ax, az, bx, bz] = SPOT.channel; return capsule(x, z, ax, az, bx, bz, 1.25 + .35 * fbm(x * .3, z * .3, 2)) + .35 * fbm(x * .4 + 5, z * .4, 2); };
+  const lip = (x, z) => .9 * (1 - smoothstep(0, 1.8, mask(x, z)));   /* 섬 가장자리 둥근 턱 */
 
-  /* 절벽 결: 바위가 층층이 쌓인 턱 (턱마다 이끼가 앉음) — 그냥 매끈한 비탈이 아니라 */
-  const ledges = (t, n, x, z) => { t = Math.min(1, Math.max(0, t + .06 * fbm(x * .3, z * .3, 2))); const s = t * n, i = Math.floor(s), f = s - i; return Math.min(1, (i + Math.pow(smoothstep(.35, 1, f), 1.6)) / n); };
-
-  const meadow = (x, z) => Y.MEADOW + .55 * fbm(x * .045, z * .045, 3) + .22 * fbm(x * .19, z * .19, 2);
-  /* 위 땅 높이 · 그 자리의 땅 종류 정보 */
-  function top(x, z) {
-    let h = meadow(x, z);
-    const lo = low(x, z), kl = ledges(smoothstep(-1.2, 3.2, lo), 2, x, z);
-    h += (Y.LOW + .4 * fbm(x * .08, z * .08, 2) - Y.MEADOW) * kl;
-    const pd = pond(x, z), kp = smoothstep(-1.8, 2.6, pd); h -= 2.4 * kp * kp * (1 - kl);
-    const ch = chan(x, z), kc = smoothstep(-.9, .7, ch) * (1 - smoothstep(-.5, 2, pd)); h = Math.min(h, h * (1 - kc) + (Y.WATER - .55) * kc);
-    const pl = plateau(x, z), kP = ledges(smoothstep(-1.4, 3.6, pl), 3, x, z);
-    h += (Y.PLATEAU + .7 * fbm(x * .07, z * .07, 3) - h) * kP;
-    const rg = ridge(x, z), kR = ledges(smoothstep(-1.1, 1.6, rg), 2, x - 20, z) * (1 - kP);   /* 1층 벽 (풀밭 위에서만) */
-    h += (Y.RIDGE + .35 * fbm(x * .3, z * .3, 2) - h) * kR * smoothstep(Y.MEADOW - 2, Y.MEADOW + .5, h);
-    for (const S of SPOT.spires) { const sp = spire(x, z, S); if (sp < -2) continue; const kI = ledges(smoothstep(-.9, 1.5, sp), 4, x + 40 + S[0], z);   /* 깎아지른 벽 + 평평한 꼭대기 (뾰족한 고깔이 아니라 기둥 바위) */ h += (S[3] + .4 * fbm(x * .3, z * .3, 2) - h) * kI; }
-    const m = mask(x, z); h -= .9 * (1 - smoothstep(0, 1.8, m));   /* 가장자리 둥근 턱 */
-    return h; }
-  /* 아래 바위 몸통: 가장자리에서 급히 꺾여 가운데로 갈수록 깊이 · 층진 바위 결 */
-  function bottom(x, z, h, m) {
-    const d = 1.6 * smoothstep(0, .7, m) + 36 * Math.pow(smoothstep(0, 30, m), .85) + 5 * smoothstep(4, 20, m) * fbm(x * .06, z * .06, 3) + 1.4 * fbm(x * .3, z * .3, 2) * smoothstep(0, 3, m);
-    return h - d; }
-  const H = (x, z) => top(x, z);
-  /* 땅 말고 공중에 걸친 것(아치 · 다리): 구슬 여럿 (x, y, z, 반지름) — 그 높이를 지나는 층만 막힘 */
-  const obstacles = [];
-  /* 기체를 막는 곳: 그 층 높이 근처까지 솟은 땅 · 그 층 높이를 지나는 아치·다리 */
-  const blocked = (x, z, L = 1) => { const y = LAYERS[L]; if (mask(x, z) > -1 && top(x, z) > y - CLEAR) return true;
-    for (const o of obstacles) { const dx = x - o[0], dz = z - o[2]; if (dx * dx + dz * dz < o[3] * o[3] && Math.abs(y - o[1]) < o[3] + CLEAR * .6) return true; } return false; };
-  return { mask, plateau, pillar, ridge, spire, low, pond, chan, top, bottom, H, blocked, obstacles };
+  const meadowH = (x, z) => { let h = Y.MEADOW + .5 * fbm(x * .045, z * .045, 3) + .2 * fbm(x * .19, z * .19, 2);
+    const pd = pond(x, z), kp = smoothstep(-1.8, 2.6, pd); h -= 4 * kp * kp;   /* 연못 우묵 */
+    const ch = chan(x, z), kc = smoothstep(-.9, .7, ch) * (1 - smoothstep(-.5, 2, pd)); h = h * (1 - kc) + (Y.WATER - .6) * kc;
+    return h - lip(x, z); };
+  /* 단: 위에 있는 순서대로 (먼저 나온 것이 그 자리의 땅) · 높이는 거의 평평 (작은 너울만) */
+  const TIERS = [
+    ...SPOT.spires.map((S, k) => ({ name: 'spire' + k, sd: (x, z) => spire(x, z, S), sdS: (x, z) => spireS(x, z, S), h: (x, z) => S[3] + .35 * fbm(x * .3 + k, z * .3, 2), top: S[3], box: [S[0] - S[2] - 3, S[1] - S[2] - 3, S[0] + S[2] + 3, S[1] + S[2] + 3] })),
+    { name: 'plateau', sd: plateau, sdS: plateauS, h: (x, z) => Y.PLATEAU + .6 * fbm(x * .07, z * .07, 3) - lip(x, z), top: Y.PLATEAU },
+    { name: 'wall', sd: wall, sdS: wallS, h: (x, z) => Y.WALL + 1.4 * fbm(x * .09 + 3, z * .09, 2) + .4 * fbm(x * .3, z * .3, 2), top: Y.WALL + 1.6 },   /* 벽 높이가 들쭉날쭉 (사람이 쌓은 담처럼 반듯하지 않게) */
+    { name: 'low', sd: low, sdS: lowS, h: (x, z) => Y.LOW + .5 * fbm(x * .08, z * .08, 2) - lip(x, z), top: Y.LOW, lower: true },
+    { name: 'meadow', sd: mask, sdS: mask, h: meadowH, top: Y.MEADOW },
+  ];
+  const tierAt = (x, z) => { if (mask(x, z) < 0) return null; for (const T of TIERS) { if (T.box && (x < T.box[0] || z < T.box[1] || x > T.box[2] || z > T.box[3])) continue; if (T.sd(x, z) >= 0) return T; } return null; };
+  const top = (x, z) => { const T = tierAt(x, z); return T ? T.h(x, z) : -60; };
+  /* 아래 바위 몸통: 가장자리에서 급히 꺾여 가운데로 갈수록 깊이 */
+  const bottom = (x, z, h, m) => h - (1.6 * smoothstep(0, .7, m) + 40 * Math.pow(smoothstep(0, 30, m), .85) + 6 * smoothstep(4, 20, m) * fbm(x * .06, z * .06, 3) + 1.6 * fbm(x * .3, z * .3, 2) * smoothstep(0, 3, m));
+  const obstacles = [];   /* 공중에 걸친 것 (아치 · 다리): 구슬 (x, y, z, 반지름) */
+  /* 막힘: 그 층 높이 근처까지 솟은 단 — 판정은 매끈한 모양으로 보이는 바위보다 안쪽(IN)에서 · 아치·다리는 구슬을 줄여서 */
+  const IN = .9;
+  const blocked = (x, z, L = 1) => { const y = LAYERS[L];
+    for (const T of TIERS) { if (T.lower || T.name === 'meadow' || T.top <= y - CLEAR) continue; if (T.box && (x < T.box[0] || z < T.box[1] || x > T.box[2] || z > T.box[3])) continue; if (T.sdS(x, z) > IN) return true; }
+    for (const o of obstacles) { const r = o[3] * .8, dx = x - o[0], dz = z - o[2]; if (dx * dx + dz * dz < r * r && Math.abs(y - o[1]) < r + CLEAR * .5) return true; } return false; };
+  return { mask, plateau, spire, wall, low, pond, chan, TIERS, tierAt, top, bottom, H: top, blocked, obstacles };
 }

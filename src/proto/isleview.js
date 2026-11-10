@@ -2,11 +2,11 @@
    · 카메라 · 화면 밝기 처리 · 기체 · 조종은 새 맵(map2)과 같은 것 · 섬만 새것 */
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
-import { makeBloom } from '../core/hangar/bloom.js?v=11101415';
-import { makeForgeShip, forgeList } from './forgeship.js?v=11101415';
-import { makePerf } from './perf.js?v=11101415';
-import { makeFlight, FLY, padZone } from './flight.js?v=11101415';
-import { buildIsle } from './isle.js?v=11101415';
+import { makeBloom } from '../core/hangar/bloom.js?v=11101440';
+import { makeForgeShip, forgeList } from './forgeship.js?v=11101440';
+import { makePerf } from './perf.js?v=11101440';
+import { makeFlight, FLY, padZone } from './flight.js?v=11101440';
+import { buildIsle } from './isle.js?v=11101440';
 
 const $ = s => document.querySelector(s);
 export async function start(canvas, onProgress = () => {}) {
@@ -69,17 +69,23 @@ export async function start(canvas, onProgress = () => {}) {
       float off = -uD * (fract(uF * 1.6 + iA.z) - .5) * 3.2; c.y += off; vec4 mv = viewMatrix * vec4(c, 1.); mv.x += position.x * .05; mv.y += (position.y - .5) * 1.3; vY = position.y; vK = iA.z; gl_Position = projectionMatrix * mv; }`,
     fragmentShader: 'uniform float uA; varying float vY, vK; void main(){ float k = sin(vY * 3.1416); gl_FragColor = vec4(vec3(.85, .95, 1.) * k * uA * (.5 + .5 * vK), 1.); }' }));
   streak.frustumCulled = false; streak.renderOrder = 8; scene.add(streak);
-  /* 높이 바꾸기: 조이스틱과 오른쪽 버튼 사이(아래 가운데)에서 위로 끌면 올라가고 아래로 끌면 내려감 · 컴퓨터는 E(위) · Q(아래) */
-  const ZONE = { x0: .42, x1: .8, y0: .64 };
-  const inZone = (x, y) => x > innerWidth * ZONE.x0 && x < innerWidth * ZONE.x1 && y > innerHeight * ZONE.y0;
-  const zone = document.createElement('div'); zone.style.cssText = `position:absolute;left:${ZONE.x0 * 100}%;width:${(ZONE.x1 - ZONE.x0) * 100}%;top:${ZONE.y0 * 100}%;bottom:calc(env(safe-area-inset-bottom,0px) + 6px);border:1.5px dashed rgba(200,230,255,.28);border-radius:16px;display:flex;align-items:center;justify-content:center;gap:12px;pointer-events:none;color:rgba(230,242,255,.75);font-size:11px;letter-spacing:.04em;text-shadow:0 0 4px rgba(0,0,0,.6)`;
-  zone.innerHTML = '<span>위로 끌기 ↑</span><span id="pips" style="display:flex;flex-direction:column-reverse;gap:4px"><i></i><i></i><i></i></span><span>↓ 아래로 끌기</span>'; $('#ui').append(zone);
-  const pips = [...zone.querySelectorAll('#pips i')]; pips.forEach(p => p.style.cssText = 'display:block;width:22px;height:6px;border-radius:3px;background:rgba(255,255,255,.18)');
+  /* 설정창은 오른쪽 위 톱니 단추로 접어 둠 (그 자리를 높이 바꾸는 칸이 씀 · 사용자 2026-11-10) */
+  { const view = $('#view'), gear = document.createElement('button'); gear.type = 'button'; gear.textContent = '⚙'; gear.setAttribute('aria-label', '설정');
+    gear.style.cssText = 'position:absolute;top:calc(env(safe-area-inset-top,0px) + 30px);right:max(12px,env(safe-area-inset-right,0px));width:34px;height:34px;border-radius:50%;border:1px solid rgba(185,255,74,.35);background:rgba(4,8,14,.6);color:#d9f7b0;font-size:17px;line-height:1';
+    $('#ui').append(gear); if (view) { view.hidden = true; view.style.top = 'calc(env(safe-area-inset-top,0px) + 70px)'; view.style.zIndex = 4; const tog = $('#tog'); if (tog) tog.remove(); gear.onclick = () => { view.hidden = !view.hidden; }; } }
+  /* 높이 바꾸기: 오른쪽 위 세로 칸(스킬 단추들 위)에서 위로 끌면 올라가고 아래로 끌면 내려감 · 컴퓨터는 E(위) · Q(아래) */
+  const zone = document.createElement('div'); zone.style.cssText = 'position:absolute;right:max(12px,env(safe-area-inset-right,0px));top:calc(env(safe-area-inset-top,0px) + 76px);width:min(120px,20vw);height:42%;border:1.5px dashed rgba(200,230,255,.28);border-radius:18px;display:flex;flex-direction:column;align-items:center;justify-content:space-between;padding-block:10px;pointer-events:none;color:rgba(230,242,255,.78);font-size:11px;letter-spacing:.04em;text-shadow:0 0 4px rgba(0,0,0,.6)';
+  zone.innerHTML = '<span>↑ 위로</span><span id="pips" style="display:flex;flex-direction:column-reverse;gap:6px"><i></i><i></i><i></i></span><span>아래로 ↓</span>'; $('#ui').append(zone);
+  const inZone = (x, y) => { const r = zone.getBoundingClientRect(); return x > r.left && x < r.right && y > r.top && y < r.bottom && ($('#view')?.hidden ?? true); };
+  const pips = [...zone.querySelectorAll('#pips i')]; pips.forEach(p => p.style.cssText = 'display:block;width:28px;height:7px;border-radius:4px;background:rgba(255,255,255,.18)');
   const drawPips = () => pips.forEach((p, k) => { const c = LC[k]; p.style.background = k === LV.to ? `rgb(${c.map(v => v * 255 | 0)})` : 'rgba(255,255,255,.18)'; p.style.boxShadow = k === LV.to ? `0 0 8px rgb(${c.map(v => v * 255 | 0)})` : 'none'; }); drawPips();
+  /* 층 바꾸기는 너그럽게 (사용자: 걸려서 멈추는 일이 없어야): 그 자리 위·아래에 돌탑·다리가 있으면 거절하지 않고 가까운 빈 곳(2m 안)으로 비켜 주며 바꿈 · 빈 곳이 없을 때만 빨갛게 깜빡 */
+  const bodyFree = (x, z, L) => { if (isle.blocked(x, z, L)) return false; for (let k = 0; k < 8; k++) if (isle.blocked(x + Math.cos(k * .785) * FLY.R * .55, z + Math.sin(k * .785) * FLY.R * .55, L)) return false; return true; };
   const tryLayer = d => { if (LV.cur !== LV.to) return; const to = LV.cur + d; if (to < 0 || to > 2) { LV.flash = 1; return; }
-    const pts = [[0, 0]]; for (let k = 0; k < 8; k++) pts.push([Math.cos(k * .785) * FLY.R, Math.sin(k * .785) * FLY.R]);
-    if (pts.some(([ox, oz]) => isle.blocked(FS.x + ox, FS.z + oz, to))) { LV.flash = 1; return; }   /* 가려는 높이에 돌탑·다리가 있으면 못 감 */
-    LV.to = to; LV.f = 0; LV.dir = d; LV.y0 = LV.y; drawPips(); if (d > 0) { LV.puff = 0; LV.puffX = FS.x; LV.puffZ = FS.z; } };
+    let spot = bodyFree(FS.x, FS.z, to) ? [FS.x, FS.z] : null;
+    for (let r = .3; !spot && r <= 2; r += .3) for (let k = 0; k < 16; k++) { const x = FS.x + Math.cos(k * .3927) * r, z = FS.z + Math.sin(k * .3927) * r; if (bodyFree(x, z, to) && bodyFree(x, z, LV.cur)) { spot = [x, z]; break; } }
+    if (!spot) { LV.flash = 1; return; }
+    LV.to = to; LV.f = 0; LV.dir = d; LV.y0 = LV.y; LV.sx = FS.x; LV.sz = FS.z; LV.nx = spot[0]; LV.nz = spot[1]; drawPips(); if (d > 0) { LV.puff = 0; LV.puffX = FS.x; LV.puffZ = FS.z; } };
   const zd = { id: null, y: 0, done: false };
   addEventListener('pointerdown', e => { if (zd.id !== null || !inZone(e.clientX, e.clientY)) return; zd.id = e.pointerId; zd.y = e.clientY; zd.done = false; }, true);
   addEventListener('pointermove', e => { if (e.pointerId !== zd.id || zd.done) return; const dy = e.clientY - zd.y; if (Math.abs(dy) > 34) { zd.done = true; tryLayer(dy < 0 ? 1 : -1); } });
@@ -113,16 +119,17 @@ export async function start(canvas, onProgress = () => {}) {
     /* 높이 바꾸는 중 (0.55초): 오를 땐 기수를 들고 조금 커지며 · 내릴 땐 숙이고 작아짐 · 카메라는 높을수록 물러나 넓게 */
     if (LV.f < 1) { LV.f = Math.min(1, LV.f + dt / .55); const e = LV.f * LV.f * (3 - 2 * LV.f); LV.y = LV.y0 + (LY[LV.to] - LV.y0) * e;
       if (LV.dir < 0 && LV.f > .72 && LV.puff > 1) { LV.puff = 0; LV.puffX = FS.x; LV.puffZ = FS.z; }   /* 내려앉는 순간 아래가 눌림 */
+      if (LV.f < .45 && (LV.nx !== LV.sx || LV.nz !== LV.sz)) { const k = Math.min(1, dt / Math.max(.02, (.45 - LV.f) * .55)); FS.x += (LV.nx - FS.x) * k; FS.z += (LV.nz - FS.z) * k; }   /* 비켜 주기 */
       if (LV.f >= 1) { LV.cur = LV.to; LV.ring = 0; } }
     fly.position.y = LV.y - FLY.HOVER;
     fly.updateMatrixWorld(true); fly.userData.update(t, dt);
-    { const S = fly.children[0], e = LV.f < 1 ? Math.sin(LV.f * Math.PI) : 0; S.rotateX(LV.dir * .3 * e);
-      const sc = [.93, 1, 1.08], a0 = sc[LV.cur], a1 = sc[LV.to], k = LV.f * LV.f * (3 - 2 * LV.f); S.scale.setScalar(a0 + (a1 - a0) * k); S.updateMatrixWorld(true);
+    { const S = fly.children[0], e = LV.f < 1 ? Math.sin(LV.f * Math.PI) : 0; S.rotateX(LV.dir * .52 * e);   /* 오르내릴 때 기수를 크게 들고 숙임 (사용자 2026-11-10: 높이감이 더 보이게 · 약 30°) */
+      const sc = [.92, 1, 1.1], a0 = sc[LV.cur], a1 = sc[LV.to], k = LV.f * LV.f * (3 - 2 * LV.f); S.scale.setScalar(a0 + (a1 - a0) * k); S.updateMatrixWorld(true);
       stU.uA.value = e * .9; stU.uD.value = LV.dir; stU.uF.value = LV.f; stU.uC.value.set(FS.x, LV.y - .6, FS.z); }
     FG.step(dt, t, { moving: Math.hypot(FS.vx, FS.vz) > 1.5, fire: false });
     if (look.id === null) { const k = Math.min(1, dt * 3.5); look.x -= look.x * k; look.z -= look.z * k; }
     const sp = fly.children[0].position; { const k = Math.min(1, dt * 4); cam.x += (sp.x + FS.vx * .25 - cam.x) * k; cam.z += (sp.z + FS.vz * .25 - cam.z) * k; }
-    { const cf = [.88, 1, 1.2], k = LV.f * LV.f * (3 - 2 * LV.f), f = cf[LV.cur] + (cf[LV.to] - cf[LV.cur]) * k; camD += (cfg.dist * CAMK * f - camD) * Math.min(1, dt * 3); }
+    { const cf = [.85, 1, 1.3], k = LV.f * LV.f * (3 - 2 * LV.f), f = cf[LV.cur] + (cf[LV.to] - cf[LV.cur]) * k; camD += (cfg.dist * CAMK * f - camD) * Math.min(1, dt * 3); }
     const a = cfg.ang * Math.PI / 180, vx = cam.x + look.x, vz = cam.z + look.z, cy = LV.y; camera.position.set(vx, cy + camD * Math.sin(a), vz + camD * Math.cos(a)); camera.lookAt(vx, cy, vz); camera.updateMatrixWorld();
     isle.sky.position.copy(camera.position); isle.update(t); xrayM.uniforms.uT.value = t;
     /* 땅을 미는 바람 · 땅 바람 고리 · 발밑 층 고리 */
