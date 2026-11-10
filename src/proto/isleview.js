@@ -2,12 +2,12 @@
    · 카메라 · 화면 밝기 처리 · 기체 · 조종은 새 맵(map2)과 같은 것 · 섬만 새것 */
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
-import { makeBloom } from '../core/hangar/bloom.js?v=11101828';
-import { makeForgeShip, forgeList } from './forgeship.js?v=11101828';
-import { makePerf } from './perf.js?v=11101828';
-import { makeFlight, FLY, padZone } from './flight.js?v=11101828';
-import { buildIsle } from './isle.js?v=11101828';
-import { makeInputBuffer } from './inbuf.js?v=11101828';
+import { makeBloom } from '../core/hangar/bloom.js?v=11101834';
+import { makeForgeShip, forgeList } from './forgeship.js?v=11101834';
+import { makePerf } from './perf.js?v=11101834';
+import { makeFlight, FLY, padZone } from './flight.js?v=11101834';
+import { buildIsle } from './isle.js?v=11101834';
+import { makeInputBuffer } from './inbuf.js?v=11101834';
 
 const $ = s => document.querySelector(s);
 export async function start(canvas, onProgress = () => {}) {
@@ -74,9 +74,11 @@ export async function start(canvas, onProgress = () => {}) {
   { const view = $('#view'), gear = document.createElement('button'); gear.type = 'button'; gear.textContent = '⚙'; gear.setAttribute('aria-label', '설정');
     gear.style.cssText = 'position:absolute;top:calc(env(safe-area-inset-top,0px) + 30px);right:max(12px,env(safe-area-inset-right,0px));width:34px;height:34px;border-radius:50%;border:1px solid rgba(185,255,74,.35);background:rgba(4,8,14,.6);color:#d9f7b0;font-size:17px;line-height:1';
     $('#ui').append(gear); if (view) { view.hidden = true; view.style.top = 'calc(env(safe-area-inset-top,0px) + 70px)'; view.style.zIndex = 4; const tog = $('#tog'); if (tog) tog.remove(); gear.onclick = () => { view.hidden = !view.hidden; }; } }
-  /* 높이 바꾸기: 오른쪽 위 세로 칸(스킬 단추들 위)에서 위로 끌면 올라가고 아래로 끌면 내려감 · 컴퓨터는 E(위) · Q(아래) */
-  const zone = document.createElement('div'); zone.style.cssText = 'position:absolute;right:max(12px,env(safe-area-inset-right,0px));top:calc(env(safe-area-inset-top,0px) + 76px);width:min(120px,20vw);height:42%;border:1.5px dashed rgba(200,230,255,.28);border-radius:18px;display:flex;flex-direction:column;align-items:center;justify-content:space-between;padding-block:10px;pointer-events:none;color:rgba(230,242,255,.78);font-size:11px;letter-spacing:.04em;text-shadow:0 0 4px rgba(0,0,0,.6)';
-  zone.innerHTML = '<span>↑ 위로</span><span id="pips" style="display:flex;flex-direction:column-reverse;gap:6px"><i></i><i></i><i></i></span><span>아래로 ↓</span>'; $('#ui').append(zone);
+  /* 높이 바꾸기: 오른쪽 위 세로 칸(스킬 단추들 위)에서 위로 끌면 올라가고 아래로 끌면 내려감 · 컴퓨터는 E(위) · Q(아래)
+     보이는 건 층 표시 막대 세 개와 위아래 작은 회색 화살표뿐 (사용자 2026-11-10) — 끄는 칸은 안 보여도 같은 크기 그대로 */
+  const zone = document.createElement('div'); zone.style.cssText = 'position:absolute;right:max(12px,env(safe-area-inset-right,0px));top:calc(env(safe-area-inset-top,0px) + 76px);width:min(120px,20vw);height:42%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:7px;pointer-events:none;filter:drop-shadow(0 0 3px rgba(0,0,0,.45))';
+  const arrow = up => `<svg width="14" height="8" viewBox="0 0 14 8" aria-hidden="true"><path d="${up ? 'M1.5 6.5 7 1.5 12.5 6.5' : 'M1.5 1.5 7 6.5 12.5 1.5'}" fill="none" stroke="rgba(214,222,232,.62)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+  zone.innerHTML = arrow(true) + '<span id="pips" style="display:flex;flex-direction:column-reverse;gap:6px"><i></i><i></i><i></i></span>' + arrow(false); $('#ui').append(zone);
   const inZone = (x, y) => { const r = zone.getBoundingClientRect(); return x > r.left && x < r.right && y > r.top && y < r.bottom && ($('#view')?.hidden ?? true); };
   const pips = [...zone.querySelectorAll('#pips i')]; pips.forEach(p => p.style.cssText = 'display:block;width:28px;height:7px;border-radius:4px;background:rgba(255,255,255,.18)');
   const drawPips = () => pips.forEach((p, k) => { const c = LC[k]; p.style.background = k === LV.to ? `rgb(${c.map(v => v * 255 | 0)})` : 'rgba(255,255,255,.18)'; p.style.boxShadow = k === LV.to ? `0 0 8px rgb(${c.map(v => v * 255 | 0)})` : 'none'; }); drawPips();
