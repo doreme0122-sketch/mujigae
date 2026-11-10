@@ -6,10 +6,10 @@
    기체는 1층 → 2층 → 3층 → 2층 → 1층을 쉬어 가며 되풀이 · 카메라는 게임처럼 기체 높이를 따라감 */
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
-import { makeBloom } from '../core/hangar/bloom.js?v=11102116';
-import { makePerf } from './perf.js?v=11102116';
-import { makeForgeShip, forgeList } from './forgeship.js?v=11102116';
-import { SUN, reedBush, vegShader } from './flora.js?v=11102116';
+import { makeBloom } from '../core/hangar/bloom.js?v=11102130';
+import { makePerf } from './perf.js?v=11102130';
+import { makeForgeShip, forgeList } from './forgeship.js?v=11102130';
+import { SUN, reedBush, vegShader } from './flora.js?v=11102130';
 
 const $ = s => document.querySelector(s);
 const hash2 = (i, j) => { let h = (i * 374761393 + j * 668265263) | 0; h = (h ^ (h >>> 13)) * 1274126177 | 0; return ((h ^ (h >>> 16)) >>> 0) / 4294967296; };
@@ -36,7 +36,8 @@ const U = { uSun: { value: SUN }, uT: { value: 0 } };
 /* ── 세로 빛줄기 ──
    공기 속에 잠깐 맺히는 빛 (기체가 지나는 길 둘레 · 땅에 붙어 있음) → 기체를 따라가는 카메라에는 반대로 흘러 보임
    한 가닥 = 바람에 찢긴 빛: 조각들이 끊어지며 흐르는 쪽으로 미끄러짐 · 가운데 아주 가는 흰 심 + 옅은 푸른 번짐 · 꼬리 쪽은 흐려짐
-   빛 알갱이 하나가 줄기를 따라 빠르게 미끄러짐 · 줄기 전체가 조금씩 흔들려 딱딱한 직선이 아님 · 늘 카메라를 봄(세로축은 그대로) */
+   빛 알갱이 하나가 줄기를 따라 빠르게 미끄러짐 · 곧은 직선 · 늘 카메라를 봄(세로축은 그대로)
+   출발하는 순간 바로 가장 밝고 → 이동하는 동안 옅어져 → 도착하면 0.1초 안에 사라짐 (사용자 2026-11-10: 도착한 뒤에 나오면 의미 없음) */
 function Streaks(scene, N) {
   const g = new THREE.InstancedBufferGeometry(), P = [], I = [], SEG = 24;
   for (let k = 0; k <= SEG; k++) { const v = k / SEG; P.push(-1, v, 0, 1, v, 0); if (k < SEG) I.push(k * 2, k * 2 + 1, k * 2 + 3, k * 2, k * 2 + 3, k * 2 + 2); }
@@ -48,9 +49,9 @@ function Streaks(scene, N) {
     vertexShader: `attribute vec4 iA, iB; attribute vec2 iC; uniform float uT; varying vec2 vQ; varying float vB, vV, vAg, vF, vS, vSp, vL;
       void main(){ float v = position.y, taper = pow(sin(v * 3.14159), .55);                                           /* 양 끝이 가늘게 */
         vec3 w = iA.xyz + vec3(0., v * iA.w, 0.); vec3 side = normalize(cross(vec3(0., 1., 0.), cameraPosition - w));   /* 세로축은 그대로 두고 카메라 쪽으로 돌림 */
-        w += side * (position.x * iB.x * (1.6 + 1.4 * taper) + sin(v * 7. + uT * 17. + iC.x * 31.) * .035 + sin(v * 15. - uT * 23. + iC.x * 17.) * .012);   /* 번짐까지 담는 폭 · 조금씩 흔들림 */
+        w += side * position.x * iB.x * (1.6 + 1.4 * taper);   /* 번짐까지 담는 폭 · 곧은 직선 (사용자 2026-11-10: 흔들림 때문에 휘어 보임 → 뺌) */
         float ag = clamp(iB.z, 0., 1.);
-        vB = iB.y * sin(ag * 3.14159) * taper; vV = iB.w > 0. ? v : 1. - v; vAg = ag; vF = iB.w; vS = iC.x; vSp = iC.y; vL = iA.w;   /* vV: 0 = 머리(흘러가는 쪽 끝 · 아래로 흐르면 아래 끝) → 1 = 꼬리 */
+        vB = iB.y * smoothstep(0., .06, ag) * pow(1. - ag, 1.3) * taper; vV = iB.w > 0. ? v : 1. - v; vAg = ag; vF = iB.w; vS = iC.x; vSp = iC.y; vL = iA.w;   /* vV: 0 = 머리(흘러가는 쪽 끝 · 아래로 흐르면 아래 끝) → 1 = 꼬리 */
         vQ = vec2(position.x * (1.6 + 1.4 * taper), v); gl_Position = projectionMatrix * viewMatrix * vec4(w, 1.); }`,
     fragmentShader: `varying vec2 vQ; varying float vB, vV, vAg, vF, vS, vSp, vL;
       float h(float x){ return fract(sin(x * 127.1) * 43758.55); }
@@ -142,10 +143,13 @@ export async function start(canvas, onProgress = () => {}) {
         if (M.dir > 0) { M.shock = 0; M.sy = M.y - .3; } } }   /* 올라갈 때만: 박차는 자리에서 충격파 */
     let moving = false;
     if (M.f < 1) { const dur = Math.abs(LY[M.to] - M.y0) / SPEED; M.f = Math.min(1, M.f + dt / dur); M.y = M.y0 + (LY[M.to] - M.y0) * M.f; moving = M.f < 1; if (M.f >= 1) { M.L = M.to; M.hold = HOLD; } }
-    /* 세로 빛줄기: 움직이는 동안 기체가 지나갈 길 둘레에 맺힘 (공기에 붙어 있어 기체를 따라가는 화면에선 반대로 흘러 보임)
-       기체에 가까운 건 굵고 밝고 빠르게 · 먼 건 가늘고 흐리고 느리게 (깊이) */
-    if (moving) { M.acc += dt * 38; while (M.acc > 1) { M.acc--; const a = rnd() * 6.283, near = rnd(), r = .75 + near * 1.6, len = (2.6 - near * 1.1) * (.8 + rnd() * .5);
-      SK.emit({ x: M.x + Math.cos(a) * r, y: M.y + M.dir * (rnd() * 2.4) - len * .5, z: M.z + Math.sin(a) * r, len, w: .06 - near * .03 + rnd() * .012, b: (1.5 - near * .9) * (.8 + rnd() * .4), flow: M.dir, life: .3 + rnd() * .18, seed: rnd(), sp: 1.8 - near * 1.1 + rnd() * .4 }); } }
+    /* 세로 빛줄기: 출발하는 순간 여러 가닥이 한꺼번에 맺히고, 이동 앞쪽 절반 동안 조금 더 맺힘 · 모두 도착 뒤 0.1초 안에 사라지게 수명을 맞춤
+       공기에 붙어 있어 기체를 따라가는 화면에선 반대로 흘러 보임 · 기체에 가까운 건 굵고 밝고 빠르게 · 먼 건 가늘고 흐리고 느리게 (깊이) */
+    if (moving) { const left = (1 - M.f) * Math.abs(LY[M.to] - M.y0) / SPEED + .1, n = M.burst ? 0 : 9; M.burst = true;   /* left: 도착 뒤 0.1초까지 남은 시간 */
+      if (M.f < .55) M.acc += dt * 30; let k = n + Math.floor(M.acc); M.acc -= Math.floor(M.acc);
+      for (; k > 0; k--) { const a = rnd() * 6.283, near = rnd(), r = .75 + near * 1.6, len = (2.6 - near * 1.1) * (.8 + rnd() * .5);
+        SK.emit({ x: M.x + Math.cos(a) * r, y: M.y + M.dir * (rnd() * 2.4) - len * .5, z: M.z + Math.sin(a) * r, len, w: .06 - near * .03 + rnd() * .012, b: (1.5 - near * .9) * (.8 + rnd() * .4), flow: M.dir, life: left * (.85 + rnd() * .15), seed: rnd(), sp: 1.8 - near * 1.1 + rnd() * .4 }); } }
+    else M.burst = false;
     SK.update(dt, t);
     M.shock += dt;
     /* 기체: 그 자리에서 곧게 오르내림 · 기수만 듦/숙임 */
