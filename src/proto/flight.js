@@ -11,9 +11,9 @@
 import * as THREE from 'three';
 import { buildShip, engineSpots } from '../core/ships/build.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { flameMesh } from './sortie.js?v=11102332';
-import { MAP } from './mapfloor.js?v=11102332';
-import { applyShipHeat, heatVis } from './shipheat.js?v=11102332';
+import { flameMesh } from './sortie.js?v=11102337';
+import { MAP } from './mapfloor.js?v=11102337';
+import { applyShipHeat, heatVis } from './shipheat.js?v=11102337';
 
 export const FLY = { LEN: 2, HOVER: .7, R: .8, SPEEDS: [9, 12, 15, 18], TURN: 7, ACC: .22, TURNMAX: 9,
   BASE: 9, SHIELD: 3, BOOST: 5, BOOSTK: 1.5 };   /* 기지 고리(반지름 9m)를 벗어나는 순간: 보호막 3초 · 가속 5초(1.5배) — 기지 출구 앞 매복에 바로 당하지 않게 */
@@ -132,7 +132,6 @@ void main() {
   G.userData.update = (t, dt) => {
     let ix = inp.x, iy = inp.y;
     if (keys.size) { ix = (keys.has('d') || keys.has('arrowright')) - (keys.has('a') || keys.has('arrowleft')); iy = (keys.has('s') || keys.has('arrowdown')) - (keys.has('w') || keys.has('arrowup')); const l = Math.hypot(ix, iy); if (l > 1) { ix /= l; iy /= l; } }
-    if (S.camYaw) { const c = Math.cos(S.camYaw), sn = Math.sin(S.camYaw), wx = ix * c + iy * sn, wz = -ix * sn + iy * c; ix = wx; iy = wz; }   /* 카메라를 옆으로 돌려 둔 만큼 화면 위·아래·좌·우를 세상 방향으로 (쿼터뷰 · 사용자 2026-11-10) */
     const m = Math.hypot(ix, iy) > .15 ? 1 : 0;                        /* 조이스틱: 조금만 밀어도 항상 같은 속도 (방향만 정함) */
     /* 머리 돌리기: 미는 쪽으로, 무게 때문에 한 번에 다 돌지 않음 */
     let turn = 0;

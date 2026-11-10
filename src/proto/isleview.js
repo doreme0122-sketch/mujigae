@@ -2,28 +2,23 @@
    · 카메라 · 화면 밝기 처리 · 기체 · 조종은 새 맵(map2)과 같은 것 · 섬만 새것 */
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
-import { makeBloom } from '../core/hangar/bloom.js?v=11102332';
-import { makeForgeShip, forgeList } from './forgeship.js?v=11102332';
-import { makePerf } from './perf.js?v=11102332';
-import { makeFlight, FLY, padZone } from './flight.js?v=11102332';
-import { buildIsle } from './isle.js?v=11102332';
-import { makeInputBuffer } from './inbuf.js?v=11102332';
-import { makeLiftFx } from './liftfx.js?v=11102332';
-import { makeBackdrop } from './backdrop.js?v=11102332';
+import { makeBloom } from '../core/hangar/bloom.js?v=11102337';
+import { makeForgeShip, forgeList } from './forgeship.js?v=11102337';
+import { makePerf } from './perf.js?v=11102337';
+import { makeFlight, FLY, padZone } from './flight.js?v=11102337';
+import { buildIsle } from './isle.js?v=11102337';
+import { makeInputBuffer } from './inbuf.js?v=11102337';
+import { makeLiftFx } from './liftfx.js?v=11102337';
 
 const $ = s => document.querySelector(s);
-/* 카메라 (사용자 2026-11-10: 롤 쿼터뷰처럼 · 2.5D)
-   · 원근이 없는 카메라: 멀든 가깝든 크기가 같음 · 땅에서 45° 위에서 내려다보고 옆으로 45° 돌린 대각선 시점 · 기체를 따라가도 기울기 · 돌림은 그대로
-   · 바탕은 그림(backdrop.js) · 기체 · 섬 · 장애물은 3D 모델 · 한 세상 좌표에 함께 · 조이스틱 위·아래·좌·우는 화면 방향 그대로 */
-const ANG = 45, YAW = Math.PI / 4, CAM_R = 300;   /* 기울기 · 옆 돌림 · 카메라가 떨어진 거리 (원근이 없어 거리는 앞뒤 가림에만 쓰임) */
 export async function start(canvas, onProgress = () => {}) {
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: false, powerPreference: 'high-performance' });
   renderer.toneMapping = THREE.NoToneMapping; renderer.autoClear = false; renderer.setClearColor(0x9fc3e0, 1);
-  const scene = new THREE.Scene(), camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 1, 1400), bloom = makeBloom(renderer, { samples: 0 });
+  const scene = new THREE.Scene(), camera = new THREE.PerspectiveCamera(20, 1, .5, 2000), bloom = makeBloom(renderer, { samples: 0 });
   { const pm = new THREE.PMREMGenerator(renderer); scene.environment = pm.fromScene(new RoomEnvironment(), .04).texture; scene.environmentIntensity = .7; pm.dispose(); }
   onProgress(.1); await new Promise(r => setTimeout(r, 30));
   const K = .5;   /* 섬 크기: 0.5배 (사용자 2026-11-10 · 기체에 비해 땅이 너무 컸음) */
-  const t0 = performance.now(), isle = await buildIsle({ K }); scene.add(isle.group); const bd = makeBackdrop({ y: -60 }); scene.add(bd.group);   /* 바탕 그림: 저 아래 구름 바다 · 사이 구름 조각 */ console.log('[초원 섬]', JSON.stringify(isle.stats), Math.round(performance.now() - t0) + 'ms');
+  const t0 = performance.now(), isle = await buildIsle({ K }); scene.add(isle.group, isle.sky); console.log('[초원 섬]', JSON.stringify(isle.stats), Math.round(performance.now() - t0) + 'ms');
   onProgress(.55);
 
   /* 기체: 스킨 고르기 (새 맵과 같은 기억 자리) */
@@ -36,7 +31,7 @@ export async function start(canvas, onProgress = () => {}) {
   const LV = { cur: 1, to: 1, f: 1, dur: .33, dir: 0, y: LY[1], flash: 0, puff: 9, puffX: 0, puffZ: 0, puffL: 0 };
   const B = { blocked: (x, z) => Math.hypot(x, z) > 78 * K || isle.blocked(x, z, LV.cur) || (LV.to !== LV.cur && isle.blocked(x, z, LV.to)), region: () => 0 };
   const START = [8 * K, 8 * K];   /* 트인 풀밭 (세 높이 모두 비어 있는 자리) */
-  const fly = await makeFlight(renderer, B, START, 0, FG); scene.add(fly); const FS = fly.userData.S; FS.camYaw = YAW;   /* 조이스틱은 화면 방향 그대로 */ fly.userData.respawn(START[0], START[1], 0);
+  const fly = await makeFlight(renderer, B, START, 0, FG); scene.add(fly); const FS = fly.userData.S; fly.userData.respawn(START[0], START[1], 0);
   onProgress(.85);
   /* 가려진 기체: 고원·돌탑 뒤에 숨으면 가려진 부분만 은은한 빛 윤곽 (새 맵과 같은 것) */
   const xrayM = new THREE.ShaderMaterial({ transparent: false, blending: THREE.CustomBlending, blendSrc: THREE.SrcAlphaFactor, blendDst: THREE.OneMinusSrcAlphaFactor, depthWrite: false, depthFunc: THREE.GreaterDepth, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -4,
@@ -126,19 +121,18 @@ export async function start(canvas, onProgress = () => {}) {
     if (D.L === 0 && inBush(x, z) && dist > 2.2) return false;                  /* 부쉬 안: 바로 옆이 아니면 어느 층에서도 안 보임 */
     if (dist > VR[L]) return false; if (L === 2) return true; return ray(L, FS.x, FS.z, dx / dist, dz / dist, dist, me) >= dist - .3; };
   /* 카메라 (새 맵과 같은 롤 방식: 좁은 시야 · 멀리서) + 둘러보기 */
-  const cfg = { ang: ANG, dist: 25 }; const bind = (id, key, fmt) => { const el = $('#' + id), out = $('#' + id + 'v'); if (!el) return; const rd = () => { cfg[key] = +el.value; out.textContent = fmt(+el.value); }; el.addEventListener('input', rd); rd(); };
+  const cfg = { ang: 45, dist: 25 }; const bind = (id, key, fmt) => { const el = $('#' + id), out = $('#' + id + 'v'); if (!el) return; const rd = () => { cfg[key] = +el.value; out.textContent = fmt(+el.value); }; el.addEventListener('input', rd); rd(); };
   bind('ang', 'ang', v => v + '°'); bind('dist', 'dist', v => v + 'm');
-  /* 보이는 크기: 화면 세로 절반이 세상에서 몇 m인지 (거리 칸 25 = 예전과 같은 넓이) */
-  let camH = cfg.dist * Math.tan(20 * Math.PI / 180); const cam = { x: START[0], z: START[1] };
+  const CAMK = Math.tan(20 * Math.PI / 180) / Math.tan(10 * Math.PI / 180); let camD = cfg.dist * CAMK; const cam = { x: START[0], z: START[1] };
   const look = { x: 0, z: 0, id: null, px: 0, py: 0 };
   addEventListener('pointerdown', e => { if (look.id !== null || e.target.closest('#ui') || padZone(e.clientX, e.clientY) || inZone(e.clientX, e.clientY)) return; look.id = e.pointerId; look.px = e.clientX; look.py = e.clientY; });
-  addEventListener('pointermove', e => { if (e.pointerId !== look.id) return; const r = canvas.getBoundingClientRect(), mpp = 2 * camH / Math.max(1, r.height), a = cfg.ang * Math.PI / 180;
-    { const dx = (e.clientX - look.px) * mpp, dy = (e.clientY - look.py) * mpp / Math.max(.35, Math.sin(a)), c = Math.cos(YAW), sn = Math.sin(YAW); look.x -= dx * c + dy * sn; look.z -= -dx * sn + dy * c; }   /* 끈 화면 방향 → 세상 방향 (옆으로 돌린 만큼) */ const l = Math.hypot(look.x, look.z); if (l > 90) { look.x *= 90 / l; look.z *= 90 / l; } look.px = e.clientX; look.py = e.clientY; });
+  addEventListener('pointermove', e => { if (e.pointerId !== look.id) return; const r = canvas.getBoundingClientRect(), mpp = 2 * camD * Math.tan(camera.fov * Math.PI / 360) / Math.max(1, r.height), a = cfg.ang * Math.PI / 180;
+    look.x -= (e.clientX - look.px) * mpp; look.z -= (e.clientY - look.py) * mpp / Math.max(.35, Math.sin(a)); const l = Math.hypot(look.x, look.z); if (l > 90) { look.x *= 90 / l; look.z *= 90 / l; } look.px = e.clientX; look.py = e.clientY; });
   const up = e => { if (e.pointerId === look.id) look.id = null; }; addEventListener('pointerup', up); addEventListener('pointercancel', up);
 
   let Wd = 2, Hd = 2; const perf = makePerf(st => { bloom.setSamples(st.aa ? 4 : 0); size(); });
-  function size() { const r = canvas.getBoundingClientRect(); [Wd, Hd] = perf.size(r.width, r.height); renderer.setSize(Wd, Hd, false); bloom.size(Wd, Hd); lfx.size(Wd, Hd);
-  }
+  function size() { const r = canvas.getBoundingClientRect(); [Wd, Hd] = perf.size(r.width, r.height); renderer.setSize(Wd, Hd, false); bloom.size(Wd, Hd); lfx.size(Wd, Hd); camera.aspect = Wd / Hd; camera.updateProjectionMatrix();
+    const px = Hd / (2 * Math.tan(camera.fov * Math.PI / 360)); isle.setPx(px); fly.userData.setPx?.(px); }
   addEventListener('resize', size); size(); bloom.setSamples(perf.st.aa ? 4 : 0);
   /* 무게 표시 */
   const info = document.createElement('div'); info.style.cssText = 'position:absolute;top:calc(env(safe-area-inset-top,0px) + 50px);left:max(18px,env(safe-area-inset-left,0px));font-size:11px;color:rgba(185,255,74,.85);pointer-events:none;font-family:monospace;line-height:1.5'; $('#ui').append(info);
@@ -161,22 +155,19 @@ export async function start(canvas, onProgress = () => {}) {
     fly.position.y = LV.y - FLY.HOVER;
     fly.updateMatrixWorld(true); fly.userData.update(t, dt);
     { const S = fly.children[0], e = LV.f < 1 ? Math.sin(LV.f * Math.PI) : 0; S.rotateX(LV.dir * .52 * e);   /* 오르내릴 때 기수를 크게 들고 숙임 (사용자 2026-11-10: 높이감이 더 보이게 · 약 30°) */
-      const sc = [.86, 1, 1.16],   /* 원근이 없어 높이를 크기로 더 또렷이 */ a0 = sc[LV.cur], a1 = sc[LV.to], k = LV.f * LV.f * (3 - 2 * LV.f); S.scale.setScalar(a0 + (a1 - a0) * k); S.updateMatrixWorld(true); }
+      const sc = [.92, 1, 1.1], a0 = sc[LV.cur], a1 = sc[LV.to], k = LV.f * LV.f * (3 - 2 * LV.f); S.scale.setScalar(a0 + (a1 - a0) * k); S.updateMatrixWorld(true); }
     FG.step(dt, t, { moving: Math.hypot(FS.vx, FS.vz) > 1.5, fire: false });
     if (look.id === null) { const k = Math.min(1, dt * 3.5); look.x -= look.x * k; look.z -= look.z * k; }
     const sp = fly.children[0].position; { const k = Math.min(1, dt * 4); cam.x += (sp.x + FS.vx * .25 - cam.x) * k; cam.z += (sp.z + FS.vz * .25 - cam.z) * k; }
-    { const cf = [.85, 1, 1.3], k = LV.f * LV.f * (3 - 2 * LV.f), f = cf[LV.cur] + (cf[LV.to] - cf[LV.cur]) * k; camH += (cfg.dist * Math.tan(20 * Math.PI / 180) * f - camH) * Math.min(1, dt * 3); }   /* 높을수록 넓게 */
-    const a = cfg.ang * Math.PI / 180, vx = cam.x + look.x, vz = cam.z + look.z, cy = LV.y, asp = Wd / Hd;
-    camera.position.set(vx + Math.sin(YAW) * Math.cos(a) * CAM_R, cy + Math.sin(a) * CAM_R, vz + Math.cos(YAW) * Math.cos(a) * CAM_R); camera.lookAt(vx, cy, vz);
-    camera.left = -camH * asp; camera.right = camH * asp; camera.top = camH; camera.bottom = -camH; camera.updateProjectionMatrix(); camera.updateMatrixWorld();
-    { const px = Hd / (2 * camH) * CAM_R; isle.setPx(px); fly.userData.setPx?.(px); }   /* 빛 알갱이 크기: 원근이 없으니 화면 크기 기준으로 */
-    bd.update(t); isle.update(t); xrayM.uniforms.uT.value = t;
+    { const cf = [.85, 1, 1.3], k = LV.f * LV.f * (3 - 2 * LV.f), f = cf[LV.cur] + (cf[LV.to] - cf[LV.cur]) * k; camD += (cfg.dist * CAMK * f - camD) * Math.min(1, dt * 3); }
+    const a = cfg.ang * Math.PI / 180, vx = cam.x + look.x, vz = cam.z + look.z, cy = LV.y; camera.position.set(vx, cy + camD * Math.sin(a), vz + camD * Math.cos(a)); camera.lookAt(vx, cy, vz); camera.updateMatrixWorld();
+    isle.sky.position.copy(camera.position); isle.update(t); xrayM.uniforms.uT.value = t;
     /* 바람 고리 (1층이면 땅에 닿아 풀 · 꽃을 밂 · 2 · 3층은 그 높이 공중에서만) · 못 바꾸면 층 막대가 빨갛게 깜빡 */
     if (LV.puff < 1) { LV.puff = Math.min(1, LV.puff + dt / .7); const p = LV.puff, onGround = LV.puffL === 0, gh = isle.H(LV.puffX, LV.puffZ);
       puff.visible = !onGround || isle.mask(LV.puffX, LV.puffZ) > 0; puff.position.set(LV.puffX, onGround ? gh + .08 : LY[LV.puffL] - .45, LV.puffZ); puff.scale.setScalar(5.5); puffU.uP.value = p;
       if (onGround) isle.push(LV.puffX, LV.puffZ, 3.2, .9 * Math.sin(Math.min(1, p * 2.2) * Math.PI * .5) * (1 - p)); else isle.push(0, 0, 1, 0); } else { puff.visible = false; isle.push(0, 0, 1, 0); }
     if (LV.flash > 0) { LV.flash = Math.max(0, LV.flash - dt * 1.6); const on = LV.flash > 0 && Math.sin(LV.flash * 25) > 0; pips.forEach(q => { q.style.background = on ? 'rgb(255,70,55)' : 'rgba(255,255,255,.18)'; q.style.boxShadow = on ? '0 0 8px rgb(255,70,55)' : 'none'; }); if (LV.flash === 0) drawPips(); }
-    { const gh = isle.H(FS.x, FS.z), inIsle = isle.mask(FS.x, FS.z) > 0, d = LV.y - gh; shadow.visible = inIsle; shadow.position.set(FS.x + .58 * d, gh + .06, FS.z - .56 * d); const s = 2.2 + d * .12;   /* 그림자는 해 반대쪽으로 높을수록 멀리 비켜 떨어짐 → 원근이 없어도 높이가 보임 */ shadow.scale.set(s, 1, s); shadow.rotation.y = FS.head; shU.uA.value = .5 * Math.exp(-d * .05);
+    { const gh = isle.H(FS.x, FS.z), inIsle = isle.mask(FS.x, FS.z) > 0, d = LV.y - gh; shadow.visible = inIsle; shadow.position.set(FS.x + .4, gh + .06, FS.z + .3); const s = 2.2 + d * .12; shadow.scale.set(s, 1, s); shadow.rotation.y = FS.head; shU.uA.value = .5 * Math.exp(-d * .05);
       say.textContent = LN[LV.f < .5 ? LV.cur : LV.to] + (inIsle ? ` · 땅까지 ${d.toFixed(1)}m` : ' · 섬 밖'); }
     castSight();   /* 매 장면 (깜빡임 없게) */
     for (const D of dummies) { const a = t * .25 + D.k * 1.7; D.g.position.set(D.cx + Math.cos(a) * D.r, LY[D.L] + Math.sin(t * 1.3 + D.k) * .08, D.cz + Math.sin(a) * D.r); D.g.rotation.y = -a; D.a += ((seeDummy(D) ? 1 : 0) - D.a) * Math.min(1, dt * 6); D.m.opacity = D.a; D.g.visible = D.a > .02; }
