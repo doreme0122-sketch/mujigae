@@ -5,7 +5,7 @@
    · 도착한 섬: 그 섬 땅 위만 날 수 있음(땅 밖은 막힘) · 섬 가장자리에 돌아가는 문(받침 섬 위) — 같은 방법으로 돌아감
    · 돌아가는 문과 도착 섬의 땅 지도는 '갈 때만' 만들고 돌아오면 비움 (지금 쓰는 것만 올림 · 설계 원칙) */
 import * as THREE from 'three';
-import { gate4, pedestal } from './gates.js?v=11101046';
+import { gate4, pedestal } from './gates.js?v=11101055';
 
 const clamp = THREE.MathUtils.clamp, smooth = (a, b, x) => { const k = clamp((x - a) / (b - a), 0, 1); return k * k * (3 - 2 * k); };
 const AB = { transparent: true, depthWrite: false, blending: THREE.AdditiveBlending };

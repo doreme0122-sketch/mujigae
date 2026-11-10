@@ -160,16 +160,16 @@ export async function makeForgeShip(renderer, camera, fi, { size = 3.6, patch = 
       const me = new THREE.Mesh(g, mat); me.frustumCulled = false; me.renderOrder = list[0].renderOrder; me.name = 'fgSprites'; sm.add(me);
       const rec = list.map(s => { const p = s.parent; p.remove(s); return { s, p }; }); batches.push({ me, rec, iP, iS, iC }); } }
   const mw = new THREE.Matrix4(), vp = new THREE.Vector3(), vq = new THREE.Quaternion(), vs = new THREE.Vector3(), mi = new THREE.Matrix4();
-  /* 구름 덩이(기체 둘레를 떠다니는 빛 덩이 무리)도 같은 두 가지: 새로 생긴 순간의 기체 자리를 기억해 그 자리에 남김 · 사라지는 건 작업대의 덩이 수명 그대로 */
+  /* 구름 덩이(기체 둘레를 떠다니는 빛 덩이 무리)도 같은 두 가지: 새로 생긴 순간의 기체 자리를 기억해 그 자리에 남김 · 사라지는 건 다른 효과와 같은 짧은 수명 */
   const bankOf = p => { let q = p; while (q && q.parent && q.parent !== S.root) q = q.parent; return q && q.parent === S.root && moved.has(q) ? q : null; };
-  const banks = new Map(); for (const b of batches) b.rec.forEach(r => { r.bank = bankOf(r.p); if (r.bank && !banks.has(r.bank)) banks.set(r.bank, { last: new THREE.Vector3(1e9, 0, 0), M: new THREE.Matrix4() }); });
+  const banks = new Map(); for (const b of batches) b.rec.forEach(r => { r.bank = bankOf(r.p); if (r.bank && !banks.has(r.bank)) banks.set(r.bank, { last: new THREE.Vector3(1e9, 0, 0), M: new THREE.Matrix4(), t: 0 }); });
   const JUMP = .12 * C.radius, rInv = new THREE.Matrix4();
   const syncSprites = () => { rInv.copy(S.root.matrixWorld).invert();
-    for (const [g, st] of banks) { if (st.last.distanceTo(g.position) > JUMP) st.M.copy(S.root.matrixWorld); st.last.copy(g.position); }   /* 새로 생김 (자리가 확 바뀜) */
+    for (const [g, st] of banks) { if (st.last.distanceTo(g.position) > JUMP) { st.M.copy(S.root.matrixWorld); st.t = gameT; } st.last.copy(g.position); }   /* 새로 생김 (자리가 확 바뀜) */
     for (const b of batches) { mi.copy(b.me.matrixWorld).invert();
     b.rec.forEach(({ s, p, bank }, i) => { s.updateMatrix(); mw.multiplyMatrices(p.matrixWorld, s.matrix); mw.decompose(vp, vq, vs); let on = s.visible; for (let q = p; q && on; q = q.parent) on = q.visible;
-      if (bank) vp.applyMatrix4(rInv).applyMatrix4(banks.get(bank).M);
-      vp.applyMatrix4(mi); b.iP.setXYZ(i, vp.x, vp.y, vp.z); b.iS.setXY(i, vs.x, vs.y); const c = s.material.color, a = on ? s.material.opacity : 0; b.iC.setXYZW(i, c.r, c.g, c.b, a); });
+      let fd = 1; if (bank) { const st = banks.get(bank); vp.applyMatrix4(rInv).applyMatrix4(st.M); fd = 1 - THREE.MathUtils.smoothstep(gameT - st.t, LIFE[0], LIFE[1]); }   /* 같은 짧은 수명 */
+      vp.applyMatrix4(mi); b.iP.setXYZ(i, vp.x, vp.y, vp.z); b.iS.setXY(i, vs.x, vs.y); const c = s.material.color, a = on ? s.material.opacity * fd : 0; b.iC.setXYZW(i, c.r, c.g, c.b, a); });
     b.iP.needsUpdate = b.iS.needsUpdate = b.iC.needsUpdate = true; } };
   /* ⑤ ⑥ 칠마다 불빛 · 색 곡선 끼우기 */
   /* 효과가 '맵 방향'으로 흐르던 것 → '기체 방향'으로 (사용자 2026-11-09: 남쪽으로 내려오면 냉기가 기체 앞으로 나옴)
@@ -182,16 +182,20 @@ export async function makeForgeShip(renderer, camera, fi, { size = 3.6, patch = 
     const a = snap(); S.root.rotation.y = 1.3; S.root.updateMatrixWorld(true); S.update(1 / 60, 50); const b = snap(); S.root.rotation.y = 0; S.root.updateMatrixWorld(true); S.update(1 / 60, 50.02);
     sms.forEach((m, i) => { if (a[i] !== b[i]) return; m.vertexShader = 'uniform mat4 fgRot;\n' + m.vertexShader.replace(WDIR, 'viewMatrix * (fgRot * vec4($1, 0.))'); m.uniforms.fgRot = ROT; m.needsUpdate = true; }); }
   /* 궤적 (사용자 2026-11-10): ① 지나간 자리에 남는다 ② 나온 순서대로 사라진다 — 이 두 가지만
-     · 기체가 지나온 길(자리 · 방향)을 8초 동안 기억 (효과 알갱이 가장 긴 수명보다 길게)
+     · 기체가 지나온 길(자리 · 방향)을 기억 · 칸은 시계에 고정(0.1초마다 한 칸) → 칸 자리가 매 장면 밀리지 않아 놓인 알갱이가 흔들리지 않음
+       (매 장면 '지금' 기준으로 칸을 다시 뽑았더니 굽은 길에서 칸 사이 오차가 매번 달라져 오래된 알갱이가 흔들렸음 · 사용자 2026-11-10)
      · 알갱이마다 '나온 지 몇 초'(효과가 스스로 아는 나이)만큼 전의 기체 자리 · 방향에 그려 넣음 → 나온 자리에 남음
-     · 사라지는 건 작업대 효과 각자의 수명 그대로 (먼저 나온 것부터) · 나이를 모르는 효과(몸에 붙은 불꽃 혀)는 몸을 그대로 따라감 */
-  const HN = 64, HDT = .125;   /* 기억 칸 수 · 칸 간격(초) */
+     · 모든 효과 같은 짧은 수명: 나온 지 0.5초부터 흐려져 1초면 사라짐, 먼저 나온 것부터 (사용자 2026-11-10: 너무 오래 남음 · 예외 없음)
+     · 나이를 모르는 효과(몸에 붙은 불꽃 혀 · 후광)는 몸을 그대로 따라감 */
+  const HN = 14, HDT = .1, LIFE = [.5, 1];   /* 기억 칸 수 · 칸 간격(초) · 흐려지기 시작 · 다 사라짐(초) */
   const isFx = o => o.isPoints || (o.isMesh && o.name !== 'xray' && o.name !== 'fgSprites' && ['aC', 'aS', 'iP', 'iV'].some(a => o.geometry.attributes[a]));
-  const TU = { fgVR: { value: new THREE.Matrix4() }, fgRV: { value: new THREE.Matrix4() }, fgHP: { value: Array.from({ length: HN }, () => new THREE.Vector3()) }, fgHQ: { value: Array.from({ length: HN }, () => new THREE.Vector4(0, 0, 0, 1)) }, fgDT: { value: HDT } };
-  const TRAIL = `uniform mat4 fgVR; uniform mat4 fgRV; uniform vec3 fgHP[${HN}]; uniform vec4 fgHQ[${HN}]; uniform float fgDT;
+  const TU = { fgVR: { value: new THREE.Matrix4() }, fgRV: { value: new THREE.Matrix4() }, fgHP: { value: Array.from({ length: HN }, () => new THREE.Vector3()) }, fgHQ: { value: Array.from({ length: HN }, () => new THREE.Vector4(0, 0, 0, 1)) }, fgDT: { value: HDT }, fgPh: { value: 0 } };
+  const TRAIL = `varying float fgFd; uniform mat4 fgVR; uniform mat4 fgRV; uniform vec3 fgHP[${HN}]; uniform vec4 fgHQ[${HN}]; uniform float fgDT; uniform float fgPh;
 vec3 fgQR(vec4 q, vec3 v){ return v + 2. * cross(q.xyz, cross(q.xyz, v) + q.w * v); }
-vec4 fgBendV(vec4 v, float secs){ if (secs <= 0.) return v; vec4 r = fgVR * v;
-  float fi = clamp(secs / fgDT, 0., ${HN - 1}.0 - .001); int i = int(fi); float f = fi - float(i);
+vec4 fgBendV(vec4 v, float secs){ fgFd = 1. - smoothstep(${LIFE[0].toFixed(2)}, ${LIFE[1].toFixed(2)}, secs); if (secs <= 0.) return v; vec4 r = fgVR * v;
+  /* 칸 0 = 지금 · 칸 1부터 시계에 고정된 칸 (칸 0과 1 사이만 fgPh초) */
+  float u = secs < fgPh ? secs / max(fgPh, 1e-4) : 1. + (secs - fgPh) / fgDT;
+  float fi = clamp(u, 0., ${HN - 1}.0 - .001); int i = int(fi); float f = fi - float(i);
   r.xyz = mix(fgHP[i], fgHP[i + 1], f) + fgQR(normalize(mix(fgHQ[i], fgHQ[i + 1], f)), r.xyz);
   return fgRV * r; }
 `;
@@ -204,14 +208,17 @@ vec4 fgBendV(vec4 v, float secs){ if (secs <= 0.) return v; vec4 r = fgVR * v;
       /* 알갱이 네 귀퉁이를 펼치기 직전에 옮김 → 알갱이 하나는 한 덩어리로 같이 옮겨져 찢어지지 않음 */
       let k = -1; for (const mm of body.matchAll(new RegExp('\\b' + X + '\\.(xyz?)\\s*\\+=([^;]*);', 'g'))) if (mm[1] === 'xy' || /\baC\b/.test(mm[2])) { k = mm.index; break; }
       body = k >= 0 ? body.slice(0, k) + `${X} = fgBendV(${X}, ${AGE}); ` + body.slice(k) : body.replace(GLP, `gl_Position = projectionMatrix * fgBendV($1, ${AGE});`);
-      m.vertexShader = vs.slice(0, at) + TRAIL + body; Object.assign(m.uniforms, TU); m.needsUpdate = true; nTrail++; } }); }
-  /* 지나온 길 기억: 장면마다 기체 자리를 적고, 0.125초 간격 64칸으로 다시 뽑아 '지금 기체 기준' 상대 자리 · 방향으로 넘김 */
+      m.vertexShader = vs.slice(0, at) + TRAIL + body;
+      { const fs = m.fragmentShader, e = fs.lastIndexOf('}');   /* 흐려지는 만큼 (더하는 빛은 밝기까지) */
+        m.fragmentShader = 'varying float fgFd;\n' + fs.slice(0, e) + (m.blending === THREE.AdditiveBlending ? '\n gl_FragColor *= fgFd;\n}' : '\n gl_FragColor.a *= fgFd;\n}'); }
+      Object.assign(m.uniforms, TU); m.needsUpdate = true; nTrail++; } }); }
+  /* 지나온 길 기억: 장면마다 기체 자리를 적고, 칸 0은 지금 · 칸 1부터는 시계에 고정된 0.1초 칸으로 뽑아 '지금 기체 기준' 상대 자리 · 방향으로 넘김 */
   const qPrev = new THREE.Quaternion(), hist = [], hP = new THREE.Vector3(), hQ = new THREE.Quaternion(), hS = new THREE.Vector3(), qa = new THREE.Quaternion(), qb = new THREE.Quaternion(), pa = new THREE.Vector3();
   let gameT = 0; const trailTick = () => { const now = gameT; S.root.matrixWorld.decompose(hP, hQ, hS);
     const last = hist[hist.length - 1]; if (last && last.p.distanceTo(hP) > 40) hist.length = 0;   /* 순간이동하면 길을 새로 */
     hist.push({ t: now, p: hP.clone(), q: hQ.clone() }); while (hist.length > 2 && hist[1].t < now - HN * HDT - .2) hist.shift();
-    const sc = hS.x || 1, qi = hQ.clone().invert();
-    let j = hist.length - 1; for (let i = 0; i < HN; i++) { const tt = now - i * HDT; while (j > 0 && hist[j].t > tt) j--; const A = hist[j], B = hist[Math.min(j + 1, hist.length - 1)];
+    const sc = hS.x || 1, qi = hQ.clone().invert(), g0 = Math.floor(now / HDT) * HDT; TU.fgPh.value = now - g0;
+    let j = hist.length - 1; for (let i = 0; i < HN; i++) { const tt = i ? g0 - (i - 1) * HDT : now; while (j > 0 && hist[j].t > tt) j--; const A = hist[j], B = hist[Math.min(j + 1, hist.length - 1)];
       const f = B.t > A.t ? THREE.MathUtils.clamp((tt - A.t) / (B.t - A.t), 0, 1) : 0; pa.lerpVectors(A.p, B.p, f); qa.slerpQuaternions(A.q, B.q, f);
       pa.sub(hP).applyQuaternion(qi).divideScalar(sc); qb.copy(qi).multiply(qa); if (i && qb.dot(qPrev) < 0) qb.set(-qb.x, -qb.y, -qb.z, -qb.w); qPrev.copy(qb);   /* 이웃 칸과 같은 쪽 부호로 (섞을 때 뒤집혀 큰 세모가 튀던 원인) */
       TU.fgHP.value[i].copy(pa); TU.fgHQ.value[i].set(qb.x, qb.y, qb.z, qb.w); } };

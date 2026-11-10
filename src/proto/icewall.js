@@ -11,8 +11,8 @@
    무게: 벽 한 줄 = 얼음 1번 + 눈 1번 그리기 */
 import * as THREE from 'three';
 import { mergeGeometries, mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js';
-import { iceMaterial, block } from './ice.js?v=11101046';
-import { SNOW_GLSL, SNOW_U } from './snowtone.js?v=11101046';
+import { iceMaterial, block } from './ice.js?v=11101055';
+import { SNOW_GLSL, SNOW_U } from './snowtone.js?v=11101055';
 
 const hs = (x, y, z) => { const s = Math.sin(x * 127.1 + y * 311.7 + z * 74.7) * 43758.5453; return s - Math.floor(s); };
 const vn = (x, y, z) => { const ix = Math.floor(x), iy = Math.floor(y), iz = Math.floor(z), fx = x - ix, fy = y - iy, fz = z - iz, u = fx * fx * (3 - 2 * fx), v = fy * fy * (3 - 2 * fy), w = fz * fz * (3 - 2 * fz);
