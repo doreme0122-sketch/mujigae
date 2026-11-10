@@ -7,8 +7,8 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { MeshoptSimplifier as MO } from '../../vendor/meshopt_simplifier.module.js';
-import { makeField, Y, SPOT, LAYERS, fbm, noise2, smoothstep } from './islefield.js?v=11102301';
-import { reedBush, vegShader } from './flora.js?v=11102301';
+import { makeField, Y, SPOT, LAYERS, fbm, noise2, smoothstep } from './islefield.js?v=11102312';
+import { reedBush, vegShader } from './flora.js?v=11102312';
 
 const SUN = new THREE.Vector3(-.45, .78, .44).normalize();   /* 왼쪽 위 앞에서 (카메라 쪽 절벽 면이 비스듬히 빛을 받아 결이 드러남) */
 const rngOf = s => () => (s = (s * 16807) % 2147483647) / 2147483647;
@@ -360,19 +360,24 @@ export async function buildIsle({ K = 1 } = {}) {   /* K: 섬 전체 크기 (기
      · 섬 밖으로 떨어지는 폭포는 섬 땅 속에 들어갈 때만 밀고, 테두리를 넘으면 곧게 떨어짐
      · 물결 무늬는 물줄기를 따라 흘러간 거리로 그림 → 휘어 넘어가는 곳에서도 같은 빠르기로 끊김 없이 흐름
      · 턱을 넘는 자리에 흰 물머리 · 수면에 닿으면 끝에서 물거품(intoWater) · 허공으로 떨어지면 흩어짐 */
-  const fall = (P0, out, H, w, wid, intoWater) => { const N = 64, side = new THREE.Vector3(-out.z, 0, out.x), need = [], hit = [], D = [];
-    const at = (d, y) => [P0.x + out.x * d, P0.z + out.z * d, y];
-    for (let k = 0; k <= N; k++) { const f = k / N, y = P0.y - H * f; let d = (2.6 * Math.sqrt(f) + 1.2 * f) * w;
-      const inRock = d => { const [x, z] = at(d, y); return hAt(x, z) > y - .35 && (intoWater || F.mask(x, z) > -.4); };   /* 섬 밖 폭포: 테두리 밖이면 바위 아님 */
+  /* 폭포 길 (한 번만 계산 · 여러 장이 같은 길을 따름 → 층져 보이지 않게 · 사용자 2026-11-10)
+     · 물줄기 폭 전체(왼쪽 끝 ~ 오른쪽 끝)가 바위에 묻히지 않게 확인 (가장자리가 턱 뒤로 숨던 것) · lo, hi: 가운데에서 옆으로 펼쳐진 범위 */
+  const N_F = 64;
+  const fallPath = (P0, out, H, w, lo, hi, intoWater) => { const side = new THREE.Vector3(-out.z, 0, out.x), need = [], hit = [0], D = [];
+    for (let k = 0; k <= N_F; k++) { const f = k / N_F, y = P0.y - H * f, sp = 1 + f * .6; let d = (2.6 * Math.sqrt(f) + 1.2 * f) * w;
+      const inRock = d => { for (let q = 0; q <= 4; q++) { const o = (lo + (hi - lo) * q / 4) * sp, x = P0.x + out.x * d + side.x * o, z = P0.z + out.z * d + side.z * o; if (hAt(x, z) > y - .35 && (intoWater || F.mask(x, z) > -.4)) return true; } return false; };   /* 섬 밖 폭포: 테두리 밖이면 바위 아님 */
       for (let q = 0; q < 300 && inRock(d); q++) d += .08; need.push(d); }
-    for (let k = 1; k <= N; k++) { const raw = need[k]; need[k] = Math.max(need[k], need[k - 1]); hit.push(0); hit[k] = smoothstep(.1, .6, raw - need[k - 1]); } hit[0] = 0;
-    for (let k = 0; k <= N; k++) { let d = need[k]; for (let j = k + 1; j <= Math.min(N, k + 10); j++) d = Math.max(d, need[j] - (j - k) * .32); D.push(d); }   /* 미리 휘어 나감 */
-    for (let pass = 0; pass < 3; pass++) for (let k = 1; k < N; k++) D[k] = Math.max(need[k], (D[k - 1] + D[k] * 2 + D[k + 1]) / 4);   /* 꺾임을 둥글게 (바위 안으로는 안 들어감) */
-    const p = [], u = [], vv = [], ll = [], fo = [], th = [], ix = []; let L = 0, prev = null, end = P0.clone();
-    for (let k = 0; k <= N; k++) { const f = k / N, c = P0.clone().addScaledVector(out, D[k]).add(new THREE.Vector3(0, -H * f, 0)); if (prev) L += c.distanceTo(prev); prev = c; end = c;
-      const ww = wid * (1 + f * .6), fz = Math.max(hit[k] * .8, intoWater ? smoothstep(.9, 0, H * (1 - f)) : 0);
+    for (let k = 1; k <= N_F; k++) { const raw = need[k]; need[k] = Math.max(need[k], need[k - 1]); hit[k] = smoothstep(.1, .6, raw - need[k - 1]); }
+    for (let k = 0; k <= N_F; k++) { let d = need[k]; for (let j = k + 1; j <= Math.min(N_F, k + 10); j++) d = Math.max(d, need[j] - (j - k) * .32); D.push(d); }   /* 턱을 만나기 전부터 미리 휘어 나감 */
+    for (let pass = 0; pass < 3; pass++) for (let k = 1; k < N_F; k++) D[k] = Math.max(need[k], (D[k - 1] + D[k] * 2 + D[k + 1]) / 4);   /* 꺾임을 둥글게 (바위 안으로는 안 들어감) */
+    return { D, hit }; };
+  /* 물줄기 한 장: 길을 따라 · lat 옆 자리 · dz 앞뒤로 살짝 겹침 · 물결 무늬는 흘러간 거리로 (끊김 없이)
+     · 턱을 넘는 자리에 흰 물머리 · 수면에 닿으면 끝에서 물거품(intoWater) · 허공으로 떨어지면 점점 가늘게 흩어짐 */
+  const fall = (P0, out, H, path, lat, wid, dz, intoWater) => { const side = new THREE.Vector3(-out.z, 0, out.x), p = [], u = [], vv = [], ll = [], fo = [], th = [], ix = []; let L = 0, prev = null, end = P0.clone();
+    for (let k = 0; k <= N_F; k++) { const f = k / N_F, sp = 1 + f * .6, c = P0.clone().addScaledVector(out, path.D[k] + dz).addScaledVector(side, lat * sp).add(new THREE.Vector3(0, -H * f, 0)); if (prev) L += c.distanceTo(prev); prev = c; end = c;
+      const ww = wid * sp, fz = Math.max(path.hit[k] * .8, intoWater ? smoothstep(.9, 0, H * (1 - f)) : 0);
       for (const e of [0, 1]) { const q = c.clone().addScaledVector(side, (e - .5) * ww); p.push(q.x, q.y, q.z); u.push(e); vv.push(f); ll.push(L); fo.push(fz); th.push(intoWater ? 0 : smoothstep(.25, 1, f)); } }
-    for (let k = 0; k < N; k++) { const a = k * 2; ix.push(a, a + 2, a + 1, a + 1, a + 2, a + 3); }
+    for (let k = 0; k < N_F; k++) { const a = k * 2; ix.push(a, a + 2, a + 1, a + 1, a + 2, a + 3); }
     const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(p, 3)); g.setAttribute('aU', new THREE.Float32BufferAttribute(u, 1)); g.setAttribute('aV', new THREE.Float32BufferAttribute(vv, 1)); g.setAttribute('aL', new THREE.Float32BufferAttribute(ll, 1));
     g.setAttribute('aF', new THREE.Float32BufferAttribute(fo, 1)); g.setAttribute('aT', new THREE.Float32BufferAttribute(th, 1)); g.setIndex(ix);
     const m = new THREE.Mesh(g, fallM); m.renderOrder = 3; FX.add(m); return end; };   /* 끝자리 (물에 닿는 곳) */
@@ -380,10 +385,11 @@ export async function buildIsle({ K = 1 } = {}) {   /* K: 섬 전체 크기 (기
   let best = null; for (let a = 0; a < 6.283; a += .02) { for (let d = 0; d < 30; d += .2) { const x = SPOT.pond[0] + Math.cos(a) * d, z = SPOT.pond[1] + Math.sin(a) * d; if (F.plateau(x, z) > 3.3) { if (!best || d < best.d) best = { d, x, z }; break; } } }
   const fallSpots = [];
   if (best) { const n = nAt(best.x - (best.x - SPOT.pond[0]) * .15, best.z - (best.z - SPOT.pond[1]) * .15, 1.5), out = new THREE.Vector3(SPOT.pond[0] - best.x, 0, SPOT.pond[1] - best.z).normalize(); const P0 = new THREE.Vector3(best.x, hAt(best.x, best.z) + .1, best.z);
-    const ends = [[1, 2.2], [.8, 1.4], [1.15, 1.1]].map(([w, wid]) => fall(P0.clone().addScaledVector(new THREE.Vector3(-out.z, 0, out.x), (wid - 1.6) * .6), out, P0.y - Y.WATER, w, wid, true));
+    const SH = [[.36, 2.2, 0], [-.12, 1.4, .1], [-.3, 1.1, -.08]], H = P0.y - Y.WATER, path = fallPath(P0, out, H, 1, Math.min(...SH.map(([l, w]) => l - w / 2)), Math.max(...SH.map(([l, w]) => l + w / 2)), true);   /* 세 장: 옆 자리 · 폭 · 앞뒤 겹침 */
+    const ends = SH.map(([lat, wid, dz]) => fall(P0, out, H, path, lat, wid, dz, true));
     const q = ends[0]; fallSpots.push(new THREE.Vector3(q.x, Y.WATER + .2, q.z)); WFALL.value.set(q.x, q.z, 1); }   /* 물줄기 끝 = 물보라 · 수면 물거품 자리 */
   { const [ax, az, bx, bz] = SPOT.channel; let ex = ax, ez = az; for (let t = 0; t <= 1; t += .005) { const x = ax + (bx - ax) * t, z = az + (bz - az) * t; if (F.mask(x, z) < .2) break; ex = x; ez = z; }
-    const out = new THREE.Vector3(bx - ax, 0, bz - az).normalize(), P0 = new THREE.Vector3(ex, Y.WATER, ez); for (const [w, wid] of [[1.3, 2], [1, 1.4]]) fall(P0, out, 34, w, wid, false); fallSpots.push(P0.clone().addScaledVector(out, 2).setY(Y.WATER - 26)); }
+    const out = new THREE.Vector3(bx - ax, 0, bz - az).normalize(), P0 = new THREE.Vector3(ex, Y.WATER, ez); const path = fallPath(P0, out, 34, 1.15, -1, 1, false); for (const [lat, wid, dz] of [[0, 2, 0], [.15, 1.4, .1]]) fall(P0, out, 34, path, lat, wid, dz, false);   /* 섬 밖 폭포: 허공 안개 덩어리는 뺌 (부딪힐 곳이 없어서 · 사용자 2026-11-10) — 물줄기가 스스로 흩어짐 */ }
 
   /* ⑬ 안개: 폭포 밑 물보라 · 섬 아래 · 구름 띠 (흐릿한 덩이가 천천히 흘러감) */
   { const L3 = []; for (const s of fallSpots) for (let k = 0; k < 10; k++) L3.push([s.x + (rnd() - .5) * 4.5, s.y + .3 + rnd() * 2.2, s.z + (rnd() - .5) * 4.5, 1.8 + rnd() * 2.4, .9]);   /* 물보라 */
