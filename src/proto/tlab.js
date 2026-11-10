@@ -3,8 +3,8 @@
    색은 절제: 평소엔 은빛 흰색 하나, 고정되면 산호빛 하나, 무지개는 고정되는 순간 한 번 스치는 빛으로만 ("반사"의 순간)
    규칙: 고정은 내 시야(24m) 안에서만 유지 · 시야 밖이나 숲에 숨으면 1.5초 버팀 → 끊김 · 같은 대상 다시 누르거나 빈 곳 누르면 풀림 */
 import * as THREE from 'three';
-import { makeBloom } from '../core/hangar/bloom.js?v=11101325';
-import { makeFlight, FLY, mergeShip, padZone, PADZ } from './flight.js?v=11101325';
+import { makeBloom } from '../core/hangar/bloom.js?v=11101344';
+import { makeFlight, FLY, mergeShip, padZone, PADZ } from './flight.js?v=11101344';
 import { buildShip } from '../core/ships/build.js';
 
 const SIGHT = 24, ISL = 32;

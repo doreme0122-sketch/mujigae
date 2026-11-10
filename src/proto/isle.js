@@ -7,7 +7,7 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { MeshoptSimplifier as MO } from '../../vendor/meshopt_simplifier.module.js';
-import { makeField, Y, SPOT, fbm, noise2, smoothstep } from './islefield.js?v=11101325';
+import { makeField, Y, SPOT, fbm, noise2, smoothstep } from './islefield.js?v=11101344';
 
 const SUN = new THREE.Vector3(-.45, .78, .44).normalize();   /* 왼쪽 위 앞에서 (카메라 쪽 절벽 면이 비스듬히 빛을 받아 결이 드러남) */
 const rngOf = s => () => (s = (s * 16807) % 2147483647) / 2147483647;
@@ -25,7 +25,7 @@ vec3 fogged(vec3 c, vec3 wp){ float k = smoothstep(-16., -64., wp.y); return mix
 `;
 const U = { uSun: { value: SUN }, uT: { value: 0 } };
 
-export async function buildIsle() {
+export async function buildIsle({ K = 1 } = {}) {   /* K: 섬 전체 크기 (기체는 그대로 · 사용자 2026-11-10: 기체에 비해 땅이 너무 큼) */
   await MO.ready;
   const F = makeField(), G = new THREE.Group(), rnd = rngOf(20261110), st = { tris: 0, draws: 0 };
   const X0 = -52, X1 = 52, Z0 = -48, Z1 = 46, S = .34, NX = Math.round((X1 - X0) / S) + 1, NZ = Math.round((Z1 - Z0) / S) + 1;
@@ -95,7 +95,7 @@ export async function buildIsle() {
   const topG = new THREE.BufferGeometry(); topG.setAttribute('position', new THREE.BufferAttribute(pos, 3)); topG.setAttribute('normal', new THREE.BufferAttribute(nrm, 3));
   topG.setAttribute('aW', new THREE.BufferAttribute(W, 4)); topG.setAttribute('aL', new THREE.BufferAttribute(L, 2)); topG.setIndex(new THREE.BufferAttribute(I, 1)); topG.computeBoundingSphere();
   const topM = new THREE.ShaderMaterial({ uniforms: U,
-    vertexShader: `attribute vec4 aW; attribute vec2 aL; varying vec3 vP, vN; varying vec4 vW; varying vec2 vL; void main(){ vP = position; vN = normal; vW = aW; vL = aL; gl_Position = projectionMatrix * viewMatrix * vec4(position, 1.); }`,
+    vertexShader: `attribute vec4 aW; attribute vec2 aL; varying vec3 vP, vN; varying vec4 vW; varying vec2 vL; void main(){ vP = position; vN = normal; vW = aW; vL = aL; gl_Position = projectionMatrix * viewMatrix * modelMatrix * vec4(position, 1.); }`,
     fragmentShader: GL + `varying vec3 vP, vN; varying vec4 vW; varying vec2 vL;
       void main(){ vec3 n = normalize(vN); vec2 q = vP.xz;
         float g1 = fb(q * .07), g2 = fb(q * .42 + 4.), g3 = vn(q * 3.3), g4 = vn(q * 11.);
@@ -126,7 +126,7 @@ export async function buildIsle() {
   const botG = new THREE.BufferGeometry(); botG.setAttribute('position', new THREE.BufferAttribute(bpos, 3)); botG.setIndex(new THREE.BufferAttribute(BI, 1)); botG.computeVertexNormals();
   { const nn = botG.attributes.normal; for (let v = 0; v < NV; v++) { const y = bpos[v * 3 + 1], x = bpos[v * 3], z = bpos[v * 3 + 2]; bL[v] = .55 + .45 * smoothstep(-1, .6, nn.getY(v) * -1 + .3) * (.7 + .3 * noise2(x * .2, z * .2)); } botG.setAttribute('aL', new THREE.BufferAttribute(bL, 1)); }
   const botM = new THREE.ShaderMaterial({ uniforms: U,
-    vertexShader: `attribute float aL; varying vec3 vP, vN; varying float vL; void main(){ vP = position; vN = normal; vL = aL; gl_Position = projectionMatrix * viewMatrix * vec4(position, 1.); }`,
+    vertexShader: `attribute float aL; varying vec3 vP, vN; varying float vL; void main(){ vP = position; vN = normal; vL = aL; gl_Position = projectionMatrix * viewMatrix * modelMatrix * vec4(position, 1.); }`,
     fragmentShader: GL + `varying vec3 vP, vN; varying float vL;
       void main(){ vec3 n = normalize(vN); float band = sin(vP.y * 1.7 + fb(vP.xz * .12) * 6.) * .5 + .5, b2 = sin(vP.y * 5.3 + fb(vP.xz * .4) * 3.) * .5 + .5;
         vec3 rock = mix(vec3(.22, .18, .15), vec3(.46, .40, .33), band) * (.8 + .2 * b2) * (.75 + .4 * fb(vec2(vP.x + vP.z, vP.y) * .6));
@@ -143,7 +143,7 @@ export async function buildIsle() {
     for (let z = Z0; z < Z1; z += WS) for (let x = X0; x < X1; x += WS) { const a = g(x, z), b = g(x + WS, z), c = g(x, z + WS), d = g(x + WS, z + WS); if ([a, b, c, d].every(v => v !== undefined)) wi.push(a, c, b, b, c, d); }
     const wg = new THREE.BufferGeometry(); wg.setAttribute('position', new THREE.Float32BufferAttribute(wp, 3)); wg.setAttribute('aD', new THREE.Float32BufferAttribute(wd, 1)); wg.setIndex(wi);
     const wm = new THREE.ShaderMaterial({ uniforms: U, transparent: true, depthWrite: false,
-      vertexShader: `attribute float aD; varying float vD; varying vec3 vP; void main(){ vD = aD; vP = position; gl_Position = projectionMatrix * viewMatrix * vec4(position, 1.); }`,
+      vertexShader: `attribute float aD; varying float vD; varying vec3 vP; void main(){ vD = aD; vP = position; gl_Position = projectionMatrix * viewMatrix * modelMatrix * vec4(position, 1.); }`,
       fragmentShader: GL + `varying float vD; varying vec3 vP;
         void main(){ vec2 q = vP.xz; float r = fb(q * .9 + vec2(uT * .25, -uT * .18)) + fb(q * 1.7 - vec2(uT * .2, uT * .31)) * .5;
           vec3 c = mix(vec3(.25, .62, .60), vec3(.04, .20, .28), smoothstep(.0, 1.6, vD)) * (.85 + .3 * r);
@@ -157,7 +157,7 @@ export async function buildIsle() {
   const VEG = { v: `attribute vec3 color; attribute float aS; uniform float uT; varying vec3 vC, vN, vP; varying float vS;
       void main(){ vec4 w = instanceMatrix * vec4(position, 1.); float ph = instanceMatrix[3].x * .37 + instanceMatrix[3].z * .23;
         w.xz += vec2(sin(uT * 1.3 + ph + position.y * .4), cos(uT * 1.1 + ph * 1.3)) * .07 * aS * aS * length(instanceMatrix[1].xyz);   /* 바람: 위로 갈수록 */
-        vC = color; vN = normalize(mat3(instanceMatrix) * normal); vP = w.xyz; vS = aS; gl_Position = projectionMatrix * viewMatrix * w; }`,
+        vC = color; vN = normalize(mat3(instanceMatrix) * normal); vP = w.xyz; vS = aS; gl_Position = projectionMatrix * viewMatrix * modelMatrix * w; }`,
     f: GL + `varying vec3 vC, vN, vP; varying float vS;
       void main(){ vec3 n = normalize(vN); vec3 an = abs(n); an /= an.x + an.y + an.z;
         float lf = (vn(vP.zy * 7.) * an.x + vn(vP.xz * 7.) * an.y + vn(vP.xy * 7.) * an.z) * .6 + (vn(vP.zy * 17.) * an.x + vn(vP.xz * 17.) * an.y + vn(vP.xy * 17.) * an.z) * .4;   /* 잎 뭉치 무늬 */
@@ -230,7 +230,7 @@ export async function buildIsle() {
         for (const q of [A, B, C, A, C, D]) { p.push(q.x, q.y, q.z); c.push(...col); s.push(.4); } }
       const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(p, 3)); g.setAttribute('color', new THREE.Float32BufferAttribute(c, 3)); g.setAttribute('aS', new THREE.Float32BufferAttribute(s, 1)); g.computeVertexNormals(); parts.push(g); }
     const g = mergeGeometries(parts.map(q => q.index ? q.toNonIndexed() : q)); const m = new THREE.Mesh(g, new THREE.ShaderMaterial({ uniforms: U, side: THREE.DoubleSide,
-      vertexShader: `attribute vec3 color; attribute float aS; uniform float uT; varying vec3 vC, vN, vP; void main(){ vec3 p = position; p.xz += vec2(sin(uT * .9 + p.x * .3 + p.y * .2), cos(uT * .7 + p.z * .3)) * .05 * aS; vC = color; vN = normal; vP = p; gl_Position = projectionMatrix * viewMatrix * vec4(p, 1.); }`,
+      vertexShader: `attribute vec3 color; attribute float aS; uniform float uT; varying vec3 vC, vN, vP; void main(){ vec3 p = position; p.xz += vec2(sin(uT * .9 + p.x * .3 + p.y * .2), cos(uT * .7 + p.z * .3)) * .05 * aS; vC = color; vN = normal; vP = p; gl_Position = projectionMatrix * viewMatrix * modelMatrix * vec4(p, 1.); }`,
       fragmentShader: GL + `varying vec3 vC, vN, vP; void main(){ vec3 n = normalize(vN); n *= sign(dot(n, uSun) + .3); gl_FragColor = vec4(fogged(lit(vC, n, 1., .9), vP), 1.); }` })); m.name = 'roots'; G.add(m); }
 
   /* ⑪ 다리: 고원 끝에서 돌탑까지 (기체가 그 밑으로 날아 지나감) · 널빤지 하나하나 다르게 · 밧줄 */
@@ -247,13 +247,13 @@ export async function buildIsle() {
       for (let k = 1; k < 12; k++) { const t = k / 12, p = at(t).add(side.clone().multiplyScalar(sd * .76)); parts.push(tube([p, p.clone().add(new THREE.Vector3(0, .85 - Math.sin(t * Math.PI) * .15, 0))], .02, .02, 3, ROPE, 0, 0).toNonIndexed()); }
       for (const E of [A, B]) { const p = E.clone().add(side.clone().multiplyScalar(sd * .8)); parts.push(tube([p.clone().add(new THREE.Vector3(0, -.3, 0)), p.clone().add(new THREE.Vector3(0, 1.15, 0))], .09, .07, 6, WOOD, 0, 0).toNonIndexed()); } }
     const g = mergeGeometries(parts.map(q => { for (const k of Object.keys(q.attributes)) if (!['position', 'normal', 'color', 'aS'].includes(k)) q.deleteAttribute(k); return q; })); g.computeVertexNormals();
-    const m = new THREE.Mesh(g, new THREE.ShaderMaterial({ uniforms: U, vertexShader: `attribute vec3 color; varying vec3 vC, vN, vP; void main(){ vC = color; vN = normal; vP = position; gl_Position = projectionMatrix * viewMatrix * vec4(position, 1.); }`,
+    const m = new THREE.Mesh(g, new THREE.ShaderMaterial({ uniforms: U, vertexShader: `attribute vec3 color; varying vec3 vC, vN, vP; void main(){ vC = color; vN = normal; vP = position; gl_Position = projectionMatrix * viewMatrix * modelMatrix * vec4(position, 1.); }`,
       fragmentShader: GL + `varying vec3 vC, vN, vP; void main(){ vec3 n = normalize(vN); float gr = vn(vec2(vP.x + vP.z, vP.y) * 14.) * .3 + .85; gl_FragColor = vec4(fogged(lit(vC * gr, n, 1., .95), vP), 1.); }` }));
     m.name = 'bridge'; G.add(m); G.userData.bridge = { A, B }; }
 
   /* ⑫ 폭포 두 줄기: 고원에서 연못으로 · 물길 끝에서 섬 밖 안개 속으로 — 물줄기 결이 흘러내리고 아래는 흩어짐 */
   const FX = new THREE.Group(); G.add(FX); const fallM = new THREE.ShaderMaterial({ uniforms: U, transparent: true, depthWrite: false, side: THREE.DoubleSide,
-    vertexShader: `attribute float aV; attribute float aU; varying vec2 vU; varying vec3 vP; void main(){ vU = vec2(aU, aV); vP = position; gl_Position = projectionMatrix * viewMatrix * vec4(position, 1.); }`,
+    vertexShader: `attribute float aV; attribute float aU; varying vec2 vU; varying vec3 vP; void main(){ vU = vec2(aU, aV); vP = position; gl_Position = projectionMatrix * viewMatrix * modelMatrix * vec4(position, 1.); }`,
     fragmentShader: GL + `varying vec2 vU; varying vec3 vP;
       void main(){ float x = vU.x, v = vU.y; float s = vn(vec2(x * 9., v * 1.2 - uT * 2.6)) * .6 + vn(vec2(x * 23., v * 3. - uT * 4.1)) * .4;   /* 흘러내리는 물줄기 결 */
         float edge = smoothstep(0., .18, x) * smoothstep(1., .82, x), a = (.35 + .65 * smoothstep(.3, .8, s)) * edge;
@@ -284,7 +284,7 @@ export async function buildIsle() {
     const m = new THREE.Mesh(g, new THREE.ShaderMaterial({ uniforms: U, transparent: true, depthWrite: false,
       vertexShader: `attribute vec3 iP; attribute vec2 iS; uniform float uT; varying vec2 vU; varying float vA, vS; void main(){ vU = position.xy; vA = iS.y; vS = iS.x;
         vec3 c = iP + vec3(sin(uT * .05 + iP.z) * 2., sin(uT * .3 + iP.x) * .3, cos(uT * .04 + iP.x) * 2.);
-        vec4 mv = viewMatrix * vec4(c, 1.); mv.xy += position.xy * iS.x; gl_Position = projectionMatrix * mv; }`,
+        vec4 mv = viewMatrix * modelMatrix * vec4(c, 1.); mv.xy += position.xy * iS.x * length(modelMatrix[0].xyz); gl_Position = projectionMatrix * mv; }`,
       fragmentShader: GL + `varying vec2 vU; varying float vA, vS; void main(){ float r = length(vU), n = fb(vU * 1.3 + vec2(uT * .03, vS)); float a = smoothstep(1., .2, r) * (.35 + .65 * n) * vA;
         gl_FragColor = vec4(vec3(.86, .92, .97), a * .7); }` })); m.frustumCulled = false; m.renderOrder = 4; FX.add(m); }
 
@@ -295,7 +295,7 @@ export async function buildIsle() {
     for (let k = 0; k < L4.length / 4; k++) g.attributes.position.setXYZ(k, L4[k * 4], L4[k * 4 + 1], L4[k * 4 + 2]);
     const m = new THREE.Points(g, new THREE.ShaderMaterial({ uniforms: { ...U, uPx: { value: 800 } }, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
       vertexShader: `attribute vec4 iP; uniform float uT, uPx; varying float vA, vK; void main(){ float ph = iP.w * 40.; vec3 p = position + vec3(sin(uT * .4 + ph) * .6, sin(uT * .7 + ph * 1.3) * .5, cos(uT * .35 + ph) * .6);
-        vA = .55 + .45 * sin(uT * (1.5 + iP.w * 2.) + ph); vK = iP.w; vec4 mv = viewMatrix * vec4(p, 1.); gl_Position = projectionMatrix * mv; gl_PointSize = uPx * .16 / -mv.z; }`,
+        vA = .55 + .45 * sin(uT * (1.5 + iP.w * 2.) + ph); vK = iP.w; vec4 mv = viewMatrix * modelMatrix * vec4(p, 1.); gl_Position = projectionMatrix * mv; gl_PointSize = uPx * .16 * length(modelMatrix[0].xyz) / -mv.z; }`,
       fragmentShader: `varying float vA, vK; void main(){ vec2 q = gl_PointCoord - .5; float r = dot(q, q); float k = exp(-r * 28.) + exp(-r * 260.) * 1.5;
         vec3 c = mix(vec3(1., .9, .55), vec3(.6, 1., .85), step(.6, vK)); gl_FragColor = vec4(c * k * vA * 1.4, 1.); }` }));
     m.frustumCulled = false; m.renderOrder = 6; m.name = 'motes'; FX.add(m); G.userData.motes = m; }
@@ -309,9 +309,10 @@ export async function buildIsle() {
       vec3 cloud = mix(vec3(.80, .86, .93), vec3(.98, .99, 1.), smoothstep(.55, .85, cl));
       deep = mix(deep, cloud, smoothstep(.48, .62, cl) * smoothstep(-.02, -.25, y));
       c = y > 0. ? c : mix(vec3(.66, .78, .90), deep, smoothstep(0., -.12, y));
-      gl_FragColor = vec4(c, 1.); }` })); sky.renderOrder = -10; sky.frustumCulled = false; sky.name = 'sky'; G.add(sky);
+      gl_FragColor = vec4(c, 1.); }` })); sky.renderOrder = -10; sky.frustumCulled = false; sky.name = 'sky';   /* 하늘은 섬 크기와 상관없이 카메라를 감쌈 (섬 무리에 넣지 않음) */
 
+  G.scale.setScalar(K);   /* 모양 · 무늬 · 안개 높이는 섬 안 좌표로 계산하고 통째로 줄임 → 들꽃 · 잎 무늬까지 같이 작아짐 */
   G.traverse(o => { if (o.isMesh || o.isPoints) { st.draws++; const g = o.geometry, n = (g.index ? g.index.count : g.attributes.position.count) / 3; st.tris += o.isInstancedMesh ? n * o.count : o.isPoints ? 0 : (g.instanceCount ? n * g.instanceCount : n); } });
   st.ground = { full: fullT, kept: I.length / 3, bottom: BI.length / 3 }; st.trees = trees.length; st.bushes = bushes.length;
-  return { group: G, field: F, H: hAt, stats: st, sky, setPx: px => { G.userData.motes.material.uniforms.uPx.value = px; }, update: t => { U.uT.value = t; } };
+  return { group: G, K, field: F, H: (x, z) => hAt(x / K, z / K) * K, mask: (x, z) => F.mask(x / K, z / K) * K, blocked: (x, z) => F.blocked(x / K, z / K), stats: st, sky, setPx: px => { G.userData.motes.material.uniforms.uPx.value = px; }, update: t => { U.uT.value = t; } };
 }

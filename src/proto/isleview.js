@@ -2,12 +2,12 @@
    · 카메라 · 화면 밝기 처리 · 기체 · 조종은 새 맵(map2)과 같은 것 · 섬만 새것 */
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
-import { makeBloom } from '../core/hangar/bloom.js?v=11101325';
-import { makeForgeShip, forgeList } from './forgeship.js?v=11101325';
-import { makePerf } from './perf.js?v=11101325';
-import { makeFlight, FLY, padZone } from './flight.js?v=11101325';
-import { buildIsle } from './isle.js?v=11101325';
-import { Y } from './islefield.js?v=11101325';
+import { makeBloom } from '../core/hangar/bloom.js?v=11101344';
+import { makeForgeShip, forgeList } from './forgeship.js?v=11101344';
+import { makePerf } from './perf.js?v=11101344';
+import { makeFlight, FLY, padZone } from './flight.js?v=11101344';
+import { buildIsle } from './isle.js?v=11101344';
+import { Y } from './islefield.js?v=11101344';
 
 const $ = s => document.querySelector(s);
 export async function start(canvas, onProgress = () => {}) {
@@ -16,7 +16,11 @@ export async function start(canvas, onProgress = () => {}) {
   const scene = new THREE.Scene(), camera = new THREE.PerspectiveCamera(20, 1, .5, 2000), bloom = makeBloom(renderer, { samples: 0 });
   { const pm = new THREE.PMREMGenerator(renderer); scene.environment = pm.fromScene(new RoomEnvironment(), .04).texture; scene.environmentIntensity = .7; pm.dispose(); }
   onProgress(.1); await new Promise(r => setTimeout(r, 30));
-  const t0 = performance.now(), isle = await buildIsle(); scene.add(isle.group); console.log('[초원 섬]', JSON.stringify(isle.stats), Math.round(performance.now() - t0) + 'ms');
+  const KS = [1, .7, .5], K = KS.includes(+new URLSearchParams(location.search).get('k')) ? +new URLSearchParams(location.search).get('k') : .7;   /* 섬 크기 비교 (사용자 2026-11-10) */
+  const t0 = performance.now(), isle = await buildIsle({ K }); scene.add(isle.group, isle.sky);
+  { const box = $('#view'); if (box) { const cap = document.createElement('div'); cap.className = 'cap'; cap.textContent = '섬 크기 (기체는 그대로)'; const seg = document.createElement('div'); seg.className = 'seg';
+      for (const k of KS) { const b = document.createElement('button'); b.type = 'button'; b.textContent = k === 1 ? '처음 크기' : k + '배'; if (k === K) b.className = 'on'; b.onclick = () => { const u = new URL(location.href); u.searchParams.set('k', k); location.href = u.href; }; seg.append(b); }
+      box.insertBefore(seg, box.children[1]); box.insertBefore(cap, seg); } } console.log('[초원 섬]', JSON.stringify(isle.stats), Math.round(performance.now() - t0) + 'ms');
   onProgress(.55);
 
   /* 기체: 스킨 고르기 (새 맵과 같은 기억 자리) */
@@ -24,8 +28,8 @@ export async function start(canvas, onProgress = () => {}) {
   const FG = await makeForgeShip(renderer, camera, Math.max(0, SKINS.findIndex(s => s.id === skinId)));
   { const sel = $('#skin'); if (sel) { for (const k of SKINS) { const o = document.createElement('option'); o.value = k.id; o.textContent = k.name; o.selected = k.id === FG.C.id; sel.append(o); }
       sel.onchange = () => { try { localStorage.setItem('mj-skin', sel.value); } catch (e) {} location.reload(); }; } }
-  const F = isle.field, B = { blocked: (x, z) => Math.hypot(x, z) > 78 || F.blocked(x, z), region: () => 0 };
-  const START = [2, 30];
+  const B = { blocked: (x, z) => Math.hypot(x, z) > 78 * K || isle.blocked(x, z), region: () => 0 };
+  const START = [2 * K, 30 * K];
   const fly = await makeFlight(renderer, B, START, 0, FG); scene.add(fly); const FS = fly.userData.S; fly.userData.respawn(START[0], START[1], 0);
   onProgress(.85);
   /* 가려진 기체: 고원·돌탑 뒤에 숨으면 가려진 부분만 은은한 빛 윤곽 (새 맵과 같은 것) */
@@ -72,8 +76,8 @@ export async function start(canvas, onProgress = () => {}) {
     camD += (cfg.dist * CAMK - camD) * Math.min(1, dt * 2);
     const a = cfg.ang * Math.PI / 180, vx = cam.x + look.x, vz = cam.z + look.z, cy = FLY.HOVER; camera.position.set(vx, cy + camD * Math.sin(a), vz + camD * Math.cos(a)); camera.lookAt(vx, cy, vz); camera.updateMatrixWorld();
     isle.sky.position.copy(camera.position); isle.update(t); xrayM.uniforms.uT.value = t;
-    { const gh = isle.H(FS.x, FS.z), inIsle = F.mask(FS.x, FS.z) > 0, d = FLY.HOVER - gh; shadow.visible = inIsle; shadow.position.set(FS.x + .4, gh + .06, FS.z + .3); const s = 2.2 + d * .12; shadow.scale.set(s, 1, s); shadow.rotation.y = FS.head; shU.uA.value = .5 * Math.exp(-d * .05);
-      say.textContent = !inIsle ? '섬 밖 · 아래는 구름 바다' : gh > Y.FLY - 1.2 ? '고원에 막힘' : `땅까지 ${d.toFixed(1)}m 아래` + (gh < Y.MEADOW - 2.5 ? ' · 낮은 단' : ''); }
+    { const gh = isle.H(FS.x, FS.z), inIsle = isle.mask(FS.x, FS.z) > 0, d = FLY.HOVER - gh; shadow.visible = inIsle; shadow.position.set(FS.x + .4, gh + .06, FS.z + .3); const s = 2.2 + d * .12; shadow.scale.set(s, 1, s); shadow.rotation.y = FS.head; shU.uA.value = .5 * Math.exp(-d * .05);
+      say.textContent = !inIsle ? '섬 밖 · 아래는 구름 바다' : isle.blocked(FS.x, FS.z) ? '고원에 막힘' : `땅까지 ${d.toFixed(1)}m 아래` + (gh < (Y.MEADOW - 2.5) * K ? ' · 낮은 단' : ''); }
     FG.preRender(camera);
     const c1 = performance.now(); renderer.setRenderTarget(bloom.scene); renderer.clear(); renderer.render(scene, camera); acc.calls = renderer.info.render.calls; acc.tris = renderer.info.render.triangles;
     bloom.render(Wd, Hd, !perf.st.bloom); perf.tick(dt);
