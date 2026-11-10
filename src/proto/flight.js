@@ -11,9 +11,9 @@
 import * as THREE from 'three';
 import { buildShip, engineSpots } from '../core/ships/build.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { flameMesh } from './sortie.js?v=11101055';
-import { MAP } from './mapfloor.js?v=11101055';
-import { applyShipHeat, heatVis } from './shipheat.js?v=11101055';
+import { flameMesh } from './sortie.js?v=11101146';
+import { MAP } from './mapfloor.js?v=11101146';
+import { applyShipHeat, heatVis } from './shipheat.js?v=11101146';
 
 export const FLY = { LEN: 2, HOVER: .7, R: .8, SPEEDS: [9, 12, 15, 18], TURN: 7, ACC: .22, TURNMAX: 9,
   BASE: 9, SHIELD: 3, BOOST: 5, BOOSTK: 1.5 };   /* 기지 고리(반지름 9m)를 벗어나는 순간: 보호막 3초 · 가속 5초(1.5배) — 기지 출구 앞 매복에 바로 당하지 않게 */
@@ -123,6 +123,10 @@ void main() {
   G.userData.S = S;
   G.userData.reset = () => { S.x = start[0]; S.z = start[1]; S.vx = S.vz = 0; S.head = S.mh = face; hist.length = 0; S.armed = true; S.shield = S.boost = S.pop = 0; };
   G.userData.moveTo = (x, z, h) => { S.x = x; S.z = z; S.vx = S.vz = 0; if (h != null) S.head = S.mh = h; hist.length = 0; S.armed = false; };   /* 시험장: 다른 자리로 옮김 (꼬리 자국은 지움) */
+  /* 다시 태어날 때: 움직임 상태를 전부 처음으로 (사용자 2026-11-10: 자리만 새로 정하고 기울기·미는 힘 같은 값은 그대로 두어, 한 번 깨진 값이 다시 태어나도 남아 기체가 안 보였음) */
+  G.userData.respawn = (x, z, h) => { Object.assign(S, { x, z, vx: 0, vz: 0, head: h, mh: h, aim: null, aimK: 0, bank: 0, thr: 0, hit: 0, armed: true, shield: 0, boost: 0, pop: 0, tacc: 0, rc: 0, turning: false,
+      brakeUntil: 0, dashUntil: 0, dashOn: false, dashVx: 0, dashVz: 0, dashEndK: 1, stunUntil: 0, shake: 0, ex: 0, ez: 0, goo: 0, extraSlow: 0, heatV: 0, heatFlash: 0 });
+    inp.x = inp.y = 0; hist.length = 0; SP.forEach(q => { q.l = 0; }); ghost = ghostT = 0; uGhost.value = 0; };
   G.userData.setPx = px => { sparks.material.uniforms.uPx.value = px; };
   G.userData.update = (t, dt) => {
     let ix = inp.x, iy = inp.y;

@@ -5,18 +5,18 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
-import { makeBloom } from '../core/hangar/bloom.js?v=11101055';
-import { makePad } from '../core/hangar/pad.js?v=11101055';
-import { makeMag } from '../core/hangar/mag.js?v=11101055';
-import { makeForgeShip, forgeList } from './forgeship.js?v=11101055';
-import { makeGoldStar } from './goldstar.js?v=11101055';
-import { makeArena, SPEED, WAVE_R0 } from './arena.js?v=11101055';
-import { makeGuardians, GUARD } from './guardian.js?v=11101055';
-import { makeBirth, BIRTH } from './birth.js?v=11101055';
-import { makePerf } from './perf.js?v=11101055';
-import { autoMerge } from './automerge.js?v=11101055';
+import { makeBloom } from '../core/hangar/bloom.js?v=11101146';
+import { makePad } from '../core/hangar/pad.js?v=11101146';
+import { makeMag } from '../core/hangar/mag.js?v=11101146';
+import { makeForgeShip, forgeList } from './forgeship.js?v=11101146';
+import { makeGoldStar } from './goldstar.js?v=11101146';
+import { makeArena, SPEED, WAVE_R0 } from './arena.js?v=11101146';
+import { makeGuardians, GUARD } from './guardian.js?v=11101146';
+import { makeBirth, BIRTH } from './birth.js?v=11101146';
+import { makePerf } from './perf.js?v=11101146';
+import { autoMerge } from './automerge.js?v=11101146';
 import { makeGlow } from '../preview/glow.js';
-import { makeFlight, FLY, PADZ, padZone } from './flight.js?v=11101055';
+import { makeFlight, FLY, PADZ, padZone } from './flight.js?v=11101146';
 
 const $ = s => document.querySelector(s), clamp = THREE.MathUtils.clamp, HOVER = FLY.HOVER;
 const R = 240, NB = 10, GAPH = 5.6, BASE_D = 0;     /* 맵 반지름 · 기지 수 · 벽 틈 반 폭(= 기지 반지름) · 기지 가운데는 벽 선 위 (앞 절반은 맵 안, 뒤 절반은 맵 밖 · 사용자 2026-11-06) */
@@ -170,8 +170,7 @@ export async function start(canvas, onProgress = () => {}) {
   const shock = new THREE.Mesh(new THREE.CircleGeometry(3, 96), shockM); shock.renderOrder = 9; shock.visible = false; scene.add(shock); let shockT = 9;
   const launch = t => { bship.updateMatrixWorld(true); const p = new THREE.Vector3(), q = new THREE.Quaternion(); bship.getWorldPosition(p); bship.getWorldQuaternion(q); birth.userData.stop();
     const yaw = new THREE.Euler().setFromQuaternion(q, 'YXZ').y;   /* 판 위에 있던 그대로의 자리 · 높이 · 방향에서 이어 몬다 */
-    fly.add(bship); bship.scale.setScalar(S0); bship.visible = true; fly.userData.moveTo(p.x, p.z, yaw); fly.position.y = p.y - HOVER; flyY = fly.position.y; fly.visible = true; flying = true;
-    FS.armed = true; FS.vx = FS.vz = 0; };   /* 기지 고리 9m를 벗어나면 보호막 3초 · 가속 5초 */
+    fly.add(bship); bship.scale.setScalar(S0); bship.visible = true; fly.userData.respawn(p.x, p.z, yaw); fly.position.y = p.y - HOVER; flyY = fly.position.y; fly.visible = true; flying = true; };   /* 기지 고리 9m를 벗어나면 보호막 3초 · 가속 5초 */
   /* ── 죽음 → 기다림 → 다시 태어남 (사용자 2026-11-07):
         죽는 순간 그 자리에 카메라가 머물고 화면이 살짝 어두워짐 · 기다리는 동안 둘러보기로 맵을 자유롭게 봄
         기다리는 시간 = 5초 + 레벨당 1초 (최대 20초 · 이미 정한 규칙) · 태어나는 순서(탑 → 빛 물결 → 금테 별 → 유성)가 시작될 때 카메라가 태어나는 곳으로 바로 넘어감 */
@@ -217,7 +216,7 @@ export async function start(canvas, onProgress = () => {}) {
   addEventListener('pointermove', e => { if (e.pointerId !== look.id) return; const now = performance.now(), dx = e.clientX - look.px, dy = e.clientY - look.py, sp = Math.hypot(dx, dy) / Math.max(1, now - look.pt) * 1000;
     const r = canvas.getBoundingClientRect(), mpp = 2 * camD * Math.tan(camera.fov * Math.PI / 360) / Math.max(1, r.height), fast = 1 + Math.min(2.5, sp / 900), a = cfg.ang * Math.PI / 180;
     look.x -= dx * mpp * fast; look.z -= dy * mpp * fast / Math.max(.35, Math.sin(a)); const l = Math.hypot(look.x, look.z); if (l > 160) { look.x *= 160 / l; look.z *= 160 / l; }
-    look.px = e.clientX; look.py = e.clientY; look.pt = now; });
+    look.px = e.clientX; look.py = e.clientY; look.pt = now; chk('둘러보기 끌기', `dx ${dx} dy ${dy} 한 칸 ${mpp.toFixed(3)} 빠르기 ${fast.toFixed(2)}`); });
   const lookUp = e => { if (e.pointerId === look.id) look.id = null; zoneHit(null, false); }; addEventListener('pointerup', lookUp); addEventListener('pointercancel', lookUp);
 
   /* ── 쏘기: 버튼을 누르고 있거나 스페이스 ── */
@@ -269,16 +268,29 @@ export async function start(canvas, onProgress = () => {}) {
     wake(.6); for (let ts = 0; ts < launchAt + 1.5; ts += .08) { baseStep(ts, .08); for (const A of AMS) A.watch(); }
     birth.userData.stop(); let saved = 0; for (const A of AMS) saved += A.merge().saved; console.log('[새 맵] 미리 합친 부품', saved); }
   wake(.6);
+  /* 깨진 숫자 찾기 (사용자 2026-11-10: 태어날 때 기체가 안 보이고 화면이 빈 채 '한가운데까지 NaNm' — 여기 시험기에선 안 생겨 폰에서 원인을 봐야 함)
+     · 고치거나 가리지 않음: 숫자가 처음 깨진 순간 어디서 · 무엇이 · 그때 상태를 화면 아래에 글자로 남겨 둠 (사진 찍어 보내면 원인을 바로 앎) */
+  const BAD = { el: null, prev: '' }, fin = v => typeof v !== 'number' || Number.isFinite(v);
+  const snap = () => `t ${t.toFixed(2)} · 날기 ${flying ? 1 : 0} · 태어남 ${born ? 1 : 0} · 죽음 ${dead ? 1 : 0} · 둘러보기 ${look.x.toFixed(1)},${look.z.toFixed(1)}(${look.id === null ? '뗌' : '누름'}) · 카메라거리 ${camD.toFixed(1)} · 기체 ${FS.x.toFixed(1)},${FS.z.toFixed(1)} 속도 ${FS.vx.toFixed(1)},${FS.vz.toFixed(1)} 방향 ${FS.head.toFixed(2)}`;
+  const chk = (where, extra = '') => { if (BAD.el) return;
+    const bad = []; for (const [k, v] of Object.entries(FS)) if (!fin(v)) bad.push('기체.' + k);
+    const V = { '판 위 기체 자리': bship.position, '판 위 기체 돌기': bship.quaternion, '판 위 기체 크기': bship.scale, '받침': stand.position, '나는 몸': fly.position, '카메라': camera.position };
+    for (const [k, v] of Object.entries(V)) if (!fin(v.x) || !fin(v.y) || !fin(v.z) || (v.w !== undefined && !fin(v.w))) bad.push(k);
+    for (const [k, v] of Object.entries({ '둘러보기x': look.x, '둘러보기z': look.z, '카메라 따라감x': cam.x, '카메라 따라감z': cam.z, '카메라 거리': camD, '시간': t })) if (!fin(v)) bad.push(k);
+    if (!bad.length) { BAD.prev = snap(); return; }
+    BAD.el = document.createElement('div'); BAD.el.style.cssText = 'position:fixed;left:8px;right:8px;bottom:calc(env(safe-area-inset-bottom,0px) + 8px);z-index:99;pointer-events:none;font:11px/1.45 monospace;color:#fff;background:rgba(150,10,30,.85);border-radius:8px;padding:6px 9px;white-space:pre-wrap';
+    BAD.el.textContent = `숫자 깨짐 · 처음 깨진 곳: ${where}${extra ? ' (' + extra + ')' : ''}\n깨진 것: ${bad.join(', ')}\n바로 전 장면: ${BAD.prev}`; document.body.appendChild(BAD.el); console.error('[숫자 깨짐]', BAD.el.textContent); };
   const CPU = { a: 0, b: 0, n: 0, tt: 0, el: null };   /* 폰 무게 재기: 한 장면에서 계산(움직임·판정) 시간 · 그리기 명령 시간 */
   renderer.setAnimationLoop(now => { try { const c0 = performance.now();
     const dt = clamp((now - last) / 1000, 0, .05); last = now; t += dt;
     /* 기지들 */
-    baseStep(t, dt);
-    if (dead && t >= reviveAt) revive();
-    if (!flying && t >= launchAt) launch(t);
+    chk('장면 시작', 'dt ' + dt);
+    baseStep(t, dt); chk('기지·태어나기');
+    if (dead && t >= reviveAt) { revive(); chk('다시 태어나기'); }
+    if (!flying && t >= launchAt) { launch(t); chk('튀어 나가기'); }
     if (look.id === null) { const k = Math.min(1, dt * 3.5); look.x -= look.x * k; look.z -= look.z * k; }   /* 손 떼면 돌아옴 */
     /* 기체 */
-    if (flying) { fly.position.y = flyY; fly.updateMatrixWorld(true); fly.userData.update(t, dt); for (const o of oldSh) o.visible = false; }
+    if (flying) { fly.position.y = flyY; fly.updateMatrixWorld(true); fly.userData.update(t, dt); for (const o of oldSh) o.visible = false; chk('기체 몰기'); }
     zoneTick();
     FG.step(dt, t, { moving: flying && Math.hypot(FS.vx, FS.vz) > 1.5, fire: flying && fireOn });   /* 기체 움직임: 날면 무빙 자세(날개짓 빨라짐) · 쏘면 입을 벌림 */
     { const sp = flying ? bship.getWorldPosition(v3) : v3.set(cam.x, cam.y, cam.z); sight.position.set(sp.x, sp.y - .2, sp.z); sightU.uOn.value += ((flying || dead ? 1 : 0) - sightU.uOn.value) * Math.min(1, dt * 1.5); sightU.uT.value = t; }
@@ -302,6 +314,7 @@ export async function start(canvas, onProgress = () => {}) {
     { const r = Math.hypot(FS.x, FS.z); say.textContent = dead ? `다시 태어나기까지 ${Math.max(1, Math.ceil(reviveAt - t))}초` : !flying ? '태어나는 중' : baseAt(FS.x, FS.z) ? '태어나는 곳 · 출구로 나가면 맵 안' : '새 하늘 맵 · 한가운데까지 ' + Math.round(r) + 'm'; }
     /* 별똥별이 꽂힐 때 공간 일그러짐 충격파 (시작 기지와 같은 효과) */
     if (WARP.s > 0) { B0.w.localToWorld(v3.set(0, .2, 0)); v3.project(camera); bloom.warp(v3.x * .5 + .5, v3.y * .5 + .5, WARP.r, WARP.s, Wd / Hd); } else bloom.warp(.5, .5, 0, 0, Wd / Hd);
+    chk('카메라');
     FG.preRender(camera);   /* 기체 불빛 방향 · 빛 덩이 자리 */
     const c1 = performance.now(); renderer.setRenderTarget(bloom.scene); renderer.clear(); renderer.render(scene, camera); CPU.calls = renderer.info.render.calls;
     bloom.render(Wd, Hd, !perf.st.bloom); perf.tick(dt);
