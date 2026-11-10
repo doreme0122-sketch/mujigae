@@ -2,11 +2,11 @@
    · 카메라 · 화면 밝기 처리 · 기체 · 조종은 새 맵(map2)과 같은 것 · 섬만 새것 */
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
-import { makeBloom } from '../core/hangar/bloom.js?v=11101601';
-import { makeForgeShip, forgeList } from './forgeship.js?v=11101601';
-import { makePerf } from './perf.js?v=11101601';
-import { makeFlight, FLY, padZone } from './flight.js?v=11101601';
-import { buildIsle } from './isle.js?v=11101601';
+import { makeBloom } from '../core/hangar/bloom.js?v=11101615';
+import { makeForgeShip, forgeList } from './forgeship.js?v=11101615';
+import { makePerf } from './perf.js?v=11101615';
+import { makeFlight, FLY, padZone } from './flight.js?v=11101615';
+import { buildIsle } from './isle.js?v=11101615';
 
 const $ = s => document.querySelector(s);
 export async function start(canvas, onProgress = () => {}) {
