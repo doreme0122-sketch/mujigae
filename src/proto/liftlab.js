@@ -6,10 +6,10 @@
    기체는 1층 → 2층 → 3층 → 2층 → 1층을 쉬어 가며 되풀이 · 카메라는 게임처럼 기체 높이를 따라감 */
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
-import { makeBloom } from '../core/hangar/bloom.js?v=11102130';
-import { makePerf } from './perf.js?v=11102130';
-import { makeForgeShip, forgeList } from './forgeship.js?v=11102130';
-import { SUN, reedBush, vegShader } from './flora.js?v=11102130';
+import { makeBloom } from '../core/hangar/bloom.js?v=11102135';
+import { makePerf } from './perf.js?v=11102135';
+import { makeForgeShip, forgeList } from './forgeship.js?v=11102135';
+import { SUN, reedBush, vegShader } from './flora.js?v=11102135';
 
 const $ = s => document.querySelector(s);
 const hash2 = (i, j) => { let h = (i * 374761393 + j * 668265263) | 0; h = (h ^ (h >>> 13)) * 1274126177 | 0; return ((h ^ (h >>> 16)) >>> 0) / 4294967296; };
@@ -44,16 +44,15 @@ function Streaks(scene, N) {
   g.setAttribute('position', new THREE.Float32BufferAttribute(P, 3)); g.setIndex(I);
   const iA = new THREE.InstancedBufferAttribute(new Float32Array(N * 4), 4), iB = new THREE.InstancedBufferAttribute(new Float32Array(N * 4), 4), iC = new THREE.InstancedBufferAttribute(new Float32Array(N * 2), 2); [iA, iB, iC].forEach(a => a.setUsage(THREE.DynamicDrawUsage));
   g.setAttribute('iA', iA); g.setAttribute('iB', iB); g.setAttribute('iC', iC); g.instanceCount = 0;   /* iA: 아래 끝 x, y, z · 길이  /  iB: 굵기 · 밝기 · 나이(0~1) · 흐름(+1 아래로 흘러 보임 · −1 위로)  /  iC: 씨앗 · 미끄러지는 빠르기 */
-  const u = { uT: { value: 0 } };
-  const m = new THREE.Mesh(g, new THREE.ShaderMaterial({ uniforms: u, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
-    vertexShader: `attribute vec4 iA, iB; attribute vec2 iC; uniform float uT; varying vec2 vQ; varying float vB, vV, vAg, vF, vS, vSp, vL;
+  const m = new THREE.Mesh(g, new THREE.ShaderMaterial({ transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
+    vertexShader: `attribute vec4 iA, iB; attribute vec2 iC; varying vec2 vQ; varying float vB, vV, vAg, vS, vSp, vL;
       void main(){ float v = position.y, taper = pow(sin(v * 3.14159), .55);                                           /* 양 끝이 가늘게 */
         vec3 w = iA.xyz + vec3(0., v * iA.w, 0.); vec3 side = normalize(cross(vec3(0., 1., 0.), cameraPosition - w));   /* 세로축은 그대로 두고 카메라 쪽으로 돌림 */
         w += side * position.x * iB.x * (1.6 + 1.4 * taper);   /* 번짐까지 담는 폭 · 곧은 직선 (사용자 2026-11-10: 흔들림 때문에 휘어 보임 → 뺌) */
         float ag = clamp(iB.z, 0., 1.);
-        vB = iB.y * smoothstep(0., .06, ag) * pow(1. - ag, 1.3) * taper; vV = iB.w > 0. ? v : 1. - v; vAg = ag; vF = iB.w; vS = iC.x; vSp = iC.y; vL = iA.w;   /* vV: 0 = 머리(흘러가는 쪽 끝 · 아래로 흐르면 아래 끝) → 1 = 꼬리 */
+        vB = iB.y * smoothstep(0., .06, ag) * pow(1. - ag, 1.3) * taper; vV = iB.w > 0. ? v : 1. - v; vAg = ag; vS = iC.x; vSp = iC.y; vL = iA.w;   /* vV: 0 = 머리(흘러가는 쪽 끝 · 아래로 흐르면 아래 끝) → 1 = 꼬리 */
         vQ = vec2(position.x * (1.6 + 1.4 * taper), v); gl_Position = projectionMatrix * viewMatrix * vec4(w, 1.); }`,
-    fragmentShader: `varying vec2 vQ; varying float vB, vV, vAg, vF, vS, vSp, vL;
+    fragmentShader: `varying vec2 vQ; varying float vB, vV, vAg, vS, vSp, vL;
       float h(float x){ return fract(sin(x * 127.1) * 43758.55); }
       float vn1(float x){ float i = floor(x), f = fract(x); f = f * f * (3. - 2. * f); return mix(h(i), h(i + 1.), f); }
       void main(){ float u = vQ.x, s = vV;
@@ -68,7 +67,7 @@ function Streaks(scene, N) {
   const L = [];
   return {
     emit(o) { if (L.length >= N) L.shift(); L.push({ ...o, age: 0 }); },
-    update(dt, t) { u.uT.value = t; let n = 0; for (let i = L.length - 1; i >= 0; i--) { L[i].age += dt; if (L[i].age >= L[i].life) L.splice(i, 1); }
+    update(dt) { let n = 0; for (let i = L.length - 1; i >= 0; i--) { L[i].age += dt; if (L[i].age >= L[i].life) L.splice(i, 1); }
       for (const q of L) { iA.array.set([q.x, q.y, q.z, q.len], n * 4); iB.array.set([q.w, q.b, q.age / q.life, q.flow], n * 4); iC.array.set([q.seed, q.sp], n * 2); n++; }
       g.instanceCount = n; iA.needsUpdate = iB.needsUpdate = iC.needsUpdate = true; } }; }
 
@@ -106,8 +105,8 @@ export async function start(canvas, onProgress = () => {}) {
      · 센 첫 물결 + 뒤따르는 약한 물결 둘 (운석과 같은 모양) · 물마루에서 빛이 살짝 갈라지고 밝아짐 */
   FG.root.traverse(o => o.layers.set(1));
   const rtW = new THREE.WebGLRenderTarget(2, 2, { type: THREE.HalfFloatType, depthTexture: new THREE.DepthTexture(2, 2) });
-  const lensU = { tC: { value: rtW.texture }, tD: { value: rtW.depthTexture }, uS: { value: new THREE.Vector4(.5, .5, .1, .1) }, uK: { value: 0 }, uAsp: { value: 1 } };
-  const lensQ = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), new THREE.RawShaderMaterial({ glslVersion: THREE.GLSL3, uniforms: lensU, depthTest: true, depthWrite: true, depthFunc: THREE.AlwaysDepth,
+  const shockU = { tC: { value: rtW.texture }, tD: { value: rtW.depthTexture }, uS: { value: new THREE.Vector4(.5, .5, .1, .1) }, uK: { value: 0 }, uAsp: { value: 1 } };
+  const shockQ = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), new THREE.RawShaderMaterial({ glslVersion: THREE.GLSL3, uniforms: shockU, depthTest: true, depthWrite: true, depthFunc: THREE.AlwaysDepth,
     vertexShader: 'in vec3 position; in vec2 uv; out vec2 vU; void main(){ vU = uv; gl_Position = vec4(position.xy, 0., 1.); }',
     fragmentShader: `precision highp float; precision highp sampler2D; in vec2 vU; out vec4 o; uniform sampler2D tC, tD; uniform vec4 uS; uniform float uK, uAsp;
       float g(float x, float c, float s){ return exp(-((x - c) / s) * ((x - c) / s)); }
@@ -119,9 +118,9 @@ export async function start(canvas, onProgress = () => {}) {
           c = vec3(texture(tC, uv + dir * ca * .02).r, texture(tC, uv).g, texture(tC, uv - dir * ca * .02).b) * (1. + .3 * max(w, 0.) * uK); }
         else c = texture(tC, uv).rgb;
         o = vec4(c, 1.); gl_FragDepth = texture(tD, vU).r; }` }));
-  lensQ.frustumCulled = false; const lensS = new THREE.Scene(); lensS.add(lensQ); const lensC = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+  shockQ.frustumCulled = false; const shockS = new THREE.Scene(); shockS.add(shockQ); const shockC = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
   /* 단추: 시점 · 천천히 보기 */
-  const cfg = { ang: 45, dist: 25, side: false, slow: 1, yaw: .9 };
+  const cfg = { ang: 45, dist: 25, side: false, slow: 1 };
   { const box = document.createElement('div'); box.style.cssText = 'position:absolute;left:50%;transform:translateX(-50%);bottom:calc(env(safe-area-inset-bottom,0px) + 12px);display:flex;gap:6px;align-items:center;max-width:calc(100% - 32px)';
     const view = document.createElement('button'); view.type = 'button'; view.textContent = '옆에서 보기'; view.style.cssText = 'font-size:11px;padding:4px 10px;border:1px solid rgba(185,255,74,.3);border-radius:10px;color:#eaffd2;background:rgba(4,10,6,.5)';
     view.onclick = () => { cfg.side = !cfg.side; view.textContent = cfg.side ? '게임 시점' : '옆에서 보기'; };
@@ -150,10 +149,10 @@ export async function start(canvas, onProgress = () => {}) {
       for (; k > 0; k--) { const a = rnd() * 6.283, near = rnd(), r = .75 + near * 1.6, len = (2.6 - near * 1.1) * (.8 + rnd() * .5);
         SK.emit({ x: M.x + Math.cos(a) * r, y: M.y + M.dir * (rnd() * 2.4) - len * .5, z: M.z + Math.sin(a) * r, len, w: .06 - near * .03 + rnd() * .012, b: (1.5 - near * .9) * (.8 + rnd() * .4), flow: M.dir, life: left * (.85 + rnd() * .15), seed: rnd(), sp: 1.8 - near * 1.1 + rnd() * .4 }); } }
     else M.burst = false;
-    SK.update(dt, t);
+    SK.update(dt);
     M.shock += dt;
     /* 기체: 그 자리에서 곧게 오르내림 · 기수만 듦/숙임 */
-    const e = M.f < 1 ? Math.sin(M.f * Math.PI) : 0; FG.root.position.set(M.x, M.y, M.z); FG.root.rotation.set(0, cfg.yaw, 0); FG.root.rotateX(M.dir * .52 * e);   /* 오를 땐 기수를 듦 · 내릴 땐 숙임 (옆에서 확인) */
+    const e = M.f < 1 ? Math.sin(M.f * Math.PI) : 0; FG.root.position.set(M.x, M.y, M.z); FG.root.rotation.set(0, .9, 0); FG.root.rotateX(M.dir * .52 * e);   /* 오를 땐 기수를 듦 · 내릴 땐 숙임 (옆에서 확인) */
     FG.step(dt, t, { moving: false, fire: false });
     shU.uS.value.set(M.x + .5, M.z + .4, M.y);
     /* 카메라: 게임처럼 기체 높이를 따라감 (옆에서 보기는 높이 변화를 보이게 고정) */
@@ -163,12 +162,12 @@ export async function start(canvas, onProgress = () => {}) {
     if (say) say.textContent = `${M.L + 1}층${M.f < 1 ? (M.dir > 0 ? ' → 올라가는 중' : ' → 내려가는 중') : ''}`;
     /* 충격파를 화면 마무리에: 떠난 높이의 수평 고리 → 화면에서 납작한 타원 (가로 · 세로 반지름을 따로 잼) · 0.45초에 약 3m까지 퍼지며 사라짐 */
     { const k = M.shock / .45; if (k < 1) { const e = 1 - Math.pow(1 - k, 3), rw = .3 + 2.7 * e, c = new THREE.Vector3(M.x, M.sy, M.z).project(camera), px = new THREE.Vector3(M.x + rw, M.sy, M.z).project(camera), pz = new THREE.Vector3(M.x, M.sy, M.z + rw).project(camera);
-        lensU.uS.value.set(c.x * .5 + .5, c.y * .5 + .5, Math.abs(px.x - c.x) * .5, Math.max(Math.abs(pz.y - c.y) * .5, .25 * Math.abs(px.x - c.x) * .5)); lensU.uK.value = Math.pow(1 - k, 1.6) * Math.min(1, k * 12); }
-      else lensU.uK.value = 0; lensU.uAsp.value = Wd / Hd; }
+        shockU.uS.value.set(c.x * .5 + .5, c.y * .5 + .5, Math.abs(px.x - c.x) * .5, Math.max(Math.abs(pz.y - c.y) * .5, .25 * Math.abs(px.x - c.x) * .5)); shockU.uK.value = Math.pow(1 - k, 1.6) * Math.min(1, k * 12); }
+      else shockU.uK.value = 0; shockU.uAsp.value = Wd / Hd; }
     FG.preRender(camera);
     camera.layers.set(0); renderer.setRenderTarget(rtW); renderer.clear(); renderer.render(scene, camera);                    /* ① 기체를 뺀 풍경 */
-    renderer.setRenderTarget(bloom.scene); renderer.clear(); renderer.render(lensS, lensC);                                   /* ② 기체 둘레만 휘게 옮겨 그림 (깊이 포함) */
+    renderer.setRenderTarget(bloom.scene); renderer.clear(); renderer.render(shockS, shockC);                                   /* ② 기체 둘레만 휘게 옮겨 그림 (깊이 포함) */
     camera.layers.set(1); renderer.render(scene, camera); camera.layers.set(0);                                                /* ③ 기체 · 세로 빛줄기는 휘지 않게 그 위에 */
     bloom.render(Wd, Hd, false); perf.tick(dt); });
-  onProgress(1); window.__lift = { M, cfg, camera, THREE, lensU };
+  onProgress(1); window.__lift = { M, cfg, camera, THREE };
 }
