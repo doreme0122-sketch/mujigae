@@ -11,9 +11,9 @@
 import * as THREE from 'three';
 import { buildShip, engineSpots } from '../core/ships/build.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { flameMesh } from './sortie.js?v=11101517';
-import { MAP } from './mapfloor.js?v=11101517';
-import { applyShipHeat, heatVis } from './shipheat.js?v=11101517';
+import { flameMesh } from './sortie.js?v=11101539';
+import { MAP } from './mapfloor.js?v=11101539';
+import { applyShipHeat, heatVis } from './shipheat.js?v=11101539';
 
 export const FLY = { LEN: 2, HOVER: .7, R: .8, SPEEDS: [9, 12, 15, 18], TURN: 7, ACC: .22, TURNMAX: 9,
   BASE: 9, SHIELD: 3, BOOST: 5, BOOSTK: 1.5 };   /* 기지 고리(반지름 9m)를 벗어나는 순간: 보호막 3초 · 가속 5초(1.5배) — 기지 출구 앞 매복에 바로 당하지 않게 */
@@ -118,7 +118,7 @@ float gB4(vec2 a){ return gB2(.5*a)*.25+gB2(a); }
 void main() {
   if(uGhost>.002 && gB4(gl_FragCoord.xy)+.03<uGhost*.55) discard;`); };
     m.customProgramCacheKey = () => (ok ? ok.call(m) : '') + '|ghost'; m.needsUpdate = true; }
-  G.userData.setGhost = on => { ghostT = on ? 1 : 0; };
+  G.userData.setGhost = (on, k = 1) => { ghostT = on ? k : 0; };   /* k: 얼마나 비울지 (1 = 새 맵 기본 · 초원 섬 부쉬는 덜 흐리게) */
   const applyGhost = dt => { const g0 = ghost; ghost += (ghostT - ghost) * Math.min(1, dt * 6); if (Math.abs(ghost - g0) < 1e-4 && (ghost < .001 || ghost > .999)) return;
     uGhost.value = ghost; flames.forEach(f => f.visible = ghost < .65); };
   G.userData.S = S;

@@ -7,7 +7,7 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { MeshoptSimplifier as MO } from '../../vendor/meshopt_simplifier.module.js';
-import { makeField, Y, SPOT, LAYERS, fbm, noise2, smoothstep } from './islefield.js?v=11101517';
+import { makeField, Y, SPOT, LAYERS, fbm, noise2, smoothstep } from './islefield.js?v=11101539';
 
 const SUN = new THREE.Vector3(-.45, .78, .44).normalize();   /* 왼쪽 위 앞에서 (카메라 쪽 절벽 면이 비스듬히 빛을 받아 결이 드러남) */
 const rngOf = s => () => (s = (s * 16807) % 2147483647) / 2147483647;
@@ -22,7 +22,7 @@ uniform vec3 uSun; uniform float uT; uniform sampler2D uRay; uniform vec2 uVC; u
 const vec3 SUNC = vec3(1.55, 1.45, 1.28), SKYC = vec3(.50, .62, .80), GNDC = vec3(.20, .22, .12), MIST = vec3(.50, .64, .80);
 vec3 lit(vec3 al, vec3 n, float sh, float ao){ float d = max(dot(n, uSun), 0.); return al * (SUNC * d * sh + mix(GNDC, SKYC, .5 + .5 * n.y) * ao + .05); }
 /* 시야 (2D 좌표 · 사용자 2026-11-10): 높이와 상관없이 그 자리의 x, z가 시야 안이면 밝고 밖이면 어둠 — 땅 · 절벽 · 나무 · 물 모두 자기 자리로 */
-float seen(vec3 lp){ vec2 d = lp.xz * uK - uVC; float r = length(d), reach = texture2D(uRay, vec2(atan(d.y, d.x) / 6.2831853 + .5, .5)).r * uVR; return mix(1., smoothstep(reach + .55, reach - .15, r), uVOn); }
+float seen(vec3 lp){ vec2 d = lp.xz * uK - uVC; float r = length(d), reach = texture2D(uRay, vec2(atan(d.y, d.x) / 6.2831853 + .5, .5)).r * uVR; return mix(1., smoothstep(reach + .9, reach - .3, r), uVOn); }   /* 경계는 부드럽게 */
 vec3 fogged(vec3 c, vec3 wp){ float k = smoothstep(-16., -64., wp.y); c = mix(c, MIST, k * .85); return mix(c * vec3(.13, .15, .24), c, seen(wp)); }
 `;
 const U = { uSun: { value: SUN }, uT: { value: 0 }, uPush: { value: new THREE.Vector4(0, 0, 1, 0) }, uRay: { value: null }, uVC: { value: new THREE.Vector2() }, uVR: { value: 12 }, uK: { value: 1 }, uVOn: { value: 0 } };   /* uPush: 기체가 오르내릴 때 밑의 풀·덤불을 미는 바람 (x, z, 반지름, 세기 · 섬 안 단위) */
@@ -40,21 +40,21 @@ export async function buildIsle({ K = 1 } = {}) {   /* K: 섬 전체 크기 (기
   const nAt = (x, z, e = .3) => new THREE.Vector3(hAt(x - e, z) - hAt(x + e, z), 2 * e, hAt(x, z - e) - hAt(x, z + e)).normalize();
 
   /* ② 나무 자리 먼저 (나무 밑 그늘을 땅에 굽기 위해) */
-  const trees = [], bushes = [];
-  const flatOK = (x, z, lim = .8) => F.mask(x, z) > 2.2 && nAt(x, z, .8).y > lim && F.pond(x, z) < -1.5 && F.chan(x, z) < -1.5;
+  /* ② 낮은 식물 자리 (사용자 2026-11-10: 나무 한 그루씩은 부쉬와 헷갈려서 넣지 않음 → 숨을 수 없다는 게 한눈에 보이는 낮은 식물로)
+     · 고사리: 절벽 밑 · 돌탑 둘레 · 연못가 · 부쉬 가장자리 그늘 / 꽃무더기: 풀밭에 무리 지어 / 이끼 돌: 절벽 밑 · 풀밭 군데군데 */
+  const plants = [];
   const farFrom = (L, x, z, d) => L.every(t => (t.x - x) ** 2 + (t.z - z) ** 2 > d * d);
-  for (const [cx, cz, r] of SPOT.forest) for (let k = 0; k < r * r * .55; k++) {   /* 숲 덩이: 가운데 빽빽 · 가장자리 듬성 (숨는 곳) */
-    const a = rnd() * 6.283, d = Math.sqrt(rnd()) * r, x = cx + Math.cos(a) * d, z = cz + Math.sin(a) * d;
-    if (flatOK(x, z, .75) && farFrom(trees, x, z, 2.1 + d / r * 1.2)) trees.push({ x, z, y: hAt(x, z), s: (1.15 - .45 * d / r) * (.85 + rnd() * .3), r: rnd() * 6.283, v: (rnd() * 3) | 0 }); }
-  for (let k = 0; k < 900 && trees.length < 95; k++) {   /* 외톨이 나무 · 고원 위 · 가장자리 */
-    const x = X0 + rnd() * (X1 - X0), z = Z0 + rnd() * (Z1 - Z0); if (!flatOK(x, z, .82) || !farFrom(trees, x, z, 7)) continue;
-    const onTop = hAt(x, z) > 0; if (!onTop && rnd() < .55) continue;
-    trees.push({ x, z, y: hAt(x, z), s: .7 + rnd() * .45, r: rnd() * 6.283, v: onTop ? 3 : (rnd() * 3) | 0 }); }
-  for (let k = 0; k < 4000 && bushes.length < 140; k++) {   /* 작은 덤불(숨지 못함 · 부쉬와 헷갈리지 않게 낮고 작게): 나무 둘레 · 절벽 위 끝 · 연못가 */
-    const x = X0 + rnd() * (X1 - X0), z = Z0 + rnd() * (Z1 - Z0); if (F.mask(x, z) < 1 || nAt(x, z, .5).y < .7 || F.pond(x, z) > -.6 || F.chan(x, z) > -.4 || F.brush(x, z) > -1.5) continue;
-    const nearT = !farFrom(trees, x, z, 4.5), rim = nAt(x + 2, z, 1).y < .6 || nAt(x - 2, z, 1).y < .6 || nAt(x, z + 2, 1).y < .6 || nAt(x, z - 2, 1).y < .6, shore = F.pond(x, z) > -3.5;
-    if (!(nearT || rim || shore) && rnd() > .12) continue; if (!farFrom(trees, x, z, 1.4) || !farFrom(bushes, x, z, 1.1)) continue;
-    bushes.push({ x, z, y: hAt(x, z), s: .45 + rnd() * .35, r: rnd() * 6.283, v: (rnd() * 2) | 0 }); }
+  const okAt = (x, z, lim) => F.mask(x, z) > 1.2 && nAt(x, z, .5).y > lim && F.pond(x, z) < -.8 && F.chan(x, z) < -.6 && F.brush(x, z) < -.4;
+  const nearCliff = (x, z) => nAt(x + 1.6, z, .8).y < .6 || nAt(x - 1.6, z, .8).y < .6 || nAt(x, z + 1.6, .8).y < .6 || nAt(x, z - 1.6, .8).y < .6;
+  for (let k = 0; k < 20000 && plants.filter(p => p.v === 'fern').length < 420; k++) { const x = X0 + rnd() * (X1 - X0), z = Z0 + rnd() * (Z1 - Z0); if (!okAt(x, z, .72)) continue;
+    const want = nearCliff(x, z) || F.pond(x, z) > -3.5 || F.brush(x, z) > -2.2; if (!want && rnd() > .06) continue; if (!farFrom(plants, x, z, .7)) continue;
+    plants.push({ x, z, y: hAt(x, z), s: .75 + rnd() * .6, r: rnd() * 6.283, v: 'fern' }); }
+  for (let k = 0; k < 20000 && plants.filter(p => p.v.startsWith('fl')).length < 260; k++) { const x = X0 + rnd() * (X1 - X0), z = Z0 + rnd() * (Z1 - Z0); if (!okAt(x, z, .85)) continue;
+    const pat = fbm(x * .07 + 11, z * .07, 3); if (pat < .12 && rnd() > .04) continue; if (!farFrom(plants, x, z, .55)) continue;   /* 꽃은 무리 지어 핌 */
+    plants.push({ x, z, y: hAt(x, z), s: .7 + rnd() * .5, r: rnd() * 6.283, v: 'fl' + (fbm(x * .05, z * .05 + 3, 2) > .1 ? 0 : fbm(x * .05 + 9, z * .05, 2) > 0 ? 1 : 2) }); }
+  for (let k = 0; k < 20000 && plants.filter(p => p.v === 'stone').length < 80; k++) { const x = X0 + rnd() * (X1 - X0), z = Z0 + rnd() * (Z1 - Z0); if (!okAt(x, z, .6)) continue;
+    if (!nearCliff(x, z) && rnd() > .25) continue; if (!farFrom(plants, x, z, 1)) continue;
+    plants.push({ x, z, y: hAt(x, z), s: .35 + rnd() * rnd() * .9, r: rnd() * 6.283, v: 'stone' }); }
 
   /* ③ 빛 굽기: 오목한 곳(사방 땅이 얼마나 막는지) · 해 가림(해 쪽으로 걸어가며 땅에 막히는지) · 나무 밑 그늘 */
   const AOg = new Float32Array(NX * NZ), SHg = new Float32Array(NX * NZ);
@@ -64,7 +64,7 @@ export async function buildIsle({ K = 1 } = {}) {   /* K: 섬 전체 크기 (기
     AOg[k] = 1 - .62 * oc / DIRS.length;
     let s = 1; for (let d = .6; d < 26; d += .6) { const hx = x + sx * d, hz = z + sz * d; if (F.mask(hx, hz) < -.5) break; const hh = hAt(hx, hz); if (hh > h + d * slope + .25) { s = Math.max(.12, 1 - (d < 3 ? .6 : .85)); break; } }
     SHg[k] = s; }
-  const treeShade = (x, z) => { let s = 1; for (const t of trees) { const R = 3.2 * t.s, dx = x - (t.x - SUN.x / SUN.y * 4 * t.s), dz = z - (t.z - SUN.z / SUN.y * 4 * t.s), d2 = dx * dx + dz * dz; if (d2 < R * R) s *= .55 + .45 * Math.sqrt(d2) / R; } for (const b of bushes) { const R = 1.3 * b.s, dx = x - b.x, dz = z - b.z; if (dx * dx + dz * dz < R * R) s *= .8; } return s; };
+  const treeShade = (x, z) => 1 - .4 * smoothstep(-1.6, .2, F.brush(x, z));   /* 부쉬 가장자리 밑 그늘 */
 
   /* ④ 땅 그물: 칸을 삼각형으로 나누고, 섬 밖에 걸친 삼각형은 가장자리에서 잘라 매끈한 테두리 */
   const P = [], key = new Map(), isEdge = [];
@@ -183,32 +183,32 @@ export async function buildIsle({ K = 1 } = {}) {   /* K: 섬 전체 크기 (기
     g.setAttribute('color', new THREE.Float32BufferAttribute(c, 3)); g.setAttribute('aS', new THREE.Float32BufferAttribute(s, 1));
     { const nn = []; for (let k = 0; k < p.count; k++) { v.fromBufferAttribute(p, k); o.set((v.x - cx) / r, (v.y - cy) / (r * sq), (v.z - cz) / r).normalize(); o.lerp(new THREE.Vector3(v.x - ctr.x, v.y - ctr.y, v.z - ctr.z).normalize(), .35).normalize(); nn.push(o.x, o.y, o.z); } g.setAttribute('normal', new THREE.Float32BufferAttribute(nn, 3)); }   /* 매끈한 덩이 빛 (각진 면 없음) · 나무 전체로 둥글게 */
     return g; };
-  const LEAF = [lin(0x3f7a22), lin(0x5b8f26), lin(0x2f6a2a), lin(0x6d9a2c)], BARK = lin(0x5a4330);
-  const makeTree = (v, seed) => { const r = rngOf(seed), parts = [], H = [6.2, 5.0, 7.4, 4.2][v], lean = new THREE.Vector3((r() - .5) * .8, 0, (r() - .5) * .8);
-    const trunk = []; for (let k = 0; k <= 6; k++) { const f = k / 6; trunk.push(new THREE.Vector3(lean.x * f * f + Math.sin(f * 3 + seed) * .12, f * H * .72, lean.z * f * f)); }
-    parts.push(tube(trunk, .34 * H / 6, .12 * H / 6, 7, BARK, 0, .35));
-    const top = trunk[6], ctr = new THREE.Vector3(top.x, H * .78, top.z), tips = [top.clone()];
-    const nb = v === 2 ? 4 : 3; for (let k = 0; k < nb; k++) { const a = k / nb * 6.283 + r() * .8, base = trunk[3 + (k % 3)], L = H * (.28 + r() * .12);
-      const tip = base.clone().add(new THREE.Vector3(Math.cos(a) * L, L * .55, Math.sin(a) * L)); const mid = base.clone().lerp(tip, .5).add(new THREE.Vector3(0, .25, 0));
-      parts.push(tube([base, mid, tip], .1 * H / 6, .05 * H / 6, 5, BARK, .25, .6)); tips.push(tip); }
-    const R = H * .42, col0 = LEAF[v]; const nClump = v === 2 ? 18 : 15;   /* 작은 잎 뭉치를 많이 겹쳐 둥근 공 대신 풍성한 잎 덩어리 */
-    for (let k = 0; k < nClump; k++) { const t = tips[k % tips.length], j = new THREE.Vector3((r() - .5), (r() - .25) * .8, (r() - .5)).multiplyScalar(H * .3);
-      const hue = .85 + r() * .3, col = [col0[0] * hue, col0[1] * (.9 + r() * .2), col0[2] * hue];
-      parts.push(blob(t.x + j.x, t.y + j.y + H * .05, t.z + j.z, H * (.12 + r() * .06), .8, col, ctr, R, 1, 1)); }
-    return mergeAll(parts); };
-  const makeBush = (v, seed) => { const r = rngOf(seed), parts = [], ctr = new THREE.Vector3(0, .35, 0), col0 = [lin(0x3c7524), lin(0x557f2a)][v];
-    for (let k = 0; k < 5; k++) { const a = r() * 6.283, d = r() * .55; const hue = .85 + r() * .3; parts.push(blob(Math.cos(a) * d, .35 + r() * .25, Math.sin(a) * d, .42 + r() * .2, .8, [col0[0] * hue, col0[1], col0[2] * hue], ctr, .9, .6, 1)); }
-    return mergeAll(parts); };
   const mergeAll = parts => mergeGeometries(parts.map(g => g.index ? g.toNonIndexed() : g));
   const inst = (geo, list, name) => { if (!list.length) return; const m = new THREE.InstancedMesh(geo, vegM, list.length), q = new THREE.Matrix4(), e = new THREE.Euler();
     list.forEach((t, k) => { q.compose(new THREE.Vector3(t.x, t.y - .15, t.z), new THREE.Quaternion().setFromEuler(e.set(0, t.r, 0)), new THREE.Vector3(t.s, t.s * (.9 + (k % 5) * .05), t.s)); m.setMatrixAt(k, q); });
     m.computeBoundingSphere(); m.name = name; G.add(m); };
-  for (let v = 0; v < 4; v++) inst(makeTree(v, 11 + v * 7), trees.filter(t => t.v === v), 'trees' + v);
-  for (let v = 0; v < 2; v++) inst(makeBush(v, 91 + v * 5), bushes.filter(t => t.v === v), 'bush' + v);
+  /* 낮은 식물 · 이끼 돌 (종류마다 한 번에 그림) */
+  { const G0 = []; const frond = (a, L, w, lean) => { const p = [], c = [], sw = [], idx = []; const dir = new THREE.Vector3(Math.cos(a), 0, Math.sin(a)), side = new THREE.Vector3(-dir.z, 0, dir.x);
+      for (let k = 0; k <= 6; k++) { const f = k / 6, q = dir.clone().multiplyScalar(L * f).add(new THREE.Vector3(0, Math.sin(f * 1.9) * L * lean, 0)), ww = w * Math.sin(Math.min(1, f * 1.4) * Math.PI) * (1 - f * .3);
+        for (const sd of [-1, 1]) { const v = q.clone().addScaledVector(side, sd * ww); p.push(v.x, v.y, v.z); const sh = .55 + .5 * f; c.push(.12 * sh, .32 * sh, .08 * sh); sw.push(f); } }
+      for (let k = 0; k < 6; k++) { const a0 = k * 2; idx.push(a0, a0 + 2, a0 + 1, a0 + 1, a0 + 2, a0 + 3); }
+      const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(p, 3)); g.setAttribute('color', new THREE.Float32BufferAttribute(c, 3)); g.setAttribute('aS', new THREE.Float32BufferAttribute(sw, 1)); g.setIndex(idx); g.computeVertexNormals(); return g; };
+    const fern = mergeAll(Array.from({ length: 8 }, (_, k) => frond(k * .785 + (k % 2) * .3, .75 + (k % 3) * .15, .13, .55 + (k % 2) * .2)));   /* 고사리: 잎줄기 여덟 개가 둥글게 휘어 퍼짐 */
+    const flower = col => { const parts = []; for (let k = 0; k < 6; k++) { const a = k * 1.05, d = .12 + (k % 3) * .08, h = .32 + (k % 3) * .1, x = Math.cos(a) * d, z = Math.sin(a) * d;
+        const st = new THREE.BufferGeometry(); st.setAttribute('position', new THREE.Float32BufferAttribute([x - .015, 0, z, x + .015, 0, z, x, h, z], 3)); st.setAttribute('color', new THREE.Float32BufferAttribute([.1, .25, .06, .1, .25, .06, .2, .4, .1], 3)); st.setAttribute('aS', new THREE.Float32BufferAttribute([0, 0, 1], 1)); st.computeVertexNormals(); parts.push(st);
+        const hd = new THREE.IcosahedronGeometry(.06 + (k % 2) * .02, 0); hd.deleteAttribute('uv'); hd.translate(x, h, z); const n = hd.attributes.position.count; hd.setAttribute('color', new THREE.Float32BufferAttribute(Array.from({ length: n * 3 }, (_, i) => col[i % 3] * (.85 + .3 * ((i / 3 | 0) % 2))), 3)); hd.setAttribute('aS', new THREE.Float32BufferAttribute(new Array(n).fill(1), 1)); parts.push(hd); }
+      return mergeAll(parts); };
+    const stone = (() => { const g = new THREE.IcosahedronGeometry(.5, 1); g.deleteAttribute('uv'); const p = g.attributes.position, c = [], v = new THREE.Vector3();
+      for (let k = 0; k < p.count; k++) { v.fromBufferAttribute(p, k); const n = v.clone().normalize(), d = 1 + .25 * noise2(n.x * 2.3 + 4, n.z * 2.3 + n.y), y = n.y * .62; v.set(n.x * d * .5, Math.max(-.1, y * d * .5), n.z * d * .5); p.setXYZ(k, v.x, v.y, v.z);
+        const moss = smoothstep(.3, .75, n.y + .15 * noise2(n.x * 6, n.z * 6)), g0 = .38 + .12 * noise2(n.x * 5, n.y * 5); c.push(...[g0 * 1.05, g0, g0 * .9].map((q, i) => q * (1 - moss) + [.16, .32, .08][i] * moss)); }
+      g.setAttribute('color', new THREE.Float32BufferAttribute(c, 3)); g.setAttribute('aS', new THREE.Float32BufferAttribute(new Array(p.count).fill(0), 1)); g.computeVertexNormals(); return g; })();
+    inst(fern, plants.filter(p => p.v === 'fern'), 'ferns');
+    [lin(0xf4f0e6), lin(0xffd24a), lin(0xc49bff)].forEach((c, k) => inst(flower(c), plants.filter(p => p.v === 'fl' + k), 'flowers' + k));
+    inst(stone, plants.filter(p => p.v === 'stone'), 'stones'); }
 
   /* ⑧-2 부쉬: 덩이 모양 그대로 빈틈없이 덮은 덤불 무리 — 가장자리 = 숨는 경계 (사용자 2026-11-10: 경계가 정확해야 · 띄엄띄엄이면 어설픔)
      · 덩이 모양 하나로 칸을 잘라 덮개를 만들고, 가장자리에서 1층 높이를 넘게 둥글게 솟음 · 위는 잎 뭉치가 울퉁불퉁 · 바람에 물결 */
-  { const P = [], A = [], IDX = [], key = new Map(), BS = .3, HB = 3.1;
+  { const P = [], A = [], IDX = [], key = new Map(), BS = .3, HB = 2.7, CL = [];   /* CL: 덤불 포기 자리 */
     const lump = (x, z) => .75 * fbm(x * .7, z * .7, 3) + .4 * Math.abs(fbm(x * 1.6 + 7, z * 1.6, 2)) + .18 * fbm(x * 3.4, z * 3.4, 2);   /* 덤불 뭉치가 몽글몽글 (매끈한 언덕이 아니게) */
     const hB = (x, z, sd) => hAt(x, z) + .12 + HB * Math.pow(smoothstep(0, 1.25, sd), .55) + lump(x, z) * smoothstep(0, .9, sd);
     for (const Z of SPOT.brush) { let x0 = 1e9, z0 = 1e9, x1 = -1e9, z1 = -1e9; for (const [cx, cz, r] of Z) { x0 = Math.min(x0, cx - r - 2); z0 = Math.min(z0, cz - r - 2); x1 = Math.max(x1, cx + r + 2); z1 = Math.max(z1, cz + r + 2); }
@@ -218,7 +218,11 @@ export async function buildIsle({ K = 1 } = {}) {   /* K: 섬 전체 크기 (기
       const vC = (i0, j0, i1, j1) => { const a = j0 * nx + i0, b = j1 * nx + i1, k = 'e' + Z[0][0] + ',' + Math.min(a, b) + ',' + Math.max(a, b); if (!key.has(k)) { const t = E[a] / (E[a] - E[b]), x = x0 + (i0 + (i1 - i0) * t) * BS, z = z0 + (j0 + (j1 - j0) * t) * BS; key.set(k, vtx(x, z, 0)); } return key.get(k); };
       const tri = (T) => { const inn = T.map(([i, j]) => E[j * nx + i] >= 0), n = inn.filter(Boolean).length; if (!n) return; if (n === 3) { IDX.push(...T.map(q => vG(...q))); return; }
         const poly = []; for (let q = 0; q < 3; q++) { const a = T[q], b = T[(q + 1) % 3]; if (inn[q]) poly.push(vG(...a)); if (inn[q] !== inn[(q + 1) % 3]) poly.push(vC(...a, ...b)); } for (let q = 1; q + 1 < poly.length; q++) IDX.push(poly[0], poly[q], poly[q + 1]); };
-      for (let j = 0; j < nz - 1; j++) for (let i = 0; i < nx - 1; i++) { tri([[i, j], [i, j + 1], [i + 1, j + 1]]); tri([[i, j], [i + 1, j + 1], [i + 1, j]]); } }
+      for (let j = 0; j < nz - 1; j++) for (let i = 0; i < nx - 1; i++) { tri([[i, j], [i, j + 1], [i + 1, j + 1]]); tri([[i, j], [i + 1, j + 1], [i + 1, j]]); }
+      /* 덤불 포기: 가장자리를 따라 세 단으로 빽빽이 (옆에서 봐도 잎 벽) + 위는 잎 지붕 — 포기 중심은 경계 안쪽이라 잎 끝이 경계에 딱 맞음 */
+      for (let z = z0; z <= z1; z += .7) for (let x = x0; x <= x1; x += .7) { const jx = x + (rnd() - .5) * .45, jz = z + (rnd() - .5) * .45, sd = F.brush(jx, jz), g = hAt(jx, jz);
+        if (sd > .55 && sd < 1.25) for (const yy of [.75, 1.95]) CL.push({ x: jx, z: jz, y: g + yy + (rnd() - .5) * .3, s: .95 + rnd() * .3, r: rnd() * 6.283, v: (rnd() * 3) | 0 });
+        else if (sd >= 1.25 && (Math.round(x / .7) + Math.round(z / .7)) % 2 === 0) CL.push({ x: jx, z: jz, y: hB(jx, jz, sd) - .3, s: 1.05 + rnd() * .35, r: rnd() * 6.283, v: (rnd() * 3) | 0 }); } }
     const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(P, 3)); g.setAttribute('aB', new THREE.Float32BufferAttribute(A, 2)); g.setIndex(IDX); g.computeVertexNormals();
     const m = new THREE.Mesh(g, new THREE.ShaderMaterial({ uniforms: U,
       vertexShader: `attribute vec2 aB; uniform float uT; uniform vec4 uPush; varying vec3 vP, vN; varying vec2 vB; void main(){ vec3 p = position; float k = smoothstep(0., 1.2, aB.x);
@@ -231,19 +235,21 @@ export async function buildIsle({ K = 1 } = {}) {   /* K: 섬 전체 크기 (기
           float b0 = vn(P3.zy) * an.x + vn(P3.xz) * an.y + vn(P3.xy) * an.z, bx = vn(P3.zy + vec2(.15, 0.)) * an.x + vn(P3.xz + vec2(.15, 0.)) * an.y + vn(P3.xy + vec2(.15, 0.)) * an.z, bz = vn(P3.zy + vec2(0., .15)) * an.x + vn(P3.xz + vec2(0., .15)) * an.y + vn(P3.xy + vec2(0., .15)) * an.z;
           n = normalize(n + vec3(b0 - bx, 0., b0 - bz) * 2.2);                                                                                     /* 잎 뭉치마다 빛이 갈라짐 */
           float c1 = vn(q * 3.1 + vP.y * 1.3), c2 = vn(q * 8.7 - vP.y * 2.1), c3 = vn(q * 21.);                                                     /* 잎 뭉치 · 잎 · 잎결 */
-          vec3 al = mix(vec3(.05, .17, .05), vec3(.27, .47, .10), smoothstep(-.4, .7, vB.y) * .65 + c1 * .35) * (.5 + .55 * c2) * (.8 + .35 * c3) * (.55 + .6 * b0);
+          vec3 al = mix(vec3(.04, .13, .04), vec3(.18, .34, .08), smoothstep(-.4, .7, vB.y) * .65 + c1 * .35) * (.5 + .55 * c2) * (.8 + .35 * c3) * (.55 + .6 * b0);   /* 속은 잎 포기들 사이로 보이는 그늘진 안쪽 */
           al += vec3(.35, .45, .1) * step(.9, c3) * smoothstep(.3, .9, n.y) * .4;                                                                 /* 해 받은 잎 끝 */
           float ao = mix(.45, 1., smoothstep(0., 1.3, vB.x)) * (.7 + .3 * smoothstep(-.4, .5, vB.y));                                              /* 가장자리 밑 · 뭉치 사이 그늘 */
           vec3 c = lit(al, n, 1., ao); c += al * vec3(.9, 1.2, .4) * pow(max(0., dot(-n, uSun)), 2.) * .2;
           gl_FragColor = vec4(fogged(c, vP), 1.); }` }));
-    m.name = 'brush'; G.add(m); }
+    m.name = 'brush'; G.add(m);
+    const LEAF = [lin(0x3c7a22), lin(0x56892a), lin(0x2c6526)];
+    for (let v = 0; v < 3; v++) { const r = rngOf(300 + v); inst(blob(0, 0, 0, .62, .82, LEAF[v].map(q => q * (.85 + r() * .3)), new THREE.Vector3(0, -.35, 0), .8, .7, 1), CL.filter(c => c.v === v), 'brushLeaves' + v); } }   /* 잎 뭉치 하나 = 울퉁불퉁한 공 하나 (가볍게) */
 
   /* ⑨ 풀 포기: 가장자리 · 절벽 턱 · 나무 밑에 모여 남 (평평한 풀밭은 칠로 충분) */
   { const bl = [], c = [], s = []; for (let k = 0; k < 6; k++) { const a = k * 1.05 + (k % 2) * .3, lx = Math.cos(a), lz = Math.sin(a), h = .45 + (k % 3) * .14, w = .05;
       bl.push(-lz * w, 0, lx * w, lz * w, 0, -lx * w, lx * h * .45, h, lz * h * .45); c.push(.08, .2, .04, .08, .2, .04, .42, .62, .16); s.push(0, 0, 1); }
     const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(bl, 3)); g.setAttribute('color', new THREE.Float32BufferAttribute(c, 3)); g.setAttribute('aS', new THREE.Float32BufferAttribute(s, 1)); g.computeVertexNormals();
-    const L2 = []; for (let k = 0; k < 30000 && L2.length < 2600; k++) { const x = X0 + rnd() * (X1 - X0), z = Z0 + rnd() * (Z1 - Z0); if (F.mask(x, z) < .3) continue; const n = nAt(x, z, .3); if (n.y < .66) continue; const h = hAt(x, z); if (h < Y.WATER + .1) continue;
-      const edge = F.mask(x, z) < 2.5 || nAt(x + 1, z, .6).y < .6 || nAt(x - 1, z, .6).y < .6 || nAt(x, z + 1, .6).y < .6 || nAt(x, z - 1, .6).y < .6, near = !farFrom(trees, x, z, 3.2) || F.pond(x, z) > -2.5;
+    const L2 = []; for (let k = 0; k < 30000 && L2.length < 2600; k++) { const x = X0 + rnd() * (X1 - X0), z = Z0 + rnd() * (Z1 - Z0); if (F.mask(x, z) < .3 || F.brush(x, z) > 0) continue; const n = nAt(x, z, .3); if (n.y < .66) continue; const h = hAt(x, z); if (h < Y.WATER + .1) continue;
+      const edge = F.mask(x, z) < 2.5 || nAt(x + 1, z, .6).y < .6 || nAt(x - 1, z, .6).y < .6 || nAt(x, z + 1, .6).y < .6 || nAt(x, z - 1, .6).y < .6, near = F.brush(x, z) > -2.5 || F.pond(x, z) > -2.5;
       if (!edge && !near && rnd() > .1) continue; L2.push({ x, z, y: h + .02, s: .7 + rnd() * .8, r: rnd() * 6.283 }); }
     const m = new THREE.InstancedMesh(g, new THREE.ShaderMaterial({ uniforms: U, vertexShader: VEG.v, fragmentShader: GL + `varying vec3 vC, vN, vP; varying float vS; void main(){ vec3 c = lit(vC, vec3(0., 1., 0.), 1., 1.); gl_FragColor = vec4(fogged(c, vP), 1.); }`, side: THREE.DoubleSide }), L2.length);
     const q = new THREE.Matrix4(); L2.forEach((t, k) => { q.compose(new THREE.Vector3(t.x, t.y, t.z), new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), t.r), new THREE.Vector3(t.s, t.s, t.s)); m.setMatrixAt(k, q); });
@@ -347,7 +353,7 @@ export async function buildIsle({ K = 1 } = {}) {   /* K: 섬 전체 크기 (기
 
   /* ⑭ 작은 빛: 숲 · 연못 · 폭포 둘레에 떠다니는 빛 알갱이 (신비로움) — 깜빡이며 천천히 오르내림 */
   { const L4 = []; const pick = (cx, cz, r, n, y0, y1) => { for (let k = 0; k < n; k++) { const a = rnd() * 6.283, d = Math.sqrt(rnd()) * r, x = cx + Math.cos(a) * d, z = cz + Math.sin(a) * d; if (F.mask(x, z) < 0) continue; L4.push(x, hAt(x, z) + y0 + rnd() * (y1 - y0), z, rnd()); } };
-    for (const [cx, cz, r] of SPOT.forest) pick(cx, cz, r + 2, 26, .6, 4.5); pick(SPOT.pond[0], SPOT.pond[1], 9, 30, .3, 3); if (best) pick(best.x, best.z, 6, 16, 1, 9);
+    for (const Z of SPOT.brush) pick(Z[0][0], Z[0][1], Z[0][2] + 2.5, 22, .8, 4.5); pick(SPOT.pond[0], SPOT.pond[1], 9, 30, .3, 3); if (best) pick(best.x, best.z, 6, 16, 1, 9);
     const g = new THREE.BufferGeometry(); const a = new Float32Array(L4); g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(L4.length / 4 * 3), 3)); g.setAttribute('iP', new THREE.BufferAttribute(a, 4));
     for (let k = 0; k < L4.length / 4; k++) g.attributes.position.setXYZ(k, L4[k * 4], L4[k * 4 + 1], L4[k * 4 + 2]);
     const m = new THREE.Points(g, new THREE.ShaderMaterial({ uniforms: { ...U, uPx: { value: 800 } }, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
@@ -370,6 +376,6 @@ export async function buildIsle({ K = 1 } = {}) {   /* K: 섬 전체 크기 (기
 
   G.scale.setScalar(K); U.uK.value = K;   /* 모양 · 무늬 · 안개 높이는 섬 안 좌표로 계산하고 통째로 줄임 → 들꽃 · 잎 무늬까지 같이 작아짐 */
   G.traverse(o => { if (o.isMesh || o.isPoints) { st.draws++; const g = o.geometry, n = (g.index ? g.index.count : g.attributes.position.count) / 3; st.tris += o.isInstancedMesh ? n * o.count : o.isPoints ? 0 : (g.instanceCount ? n * g.instanceCount : n); } });
-  st.ground = { full: fullT, kept: I.length / 3, bottom: BI.length / 3 }; st.trees = trees.length; st.bushes = bushes.length;
-  return { group: G, K, field: F, H: (x, z) => hAt(x / K, z / K) * K, mask: (x, z) => F.mask(x / K, z / K) * K, blocked: (x, z, L = 1) => F.blocked(x / K, z / K, L), sightBlock: (x, z, L) => F.sightBlock(x / K, z / K, L), trees: trees.map(t => ({ x: t.x * K, z: t.z * K, r: 2.3 * t.s * K })), inBrush: (x, z) => F.brush(x / K, z / K) > 0, setSight: (tex, x, z, R, on) => { U.uRay.value = tex; U.uVC.value.set(x, z); U.uVR.value = R; U.uVOn.value = on; }, layers: LAYERS.map(y => y * K), push: (x, z, r, k) => U.uPush.value.set(x / K, z / K, r / K, k / K), stats: st, sky, setPx: px => { G.userData.motes.material.uniforms.uPx.value = px; }, update: t => { U.uT.value = t; } };
+  st.ground = { full: fullT, kept: I.length / 3, bottom: BI.length / 3 }; st.plants = plants.length;
+  return { group: G, K, field: F, H: (x, z) => hAt(x / K, z / K) * K, mask: (x, z) => F.mask(x / K, z / K) * K, blocked: (x, z, L = 1) => F.blocked(x / K, z / K, L), sightBlock: (x, z, L) => F.sightBlock(x / K, z / K, L), inBrush: (x, z) => F.brush(x / K, z / K) > 0, setSight: (tex, x, z, R, on) => { U.uRay.value = tex; U.uVC.value.set(x, z); U.uVR.value = R; U.uVOn.value = on; }, layers: LAYERS.map(y => y * K), push: (x, z, r, k) => U.uPush.value.set(x / K, z / K, r / K, k / K), stats: st, sky, setPx: px => { G.userData.motes.material.uniforms.uPx.value = px; }, update: t => { U.uT.value = t; } };
 }

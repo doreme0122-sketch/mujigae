@@ -34,7 +34,6 @@ export const SPOT = {
   low: [[27, 13, 13], [18, 23, 8]],
   pond: [-17, 1.6, 6.6],
   channel: [-17, 1.6, -40, 10],
-  forest: [[13, 0, 8.5], [-3, 21, 6.5], [-24, -20, 6]],
 };
 
 export function makeField() {
