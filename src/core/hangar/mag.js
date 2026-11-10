@@ -81,7 +81,7 @@ export function makeMag(pad,opt={}){   /* opt.dust=false: 떠오르는 알갱이
   function update(t,ship,shipHalf){
     const cyc=Math.floor(t/T), p=t/T-cyc;
     const hAt=pp=>{ if(pp<IMP){ const x=pp/IMP; return 1-2*(x*x*(3-2*x)); } const y=(pp-IMP)/(1-IMP); return -1+2*(1-Math.pow(1-y,2.6)); };
-    const bob=hAt(p), dt=Math.min(.05,st.lt===undefined?.016:t-st.lt); st.lt=t;
+    const bob=hAt(p), dt=st.lt===undefined?.016:Math.min(.05,Math.max(0,t-st.lt)); st.lt=t;   /* 시간이 거꾸로 가면(로딩 때 미리 돌려 본 뒤 처음부터 다시) 0 — 예전엔 음수가 되어 빛 세기가 수백만 배로 튐 (2026-11-10) */
     const near=(1-bob)/2, top=bellyY(bob);
     const tImp=(cyc+IMP)*T, t0=tImp-SPREAD;   /* 불이 다 들어온 순간 = 알갱이가 솟는 순간 = 기체가 뜨는 순간 */           /* 도착 시각에서 거꾸로: 터짐 → 번짐 → 솟음 → 닿음 */
     const e=t-t0;

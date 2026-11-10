@@ -102,7 +102,7 @@ const outX = (v, a, toned, add) => { const x = toned ? `fgACES(${v})` : v; retur
 const sig = g => Object.keys(g.attributes).sort().map(k => { const a = g.attributes[k]; return k + a.itemSize + (a.normalized ? 'n' : '') + a.array.constructor.name; }).join(',');
 
 /* fi: 기체 종류(0~8) · size: 게임에서 기체 가장 긴 쪽(날개폭이나 몸길이) */
-export async function makeForgeShip(renderer, camera, fi, { size = 3.6, patch = true } = {}) {   /* patch: false = 칠을 바꾸지 않음 (원본과 비교 시험용) */
+export async function makeForgeShip(renderer, camera, fi, { size = 3.6 } = {}) {
   await MO.ready; const t0 = performance.now();
   F ||= makeForge(renderer, camera);
   /* 효과 움직임 가려내기: 효과 없이 한 번 만들어 몸 움직임 목록을 받아 둠 → 효과까지 넣어 만든 목록에서 나머지가 효과 움직임 */
@@ -149,7 +149,7 @@ export async function makeForgeShip(renderer, camera, fi, { size = 3.6, patch = 
       for (const i of ids) list[i].parent.remove(list[i]); }
     parts.forEach(g => g.dispose()); }
   /* ④ 빛 덩이 한 번에 그리기 */
-  const batches = []; if (patch) { const byK = new Map(); S.root.traverse(o => { if (!o.isSprite) return; const m = o.material, k = (m.map?.uuid || '') + m.blending + m.depthTest + m.depthWrite + o.renderOrder + m.toneMapped; if (!byK.has(k)) byK.set(k, []); byK.get(k).push(o); });
+  const batches = []; { const byK = new Map(); S.root.traverse(o => { if (!o.isSprite) return; const m = o.material, k = (m.map?.uuid || '') + m.blending + m.depthTest + m.depthWrite + o.renderOrder + m.toneMapped; if (!byK.has(k)) byK.set(k, []); byK.get(k).push(o); });
     for (const list of byK.values()) { const n = list.length, m0 = list[0].material, toned = C.fireFX || m0.toneMapped !== false;
       const g = new THREE.InstancedBufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute([-.5, -.5, 0, .5, -.5, 0, .5, .5, 0, -.5, .5, 0], 3)); g.setAttribute('uv', new THREE.Float32BufferAttribute([0, 0, 1, 0, 1, 1, 0, 1], 2)); g.setIndex([0, 1, 2, 0, 2, 3]);
       const iP = new THREE.InstancedBufferAttribute(new Float32Array(n * 3), 3), iS = new THREE.InstancedBufferAttribute(new Float32Array(n * 2), 2), iC = new THREE.InstancedBufferAttribute(new Float32Array(n * 4), 4); [iP, iS, iC].forEach(a => a.setUsage(THREE.DynamicDrawUsage));
@@ -225,7 +225,7 @@ vec4 fgBendV(vec4 v, float secs){ fgFd = 1. - smoothstep(${LIFE[0].toFixed(2)}, 
   const NP = PL.length, U = { fgDD: { value: KEYL.map(() => new THREE.Vector3()) }, fgDC: { value: KEYL.map(l => new THREE.Color(l[3]).multiplyScalar(l[4])) }, fgK: { value: 1 } };
   if (NP) Object.assign(U, { fgPP: { value: PL.map(() => new THREE.Vector3()) }, fgPC: { value: PL.map(() => new THREE.Color()) }, fgPD: { value: PL.map(p => new THREE.Vector2(p.L.distance, p.L.decay)) } });
   const DECL = `uniform vec3 fgDD[3]; uniform vec3 fgDC[3]; uniform float fgK;${NP ? ` uniform vec3 fgPP[${NP}]; uniform vec3 fgPC[${NP}]; uniform vec2 fgPD[${NP}];` : ''}\n`;
-  const seen = new Set(); if (patch) sm.traverse(o => { if (!(o.isMesh || o.isPoints || o.isLine) || o.name === 'fgSprites') return; for (const m of [].concat(o.material)) { if (!m || seen.has(m)) continue; seen.add(m);
+  const seen = new Set(); sm.traverse(o => { if (!(o.isMesh || o.isPoints || o.isLine) || o.name === 'fgSprites') return; for (const m of [].concat(o.material)) { if (!m || seen.has(m)) continue; seen.add(m);
     if (m.isShaderMaterial) { const toned = C.fireFX || m.fragmentShader.includes('#include <tonemapping_fragment>');
       const ex = `gl_FragColor.rgb = ${outX('gl_FragColor.rgb', 'gl_FragColor.a', toned, m.blending === THREE.AdditiveBlending)};`;
       if (m.fragmentShader.includes('#include <tonemapping_fragment>')) m.fragmentShader = m.fragmentShader.replace('#include <tonemapping_fragment>', ex);
@@ -263,5 +263,5 @@ vec4 fgBendV(vec4 v, float secs){ fgFd = 1. - smoothstep(${LIFE[0].toFixed(2)}, 
   /* 효과(불길 · 연기 · 번개 · 서리 알갱이)만 끄고 켜기 — 폰 무게 재기용 */
   const FX = []; sm.traverse(o => { if (isFx(o)) FX.push(o); }); let fxOn = true;
   const setFx = v => { fxOn = v; FX.forEach(o => o.visible = v); }, getFx = () => fxOn;
-  return { root, sm, S, C, step, preRender, stats, before: stat0, buildXray, engines: [], setFx, getFx, fxCount: FX.length };
+  return { root, sm, S, C, step, preRender, stats, before: stat0, buildXray, setFx, getFx, fxCount: FX.length };
 }

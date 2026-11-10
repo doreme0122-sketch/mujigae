@@ -5,18 +5,18 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
-import { makeBloom } from '../core/hangar/bloom.js?v=11101146';
-import { makePad } from '../core/hangar/pad.js?v=11101146';
-import { makeMag } from '../core/hangar/mag.js?v=11101146';
-import { makeForgeShip, forgeList } from './forgeship.js?v=11101146';
-import { makeGoldStar } from './goldstar.js?v=11101146';
-import { makeArena, SPEED, WAVE_R0 } from './arena.js?v=11101146';
-import { makeGuardians, GUARD } from './guardian.js?v=11101146';
-import { makeBirth, BIRTH } from './birth.js?v=11101146';
-import { makePerf } from './perf.js?v=11101146';
-import { autoMerge } from './automerge.js?v=11101146';
+import { makeBloom } from '../core/hangar/bloom.js?v=11101210';
+import { makePad } from '../core/hangar/pad.js?v=11101210';
+import { makeMag } from '../core/hangar/mag.js?v=11101210';
+import { makeForgeShip, forgeList } from './forgeship.js?v=11101210';
+import { makeGoldStar } from './goldstar.js?v=11101210';
+import { makeArena, SPEED, WAVE_R0 } from './arena.js?v=11101210';
+import { makeGuardians, GUARD } from './guardian.js?v=11101210';
+import { makeBirth, BIRTH } from './birth.js?v=11101210';
+import { makePerf } from './perf.js?v=11101210';
+import { autoMerge } from './automerge.js?v=11101210';
 import { makeGlow } from '../preview/glow.js';
-import { makeFlight, FLY, PADZ, padZone } from './flight.js?v=11101146';
+import { makeFlight, FLY, PADZ, padZone } from './flight.js?v=11101210';
 
 const $ = s => document.querySelector(s), clamp = THREE.MathUtils.clamp, HOVER = FLY.HOVER;
 const R = 240, NB = 10, GAPH = 5.6, BASE_D = 0;     /* 맵 반지름 · 기지 수 · 벽 틈 반 폭(= 기지 반지름) · 기지 가운데는 벽 선 위 (앞 절반은 맵 안, 뒤 절반은 맵 밖 · 사용자 2026-11-06) */
@@ -145,7 +145,6 @@ export async function start(canvas, onProgress = () => {}) {
   { const sel = $('#skin'); if (sel) { for (const k of SKINS) { const o = document.createElement('option'); o.value = k.id; o.textContent = k.name; o.selected = k.id === FG.C.id; sel.append(o); }
       sel.onchange = () => { try { localStorage.setItem('mj-skin', sel.value); } catch (e) {} location.reload(); }; } }   /* 바꾸면 다시 불러옴: 새 스킨도 로딩 때 가볍게 바꿔 끼워야 해서 */
   const fly = await makeFlight(renderer, B, [B0.x, B0.z], 0, FG); scene.add(fly); const FS = fly.userData.S; fly.visible = false;
-  const oldSh = []; fly.traverse(o => { if (o.isMesh && o.renderOrder === 1 && o.geometry.type === 'PlaneGeometry') oldSh.push(o); });
   /* 기체는 한 대만 (사용자 2026-11-06): 조이스틱으로 모는 그 기체가 태어나는 동안엔 기지 판 위(기지 안)에 앉아 있다가, 태어나면 그대로 이어서 몬다 */
   const bship = fly.children[0], S0 = bship.scale.x, bsm = bship.children[0];
   const shipHalf = new THREE.Box3().setFromObject(bship).getSize(new THREE.Vector3()).y / BS / 2;   /* 기지 단위로 */
@@ -251,10 +250,6 @@ export async function start(canvas, onProgress = () => {}) {
   const v3 = new THREE.Vector3(), say = $('#where');
   const CAMK = Math.tan(20 * Math.PI / 180) / Math.tan(10 * Math.PI / 180);   /* 롤처럼 좁은 시야(20°) + 멀리서 (사용자 2026-11-09): 거리 막대 값은 예전 40° 때와 같은 넓이로 보이게 곱함 → 위쪽으로 가도 기체 크기가 거의 그대로 · 먼 섬이 덜 보여 가벼움 */
   let t = 0, last = performance.now(), camD = 25 * .7 * CAMK; const WARP = { r: 0, s: 0 };
-  /* 로딩 때 미리 준비 (태어날 때 끊김 원인: 태어나는 순간 처음 보이는 빛·유성·탑·기체의 칠 계산법과 그림을 폰이 그 자리에서 만들어서) → 숨은 것까지 모두 꺼내 칠 계산법을 만들고 그림을 올려 둠 */
-  { const hid = []; scene.traverse(o => { if (!o.visible) { hid.push(o); o.visible = true; } }); renderer.setRenderTarget(bloom.scene); renderer.compile(scene, camera);
-    const seen = new Set(); scene.traverse(o => { for (const m of [].concat(o.material || [])) { if (!m || seen.has(m)) continue; seen.add(m); for (const k of ['map', 'emissiveMap', 'alphaMap', 'normalMap', 'roughnessMap']) if (m[k]) renderer.initTexture(m[k]); if (m.uniforms) for (const u of Object.values(m.uniforms)) if (u && u.value && u.value.isTexture) renderer.initTexture(u.value); } });
-    renderer.setRenderTarget(null); hid.forEach(o => o.visible = false); }
   /* 기지 한 판 움직임 (게임 중 · 로딩 때 미리 돌려 보기에서 같이 씀) */
   const baseStep = (t, dt) => {
     const on = t >= onAt, filling = t >= holdAt; if (on && !born) { born = true; bship.visible = true; birth.userData.start(t); } B0.mag.userData.setHold(filling && !flying);
@@ -268,6 +263,14 @@ export async function start(canvas, onProgress = () => {}) {
     wake(.6); for (let ts = 0; ts < launchAt + 1.5; ts += .08) { baseStep(ts, .08); for (const A of AMS) A.watch(); }
     birth.userData.stop(); let saved = 0; for (const A of AMS) saved += A.merge().saved; console.log('[새 맵] 미리 합친 부품', saved); }
   wake(.6);
+  /* 로딩 때 미리 준비 (태어날 때 끊김 원인: 태어나는 순간 처음 보이는 빛·유성·탑·기체의 칠 계산법과 모양을 폰이 그 자리에서 만들어서)
+     · 합치기·태어날 준비까지 다 끝난 마지막 모습으로 함 (예전엔 합치기 전에 해서 합친 모양은 처음 보일 때 올렸음)
+     · 숨은 것은 모두 꺼내되 숨은 불빛은 그대로 둠: 불빛 개수가 다르면 칠 계산법이 달라져, 숨은 불빛까지 켜고 만든 계산법은 게임에서 못 쓰고 태어날 때 21개를 새로 만들었음 (2026-11-10)
+     · 계산법만 만들지 않고 한 번 실제로 그려 모양·그림까지 올려 둠 (화면 밖이라 빠지는 것도 그리게 잠깐 '화면 밖 빼기'를 끔) */
+  { const hid = [], cull = []; scene.traverse(o => { if (!o.visible && !o.isLight) { hid.push(o); o.visible = true; } if (o.frustumCulled) { cull.push(o); o.frustumCulled = false; } });
+    renderer.setRenderTarget(bloom.scene); renderer.compile(scene, camera); renderer.render(scene, camera); renderer.clear();
+    const seen = new Set(); scene.traverse(o => { for (const m of [].concat(o.material || [])) { if (!m || seen.has(m)) continue; seen.add(m); for (const k of ['map', 'emissiveMap', 'alphaMap', 'normalMap', 'roughnessMap']) if (m[k]) renderer.initTexture(m[k]); if (m.uniforms) for (const u of Object.values(m.uniforms)) if (u && u.value && u.value.isTexture) renderer.initTexture(u.value); } });
+    renderer.setRenderTarget(null); hid.forEach(o => o.visible = false); cull.forEach(o => o.frustumCulled = true); }
   /* 깨진 숫자 찾기 (사용자 2026-11-10: 태어날 때 기체가 안 보이고 화면이 빈 채 '한가운데까지 NaNm' — 여기 시험기에선 안 생겨 폰에서 원인을 봐야 함)
      · 고치거나 가리지 않음: 숫자가 처음 깨진 순간 어디서 · 무엇이 · 그때 상태를 화면 아래에 글자로 남겨 둠 (사진 찍어 보내면 원인을 바로 앎) */
   const BAD = { el: null, prev: '' }, fin = v => typeof v !== 'number' || Number.isFinite(v);
@@ -290,7 +293,7 @@ export async function start(canvas, onProgress = () => {}) {
     if (!flying && t >= launchAt) { launch(t); chk('튀어 나가기'); }
     if (look.id === null) { const k = Math.min(1, dt * 3.5); look.x -= look.x * k; look.z -= look.z * k; }   /* 손 떼면 돌아옴 */
     /* 기체 */
-    if (flying) { fly.position.y = flyY; fly.updateMatrixWorld(true); fly.userData.update(t, dt); for (const o of oldSh) o.visible = false; chk('기체 몰기'); }
+    if (flying) { fly.position.y = flyY; fly.updateMatrixWorld(true); fly.userData.update(t, dt); chk('기체 몰기'); }
     zoneTick();
     FG.step(dt, t, { moving: flying && Math.hypot(FS.vx, FS.vz) > 1.5, fire: flying && fireOn });   /* 기체 움직임: 날면 무빙 자세(날개짓 빨라짐) · 쏘면 입을 벌림 */
     { const sp = flying ? bship.getWorldPosition(v3) : v3.set(cam.x, cam.y, cam.z); sight.position.set(sp.x, sp.y - .2, sp.z); sightU.uOn.value += ((flying || dead ? 1 : 0) - sightU.uOn.value) * Math.min(1, dt * 1.5); sightU.uT.value = t; }

@@ -11,9 +11,9 @@
 import * as THREE from 'three';
 import { buildShip, engineSpots } from '../core/ships/build.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { flameMesh } from './sortie.js?v=11101146';
-import { MAP } from './mapfloor.js?v=11101146';
-import { applyShipHeat, heatVis } from './shipheat.js?v=11101146';
+import { flameMesh } from './sortie.js?v=11101210';
+import { MAP } from './mapfloor.js?v=11101210';
+import { applyShipHeat, heatVis } from './shipheat.js?v=11101210';
 
 export const FLY = { LEN: 2, HOVER: .7, R: .8, SPEEDS: [9, 12, 15, 18], TURN: 7, ACC: .22, TURNMAX: 9,
   BASE: 9, SHIELD: 3, BOOST: 5, BOOSTK: 1.5 };   /* 기지 고리(반지름 9m)를 벗어나는 순간: 보호막 3초 · 가속 5초(1.5배) — 기지 출구 앞 매복에 바로 당하지 않게 */
@@ -42,10 +42,11 @@ export async function loadBlock(url) {
     region: (x, z) => { const k = at(x, z); return k < 0 ? 17 : reg[k]; } };
 }
 
-/* model: 미리 만든 기체 { root, sm(모양 덩어리), engines(엔진 빛 자리) } — 없으면 예전 기체를 불러 옴 (초프리미엄 스킨은 forgeship.js가 만들어 넘김 · 엔진 불꽃 · 꼬리는 그 기체 효과를 넣을 때까지 안 그림) */
+/* model: 미리 만든 기체 { root, sm(모양 덩어리) } — 없으면 예전 기체를 불러 옴
+   초프리미엄 스킨(forgeship.js)은 불길·번개·서리 같은 제 효과를 몸에 달고 있어서, 예전 기체용 엔진 불꽃 · 꼬리 띠 · 바닥 그림자는 만들지 않음 (2026-11-10 찌꺼기 정리) */
 export async function makeFlight(renderer, B, start, face, model = null) {
   const G = new THREE.Group(), K = FLY.LEN / 2.9; let ship, sm, ENG;
-  if (model) { ship = model.root; sm = model.sm; ENG = model.engines; }
+  if (model) { ship = model.root; sm = model.sm; ENG = []; }
   else { const b = await buildShip(1, 1, 'ruby', { renderer, size: FLY.LEN }); ship = b.root; sm = ship.children[0];
     ENG = engineSpots(b.ship, sm, new THREE.Box3().setFromObject(sm).getSize(new THREE.Vector3()));
     mergeShip(sm); }   /* 기체 부품 145개를 칠마다 하나로 (모양·칠 그대로 · 그리는 횟수 145번 → 몇 번) */
@@ -55,7 +56,7 @@ export async function makeFlight(renderer, B, start, face, model = null) {
   const shM = new THREE.ShaderMaterial({ transparent: true, depthWrite: false, uniforms: { uA: { value: .5 } },
     vertexShader: 'varying vec2 vP; void main(){ vP=position.xy; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.); }',
     fragmentShader: 'uniform float uA; varying vec2 vP; void main(){ vec2 q=vP*vec2(1.,1.6); float r=dot(q,q); gl_FragColor=vec4(0.,0.,0.,exp(-r*3.)*uA); }' });
-  const shadow = new THREE.Mesh(new THREE.PlaneGeometry(FLY.LEN * 1.3, FLY.LEN * 1.3), shM); shadow.rotation.x = -Math.PI / 2; shadow.renderOrder = 1; G.add(shadow);
+  const shadow = model ? null : new THREE.Mesh(new THREE.PlaneGeometry(FLY.LEN * 1.3, FLY.LEN * 1.3), shM); if (shadow) { shadow.rotation.x = -Math.PI / 2; shadow.renderOrder = 1; G.add(shadow); }
   /* 꼬리: 엔진 뒤 지난 자리 → 위에서 보는 넓은 띠, 빠를수록 오래 남음 */
   const NT = 40, tp = new Float32Array(NT * 6), ta = new Float32Array(NT * 2), ts = new Float32Array(NT * 2), ti = [];
   for (let i = 0; i < NT; i++) { ts[i * 2] = -1; ts[i * 2 + 1] = 1; if (i < NT - 1) { const p = i * 2; ti.push(p, p + 1, p + 2, p + 1, p + 3, p + 2); } }
@@ -63,7 +64,7 @@ export async function makeFlight(renderer, B, start, face, model = null) {
   const trail = new THREE.Mesh(tg, new THREE.ShaderMaterial({ ...AB, side: THREE.DoubleSide,
     vertexShader: 'attribute float aA, aS; varying float vA, vS; void main(){ vA=aA; vS=aS; gl_Position=projectionMatrix*viewMatrix*vec4(position,1.); }',
     fragmentShader: 'varying float vA, vS; void main(){ float x=max(0.,1.-vS*vS); vec3 c=mix(vec3(.3,.55,1.4),vec3(.95,.97,1.3),vA*vA); gl_FragColor=vec4(c*x*vA*.8,1.); }' }));
-  trail.frustumCulled = false; trail.renderOrder = 8; G.add(trail); const hist = [];
+  trail.frustumCulled = false; trail.renderOrder = 8; if (ENG.length) G.add(trail); const hist = [];
   /* 불티: 벽에 세게 닿은 자리에서 튀고, 떨어지며 식음(하양 → 주황 → 꺼짐) */
   const NS = 60, sg = new THREE.BufferGeometry(); sg.setAttribute('position', new THREE.BufferAttribute(new Float32Array(NS * 3), 3)); sg.setAttribute('aL', new THREE.BufferAttribute(new Float32Array(NS), 1));
   const sparks = new THREE.Points(sg, new THREE.ShaderMaterial({ ...AB, uniforms: { uPx: { value: 600 } },
@@ -187,7 +188,7 @@ void main() {
       let a = 1; if (on && S.shield < .8) a = .45 + .55 * (Math.sin((.8 - S.shield) * (10 + (.8 - S.shield) * 30)) > 0 ? 1 : 0);
       if (!on && S.pop > 0) { S.pop -= dt; const k = 1 - S.pop / .3; { const q = 1 + k * .9; shieldMesh.scale.set(q, q * .7, q); } a = (1 - k); } else { const q = 1 + Math.sin(t * 6) * .015; shieldMesh.scale.set(q, q * .7, q); }
       u.uA.value = a; u.uT.value = t; }
-    shadow.position.set(S.x, .05, S.z); shadow.rotation.z = S.head; shM.uniforms.uA.value = .55 - bob;
+    if (shadow) { shadow.position.set(S.x, .05, S.z); shadow.rotation.z = S.head; shM.uniforms.uA.value = .55 - bob; }
     if (S.shake > 0) { S.shake = Math.max(0, S.shake - dt * 2); ship.position.x += Math.sin(t * 70) * .03 * S.shake; ship.position.z += Math.cos(t * 63) * .02 * S.shake; }   /* 과열 순간 파르르 */
     ship.updateMatrixWorld(true); fw.set(0, 0, -1).transformDirection(ship.matrixWorld);
     heatFx.update(S.heatV || 0, S.heatFlash || 0); S.nose = heatFx.nose.clone().applyMatrix4(ship.matrixWorld); S.heatVis = heatVis(S.heatV || 0);
@@ -195,7 +196,7 @@ void main() {
     const gf = (S.goo || 0) * (.5 + .5 * Math.sin(t * 23) * Math.sin(t * 7.3)), I = (.35 + S.thr * 1.1) * (1 + .5 * bk) * (1 - .45 * gf),   /* 점액에 붙잡히면 불꽃이 힘겹게 깜빡임 */ len = (.35 + S.thr * 1.1) * K * (1 + .8 * bk);   /* 가속 중엔 불꽃이 길고 밝음 (힘을 더 냄) */
     flames.forEach((f, i) => { v.copy(ENG[i]).applyMatrix4(sm.matrixWorld); const u = f.material.uniforms; u.uA.value.copy(v); u.uB.value.copy(v).addScaledVector(fw, -len * (.9 + .1 * Math.sin(t * 50 + i))); u.uW.value = .1 * K * (1 + S.thr * .4); u.uI.value = I; u.uT.value = t; });
     /* 꼬리 */
-    trail.visible = ENG.length > 0; if (ENG.length) {
+    if (ENG.length) {
     c.set(0, 0, 0); ENG.forEach(p => c.add(v.copy(p).applyMatrix4(sm.matrixWorld))); c.divideScalar(ENG.length);
     if (t < (S.dashUntil || 0) + .35) hist.length = 0;   /* 빛 칼날 도약 동안은 엔진 꼬리를 남기지 않음 (굵은 띠가 남던 것) */
     hist.unshift({ p: c.clone(), t }); if (hist.length > NT) hist.pop();
