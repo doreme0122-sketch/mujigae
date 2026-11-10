@@ -9,12 +9,12 @@
    · 가는 동안 공격받지 않음 · 가운데층에 있을 땐 윗층 섬을 점무늬로 옅게 비킴 · 식물(나무·풀)은 막지 않음 */
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
-import { makeBloom } from '../core/hangar/bloom.js?v=11110107';
-import { makePerf } from './perf.js?v=11110107';
+import { makeBloom } from '../core/hangar/bloom.js?v=11110123';
+import { makePerf } from './perf.js?v=11110123';
 import { makeGlow } from '../preview/glow.js';
-import { makeGlbIsle } from './glbisle.js?v=11110107';
-import { makeFlight, FLY } from './flight.js?v=11110107';
-import { gate4, pedestal } from './gates.js?v=11110107';
+import { makeGlbIsle } from './glbisle.js?v=11110123';
+import { makeFlight, FLY } from './flight.js?v=11110123';
+import { gate4, pedestal } from './gates.js?v=11110123';
 
 const $ = s => document.querySelector(s), clamp = THREE.MathUtils.clamp, HOVER = FLY.HOVER, GAP = 2.9;
 const UP = new THREE.Color(1.45, 1.05, .42), DN = new THREE.Color(.72, .48, 1.55);
