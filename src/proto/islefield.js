@@ -1,0 +1,73 @@
+/* 초원 섬 하나의 모양 (2026-11-10 · 새 초원 첫 시험)
+   그림을 그대로 따라 하지 않고 느낌(신비로움 · 풍성함 · 깊이)만 가져옴. 게임 규칙에 맞춘 높낮이:
+   · 기체가 나는 높이 = 0.7 (판 위 판정 높이)
+   · 풀밭(가운데 단) = −6 → 기체 한참 아래. 내려다보며 넘어감 (나는 느낌: 바닥이 저 아래)
+   · 낮은 단 = −11 → 더 깊이 내려간 땅. 위아래로 겹겹이 깊어 보임
+   · 높은 고원 = +5 · 돌탑 = +7 → 기체보다 높아서 벽. 막고 시야를 가림 (롤의 벽 역할)
+   · 고원과 돌탑 사이 좁은 틈 = 길목 (싸움이 생기는 곳) · 그 위로 다리 (밑으로 날아 지나감)
+   · 고원에서 폭포가 떨어져 연못 → 물길 → 섬 가장자리에서 아래 안개 속으로 다시 떨어짐
+   모든 높이·자리는 이 파일 한 곳에서 정함 (땅 · 물 · 나무 · 막힘이 같은 모양을 씀) */
+
+/* 값 잡음: 같은 씨앗이면 늘 같은 모양 */
+const hash2 = (i, j) => { let h = (i * 374761393 + j * 668265263) | 0; h = (h ^ (h >>> 13)) * 1274126177 | 0; return ((h ^ (h >>> 16)) >>> 0) / 4294967296; };
+const sm = t => t * t * (3 - 2 * t);
+export function noise2(x, z) { const i = Math.floor(x), j = Math.floor(z), fx = x - i, fz = z - j, u = sm(fx), v = sm(fz);
+  const a = hash2(i, j), b = hash2(i + 1, j), c = hash2(i, j + 1), d = hash2(i + 1, j + 1);
+  return (a + (b - a) * u + (c - a) * v + (a - b - c + d) * u * v) * 2 - 1; }
+export function fbm(x, z, o = 4) { let s = 0, a = .5, f = 1; for (let k = 0; k < o; k++) { s += a * noise2(x * f + k * 17.3, z * f - k * 9.1); f *= 2.03; a *= .5; } return s; }
+export const smoothstep = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
+const smax = (a, b, k) => { const h = Math.max(0, Math.min(1, .5 + .5 * (a - b) / k)); return b + (a - b) * h + k * h * (1 - h); };
+const circ = (x, z, cx, cz, r) => r - Math.hypot(x - cx, z - cz);
+const capsule = (x, z, ax, az, bx, bz, r) => { const px = x - ax, pz = z - az, dx = bx - ax, dz = bz - az, t = Math.max(0, Math.min(1, (px * dx + pz * dz) / (dx * dx + dz * dz))); return r - Math.hypot(px - dx * t, pz - dz * t); };
+
+/* 높이 기준 */
+export const Y = { FLY: .7, MEADOW: -6, LOW: -11, PLATEAU: 5, PILLAR: 7.5, WATER: -7.1 };
+/* 자리 (북쪽 = −z = 화면 위쪽) */
+export const SPOT = {
+  plateau: [[-20, -16, 14], [-9, -25, 9], [-29, -6, 8]],
+  pillar: [10, -16, 4.6],
+  low: [[27, 13, 13], [18, 23, 8]],
+  pond: [-17, 1.6, 6.6],
+  channel: [-17, 1.6, -40, 10],
+  fall: null,             /* 폭포 자리는 모양에서 찾음 (아래 findFall) */
+  forest: [[13, 0, 8.5], [-3, 21, 6.5], [-24, -20, 6]],
+};
+
+export function makeField() {
+  const warp = (x, z) => [x + 4.5 * fbm(x * .03, z * .03, 3), z + 4.5 * fbm(x * .03 + 31, z * .03 - 7, 3)];
+  /* 섬 바깥 모양 (안쪽 +, 바깥 −, 대략 가장자리까지 거리) */
+  const mask = (x, z) => { const [u, w] = warp(x, z);
+    let d = circ(u, w, 0, 0, 30); for (const [cx, cz, r] of [[-20, -14, 22], [20, -12, 17], [26, 12, 17], [-22, 9, 19], [-4, 21, 16], [8, 16, 14]]) d = smax(d, circ(u, w, cx, cz, r), 6);
+    return d + 2.2 * fbm(x * .09, z * .09, 3) + .7 * fbm(x * .35, z * .35, 2); };
+  const plateau = (x, z) => { const [u, w] = warp(x * 1.1, z * 1.1); let d = -99; for (const [cx, cz, r] of SPOT.plateau) d = smax(d, circ(u, w, cx * 1.1, cz * 1.1, r * 1.1), 5); return d / 1.1 + .9 * fbm(x * .21, z * .21, 3); };
+  const pillar = (x, z) => { const an = Math.atan2(z - SPOT.pillar[1], x - SPOT.pillar[0]); return circ(x, z, SPOT.pillar[0], SPOT.pillar[1], SPOT.pillar[2]) + .7 * fbm(x * .45, z * .45, 3) + .45 * Math.sin(an * 7 + 1.3) + .25 * Math.sin(an * 13); };   /* 기둥 바위가 엮인 결 */
+  const low = (x, z) => { const [u, w] = warp(x, z); let d = -99; for (const [cx, cz, r] of SPOT.low) d = smax(d, circ(u, w, cx, cz, r), 5); return d + .8 * fbm(x * .17, z * .17, 3); };
+  const pond = (x, z) => circ(x, z, SPOT.pond[0], SPOT.pond[1], SPOT.pond[2]) + 1.1 * fbm(x * .19, z * .19, 3);
+  const chan = (x, z) => { const [ax, az, bx, bz] = SPOT.channel; return capsule(x, z, ax, az, bx, bz, 1.25 + .35 * fbm(x * .3, z * .3, 2)) + .35 * fbm(x * .4 + 5, z * .4, 2); };
+
+  /* 절벽 결: 바위가 층층이 쌓인 턱 (턱마다 이끼가 앉음) — 그냥 매끈한 비탈이 아니라 */
+  const ledges = (t, n, x, z) => { t = Math.min(1, Math.max(0, t + .06 * fbm(x * .3, z * .3, 2))); const s = t * n, i = Math.floor(s), f = s - i; return Math.min(1, (i + Math.pow(smoothstep(.35, 1, f), 1.6)) / n); };
+
+  const meadow = (x, z) => Y.MEADOW + .55 * fbm(x * .045, z * .045, 3) + .22 * fbm(x * .19, z * .19, 2);
+  /* 위 땅 높이 · 그 자리의 땅 종류 정보 */
+  function top(x, z) {
+    let h = meadow(x, z);
+    const lo = low(x, z), kl = ledges(smoothstep(-1.2, 3.2, lo), 2, x, z);
+    h += (Y.LOW + .4 * fbm(x * .08, z * .08, 2) - Y.MEADOW) * kl;
+    const pd = pond(x, z), kp = smoothstep(-1.8, 2.6, pd); h -= 2.4 * kp * kp * (1 - kl);
+    const ch = chan(x, z), kc = smoothstep(-.9, .7, ch) * (1 - smoothstep(-.5, 2, pd)); h = Math.min(h, h * (1 - kc) + (Y.WATER - .55) * kc);
+    const pl = plateau(x, z), kP = ledges(smoothstep(-1.4, 3.6, pl), 3, x, z);
+    h += (Y.PLATEAU + .7 * fbm(x * .07, z * .07, 3) - h) * kP;
+    const pi = pillar(x, z), kI = ledges(smoothstep(-1.2, 2.6, pi), 6, x + 40, z);
+    h += (Y.PILLAR + .5 * fbm(x * .3, z * .3, 2) - h) * kI;
+    const m = mask(x, z); h -= .9 * (1 - smoothstep(0, 1.8, m));   /* 가장자리 둥근 턱 */
+    return h; }
+  /* 아래 바위 몸통: 가장자리에서 급히 꺾여 가운데로 갈수록 깊이 · 층진 바위 결 */
+  function bottom(x, z, h, m) {
+    const d = 1.6 * smoothstep(0, .7, m) + 36 * Math.pow(smoothstep(0, 30, m), .85) + 5 * smoothstep(4, 20, m) * fbm(x * .06, z * .06, 3) + 1.4 * fbm(x * .3, z * .3, 2) * smoothstep(0, 3, m);
+    return h - d; }
+  const H = (x, z) => top(x, z);
+  /* 기체를 막는 곳 = 기체가 나는 높이보다 높은 땅 (낮은 땅은 날아서 넘어감) */
+  const blocked = (x, z) => mask(x, z) > -1 && top(x, z) > Y.FLY - 1.2;
+  return { mask, plateau, pillar, low, pond, chan, top, bottom, H, blocked };
+}
