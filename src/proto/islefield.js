@@ -42,7 +42,7 @@ export function makeField() {
   /* 섬 바깥 모양 (안쪽 +, 바깥 −, 대략 가장자리까지 거리) */
   const mask = (x, z) => { const [u, w] = warp(x, z);
     let d = circ(u, w, 0, 0, 30); for (const [cx, cz, r] of [[-20, -14, 22], [20, -12, 17], [26, 12, 17], [-22, 9, 19], [-4, 21, 16], [8, 16, 14]]) d = smax(d, circ(u, w, cx, cz, r), 6);
-    return d + 2.2 * fbm(x * .09, z * .09, 3) + .7 * fbm(x * .35, z * .35, 2); };
+    return d + 2.2 * fbm(x * .09, z * .09, 3) + .7 * fbm(x * .35, z * .35, 2) + .55 * (Math.abs(fbm(x * .55 + 7, z * .55, 2)) - .22) + .25 * fbm(x * 1.4, z * 1.4, 2); };   /* 마지막 둘: 부서져 떨어져 나간 듯 오목오목한 테두리 (칼로 자른 둥근 선이 아니게) */
   const plateau = (x, z) => { const [u, w] = warp(x * 1.1, z * 1.1); let d = -99; for (const [cx, cz, r] of SPOT.plateau) d = smax(d, circ(u, w, cx * 1.1, cz * 1.1, r * 1.1), 5); return d / 1.1 + .9 * fbm(x * .21, z * .21, 3); };
   const spire = (x, z, [cx, cz, r]) => { const an = Math.atan2(z - cz, x - cx); return circ(x, z, cx, cz, r) + .6 * fbm(x * .45, z * .45, 3) * r / 4 + .3 * Math.sin(an * 7 + cx) * r / 4.6 + .12 * Math.sin(an * 13 + cz) * r / 4.6; };   /* 기둥 바위가 엮인 결 */
   const low = (x, z) => { const [u, w] = warp(x, z); let d = -99; for (const [cx, cz, r] of SPOT.low) d = smax(d, circ(u, w, cx, cz, r), 5); return d + .8 * fbm(x * .17, z * .17, 3); };
@@ -63,7 +63,7 @@ export function makeField() {
     const pl = plateau(x, z), kP = ledges(smoothstep(-1.4, 3.6, pl), 3, x, z);
     h += (Y.PLATEAU + .7 * fbm(x * .07, z * .07, 3) - h) * kP;
     for (const S of SPOT.spires) { const sp = spire(x, z, S); if (sp < -2) continue; const kI = ledges(smoothstep(-.9, 1.5, sp), 4, x + 40 + S[0], z);   /* 깎아지른 벽 + 평평한 꼭대기 (뾰족한 고깔이 아니라 기둥 바위) */ h += (S[3] + .4 * fbm(x * .3, z * .3, 2) - h) * kI; }
-    const m = mask(x, z); h -= .9 * (1 - smoothstep(0, 1.8, m));   /* 가장자리 둥근 턱 */
+    const m = mask(x, z), sh = 1 - smoothstep(0, 3.2, m); h -= (1.5 + .6 * fbm(x * .4, z * .4, 2)) * sh * sh;   /* 가장자리 둥근 어깨: 테두리로 갈수록 둥글게 꺾여 내려감 (칼처럼 끊기지 않게) */
     return h; }
   /* 아래 바위 몸통: 가장자리에서 급히 꺾여 가운데로 갈수록 깊이 · 층진 바위 결 */
   function bottom(x, z, h, m) {

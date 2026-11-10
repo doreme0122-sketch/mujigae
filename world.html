@@ -70,7 +70,7 @@ window.__ver = fetch('ver.json?t=' + Date.now(), { cache: 'no-store' }).then(r =
 <div id="load"><p>맵을 깔고 있어요</p><div class="b"><i></i></div></div>
 <div id="rot">기기를 가로로 돌려 주세요</div>
 <script type="module">
-import { start } from './src/proto/worldview.js?v=11102142';
+import { start } from './src/proto/worldview.js?v=11102203';
 await window.__ver;
 const bar = document.querySelector('#load i');
 start(document.querySelector('#cv'), p => { bar.style.transform = `scaleX(${p})`; })
