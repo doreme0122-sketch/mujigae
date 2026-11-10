@@ -72,7 +72,7 @@ export function makeField() {
   /* 위 땅 높이 · 그 자리의 땅 종류 정보 */
   function top(x, z) {
     let h = meadow(x, z);
-    const lo = low(x, z), kl = ledges(smoothstep(-1.2, 3.2, lo), 2, x, z);
+    const lo = low(x, z), kl = ledges(smoothstep(-.7, 2.4, lo), 3, x, z);   /* 낮은 단: 흐릿한 비탈이 아니라 세 턱으로 층진 바위 벽 (사용자 2026-11-10) */
     h += (Y.LOW + .4 * fbm(x * .08, z * .08, 2) - Y.MEADOW) * kl;
     const pd = pond(x, z), kp = smoothstep(-1.8, 2.6, pd); h -= 2.4 * kp * kp * (1 - kl);
     const ch = chan(x, z), kc = smoothstep(-.9, .7, ch) * (1 - smoothstep(-.5, 2, pd)); h = Math.min(h, h * (1 - kc) + (Y.WATER - .55) * kc);
