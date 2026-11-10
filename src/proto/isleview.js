@@ -2,14 +2,14 @@
    · 카메라 · 화면 밝기 처리 · 기체 · 조종은 새 맵(map2)과 같은 것 · 섬만 새것 */
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
-import { makeBloom } from '../core/hangar/bloom.js?v=11110142';
-import { makeForgeShip, forgeList } from './forgeship.js?v=11110142';
-import { makePerf } from './perf.js?v=11110142';
-import { makeFlight, FLY, padZone } from './flight.js?v=11110142';
-import { buildIsle } from './isle.js?v=11110142';
-import { makeInputBuffer } from './inbuf.js?v=11110142';
-import { makeLiftFx } from './liftfx.js?v=11110142';
-import { gate4 } from './gates.js?v=11110142';
+import { makeBloom } from '../core/hangar/bloom.js?v=11110842';
+import { makeForgeShip, forgeList } from './forgeship.js?v=11110842';
+import { makePerf } from './perf.js?v=11110842';
+import { makeFlight, FLY, padZone } from './flight.js?v=11110842';
+import { buildIsle } from './isle.js?v=11110842';
+import { makeInputBuffer } from './inbuf.js?v=11110842';
+import { makeLiftFx } from './liftfx.js?v=11110842';
+import { gate4 } from './gates.js?v=11110842';
 
 const $ = s => document.querySelector(s);
 export async function start(canvas, onProgress = () => {}, opt = {}) {   /* opt.layout: 섬 배치 (없으면 섬 하나 시험 · 초원 한 조각 체험판 = meadowsector.js) */
@@ -138,38 +138,15 @@ export async function start(canvas, onProgress = () => {}, opt = {}) {   /* opt.
   const cfg = { ang: 45, dist: 25 }; const bind = (id, key, fmt) => { const el = $('#' + id), out = $('#' + id + 'v'); if (!el) return; const rd = () => { cfg[key] = +el.value; out.textContent = fmt(+el.value); }; el.addEventListener('input', rd); rd(); };
   bind('ang', 'ang', v => v + '°'); bind('dist', 'dist', v => v + 'm');
   const CAMK = Math.tan(20 * Math.PI / 180) / Math.tan(10 * Math.PI / 180); let camD = cfg.dist * CAMK; const cam = { x: START[0], z: START[1] };
-  /* 탑뷰 속임수 (사용자 2026-11-11 · 시험): 바닥은 바로 위에서 본 2D처럼 평평하게 · 솟은 것(산 · 돌탑 · 동굴 입구 · 기체)만 높이만큼 화면 위로 살짝 밀어 옆모습이 조금 보이게
-     → 구역을 어느 방향으로 돌려 붙여도 바닥은 똑같이 보이고, 높은 것이 뒤를 가리는 폭은 높이 × 기울기만큼만
-     · 원근 없는 카메라가 바로 아래를 봄 + 높이에 비례해 화면 위로 미는 비틀기 (모든 그림에 똑같이 · 바닥 높이 차가 작아 거의 평평) */
-  const TOP = { on: false, lean: .35, H: 200 }; try { const o = JSON.parse(localStorage.getItem('mj-isle-top') || '{}'); TOP.on = !!o.on; if (o.lean) TOP.lean = o.lean; } catch (e) {}
-  const orthoM = new THREE.Matrix4(), shearM = new THREE.Matrix4(), topH = () => camD / CAMK * .95;   /* 탑뷰에서 화면 세로에 보이는 땅 길이 (지금 시점과 비슷하게) */
-  { const view = $('#view'), box = document.createElement('div'); box.style.cssText = 'display:flex;flex-direction:column;gap:4px;margin-top:4px';
-    const b = document.createElement('button'); b.type = 'button'; b.style.cssText = 'font-size:11px;padding:4px 8px;border:1px solid rgba(185,255,74,.4);border-radius:9px;color:#e8ffd0';
-    const row = document.createElement('div'); row.className = 'row'; row.innerHTML = '<label for="lean">기울기</label><input id="lean" type="range" min="0.1" max="0.7" step="0.05"><output id="leanv"></output>';
-    const save = () => { try { localStorage.setItem('mj-isle-top', JSON.stringify({ on: TOP.on, lean: TOP.lean })); } catch (e) {} };
-    const draw = () => { b.textContent = `시점: ${TOP.on ? '탑뷰 속임수' : '지금 (45°)'} · 눌러서 바꾸기`; row.hidden = !TOP.on; const ang = $('#ang'); if (ang) ang.closest('.row').hidden = TOP.on; };
-    b.onclick = () => { TOP.on = !TOP.on; if (!TOP.on) { camera.up.set(0, 1, 0); camera.updateProjectionMatrix(); size(); } save(); draw(); };
-    box.append(b, row); view?.append(box); const lean = row.querySelector('input'), lv = row.querySelector('output'); lean.value = TOP.lean; lv.textContent = TOP.lean.toFixed(2);
-    lean.oninput = () => { TOP.lean = +lean.value; lv.textContent = TOP.lean.toFixed(2); save(); }; draw(); }
-  /* 가림 걷기 (사용자 2026-11-11: 둘 다 보고 정함): 지금(작게 · 다 걷음) → 크게(다 걷음) → 크게 반투명(반쯤 비침 — 산 모양은 유리처럼 남고 너머가 보임) · 크기는 막대로 */
-  const CUT = { mode: 0, r: LO.cut || 0 }; try { const o = JSON.parse(localStorage.getItem('mj-isle-cut') || '{}'); if (o.mode >= 0) CUT.mode = o.mode; if (o.r) CUT.r = o.r; } catch (e) {}
-  if (LO.cut) { const view = $('#view'), box = document.createElement('div'); box.style.cssText = 'display:flex;flex-direction:column;gap:4px;margin-top:4px';
-    const b = document.createElement('button'); b.type = 'button'; b.style.cssText = 'font-size:11px;padding:4px 8px;border:1px solid rgba(185,255,74,.4);border-radius:9px;color:#e8ffd0';
-    const row = document.createElement('div'); row.className = 'row'; row.innerHTML = '<label for="cutr">걷기 크기</label><input id="cutr" type="range" min="2" max="25" step="0.5"><output id="cutrv"></output>';
-    const inp = row.querySelector('input'), out2 = row.querySelector('output'), NM = ['지금 (작게)', '크게', '크게 반투명'];
-    const save = () => { try { localStorage.setItem('mj-isle-cut', JSON.stringify({ mode: CUT.mode, r: CUT.r })); } catch (e) {} };
-    const draw = () => { b.textContent = `가림 걷기: ${NM[CUT.mode]} · 눌러서 바꾸기`; inp.value = CUT.r; out2.textContent = CUT.r + 'm'; };
-    b.onclick = () => { CUT.mode = (CUT.mode + 1) % 3; CUT.r = CUT.mode === 0 ? LO.cut : 14; save(); draw(); };
-    inp.oninput = () => { CUT.r = +inp.value; save(); draw(); }; box.append(b, row); view?.append(box); draw(); }
   const look = { x: 0, z: 0, id: null, px: 0, py: 0 };
   addEventListener('pointerdown', e => { if (look.id !== null || e.target.closest('#ui') || padZone(e.clientX, e.clientY) || inZone(e.clientX, e.clientY)) return; look.id = e.pointerId; look.px = e.clientX; look.py = e.clientY; });
-  addEventListener('pointermove', e => { if (e.pointerId !== look.id) return; const r = canvas.getBoundingClientRect(), mpp = (TOP.on ? topH() : 2 * camD * Math.tan(camera.fov * Math.PI / 360)) / Math.max(1, r.height), a = TOP.on ? Math.PI / 2 : cfg.ang * Math.PI / 180;
+  addEventListener('pointermove', e => { if (e.pointerId !== look.id) return; const r = canvas.getBoundingClientRect(), mpp = 2 * camD * Math.tan(camera.fov * Math.PI / 360) / Math.max(1, r.height), a = cfg.ang * Math.PI / 180;
     look.x -= (e.clientX - look.px) * mpp; look.z -= (e.clientY - look.py) * mpp / Math.max(.35, Math.sin(a)); const l = Math.hypot(look.x, look.z); if (l > 90) { look.x *= 90 / l; look.z *= 90 / l; } look.px = e.clientX; look.py = e.clientY; });
   const up = e => { if (e.pointerId === look.id) look.id = null; }; addEventListener('pointerup', up); addEventListener('pointercancel', up);
 
   let Wd = 2, Hd = 2; const perf = makePerf(st => { bloom.setSamples(st.aa ? 4 : 0); size(); });
   function size() { const r = canvas.getBoundingClientRect(); [Wd, Hd] = perf.size(r.width, r.height); renderer.setSize(Wd, Hd, false); bloom.size(Wd, Hd); lfx.size(Wd, Hd); camera.aspect = Wd / Hd; camera.updateProjectionMatrix();
-    const px = Hd / (2 * Math.tan(camera.fov * Math.PI / 360)); isle.setPx(px); fly.userData.setPx?.(px); TOP.ppu = 0; }
+    const px = Hd / (2 * Math.tan(camera.fov * Math.PI / 360)); isle.setPx(px); fly.userData.setPx?.(px); }
   addEventListener('resize', size); size(); bloom.setSamples(perf.st.aa ? 4 : 0);
   /* 무게 표시 */
   const info = document.createElement('div'); info.style.cssText = 'position:absolute;top:calc(env(safe-area-inset-top,0px) + 50px);left:max(18px,env(safe-area-inset-left,0px));font-size:11px;color:rgba(185,255,74,.85);pointer-events:none;font-family:monospace;line-height:1.5'; $('#ui').append(info);
@@ -192,18 +169,13 @@ export async function start(canvas, onProgress = () => {}, opt = {}) {   /* opt.
     fly.position.y = LV.y - FLY.HOVER;
     fly.updateMatrixWorld(true); fly.userData.update(t, dt);
     { const S = fly.children[0], e = LV.f < 1 ? Math.sin(LV.f * Math.PI) : 0; S.rotateX(LV.dir * .52 * e);   /* 오르내릴 때 기수를 크게 들고 숙임 (사용자 2026-11-10: 높이감이 더 보이게 · 약 30°) */
-      const sc = TOP.on ? [.86, 1, 1.18] : [.92, 1, 1.1], a0 = sc[LV.cur], a1 = sc[LV.to], k = LV.f * LV.f * (3 - 2 * LV.f); S.scale.setScalar(a0 + (a1 - a0) * k); S.updateMatrixWorld(true); }
+      const sc = [.92, 1, 1.1], a0 = sc[LV.cur], a1 = sc[LV.to], k = LV.f * LV.f * (3 - 2 * LV.f); S.scale.setScalar(a0 + (a1 - a0) * k); S.updateMatrixWorld(true); }
     FG.step(dt, t, { moving: Math.hypot(FS.vx, FS.vz) > 1.5, fire: false });
     if (look.id === null) { const k = Math.min(1, dt * 3.5); look.x -= look.x * k; look.z -= look.z * k; }
     const sp = fly.children[0].position; { const k = Math.min(1, dt * 4); cam.x += (sp.x + FS.vx * .25 - cam.x) * k; cam.z += (sp.z + FS.vz * .25 - cam.z) * k; }
     { const cf = [.85, 1, 1.3], k = LV.f * LV.f * (3 - 2 * LV.f), f = cf[LV.cur] + (cf[LV.to] - cf[LV.cur]) * k; camD += (cfg.dist * CAMK * f - camD) * Math.min(1, dt * 3); }
-    const a = cfg.ang * Math.PI / 180, vx = cam.x + look.x, vz = cam.z + look.z, cy = LV.y;
-    if (TOP.on) { const hh = topH() / 2, asp = Wd / Hd, k = TOP.lean, H = TOP.H; camera.position.set(vx, cy + H, vz); camera.up.set(0, 0, -1); camera.lookAt(vx, cy, vz); camera.updateMatrixWorld();
-      orthoM.makeOrthographic(-hh * asp, hh * asp, hh, -hh, 1, H + 300); shearM.set(1, 0, 0, 0, 0, 1, k, k * H, 0, 0, 1, 0, 0, 0, 0, 1);   /* 화면 위쪽 = 북쪽 · 높이 1m마다 화면 위로 k m 밀림 */
-      camera.projectionMatrix.multiplyMatrices(orthoM, shearM); camera.projectionMatrixInverse.copy(camera.projectionMatrix).invert();
-      const ppu = Hd / topH() * H; if (Math.abs(ppu - (TOP.ppu || 0)) > 1) { TOP.ppu = ppu; isle.setPx(ppu); fly.userData.setPx?.(ppu); } }   /* 빛 알갱이 크기: 원근 없이 */
-    else { camera.position.set(vx, cy + camD * Math.sin(a), vz + camD * Math.cos(a)); camera.lookAt(vx, cy, vz); camera.updateMatrixWorld(); if (TOP.ppu) { TOP.ppu = 0; size(); } }
-    isle.sky.position.copy(camera.position); isle.update(t); if (LO.cut) isle.setCut(v3.set(FS.x, LV.y, FS.z), TOP.on ? new THREE.Vector3(FS.x, LV.y + 100, FS.z + TOP.lean * 100) : camera.position, CUT.r, CUT.mode === 2 ? .55 : 1);   /* 탑뷰: 기체를 가리는 건 바로 남쪽(화면 아래쪽)의 높은 것 */   /* 기체와 카메라 사이 높은 산 · 동굴 천장을 내 화면에서만 걷어 냄 */ xrayM.uniforms.uT.value = t;
+    const a = cfg.ang * Math.PI / 180, vx = cam.x + look.x, vz = cam.z + look.z, cy = LV.y; camera.position.set(vx, cy + camD * Math.sin(a), vz + camD * Math.cos(a)); camera.lookAt(vx, cy, vz); camera.updateMatrixWorld();
+    isle.sky.position.copy(camera.position); isle.update(t); if (LO.cut) isle.setCut(v3.set(FS.x, LV.y, FS.z), camera.position, LO.cut, .55);   /* 기체와 카메라 사이 높은 산 · 동굴 천장을 내 화면에서만 걷어 냄 · 확정(사용자 2026-11-11): 반투명 · 크기는 배치의 cut(7m) */ xrayM.uniforms.uT.value = t;
     /* 바람 고리 (1층이면 땅에 닿아 풀 · 꽃을 밂 · 2 · 3층은 그 높이 공중에서만) · 못 바꾸면 층 막대가 빨갛게 깜빡 */
     if (LV.puff < 1) { LV.puff = Math.min(1, LV.puff + dt / .7); const p = LV.puff, onGround = LV.puffL === 0, gh = isle.H(LV.puffX, LV.puffZ);
       puff.visible = !onGround || isle.mask(LV.puffX, LV.puffZ) > 0; puff.position.set(LV.puffX, onGround ? gh + .08 : LY[LV.puffL] - .45, LV.puffZ); puff.scale.setScalar(5.5); puffU.uP.value = p;

@@ -3,7 +3,7 @@
    · 남쪽 풀밭(출발) → 산맥 밑동의 동굴 입구 (들머리만 3층보다 높은 바위 천장) → 하늘이 트인 골짜기길 (양옆 산맥) → 넓은 공터 (빈 제단 · 지키는 몬스터 자리)
    · 산맥 = 땅의 테두리: 3층도 못 넘음 · 공터 둘레와 풀밭 양옆까지 감쌈 */
 export const CAVE = {
-  box: [-92, 92, -126, 66], dens: 2.4, tile: 40, cut: 4.5,
+  box: [-92, 92, -126, 66], dens: 2.4, tile: 40, cut: 7,   /* 가림 걷기 크기 7m (확정) */
   islands: [[[0, -20, 60], [-48, 8, 30], [48, 8, 30], [0, 32, 30], [-30, -70, 34], [30, -70, 34], [0, -92, 30]]],
   mount: { peak: 42, blobs: [[0, -52, 64], [-56, -20, 30], [56, -20, 30], [-64, 18, 18], [64, 18, 18]] },   /* 남쪽 끝(동굴 입구 앞면)이 풀밭 바로 뒤에서 높이 솟게 */
   gorge: { pts: [[0, 10], [0, -6], [-8, -24], [4, -42], [-4, -60], [0, -72]], w: 7, floor: -6.6,
@@ -16,9 +16,3 @@ export const CAVE = {
   pond: [14, 44, 4],
   start: [0, 48],
 };
-
-/* 6시 방향 (사용자 2026-11-11: 돌려 붙였을 때 산맥이 얼마나 가리는지 보려고): 구역 전체를 180° 돌림 → 동굴 입구가 화면 반대쪽(위)을 보고 산맥이 화면 아래쪽에서 골짜기를 가림 */
-export function turned(L) { const p = ([x, z, ...r]) => [-x, -z, ...r], R = JSON.parse(JSON.stringify(L));
-  R.box = [-L.box[1], -L.box[0], -L.box[3], -L.box[2]]; R.islands = L.islands.map(C => C.map(p)); R.mount.blobs = L.mount.blobs.map(p);
-  R.gorge.pts = L.gorge.pts.map(p); R.gorge.basin = p(L.gorge.basin); R.spires = L.spires.map(([x, z, r, h, k, rot]) => [-x, -z, r, h, k, rot + Math.PI]);
-  R.brush = L.brush.map(Z => Z.map(p)); R.pond = p(L.pond); R.start = p(L.start); return R; }
