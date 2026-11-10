@@ -79,11 +79,13 @@ export function makeField() {
     if (Y.PLATEAU > y - CLEAR && plateauS(x, z) > IN) return true;
     for (const S of SPOT.spires) if (S[3] > y - CLEAR && circ(x, z, S[0], S[1], S[2]) > IN * .6) return true;
     for (const o of obstacles) { const r = o[3] * .8, dx = x - o[0], dz = z - o[2]; if (dx * dx + dz * dz < r * r && Math.abs(y - o[1]) < r + CLEAR * .5) return true; } return false; };
-  /* 시야를 가리는 것 (그 층 높이에 걸리는 고원 · 돌탑 · 아치 기둥 — 보이는 모양 그대로) */
+  /* 시야를 가리는 것 (평평한 지도 위 바닥 모양만 · 3D 계산 없음): 그 층 높이에 걸리는 고원 · 돌탑 · 아치 다리
+     · 고원 · 돌탑은 절벽 몸통 둘레대로 · 아치는 땅에 박힌 다리 두 곳만 (가운데 휜 부분은 바닥 모양이 아니라서 안 가림) */
+  const archLegs = [];
   const sightBlock = (x, z, L) => { const y = LAYERS[L];
-    if (Y.PLATEAU > y - CLEAR && plateau(x, z) > 0) return true;
-    for (const S of SPOT.spires) if (S[3] > y - CLEAR && spire(x, z, S) > 0) return true;
-    for (const o of obstacles) { const dx = x - o[0], dz = z - o[2]; if (dx * dx + dz * dz < o[3] * o[3] && Math.abs(y - o[1]) < o[3] + CLEAR * .5) return true; } return false; };
+    if (Y.PLATEAU > y - CLEAR && plateau(x, z) > .8) return true;
+    for (const S of SPOT.spires) if (S[3] > y - CLEAR && spire(x, z, S) > .4) return true;
+    for (const a of archLegs) if (a[3] > y - CLEAR && (x - a[0]) ** 2 + (z - a[1]) ** 2 < a[2] * a[2]) return true; return false; };
   const brush = (x, z) => { let d = -99; for (const Z of SPOT.brush) { let e = -99; for (const [cx, cz, r] of Z) e = smax(e, circ(x, z, cx, cz, r), 2); d = Math.max(d, e); } return d + .5 * fbm(x * .6, z * .6, 2) + .2 * fbm(x * 1.7, z * 1.7, 2); };   /* 부쉬 안 + (가장자리가 덤불 뭉치처럼 물결) */
-  return { mask, plateau, pond, chan, brush, top, bottom, blocked, sightBlock, obstacles };
+  return { mask, plateau, pond, chan, brush, top, bottom, blocked, sightBlock, obstacles, archLegs };
 }

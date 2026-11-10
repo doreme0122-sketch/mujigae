@@ -7,7 +7,7 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { MeshoptSimplifier as MO } from '../../vendor/meshopt_simplifier.module.js';
-import { makeField, Y, SPOT, LAYERS, fbm, noise2, smoothstep } from './islefield.js?v=11101539';
+import { makeField, Y, SPOT, LAYERS, fbm, noise2, smoothstep } from './islefield.js?v=11101554';
 
 const SUN = new THREE.Vector3(-.45, .78, .44).normalize();   /* 왼쪽 위 앞에서 (카메라 쪽 절벽 면이 비스듬히 빛을 받아 결이 드러남) */
 const rngOf = s => () => (s = (s * 16807) % 2147483647) / 2147483647;
@@ -18,11 +18,11 @@ const GL = `
 float h21(vec2 p){ p = fract(p * vec2(123.34, 456.21)); p += dot(p, p + 45.32); return fract(p.x * p.y); }
 float vn(vec2 p){ vec2 i = floor(p), f = fract(p); f = f * f * (3. - 2. * f); return mix(mix(h21(i), h21(i + vec2(1., 0.)), f.x), mix(h21(i + vec2(0., 1.)), h21(i + vec2(1., 1.)), f.x), f.y); }
 float fb(vec2 p){ return vn(p) * .5 + vn(p * 2.07 + 3.1) * .25 + vn(p * 4.11 + 7.7) * .125 + vn(p * 8.3 + 1.3) * .0625; }
-uniform vec3 uSun; uniform float uT; uniform sampler2D uRay; uniform vec2 uVC; uniform float uVR, uK, uVOn;
+uniform vec3 uSun; uniform float uT; uniform sampler2D uRay; uniform vec2 uVC; uniform float uVR, uK, uVOn;   /* uRay: 보이는 칸 지도 · uVC: 지도 왼쪽 위 모서리(세상 좌표) · uVR: 지도 한 변 길이 */
 const vec3 SUNC = vec3(1.55, 1.45, 1.28), SKYC = vec3(.50, .62, .80), GNDC = vec3(.20, .22, .12), MIST = vec3(.50, .64, .80);
 vec3 lit(vec3 al, vec3 n, float sh, float ao){ float d = max(dot(n, uSun), 0.); return al * (SUNC * d * sh + mix(GNDC, SKYC, .5 + .5 * n.y) * ao + .05); }
 /* 시야 (2D 좌표 · 사용자 2026-11-10): 높이와 상관없이 그 자리의 x, z가 시야 안이면 밝고 밖이면 어둠 — 땅 · 절벽 · 나무 · 물 모두 자기 자리로 */
-float seen(vec3 lp){ vec2 d = lp.xz * uK - uVC; float r = length(d), reach = texture2D(uRay, vec2(atan(d.y, d.x) / 6.2831853 + .5, .5)).r * uVR; return mix(1., smoothstep(reach + .9, reach - .3, r), uVOn); }   /* 경계는 부드럽게 */
+float seen(vec3 lp){ vec2 uv = (lp.xz * uK - uVC) / uVR; float v = texture2D(uRay, uv).r; return mix(1., v * step(0., uv.x) * step(uv.x, 1.) * step(0., uv.y) * step(uv.y, 1.), uVOn); }   /* 칸 지도(번지게 한 것)에서 그 자리 x, z 값을 읽음 */
 vec3 fogged(vec3 c, vec3 wp){ float k = smoothstep(-16., -64., wp.y); c = mix(c, MIST, k * .85); return mix(c * vec3(.13, .15, .24), c, seen(wp)); }
 `;
 const U = { uSun: { value: SUN }, uT: { value: 0 }, uPush: { value: new THREE.Vector4(0, 0, 1, 0) }, uRay: { value: null }, uVC: { value: new THREE.Vector2() }, uVR: { value: 12 }, uK: { value: 1 }, uVOn: { value: 0 } };   /* uPush: 기체가 오르내릴 때 밑의 풀·덤불을 미는 바람 (x, z, 반지름, 세기 · 섬 안 단위) */
@@ -304,7 +304,8 @@ export async function buildIsle({ K = 1 } = {}) {   /* K: 섬 전체 크기 (기
           p.push(q.x + (a.x * ca + b.x * sa) * r, q.y + (a.y * ca + b.y * sa) * r, q.z + (a.z * ca + b.z * sa) * r); } });
       for (let k = 0; k < N; k++) for (let e = 0; e < sides; e++) { const A = k * (sides + 1) + e, B = A + sides + 1; idx.push(A, B, A + 1, A + 1, B, B + 1); }
       const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(p, 3)); g.setIndex(idx); g.computeVertexNormals(); parts.push(g);
-      pts.forEach((q, k) => { if (k % 2 === 0) F.obstacles.push([q.x, q.y, q.z, ra[k] * 1.1]); }); }
+      pts.forEach((q, k) => { if (k % 2 === 0) F.obstacles.push([q.x, q.y, q.z, ra[k] * 1.1]); });
+      F.archLegs.push([ax, az, ra[0] * .95, apex], [bx, bz, ra[N] * .95, apex]); }   /* 시야: 다리 바닥 자리만 */
     const m = new THREE.Mesh(mergeGeometries(parts), new THREE.ShaderMaterial({ uniforms: U,
       vertexShader: `varying vec3 vP, vN; void main(){ vP = position; vN = normal; gl_Position = projectionMatrix * viewMatrix * modelMatrix * vec4(position, 1.); }`,
       fragmentShader: GL + `varying vec3 vP, vN; void main(){ vec3 n = normalize(vN), an = abs(n); an /= an.x + an.y + an.z;

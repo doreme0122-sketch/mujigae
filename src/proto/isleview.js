@@ -2,11 +2,11 @@
    · 카메라 · 화면 밝기 처리 · 기체 · 조종은 새 맵(map2)과 같은 것 · 섬만 새것 */
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
-import { makeBloom } from '../core/hangar/bloom.js?v=11101539';
-import { makeForgeShip, forgeList } from './forgeship.js?v=11101539';
-import { makePerf } from './perf.js?v=11101539';
-import { makeFlight, FLY, padZone } from './flight.js?v=11101539';
-import { buildIsle } from './isle.js?v=11101539';
+import { makeBloom } from '../core/hangar/bloom.js?v=11101554';
+import { makeForgeShip, forgeList } from './forgeship.js?v=11101554';
+import { makePerf } from './perf.js?v=11101554';
+import { makeFlight, FLY, padZone } from './flight.js?v=11101554';
+import { buildIsle } from './isle.js?v=11101554';
 
 const $ = s => document.querySelector(s);
 export async function start(canvas, onProgress = () => {}) {
@@ -104,12 +104,19 @@ export async function start(canvas, onProgress = () => {}) {
       if (!b && L === 0) b = inBush(x, z);   /* 1층: 부쉬 덩이 하나가 구조물 (나무 한 그루씩은 없음) */
       A[j * VN + i] = b ? 1 : 0; } return A; });
   const occAt = (A, x, z) => { const i = Math.round((x - VX0) / VC), j = Math.round((z - VZ0) / VC); return i < 0 || j < 0 || i >= VN || j >= VM ? 0 : A[j * VN + i]; };
-  const NR = 256, rayTex = new THREE.DataTexture(new Uint8Array(NR * 4), NR, 1, THREE.RGBAFormat); rayTex.wrapS = THREE.RepeatWrapping; rayTex.magFilter = rayTex.minFilter = THREE.LinearFilter; rayTex.needsUpdate = true;
-  const ray = (L, x0, z0, dx, dz, R) => { const A = occ[L]; let inside = occAt(A, x0, z0); for (let d = .25; d < R; d += .25) { const o = occAt(A, x0 + dx * d, z0 + dz * d); if (inside) { if (!o) inside = 0; continue; } if (o) return d; } return R; };   /* 처음 서 있는 덤불·숲 안은 건너뜀 (안에서는 밖이 보임) */
-  const castSight = () => { const L = LV.f < .5 ? LV.cur : LV.to, R = VR[L], d = rayTex.image.data; const D = new Float32Array(NR); for (let k = 0; k < NR; k++) { const an = (k / NR - .5) * 6.2831853; D[k] = ray(L, FS.x, FS.z, Math.cos(an), Math.sin(an), R); }
-    for (let pass = 0; pass < 2; pass++) { const E = D.slice(); for (let k = 0; k < NR; k++) { const a = E[(k + NR - 1) % NR], b = E[(k + 1) % NR]; D[k] = Math.min(Math.max(E[k], Math.min(a, b)), Math.max(a, b)); } }   /* 빛줄기 하나만 튀는 실금(가는 검은 줄 · 가는 빛줄)을 메움 */
-    for (let k = 0; k < NR; k++) d[k * 4] = Math.round(D[k] / R * 255);
-    rayTex.needsUpdate = true; VRs += (R - VRs) * .2; isle.setSight(rayTex, FS.x, FS.z, VRs, 1); }; let VRs = VR[1];
+  /* 보이는 칸 지도 (롤처럼): 내 자리에서 사방 256줄로 닿는 거리를 재고 → 섬을 덮은 칸마다 보이는지 정하고 → 두 번 번지게 해서 경계를 안개처럼 부드럽게 */
+  const NR = 256, VG = 144, VS = 56, VO = [-28, -28], visA = new Float32Array(VG * VG), visB = new Float32Array(VG * VG), visTex = new THREE.DataTexture(new Uint8Array(VG * VG * 4), VG, VG, THREE.RGBAFormat);
+  visTex.magFilter = visTex.minFilter = THREE.LinearFilter; visTex.needsUpdate = true;
+  const ray = (L, x0, z0, dx, dz, R) => { const A = occ[L]; let inside = occAt(A, x0, z0); for (let d = .2; d < R; d += .2) { const o = occAt(A, x0 + dx * d, z0 + dz * d); if (inside) { if (!o) inside = 0; continue; } if (o) return d; } return R; };   /* 처음 서 있는 부쉬 안은 건너뜀 (안에서는 밖이 보임) */
+  let Rs = VR[1]; const D = new Float32Array(NR);
+  const castSight = () => { const L = LV.f < .5 ? LV.cur : LV.to; Rs += (VR[L] - Rs) * .25; const R = Rs;
+    for (let k = 0; k < NR; k++) { const an = k / NR * 6.2831853; D[k] = ray(L, FS.x, FS.z, Math.cos(an), Math.sin(an), R); }
+    const cs = VS / VG; for (let j = 0; j < VG; j++) for (let i = 0; i < VG; i++) { const dx = VO[0] + (i + .5) * cs - FS.x, dz = VO[1] + (j + .5) * cs - FS.z, dist = Math.hypot(dx, dz);
+      let v = 0; if (dist < R) { let a = Math.atan2(dz, dx) / 6.2831853 * NR; if (a < 0) a += NR; const k0 = a | 0, f = a - k0, reach = D[k0 % NR] * (1 - f) + D[(k0 + 1) % NR] * f; v = Math.min(1, Math.max(0, (reach - dist) / .5 + .5)) * Math.min(1, (R - dist) / 1.6); }
+      visA[j * VG + i] = v; }
+    for (let pass = 0; pass < 2; pass++) { for (let j = 0; j < VG; j++) for (let i = 0; i < VG; i++) { let t = 0, n = 0; for (let o = -2; o <= 2; o++) { const ii = i + o; if (ii >= 0 && ii < VG) { t += visA[j * VG + ii]; n++; } } visB[j * VG + i] = t / n; }
+      for (let j = 0; j < VG; j++) for (let i = 0; i < VG; i++) { let t = 0, n = 0; for (let o = -2; o <= 2; o++) { const jj = j + o; if (jj >= 0 && jj < VG) { t += visB[jj * VG + i]; n++; } } visA[j * VG + i] = t / n; } }   /* 번지게 */
+    const px = visTex.image.data; for (let k = 0; k < VG * VG; k++) px[k * 4] = visA[k] * 255 | 0; visTex.needsUpdate = true; isle.setSight(visTex, VO[0], VO[1], VS, 1); };
   /* 연습 표적 4대: 1층 부쉬 안 · 1층 트인 풀밭 · 2층 돌탑 둘레 · 3층 하늘 — 보이는지 시험용 (안 보이면 스르륵 사라짐) */
   const dummies = [[0, 6.5, 0, 0], [0, -2, 6, 3], [1, 11, -1.5, 4.5], [2, 0, 0, 11]].map(([L, cx, cz, r], k) => {
     const g = new THREE.Group(), c = LC[L], m = new THREE.MeshBasicMaterial({ color: new THREE.Color(...c).multiplyScalar(1.3), transparent: true });
