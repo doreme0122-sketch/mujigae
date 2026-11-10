@@ -5,18 +5,18 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
-import { makeBloom } from '../core/hangar/bloom.js?v=11100904';
-import { makePad } from '../core/hangar/pad.js?v=11100904';
-import { makeMag } from '../core/hangar/mag.js?v=11100904';
-import { makeForgeShip, forgeList } from './forgeship.js?v=11100904';
-import { makeGoldStar } from './goldstar.js?v=11100904';
-import { makeArena, SPEED, WAVE_R0 } from './arena.js?v=11100904';
-import { makeGuardians, GUARD } from './guardian.js?v=11100904';
-import { makeBirth, BIRTH } from './birth.js?v=11100904';
-import { makePerf } from './perf.js?v=11100904';
-import { autoMerge } from './automerge.js?v=11100904';
+import { makeBloom } from '../core/hangar/bloom.js?v=11100928';
+import { makePad } from '../core/hangar/pad.js?v=11100928';
+import { makeMag } from '../core/hangar/mag.js?v=11100928';
+import { makeForgeShip, forgeList } from './forgeship.js?v=11100928';
+import { makeGoldStar } from './goldstar.js?v=11100928';
+import { makeArena, SPEED, WAVE_R0 } from './arena.js?v=11100928';
+import { makeGuardians, GUARD } from './guardian.js?v=11100928';
+import { makeBirth, BIRTH } from './birth.js?v=11100928';
+import { makePerf } from './perf.js?v=11100928';
+import { autoMerge } from './automerge.js?v=11100928';
 import { makeGlow } from '../preview/glow.js';
-import { makeFlight, FLY, PADZ, padZone } from './flight.js?v=11100904';
+import { makeFlight, FLY, PADZ, padZone } from './flight.js?v=11100928';
 
 const $ = s => document.querySelector(s), clamp = THREE.MathUtils.clamp, HOVER = FLY.HOVER;
 const R = 240, NB = 10, GAPH = 5.6, BASE_D = 0;     /* 맵 반지름 · 기지 수 · 벽 틈 반 폭(= 기지 반지름) · 기지 가운데는 벽 선 위 (앞 절반은 맵 안, 뒤 절반은 맵 밖 · 사용자 2026-11-06) */
@@ -209,9 +209,9 @@ export async function start(canvas, onProgress = () => {}) {
   const zoneTick = () => { const idle = (performance.now() - zoneT) / 1000, show = zoneOn ? 1 : Math.max(.18, 1 - Math.max(0, idle - 1.2) * .6);   /* 손 떼고 1초 남짓 뒤 서서히 옅어짐 */
     zsv.style.opacity = show.toFixed(2); zsv.style.display = flying || dead ? '' : 'none';
     zP.setAttribute('fill', zoneOn === 'pad' ? 'rgba(185,255,74,.07)' : 'rgba(185,255,74,0)'); zM.setAttribute('fill', zoneOn === 'map' ? 'rgba(140,200,255,.06)' : 'rgba(140,200,255,0)'); };
-  addEventListener('pointerdown', e => { if (e.target.closest('#ui') || e.target.closest('#fire')) return; if (padZone(e.clientX, e.clientY) && flying && !dead) zoneHit('pad', true); }, true);
+  addEventListener('pointerdown', e => { if (e.target.closest('#ui') || e.target.closest('#fire')) return; if (padZone(e.clientX, e.clientY) && !dead) zoneHit('pad', true); }, true);
   addEventListener('pointerup', () => { if (look.id === null) zoneHit(null, false); }, true);
-  addEventListener('pointerdown', e => { if (look.id !== null || e.target.closest('#ui') || e.target.closest('#fire')) return; if (!dead && flying && padZone(e.clientX, e.clientY)) return;   /* 조이스틱 칸만 빼고 어디든 끌면 둘러보기 */
+  addEventListener('pointerdown', e => { if (look.id !== null || e.target.closest('#ui') || e.target.closest('#fire')) return; if (!dead && padZone(e.clientX, e.clientY)) return;   /* 조이스틱 칸만 빼고 어디든 끌면 둘러보기 (태어나는 중에도 조이스틱 칸은 조이스틱만 · 사용자 2026-11-10: 태어날 때 조이스틱을 밀면 화면까지 같이 움직였음) */
     zoneHit(padZone(e.clientX, e.clientY) && !dead && flying ? 'pad' : 'map', true);
     look.id = e.pointerId; look.px = e.clientX; look.py = e.clientY; look.pt = performance.now(); });
   addEventListener('pointermove', e => { if (e.pointerId !== look.id) return; const now = performance.now(), dx = e.clientX - look.px, dy = e.clientY - look.py, sp = Math.hypot(dx, dy) / Math.max(1, now - look.pt) * 1000;

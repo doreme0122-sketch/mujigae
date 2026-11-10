@@ -112,7 +112,10 @@ export async function makeForgeShip(renderer, camera, fi, { size = 3.6, patch = 
   /* 효과 바람은 늘 '떠 있기' 바람으로 (사용자 2026-11-10 영상: 날기 시작하면 효과가 다시 살아나듯 확 늘어남)
      작업대는 서 있는 기체에 '빨리 나는 중'을 강한 뒷바람으로 흉내 냄 → 바뀌는 순간 이미 나와 있던 알갱이까지 한꺼번에 길게 늘어남
      게임에선 기체가 진짜 날아가니 뒤로 남는 건 실제 궤적이 만듦 → 효과엔 바람 흉내를 빼 늘어나는 일이 없게 · 날개짓 같은 몸 움직임은 무빙 자세 그대로 */
-  S.extras = S.extras.map(f => bodyFx.has(f.toString()) ? f : (sh, dt, t) => { const m = sh.mode, mt = sh.mt; sh.mode = 'cruise'; sh.mt = 99; f(sh, dt, t); sh.mode = m; sh.mt = mt; });
+  /* 단, 알갱이를 하나씩 직접 굴리는 효과(구름 덩이 · 불티 알갱이)는 작업대 바람 그대로: 나올 때 받은 빠르기로 저마다 날아가서 한꺼번에 늘어나는 일이 없고,
+     날 때 빨리 뒤로 흘러 계속 새로 생기며 모양이 바뀌어야 자연스러움 (사용자 2026-11-10: 번개 구름이 한 덩어리로 붙어 다님) */
+  const ownParticles = src => /needsUpdate|\.position\b/.test(src);
+  S.extras = S.extras.map(f => bodyFx.has(f.toString()) || ownParticles(f.toString()) ? f : (sh, dt, t) => { const m = sh.mode, mt = sh.mt; sh.mode = 'cruise'; sh.mt = 99; f(sh, dt, t); sh.mode = m; sh.mt = mt; });
   /* 몸 전체 흔들림(좌우 기울기 · 위아래 출렁임)은 게임 비행이 따로 줌 → 작업대 것은 끔 (두 번 흔들리면 붕 떠 보임) · 날개짓 · 꼬리 · 턱은 그대로 */
   const upd0 = S.update.bind(S); S.update = (dt, t) => { upd0(dt, t); S.body.position.set(0, 0, 0); S.body.rotation.set(0, 0, 0); };
   const root = new THREE.Group(), sm = new THREE.Group(); root.add(sm); sm.add(S.root);
@@ -161,9 +164,18 @@ export async function makeForgeShip(renderer, camera, fi, { size = 3.6, patch = 
       const me = new THREE.Mesh(g, mat); me.frustumCulled = false; me.renderOrder = list[0].renderOrder; me.name = 'fgSprites'; sm.add(me);
       const rec = list.map(s => { const p = s.parent; p.remove(s); return { s, p }; }); batches.push({ me, rec, iP, iS, iC }); } }
   const mw = new THREE.Matrix4(), vp = new THREE.Vector3(), vq = new THREE.Quaternion(), vs = new THREE.Vector3(), mi = new THREE.Matrix4();
-  const syncSprites = () => { for (const b of batches) { mi.copy(b.me.matrixWorld).invert();
+  /* 구름 덩이(기체 둘레를 떠다니다 뒤로 흘러가는 빛 덩이 무리): 새로 생기는 순간의 기체 자리를 기억해 두고 그 자리 기준으로 그림 → 맵에 남아 궤적이 됨 */
+  const bankOf = p => { let q = p; while (q && q.parent && q.parent !== S.root) q = q.parent; return q && q.parent === S.root && moved.has(q) ? q : null; };
+  const banks = new Map(); for (const b of batches) b.rec.forEach(r => { r.bank = bankOf(r.p); if (r.bank && !banks.has(r.bank)) banks.set(r.bank, { last: new THREE.Vector3(1e9, 0, 0), M: new THREE.Matrix4(), t: 0, o: new THREE.Vector3() }); });
+  const JUMP = .12 * C.radius, rInv = new THREE.Matrix4(), bo = new THREE.Vector3(), bq = new THREE.Quaternion(), bs = new THREE.Vector3();
+  const syncSprites = () => { rInv.copy(S.root.matrixWorld).invert(); S.root.matrixWorld.decompose(bo, bq, bs);
+    for (const [g, st] of banks) { if (st.last.distanceTo(g.position) > JUMP) { st.M.copy(S.root.matrixWorld); st.t = gameT; st.o.copy(bo); } st.last.copy(g.position); }   /* 새로 생김 (자리가 확 바뀜) */
+    for (const b of batches) { mi.copy(b.me.matrixWorld).invert();
     b.rec.forEach(({ s, p }, i) => { s.updateMatrix(); mw.multiplyMatrices(p.matrixWorld, s.matrix); mw.decompose(vp, vq, vs); let on = s.visible; for (let q = p; q && on; q = q.parent) on = q.visible;
-      bendCPU(vp); vp.applyMatrix4(mi); b.iP.setXYZ(i, vp.x, vp.y, vp.z); b.iS.setXY(i, vs.x, vs.y); const c = s.material.color, a = on ? s.material.opacity * cpuFd : 0; b.iC.setXYZW(i, c.r, c.g, c.b, a); });
+      const st = b.rec[i].bank && banks.get(b.rec[i].bank);
+      if (st) { vp.applyMatrix4(rInv).applyMatrix4(st.M); cpuFd = 1 - THREE.MathUtils.smoothstep(gameT - st.t, FADE[0], FADE[1]) * Math.min(1, bo.distanceTo(st.o) / bs.x / TU.fgTr2.value); }
+      else bendCPU(vp);
+      vp.applyMatrix4(mi); b.iP.setXYZ(i, vp.x, vp.y, vp.z); b.iS.setXY(i, vs.x, vs.y); const c = s.material.color, a = on ? s.material.opacity * cpuFd : 0; b.iC.setXYZW(i, c.r, c.g, c.b, a); });
     b.iP.needsUpdate = b.iS.needsUpdate = b.iC.needsUpdate = true; } };
   /* ⑤ ⑥ 칠마다 불빛 · 색 곡선 끼우기 */
   /* 효과가 '맵 방향'으로 흐르던 것 → '기체 방향'으로 (사용자 2026-11-09: 남쪽으로 내려오면 냉기가 기체 앞으로 나옴)
