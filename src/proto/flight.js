@@ -11,9 +11,9 @@
 import * as THREE from 'three';
 import { buildShip, engineSpots } from '../core/ships/build.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { flameMesh } from './sortie.js?v=11101210';
-import { MAP } from './mapfloor.js?v=11101210';
-import { applyShipHeat, heatVis } from './shipheat.js?v=11101210';
+import { flameMesh } from './sortie.js?v=11101236';
+import { MAP } from './mapfloor.js?v=11101236';
+import { applyShipHeat, heatVis } from './shipheat.js?v=11101236';
 
 export const FLY = { LEN: 2, HOVER: .7, R: .8, SPEEDS: [9, 12, 15, 18], TURN: 7, ACC: .22, TURNMAX: 9,
   BASE: 9, SHIELD: 3, BOOST: 5, BOOSTK: 1.5 };   /* 기지 고리(반지름 9m)를 벗어나는 순간: 보호막 3초 · 가속 5초(1.5배) — 기지 출구 앞 매복에 바로 당하지 않게 */
@@ -53,7 +53,7 @@ export async function makeFlight(renderer, B, start, face, model = null) {
   G.add(ship);
   const flames = ENG.map(() => { const f = flameMesh(); G.add(f); return f; });
   /* 그림자: 떠 있는 높이가 높을수록 넓고 옅게 */
-  const shM = new THREE.ShaderMaterial({ transparent: true, depthWrite: false, uniforms: { uA: { value: .5 } },
+  const shM = model ? null : new THREE.ShaderMaterial({ transparent: true, depthWrite: false, uniforms: { uA: { value: .5 } },
     vertexShader: 'varying vec2 vP; void main(){ vP=position.xy; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.); }',
     fragmentShader: 'uniform float uA; varying vec2 vP; void main(){ vec2 q=vP*vec2(1.,1.6); float r=dot(q,q); gl_FragColor=vec4(0.,0.,0.,exp(-r*3.)*uA); }' });
   const shadow = model ? null : new THREE.Mesh(new THREE.PlaneGeometry(FLY.LEN * 1.3, FLY.LEN * 1.3), shM); if (shadow) { shadow.rotation.x = -Math.PI / 2; shadow.renderOrder = 1; G.add(shadow); }
@@ -61,10 +61,10 @@ export async function makeFlight(renderer, B, start, face, model = null) {
   const NT = 40, tp = new Float32Array(NT * 6), ta = new Float32Array(NT * 2), ts = new Float32Array(NT * 2), ti = [];
   for (let i = 0; i < NT; i++) { ts[i * 2] = -1; ts[i * 2 + 1] = 1; if (i < NT - 1) { const p = i * 2; ti.push(p, p + 1, p + 2, p + 1, p + 3, p + 2); } }
   const tg = new THREE.BufferGeometry(); tg.setAttribute('position', new THREE.BufferAttribute(tp, 3)); tg.setAttribute('aA', new THREE.BufferAttribute(ta, 1)); tg.setAttribute('aS', new THREE.BufferAttribute(ts, 1)); tg.setIndex(ti);
-  const trail = new THREE.Mesh(tg, new THREE.ShaderMaterial({ ...AB, side: THREE.DoubleSide,
+  const trail = ENG.length ? new THREE.Mesh(tg, new THREE.ShaderMaterial({ ...AB, side: THREE.DoubleSide,
     vertexShader: 'attribute float aA, aS; varying float vA, vS; void main(){ vA=aA; vS=aS; gl_Position=projectionMatrix*viewMatrix*vec4(position,1.); }',
-    fragmentShader: 'varying float vA, vS; void main(){ float x=max(0.,1.-vS*vS); vec3 c=mix(vec3(.3,.55,1.4),vec3(.95,.97,1.3),vA*vA); gl_FragColor=vec4(c*x*vA*.8,1.); }' }));
-  trail.frustumCulled = false; trail.renderOrder = 8; if (ENG.length) G.add(trail); const hist = [];
+    fragmentShader: 'varying float vA, vS; void main(){ float x=max(0.,1.-vS*vS); vec3 c=mix(vec3(.3,.55,1.4),vec3(.95,.97,1.3),vA*vA); gl_FragColor=vec4(c*x*vA*.8,1.); }' })) : null;
+  if (trail) { trail.frustumCulled = false; trail.renderOrder = 8; G.add(trail); } const hist = [];
   /* 불티: 벽에 세게 닿은 자리에서 튀고, 떨어지며 식음(하양 → 주황 → 꺼짐) */
   const NS = 60, sg = new THREE.BufferGeometry(); sg.setAttribute('position', new THREE.BufferAttribute(new Float32Array(NS * 3), 3)); sg.setAttribute('aL', new THREE.BufferAttribute(new Float32Array(NS), 1));
   const sparks = new THREE.Points(sg, new THREE.ShaderMaterial({ ...AB, uniforms: { uPx: { value: 600 } },

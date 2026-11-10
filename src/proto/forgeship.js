@@ -263,5 +263,5 @@ vec4 fgBendV(vec4 v, float secs){ fgFd = 1. - smoothstep(${LIFE[0].toFixed(2)}, 
   /* 효과(불길 · 연기 · 번개 · 서리 알갱이)만 끄고 켜기 — 폰 무게 재기용 */
   const FX = []; sm.traverse(o => { if (isFx(o)) FX.push(o); }); let fxOn = true;
   const setFx = v => { fxOn = v; FX.forEach(o => o.visible = v); }, getFx = () => fxOn;
-  return { root, sm, S, C, step, preRender, stats, before: stat0, buildXray, setFx, getFx, fxCount: FX.length };
+  return { root, sm, S, C, step, preRender, stats, before: stat0, buildXray, setFx, getFx };
 }

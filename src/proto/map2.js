@@ -1,22 +1,21 @@
 /* 새 하늘 맵 (사용자 2026-11-09: 처음부터 다시 · 아주 가볍게 · 퀄리티 좋게)
-   · 옛 하늘 맵(skymap.js)에서 무지개 벽 · 태어나는 곳(기지 10곳 · 빛의 닻 · 태어나는 장면)만 그대로 옮김 · 초원·정글·화산·구름·생물·문·기믹은 가져오지 않음
+   · 옛 하늘 맵(지금은 지움)에서 무지개 벽 · 태어나는 곳(기지 10곳 · 빛의 닻 · 태어나는 장면)만 그대로 옮김 · 초원·정글·화산·구름·생물·문·기믹은 가져오지 않음
    · 원칙: 로딩 때 미리 다 준비(칠 계산법 미리 만들기 · 조각 합치기) → 게임 중엔 가볍게 · 맵 몫 = 그림 150번 · 삼각형 30만 개
    · 화면 무게 재기 칸에서 부분마다 끄고 켜며 폰에서 프레임을 숫자로 확인 */
 import * as THREE from 'three';
-import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
-import { makeBloom } from '../core/hangar/bloom.js?v=11101210';
-import { makePad } from '../core/hangar/pad.js?v=11101210';
-import { makeMag } from '../core/hangar/mag.js?v=11101210';
-import { makeForgeShip, forgeList } from './forgeship.js?v=11101210';
-import { makeGoldStar } from './goldstar.js?v=11101210';
-import { makeArena, SPEED, WAVE_R0 } from './arena.js?v=11101210';
-import { makeGuardians, GUARD } from './guardian.js?v=11101210';
-import { makeBirth, BIRTH } from './birth.js?v=11101210';
-import { makePerf } from './perf.js?v=11101210';
-import { autoMerge } from './automerge.js?v=11101210';
+import { makeBloom } from '../core/hangar/bloom.js?v=11101236';
+import { makePad } from '../core/hangar/pad.js?v=11101236';
+import { makeMag } from '../core/hangar/mag.js?v=11101236';
+import { makeForgeShip, forgeList } from './forgeship.js?v=11101236';
+import { makeGoldStar } from './goldstar.js?v=11101236';
+import { makeArena, SPEED, WAVE_R0 } from './arena.js?v=11101236';
+import { makeGuardians, GUARD } from './guardian.js?v=11101236';
+import { makeBirth, BIRTH } from './birth.js?v=11101236';
+import { makePerf } from './perf.js?v=11101236';
+import { autoMerge } from './automerge.js?v=11101236';
 import { makeGlow } from '../preview/glow.js';
-import { makeFlight, FLY, PADZ, padZone } from './flight.js?v=11101210';
+import { makeFlight, FLY, PADZ, padZone } from './flight.js?v=11101236';
 
 const $ = s => document.querySelector(s), clamp = THREE.MathUtils.clamp, HOVER = FLY.HOVER;
 const R = 240, NB = 10, GAPH = 5.6, BASE_D = 0;     /* 맵 반지름 · 기지 수 · 벽 틈 반 폭(= 기지 반지름) · 기지 가운데는 벽 선 위 (앞 절반은 맵 안, 뒤 절반은 맵 밖 · 사용자 2026-11-06) */

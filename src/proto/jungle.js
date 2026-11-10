@@ -6,13 +6,13 @@
        기지 앞쪽 각도마다 — 정글 지형 둘(균사 뿌리섬 · 수정 산호 숲 · 촉수 나무 숲 · 포자 거품 늪 · 거대 포식 꽃 · 공중 해파리 군락을 돌려 가며) + 작은 부유체 모음
        기지 두 곳에 하나 — 덩굴 기둥 쌍섬(아래층에서 위층까지 · 층을 뚫는 기둥 = 장애물)
      알 둥지는 이번엔 안 씀 · 포식 꽃·촉수 나무·해파리는 장식(기체를 막거나 잡지 않음)
-   · 초원 → 정글은 점점: 경계 둘레에 작은 부유체가 섞이고, 기체가 안쪽으로 들어갈수록 하늘이 어두운 보랏빛으로 (skymap에서) */
+   · 초원 → 정글은 점점: 경계 둘레에 작은 부유체가 섞이고, 기체가 안쪽으로 들어갈수록 하늘이 어두운 보랏빛으로 */
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { spiralPath, SWEEP } from './path.js?v=11101210';
-import { buildSanctum } from './jsanct.js?v=11101210';
-export { SANCT_TEST } from './jsanct.js?v=11101210';
-import { makeDresser } from './jdress.js?v=11101210';
+import { spiralPath, SWEEP } from './path.js?v=11101236';
+import { buildSanctum } from './jsanct.js?v=11101236';
+export { SANCT_TEST } from './jsanct.js?v=11101236';
+import { makeDresser } from './jdress.js?v=11101236';
 let CAM = { position: new THREE.Vector3() };
 let LOD_T = .5, LOD_N = 30;   /* 섬 둘레 · 덩굴 마디 수 (키트 원래 44 · 1배) */
 /* ===================== 우주 정글 지형 키트 (사용자 제작 · 생성 코드 그대로) ===================== */
