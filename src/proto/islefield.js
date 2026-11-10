@@ -86,6 +86,8 @@ export function makeField() {
     if (Y.PLATEAU > y - CLEAR && plateau(x, z) > .8) return true;
     for (const S of SPOT.spires) if (S[3] > y - CLEAR && spire(x, z, S) > .4) return true;
     for (const a of archLegs) if (a[3] > y - CLEAR && (x - a[0]) ** 2 + (z - a[1]) ** 2 < a[2] * a[2]) return true; return false; };
-  const brush = (x, z) => { let d = -99; for (const Z of SPOT.brush) { let e = -99; for (const [cx, cz, r] of Z) e = smax(e, circ(x, z, cx, cz, r), 2); d = Math.max(d, e); } return d + .5 * fbm(x * .6, z * .6, 2) + .2 * fbm(x * 1.7, z * 1.7, 2); };   /* 부쉬 안 + (가장자리가 덤불 뭉치처럼 물결) */
-  return { mask, plateau, pond, chan, brush, top, bottom, blocked, sightBlock, obstacles, archLegs };
+  const brushZ = (k, x, z) => { let e = -99; for (const [cx, cz, r] of SPOT.brush[k]) e = smax(e, circ(x, z, cx, cz, r), 2); return e + .5 * fbm(x * .6, z * .6, 2) + .2 * fbm(x * 1.7, z * 1.7, 2); };
+  const brush = (x, z) => { let d = -99; for (let k = 0; k < SPOT.brush.length; k++) d = Math.max(d, brushZ(k, x, z)); return d; };
+  const brushZone = (x, z) => { for (let k = 0; k < SPOT.brush.length; k++) if (brushZ(k, x, z) > 0) return k; return -1; };   /* 몇 번째 부쉬 안인지 (밖이면 −1) */   /* 부쉬 안 + (가장자리가 덤불 뭉치처럼 물결) */
+  return { mask, plateau, pond, chan, brush, brushZone, top, bottom, blocked, sightBlock, obstacles, archLegs };
 }
