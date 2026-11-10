@@ -1,7 +1,7 @@
 /* 초원 섬 하나의 모양 (2026-11-10 · 새 초원 첫 시험)
    그림을 그대로 따라 하지 않고 느낌(신비로움 · 풍성함 · 깊이)만 가져옴. 게임 규칙에 맞춘 높낮이:
    · 세 높이로 나눔 (사용자 2026-11-10): 1층 = 풀밭 바로 위(숲 · 부쉬에 숨기) · 2층 = 돌탑 · 아치 · 다리 · 고원 사이를 빠져나감 · 3층 = 위로 탁 트여 다 내려다봄
-   · 높이 기준(섬 안 단위 · 게임에선 0.5배): 풀밭 −6 · 1층 −3.6 · 2층 4.4 · 고원 +7.5 · 돌탑 8~10 · 아치 꼭대기 7.6~8 · 3층 12.4
+   · 높이 기준(섬 안 단위 · 게임에선 0.5배): 풀밭 −6 · 1층 −3.6 · 2층 4.4 · 고원 +7.5 · 돌탑 8~10 · 아치 꼭대기 9.4~10 · 3층 12.4
      (사용자 2026-11-10: 층 사이를 모두 4m로 — 게임에서 땅 위 1.2m · 5.2m · 9.2m. 구조물은 2층을 확실히 막고 3층은 넘게, 아치 · 다리는 2층이 밑으로 빠져나가게)
    · 낮은 단 = −11 → 더 깊이 내려간 땅. 위아래로 겹겹이 깊어 보임
    · 고원과 큰 돌탑 사이 좁은 틈 = 길목 · 그 위로 다리 (2층은 밑으로, 3층은 위로 지나감)
@@ -27,8 +27,13 @@ export const CLEAR = 1.2;               /* 위아래로 이만큼 안에 무언�
 /* 자리 (북쪽 = −z = 화면 위쪽) */
 export const SPOT = {
   plateau: [[-20, -16, 14], [-9, -25, 9], [-29, -6, 8]],
-  spires: [[10, -16, 4.6, 10], [22, -3, 2.5, 8.6], [-1, -9, 2.1, 8], [-31, 19, 2.4, 9], [18, -27, 2.6, 9.6], [4, 31, 2.2, 8.2]],   /* 2층 장애물: 돌탑 (자리 x, z · 반지름 · 꼭대기) */
-  arches: [[-8, 13, 3, 18, 8], [24, -16, 32, -6, 7.6]],   /* 2층 장애물: 돌 아치 (양 끝 · 꼭대기) — 2층은 밑으로 빠져나감 */
+  /* 2층 장애물: 돌탑 (자리 x, z · 반지름 · 꼭대기 · 생김새 · 돌린 방향) — 사용자 2026-11-10: 같은 모양을 복붙한 듯함 → 생김새를 나눔
+     fat 이끼 덮인 굵은 탑(둥근 층 · 이끼) · lean 기울어진 탑(층마다 한쪽으로 비켜 쌓임) · broken 꼭대기가 부서진 탑(들쭉날쭉한 왕관 · 한쪽이 떨어져 나감) · twin 갈라진 쌍둥이 탑(높이가 다른 두 기둥 · 사이에 좁은 틈)
+     모두 2층은 막고 3층은 넘음 */
+  spires: [[10, -16, 4.6, 10, 'fat', .3], [22, -3, 2.5, 8.6, 'lean', 2.1], [-1, -9, 2.1, 8, 'broken', 4], [-31, 19, 2.4, 9, 'twin', 1.2], [18, -27, 2.6, 9.6, 'broken', .9], [4, 31, 2.2, 8.2, 'lean', 5]],
+  /* 2층 장애물: 돌 아치 (양 끝 · 꼭대기 · 생김새) — 2층은 밑으로 빠져나감 (사용자 2026-11-10: 2층에서 빈 곳이 3m 넘게)
+     thick 두꺼운 아치 · thin 얇고 긴 아치(살짝 휘어 돎) · broken 반쯤 무너진 아치(한쪽은 높이 솟다 끊기고 맞은편은 짧은 그루터기 · 밑에 떨어진 바위) */
+  arches: [[-11, 11, 5, 19, 10, 'thick'], [21, -19, 31.5, -6.5, 9.6, 'thin'], [5.9, -6.1, -5.9, 6.1, 9.4, 'broken']],
   /* 부쉬 (1층 숨는 곳 · 사용자 2026-11-10: 경계가 정확해야 · 띄엄띄엄이면 개념이 어설픔) — 동그라미 몇 개를 합친 덩이 하나하나가 빈틈없는 덤불 무리.
      이 모양 하나로 보이는 덤불 가장자리 = 숨는 판정 = 시야 가림이 꼭 같음 */
   brush: [[[12, 2, 5], [16, 6, 3.5], [8, -1, 3]], [[-4, 22, 4.5], [0, 25, 3.5], [-8, 25, 3]], [[-27, 16, 3.8], [-23, 19, 3]], [[3, 11, 3.2], [6, 14, 2.6]], [[16, -9, 3], [19, -12, 2.4]]],
@@ -44,7 +49,18 @@ export function makeField() {
     let d = circ(u, w, 0, 0, 30); for (const [cx, cz, r] of [[-20, -14, 22], [20, -12, 17], [26, 12, 17], [-22, 9, 19], [-4, 21, 16], [8, 16, 14]]) d = smax(d, circ(u, w, cx, cz, r), 6);
     return d + 2.2 * fbm(x * .09, z * .09, 3) + .7 * fbm(x * .35, z * .35, 2) + .55 * (Math.abs(fbm(x * .55 + 7, z * .55, 2)) - .22) + .25 * fbm(x * 1.4, z * 1.4, 2); };   /* 마지막 둘: 부서져 떨어져 나간 듯 오목오목한 테두리 (칼로 자른 둥근 선이 아니게) */
   const plateau = (x, z) => { const [u, w] = warp(x * 1.1, z * 1.1); let d = -99; for (const [cx, cz, r] of SPOT.plateau) d = smax(d, circ(u, w, cx * 1.1, cz * 1.1, r * 1.1), 5); return d / 1.1 + .9 * fbm(x * .21, z * .21, 3); };
-  const spire = (x, z, [cx, cz, r]) => { const an = Math.atan2(z - cz, x - cx); return circ(x, z, cx, cz, r) + .6 * fbm(x * .45, z * .45, 3) * r / 4 + .3 * Math.sin(an * 7 + cx) * r / 4.6 + .12 * Math.sin(an * 13 + cz) * r / 4.6; };   /* 기둥 바위가 엮인 결 */
+  /* 돌탑 층 쌓기: 생김새마다 층(동그라미 · 높이)을 따로 쌓음 → 높이장으로 만든 땅이라 아래 층이 위 층을 받치는 모양(넘어 튀어나온 곳 없음) */
+  const tierCache = new Map();
+  const tiers = S => { if (tierCache.has(S)) return tierCache.get(S); const [cx, cz, r, h, kind = 'col', rot = 0] = S, base = Y.MEADOW - 1, T = [], dx = Math.cos(rot), dz = Math.sin(rot);
+    const stack = (x, z, R, H, n, shrink, drift) => { for (let i = 0; i < n; i++) T.push({ x: x + dx * drift * i, z: z + dz * drift * i, r: R * (1 - shrink * i), h: base + (H - base) * (i + 1) / n, top: i === n - 1 }); };
+    if (kind === 'fat') stack(cx, cz, r * 1.12, h, 3, .11, 0);
+    else if (kind === 'lean') stack(cx, cz, r, h, 4, .12, r * .3);                                  /* 층마다 한쪽으로 비켜 쌓여 기울어 보임 */
+    else if (kind === 'twin') { stack(cx + dx * r * .48, cz + dz * r * .48, r * .62, h, 4, .1, 0); stack(cx - dx * r * .48, cz - dz * r * .48, r * .58, Y.MEADOW + (h - Y.MEADOW) * .84, 4, .1, 0); }
+    else stack(cx, cz, r, h, 4, .1, 0);
+    tierCache.set(S, T); return T; };
+  const rough = (x, z, t) => { const an = Math.atan2(z - t.z, x - t.x); return .6 * fbm(x * .45, z * .45, 3) * t.r / 4 + .3 * Math.sin(an * 7 + t.x) * t.r / 4.6 + .12 * Math.sin(an * 13 + t.z) * t.r / 4.6; };   /* 기둥 바위가 엮인 결 */
+  const spire = (x, z, S) => { let d = -99; for (const t of tiers(S)) d = Math.max(d, circ(x, z, t.x, t.z, t.r) + rough(x, z, t)); return d; };   /* 가장 아래 층 둘레 = 돌탑 바닥 모양 */
+  const spireMoss = (x, z) => { let m = 0; for (const S of SPOT.spires) if (S[4] === 'fat') m = Math.max(m, smoothstep(-1.5, .5, spire(x, z, S))); return m; };   /* 이끼 덮인 굵은 탑 */
   const low = (x, z) => { const [u, w] = warp(x, z); let d = -99; for (const [cx, cz, r] of SPOT.low) d = smax(d, circ(u, w, cx, cz, r), 5); return d + .8 * fbm(x * .17, z * .17, 3); };
   const pond = (x, z) => circ(x, z, SPOT.pond[0], SPOT.pond[1], SPOT.pond[2]) + 1.1 * fbm(x * .19, z * .19, 3);
   const chan = (x, z) => { const [ax, az, bx, bz] = SPOT.channel; return capsule(x, z, ax, az, bx, bz, 1.25 + .35 * fbm(x * .3, z * .3, 2)) + .35 * fbm(x * .4 + 5, z * .4, 2); };
@@ -62,33 +78,40 @@ export function makeField() {
     const ch = chan(x, z), kc = smoothstep(-.9, .7, ch) * (1 - smoothstep(-.5, 2, pd)); h = Math.min(h, h * (1 - kc) + (Y.WATER - .55) * kc);
     const pl = plateau(x, z), kP = ledges(smoothstep(-1.4, 3.6, pl), 3, x, z);
     h += (Y.PLATEAU + .7 * fbm(x * .07, z * .07, 3) - h) * kP;
-    for (const S of SPOT.spires) { const sp = spire(x, z, S); if (sp < -2) continue; const kI = ledges(smoothstep(-.9, 1.5, sp), 4, x + 40 + S[0], z);   /* 깎아지른 벽 + 평평한 꼭대기 (뾰족한 고깔이 아니라 기둥 바위) */ h += (S[3] + .4 * fbm(x * .3, z * .3, 2) - h) * kI; }
+    for (const S of SPOT.spires) { if (spire(x, z, S) < -2) continue; const g = h, soft = S[4] === 'fat';   /* 층마다 깎아지른 벽 + 평평한 턱 (굵은 탑은 둥근 어깨) */
+      for (const t of tiers(S)) { const d = circ(x, z, t.x, t.z, t.r) + rough(x, z, t), k = soft ? smoothstep(-1.1, 1., d) : smoothstep(-.45, .6, d); if (k <= 0) continue;
+        let H = t.h + .4 * fbm(x * .3, z * .3, 2);
+        if (t.top && S[4] === 'broken') { const an = Math.atan2(z - t.z, x - t.x), da = Math.abs(((an - S[5]) % 6.283 + 9.425) % 6.283 - 3.1416);
+          H += (Math.abs(fbm(x * .9, z * .9, 2)) - .25) * 1.8 - 2.4 * smoothstep(.9, .35, da); }   /* 들쭉날쭉한 왕관 · 한쪽이 떨어져 나감 */
+        if (soft && t.top) H += .8 * smoothstep(0, t.r, d);   /* 굵은 탑 꼭대기는 둥글게 솟음 */
+        h = Math.max(h, g + (H - g) * k); } }
     const m = mask(x, z), sh = 1 - smoothstep(0, 3.2, m); h -= (1.5 + .6 * fbm(x * .4, z * .4, 2)) * sh * sh;   /* 가장자리 둥근 어깨: 테두리로 갈수록 둥글게 꺾여 내려감 (칼처럼 끊기지 않게) */
     return h; }
   /* 아래 바위 몸통: 가장자리에서 급히 꺾여 가운데로 갈수록 깊이 · 층진 바위 결 */
   function bottom(x, z, h, m) {
     const d = 1.6 * smoothstep(0, .7, m) + 36 * Math.pow(smoothstep(0, 30, m), .85) + 5 * smoothstep(4, 20, m) * fbm(x * .06, z * .06, 3) + 1.4 * fbm(x * .3, z * .3, 2) * smoothstep(0, 3, m);
     return h - d; }
-  /* 땅 말고 공중에 걸친 것(아치 · 다리): 구슬 여럿 (x, y, z, 반지름) — 그 높이를 지나는 층만 막힘 */
+  /* 땅 말고 공중에 걸친 것(아치 · 다리): 구슬 여럿 (x, y, z, 보이는 반지름) — 그 높이에서 잘린 둘레만 막힘 */
   const obstacles = [];
   /* 막힘 (사용자 2026-11-10: 걸려서 멈추는 일이 없게 · 땅을 일부러 막지 않음): 그 층 높이까지 솟은 고원 · 돌탑만
      · 울퉁불퉁한 바위 결을 뺀 매끈한 모양으로 · 보이는 절벽보다 안쪽(IN)에서만 막음 → 스치면 그냥 지나가고 닿으면 미끄러짐
      · 아치 · 다리는 구슬을 줄여서 */
-  const IN = .9;
+  const IN = .9, SHIP_H = .5;   /* SHIP_H: 기체 몸 두께의 반 (위아래로 이만큼은 닿음) */
   const plateauS = (x, z) => { const [u, w] = warp(x * 1.1, z * 1.1); let d = -99; for (const [cx, cz, r] of SPOT.plateau) d = smax(d, circ(u, w, cx * 1.1, cz * 1.1, r * 1.1), 5); return d / 1.1; };
   const blocked = (x, z, L = 1) => { const y = LAYERS[L];
     if (Y.PLATEAU > y - CLEAR && plateauS(x, z) > IN) return true;
-    for (const S of SPOT.spires) if (S[3] > y - CLEAR && circ(x, z, S[0], S[1], S[2]) > IN * .6) return true;
-    for (const o of obstacles) { const r = o[3] * .8, dx = x - o[0], dz = z - o[2]; if (dx * dx + dz * dz < r * r && Math.abs(y - o[1]) < r + CLEAR * .5) return true; } return false; };
+    for (const S of SPOT.spires) for (const t of tiers(S)) if (t.h > y - CLEAR && circ(x, z, t.x, t.z, t.r) > IN * .6) return true;   /* 그 높이까지 솟은 층의 둘레만 */
+    for (const o of obstacles) { const R = o[3] + SHIP_H, dy = Math.abs(y - o[1]); if (dy >= R) continue; const rr = Math.sqrt(R * R - dy * dy) * .85, dx = x - o[0], dz = z - o[2]; if (dx * dx + dz * dz < rr * rr) return true; }   /* 보이는 바위 두께대로: 그 높이에서 잘린 둘레 (조금 너그럽게) */
+    return false; };
   /* 시야를 가리는 것 (평평한 지도 위 바닥 모양만 · 3D 계산 없음): 그 층 높이에 걸리는 고원 · 돌탑 · 아치 다리
      · 고원 · 돌탑은 절벽 몸통 둘레대로 · 아치는 땅에 박힌 다리 두 곳만 (가운데 휜 부분은 바닥 모양이 아니라서 안 가림) */
   const archLegs = [];
   const sightBlock = (x, z, L) => { const y = LAYERS[L];
     if (Y.PLATEAU > y - CLEAR && plateau(x, z) > .8) return true;
-    for (const S of SPOT.spires) if (S[3] > y - CLEAR && spire(x, z, S) > .4) return true;
+    for (const S of SPOT.spires) for (const t of tiers(S)) if (t.h > y - CLEAR && circ(x, z, t.x, t.z, t.r) + rough(x, z, t) > .4) return true;
     for (const a of archLegs) if (a[3] > y - CLEAR && (x - a[0]) ** 2 + (z - a[1]) ** 2 < a[2] * a[2]) return true; return false; };
   const brushZ = (k, x, z) => { let e = -99; for (const [cx, cz, r] of SPOT.brush[k]) e = smax(e, circ(x, z, cx, cz, r), 2); return e + .5 * fbm(x * .6, z * .6, 2) + .2 * fbm(x * 1.7, z * 1.7, 2); };
   const brush = (x, z) => { let d = -99; for (let k = 0; k < SPOT.brush.length; k++) d = Math.max(d, brushZ(k, x, z)); return d; };
   const brushZone = (x, z) => { for (let k = 0; k < SPOT.brush.length; k++) if (brushZ(k, x, z) > 0) return k; return -1; };   /* 몇 번째 부쉬 안인지 (밖이면 −1) */   /* 부쉬 안 + (가장자리가 덤불 뭉치처럼 물결) */
-  return { mask, plateau, pond, chan, brush, brushZ, brushZone, top, bottom, blocked, sightBlock, obstacles, archLegs };
+  return { mask, plateau, pond, chan, brush, brushZ, brushZone, spireMoss, top, bottom, blocked, sightBlock, obstacles, archLegs };
 }

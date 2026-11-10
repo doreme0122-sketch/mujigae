@@ -7,8 +7,8 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { MeshoptSimplifier as MO } from '../../vendor/meshopt_simplifier.module.js';
-import { makeField, Y, SPOT, LAYERS, fbm, noise2, smoothstep } from './islefield.js?v=11102203';
-import { reedBush, vegShader } from './flora.js?v=11102203';
+import { makeField, Y, SPOT, LAYERS, fbm, noise2, smoothstep } from './islefield.js?v=11102239';
+import { reedBush, vegShader } from './flora.js?v=11102239';
 
 const SUN = new THREE.Vector3(-.45, .78, .44).normalize();   /* 왼쪽 위 앞에서 (카메라 쪽 절벽 면이 비스듬히 빛을 받아 결이 드러남) */
 const rngOf = s => () => (s = (s * 16807) % 2147483647) / 2147483647;
@@ -114,7 +114,8 @@ export async function buildIsle({ K = 1 } = {}) {   /* K: 섬 전체 크기 (기
     const flat = smoothstep(.62, .82, n.y), wet = Math.max(smoothstep(-3.5, 0, F.pond(x, z)), smoothstep(-2.5, 0, F.chan(x, z))), m = F.mask(x, z);
     const ledge = (1 - flat) * smoothstep(.2, .55, n.y), base = smoothstep(-2.2, -.3, -Math.abs(F.plateau(x, z) + 2.2)) * flat * .7;   /* 절벽 턱 · 절벽 밑 */
     const lip = 1 - smoothstep(0, 1.4, m);   /* 섬 테두리 어깨: 풀이 성기고 흙 · 이끼가 드러남 */
-    let gr = flat * (1 - .55 * wet) * (1 - .6 * lip), rk = (1 - flat) * (1 - .75 * ledge), ms = ledge + .8 * wet * (1 - flat) + .25 * wet * flat + lip * .55,
+    const sm = F.spireMoss(x, z) * (.55 + .45 * smoothstep(-.3, .3, fbm(x * .35, z * .35, 2)));   /* 이끼 덮인 굵은 탑: 벽까지 이끼가 덮음 (군데군데 바위가 비침) */
+    let gr = flat * (1 - .55 * wet) * (1 - .6 * lip), rk = (1 - flat) * (1 - .75 * ledge) * (1 - .8 * sm), ms = ledge + .8 * wet * (1 - flat) + .25 * wet * flat + lip * .55 + sm * 1.6,
       dt = base + .55 * smoothstep(-1.2, 0, F.pond(x, z)) * flat + .35 * smoothstep(.55, .72, fbm(x * .06 + 3, z * .06, 3) * .5 + .5) * flat + lip * .45 * smoothstep(-.2, .4, fbm(x * .5, z * .5, 2));
     if (h < Y.WATER + .15 && (F.pond(x, z) > -1 || F.chan(x, z) > -.5)) { dt += .6; gr *= .2; }   /* 물 밑 바닥 (낮은 단은 아님) */
     const sum = gr + rk + ms + dt + 1e-4; W.set([gr / sum, rk / sum, ms / sum, dt / sum], v * 4);
@@ -300,18 +301,33 @@ export async function buildIsle({ K = 1 } = {}) {   /* K: 섬 전체 크기 (기
 
   /* ⑫-0 돌 아치: 땅에서 솟아 휘어 넘어가는 바위 띠 — 2층은 그 밑으로 빠져나가고, 다리 · 돌탑과 함께 2층의 장애물 */
   { const parts = [];
-    for (const [ax, az, bx, bz, apex] of SPOT.arches) { const pts = [], N = 26, ra = [];
-      for (let k = 0; k <= N; k++) { const f = k / N, x = ax + (bx - ax) * f, z = az + (bz - az) * f, g = hAt(x, z), base = Math.min(hAt(ax, az), hAt(bx, bz)) - 1.2, sn = Math.pow(Math.sin(f * Math.PI), .75);
-        const y = base + (apex - base) * sn; pts.push(new THREE.Vector3(x, y, z)); ra.push(1.55 - .6 * sn); }
-      const sides = 10, p = [], idx = [], t = new THREE.Vector3(), a = new THREE.Vector3(), b = new THREE.Vector3(), up = new THREE.Vector3(0, 1, 0);
+    /* 바위 띠 하나: 굵기가 변하는 관 · 둘레 울퉁불퉁함을 둘레를 따라 이어지게(시작과 끝이 같은 값 → 이음새 틈 없음 · 사용자 2026-11-10) · 옆으로 납작
+       cap: 끝을 닫음 (무너진 아치의 끊긴 끝 — 들쭉날쭉한 부러진 면) */
+    const band = (pts, ra, seed, cap) => { const N = pts.length - 1, SD = 14, p = [], idx = [], t = new THREE.Vector3(), a = new THREE.Vector3(), b = new THREE.Vector3(), up = new THREE.Vector3(0, 1, 0);
       pts.forEach((q, k) => { t.subVectors(pts[Math.min(N, k + 1)], pts[Math.max(0, k - 1)]).normalize(); a.crossVectors(t, up).normalize(); if (a.lengthSq() < .5) a.set(1, 0, 0); b.crossVectors(a, t);
-        for (let e = 0; e <= sides; e++) { const an = e / sides * 6.283, ca = Math.cos(an), sa = Math.sin(an), r = ra[k] * (1 + .22 * noise2(k * .7 + ax, e * .9) + .1 * noise2(k * 2.1, e * 2.3 + az)) * (Math.abs(ca) > .7 ? 1.18 : 1);   /* 울퉁불퉁 · 납작한 바위 띠 */
+        for (let e = 0; e < SD; e++) { const an = e / SD * 6.283, ca = Math.cos(an), sa = Math.sin(an);
+          const r = ra[k] * (1 + .2 * noise2(ca * 1.3 + k * .35 + seed, sa * 1.3 + seed * 2.1) + .08 * noise2(ca * 3 + k * 1.1, sa * 3 - seed)) * (1 + .18 * smoothstep(.55, .85, Math.abs(ca)));
           p.push(q.x + (a.x * ca + b.x * sa) * r, q.y + (a.y * ca + b.y * sa) * r, q.z + (a.z * ca + b.z * sa) * r); } });
-      for (let k = 0; k < N; k++) for (let e = 0; e < sides; e++) { const A = k * (sides + 1) + e, B = A + sides + 1; idx.push(A, B, A + 1, A + 1, B, B + 1); }
-      const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(p, 3)); g.setIndex(idx); g.computeVertexNormals(); parts.push(g);
-      pts.forEach((q, k) => { if (k % 2 === 0) F.obstacles.push([q.x, q.y, q.z, ra[k] * 1.1]); });
-      F.archLegs.push([ax, az, ra[0] * .95, apex], [bx, bz, ra[N] * .95, apex]); }   /* 시야: 다리 바닥 자리만 */
-    const m = new THREE.Mesh(mergeGeometries(parts), new THREE.ShaderMaterial({ uniforms: U,
+      for (let k = 0; k < N; k++) for (let e = 0; e < SD; e++) { const A = k * SD + e, B = A + SD, A1 = k * SD + (e + 1) % SD, B1 = A1 + SD; idx.push(A, B, A1, A1, B, B1); }   /* 둘레를 이어 붙임 (겹치는 꼭짓점 없음) */
+      if (cap) { const q = pts[N], dir = new THREE.Vector3().subVectors(pts[N], pts[N - 1]).normalize(), c = p.length / 3, rr = ra[N];   /* 부러진 면: 가운데가 조금 튀어나온 들쭉날쭉한 덩어리 */
+        const rim = [], ring = []; for (let e = 0; e < SD; e++) { const v = N * SD + e; ring.push(v); }
+        for (let e = 0; e < SD; e++) { const v = ring[e], vx = p[v * 3], vy = p[v * 3 + 1], vz = p[v * 3 + 2], j = .25 + .5 * Math.abs(noise2(e * .9 + seed, seed)); rim.push(p.length / 3); p.push(vx + dir.x * rr * j + (q.x - vx) * .35, vy + dir.y * rr * j + (q.y - vy) * .35, vz + dir.z * rr * j + (q.z - vz) * .35); }
+        const tip = p.length / 3; p.push(q.x + dir.x * rr * .55, q.y + dir.y * rr * .55, q.z + dir.z * rr * .55);
+        for (let e = 0; e < SD; e++) { const e1 = (e + 1) % SD; idx.push(ring[e], rim[e], ring[e1], ring[e1], rim[e], rim[e1], rim[e], tip, rim[e1]); } }
+      const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(p, 3)); g.setIndex(idx); g.computeVertexNormals(); return g; };
+    for (const [ax, az, bx, bz, apex, kind] of SPOT.arches) {
+      const N = 40, L = Math.hypot(bx - ax, bz - az), sx = -(bz - az) / L, sz = (bx - ax) / L, base = Math.min(hAt(ax, az), hAt(bx, bz)) - 1.2, seed = ax * .37 + az * .11;
+      const R0 = kind === 'thin' ? 1.15 : kind === 'broken' ? 1.7 : 2.0, R1 = kind === 'thin' ? .45 : kind === 'broken' ? .6 : .8, ex = kind === 'thin' ? .9 : .75, sway = kind === 'thin' ? 1.1 : 0;
+      const at = f => { const sn = Math.pow(Math.sin(f * Math.PI), ex), sw = Math.sin(f * Math.PI) * sway; return [new THREE.Vector3(ax + (bx - ax) * f + sx * sw, base + (apex - base) * sn, az + (bz - az) * f + sz * sw), R0 - R1 * sn]; };   /* 얇은 아치는 옆으로 살짝 휘어 돎 */
+      const seg = (f0, f1, cap) => { const pts = [], ra = []; for (let k = 0; k <= N; k++) { const [q, r] = at(f0 + (f1 - f0) * k / N); pts.push(q); ra.push(r); }
+        parts.push(band(pts, ra, seed + f0 * 7, cap)); pts.forEach((q, k) => F.obstacles.push([q.x, q.y, q.z, ra[k]])); return pts; };   /* 막힘: 보이는 두께 그대로 */
+      if (kind === 'broken') { const A = seg(0, .58, true), B = seg(1, .86, true);   /* 한쪽은 높이 솟다 끊기고 · 맞은편은 짧은 그루터기 */
+        F.archLegs.push([ax, az, R0 * .95, A[N].y], [bx, bz, R0 * .95, B[N].y]);
+        const r = rngOf(31); for (let k = 0; k < 4; k++) { const f = .62 + r() * .2, [q] = at(f), x = q.x + (r() - .5) * 3, z = q.z + (r() - .5) * 3, s2 = .6 + r() * .8, g = new THREE.IcosahedronGeometry(s2, 1); g.deleteAttribute('uv');   /* 떨어진 바위 조각 */
+          const pp = g.attributes.position; for (let v = 0; v < pp.count; v++) { const nx = pp.getX(v), ny = pp.getY(v), nz = pp.getZ(v), d = 1 + .3 * noise2(nx * 2.1 + k, nz * 2.1 + ny); pp.setXYZ(v, nx * d * 1.2, ny * d * .7, nz * d); }
+          g.rotateY(r() * 6.28); g.translate(x, hAt(x, z) + s2 * .25, z); g.computeVertexNormals(); parts.push(g); } }
+      else { seg(0, 1, false); F.archLegs.push([ax, az, R0 * .95, apex], [bx, bz, R0 * .95, apex]); } }   /* 시야: 땅에 박힌 다리 바닥 자리만 */
+    const m = new THREE.Mesh(mergeAll(parts), new THREE.ShaderMaterial({ uniforms: U,
       vertexShader: `varying vec3 vP, vN; void main(){ vP = position; vN = normal; gl_Position = projectionMatrix * viewMatrix * modelMatrix * vec4(position, 1.); }`,
       fragmentShader: GL + `varying vec3 vP, vN; void main(){ vec3 n = normalize(vN), an = abs(n); an /= an.x + an.y + an.z;
         float tr = fb(vP.zy * .9) * an.x + fb(vP.xz * .9) * an.y + fb(vP.xy * .9) * an.z, tr2 = vn(vP.zy * 4.) * an.x + vn(vP.xz * 4.) * an.y + vn(vP.xy * 4.) * an.z;
