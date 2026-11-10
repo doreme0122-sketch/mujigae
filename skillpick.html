@@ -74,7 +74,7 @@ window.__ver = fetch('ver.json?t=' + Date.now(), { cache: 'no-store' }).then(r =
 <button id="tap" type="button" hidden><b>화면을 눌러 태어나기</b><span>소리를 켜고 보면 더 좋아요</span></button>
 <div id="rot">기기를 가로로 돌려 주세요</div>
 <script type="module">
-import { start } from './src/proto/skillpickview.js?v=11100928';
+import { start } from './src/proto/skillpickview.js?v=11100949';
 await window.__ver;
 const bar = document.querySelector('#load i');
 start(document.querySelector('#cv'), p => { bar.style.transform = `scaleX(${p})`; })

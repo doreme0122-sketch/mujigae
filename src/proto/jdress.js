@@ -5,7 +5,7 @@
    ④ 화석(막힘): 엎드려 죽은 큰 짐승 — 척추가 기체보다 높게 아치를 이루고 갈비가 양옆 땅에 박힘 → 갈비 사이(약 3m)로 들락날락 · 벌어진 입으로 들어가 목 아래를 지나 갈비 굴로
    모든 크기는 실제 미터 (섬 크기와 상관없이 기체 기준으로 맞춤) */
 import * as THREE from 'three';
-import { HC, RIBP, TEETH, boneGeo } from './jbones.js?v=11100928';
+import { HC, RIBP, TEETH, boneGeo } from './jbones.js?v=11100949';
 import { sanctFlora } from './jsanct.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 
