@@ -2,12 +2,13 @@
    · 카메라 · 화면 밝기 처리 · 기체 · 조종은 새 맵(map2)과 같은 것 · 섬만 새것 */
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
-import { makeBloom } from '../core/hangar/bloom.js?v=11102135';
-import { makeForgeShip, forgeList } from './forgeship.js?v=11102135';
-import { makePerf } from './perf.js?v=11102135';
-import { makeFlight, FLY, padZone } from './flight.js?v=11102135';
-import { buildIsle } from './isle.js?v=11102135';
-import { makeInputBuffer } from './inbuf.js?v=11102135';
+import { makeBloom } from '../core/hangar/bloom.js?v=11102142';
+import { makeForgeShip, forgeList } from './forgeship.js?v=11102142';
+import { makePerf } from './perf.js?v=11102142';
+import { makeFlight, FLY, padZone } from './flight.js?v=11102142';
+import { buildIsle } from './isle.js?v=11102142';
+import { makeInputBuffer } from './inbuf.js?v=11102142';
+import { makeLiftFx } from './liftfx.js?v=11102142';
 
 const $ = s => document.querySelector(s);
 export async function start(canvas, onProgress = () => {}) {
@@ -27,7 +28,7 @@ export async function start(canvas, onProgress = () => {}) {
       sel.onchange = () => { try { localStorage.setItem('mj-skin', sel.value); } catch (e) {} location.reload(); }; } }
   /* 세 높이 (사용자 2026-11-10): 1층 땅 가까이(부쉬 · 낮은 벽) · 2층 지형물 사이 · 3층 탁 트임 — 층마다 막히는 것이 다름 */
   const LY = isle.layers, LN = ['1층 · 부쉬와 풀밭', '2층 · 돌탑과 아치 사이', '3층 · 탁 트인 하늘'], LC = [[.45, 1., .38], [.42, .82, 1.], [1., .8, .32]];
-  const LV = { cur: 1, to: 1, f: 1, dir: 0, y: LY[1], flash: 0, puff: 9, puffX: 0, puffZ: 0, puffL: 0 };
+  const LV = { cur: 1, to: 1, f: 1, dur: .33, dir: 0, y: LY[1], flash: 0, puff: 9, puffX: 0, puffZ: 0, puffL: 0 };
   const B = { blocked: (x, z) => Math.hypot(x, z) > 78 * K || isle.blocked(x, z, LV.cur) || (LV.to !== LV.cur && isle.blocked(x, z, LV.to)), region: () => 0 };
   const START = [8 * K, 8 * K];   /* 트인 풀밭 (세 높이 모두 비어 있는 자리) */
   const fly = await makeFlight(renderer, B, START, 0, FG); scene.add(fly); const FS = fly.userData.S; fly.userData.respawn(START[0], START[1], 0);
@@ -52,15 +53,8 @@ export async function start(canvas, onProgress = () => {}) {
       void main(){ float r = length(vU), a = atan(vU.y, vU.x), n = .6 + .4 * h(floor(vec2(a * 9., r * 6.)));
       float k = exp(-pow((r - .25 - uP * .65) / (.08 + uP * .12), 2.)) * (1. - uP) * n; gl_FragColor = vec4(vec3(.93, .95, .9), k * .55); }` }));
   puff.renderOrder = 2; puff.visible = false; scene.add(puff);
-  /* 바람 줄기: 오르내리는 동안 기체 둘레를 반대 방향으로 스치는 가는 빛줄 */
-  const SN = 9, stG = new THREE.InstancedBufferGeometry(); stG.setAttribute('position', new THREE.Float32BufferAttribute([-.5, 0, 0, .5, 0, 0, .5, 1, 0, -.5, 1, 0], 3)); stG.setIndex([0, 1, 2, 0, 2, 3]);
-  stG.setAttribute('iA', new THREE.InstancedBufferAttribute(new Float32Array(Array.from({ length: SN * 3 }, (_, i) => [((i / 3) | 0) / SN * 6.283 + Math.random() * .5, .8 + Math.random() * .9, Math.random()][i % 3])), 3)); stG.instanceCount = SN;
-  const stU = { uA: { value: 0 }, uD: { value: 1 }, uF: { value: 0 }, uC: { value: new THREE.Vector3() } };
-  const streak = new THREE.Mesh(stG, new THREE.ShaderMaterial({ uniforms: stU, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
-    vertexShader: `attribute vec3 iA; uniform float uD, uF; uniform vec3 uC; varying float vY, vK; void main(){ vec3 c = uC + vec3(cos(iA.x) * iA.y * 1.4, 0., sin(iA.x) * iA.y * 1.4);
-      float off = -uD * (fract(uF * 1.6 + iA.z) - .5) * 3.2; c.y += off; vec4 mv = viewMatrix * vec4(c, 1.); mv.x += position.x * .05; mv.y += (position.y - .5) * 1.3; vY = position.y; vK = iA.z; gl_Position = projectionMatrix * mv; }`,
-    fragmentShader: 'uniform float uA; varying float vY, vK; void main(){ float k = sin(vY * 3.1416); gl_FragColor = vec4(vec3(.85, .95, 1.) * k * uA * (.5 + .5 * vK), 1.); }' }));
-  streak.frustumCulled = false; streak.renderOrder = 8; scene.add(streak);
+  /* 오르내리기 연출 (사용자 2026-11-10 확정 · liftfx.js 공용): 올라갈 때 작은 충격파 + 세로 빛줄기 · 내려갈 때 세로 빛줄기만 · 기체는 충격파에 휘지 않게 겹을 나눔 */
+  const lfx = makeLiftFx(renderer, scene); lfx.mine(fly); camera.layers.enableAll();
   /* 설정창은 오른쪽 위 톱니 단추로 접어 둠 (그 자리를 높이 바꾸는 칸이 씀 · 사용자 2026-11-10) */
   { const view = $('#view'), gear = document.createElement('button'); gear.type = 'button'; gear.textContent = '⚙'; gear.setAttribute('aria-label', '설정');
     gear.style.cssText = 'position:absolute;top:calc(env(safe-area-inset-top,0px) + 30px);right:max(12px,env(safe-area-inset-right,0px));width:34px;height:34px;border-radius:50%;border:1px solid rgba(185,255,74,.35);background:rgba(4,8,14,.6);color:#d9f7b0;font-size:17px;line-height:1';
@@ -79,11 +73,11 @@ export async function start(canvas, onProgress = () => {}) {
     let spot = bodyFree(FS.x, FS.z, to) ? [FS.x, FS.z] : null;
     for (let r = .3; !spot && r <= 2; r += .3) for (let k = 0; k < 16; k++) { const x = FS.x + Math.cos(k * .3927) * r, z = FS.z + Math.sin(k * .3927) * r; if (bodyFree(x, z, to) && bodyFree(x, z, LV.cur)) { spot = [x, z]; break; } }
     if (!spot) { LV.flash = 1; return; }
-    LV.to = to; LV.f = 0; LV.dir = d; LV.y0 = LV.y; LV.sx = FS.x; LV.sz = FS.z; LV.nx = spot[0]; LV.nz = spot[1]; drawPips(); if (d > 0) { LV.puff = 0; LV.puffX = FS.x; LV.puffZ = FS.z; LV.puffL = LV.cur; } };
-  /* 선입력: 오르내리는 중(0.55초)에 한 번 더 쓸면 기억했다가 닿는 순간 이어서 바꿈 → 두 번 연달아 쓸면 3층에서 1층까지 멈춤 없이
+    LV.to = to; LV.f = 0; LV.dir = d; LV.y0 = LV.y; LV.sx = FS.x; LV.sz = FS.z; LV.nx = spot[0]; LV.nz = spot[1]; drawPips(); LV.dur = Math.abs(LY[to] - LV.y) / FS.speed; lfx.go(d, FS.x, LV.y, FS.z); if (d > 0) { LV.puff = 0; LV.puffX = FS.x; LV.puffZ = FS.z; LV.puffL = LV.cur; } };   /* 오르내리는 빠르기 = 이동 빠르기 (사용자 2026-11-10) */
+  /* 선입력: 오르내리는 중에 한 번 더 쓸면 기억했다가 닿는 순간 이어서 바꿈 → 두 번 연달아 쓸면 3층에서 1층까지 멈춤 없이
      층 바꾸기는 손가락으로 두 번 쓸어내리는 간격이 짧아서, 오르내리는 동안 언제든 받음 (스킬은 끝나기 0.3초 전부터) */
-  const LT = .55, buf = makeInputBuffer(), lvRemain = () => LV.cur !== LV.to ? (1 - LV.f) * LT : 0;
-  const askLayer = d => buf.press(() => tryLayer(d), lvRemain(), LT);
+  const buf = makeInputBuffer(), lvRemain = () => LV.cur !== LV.to ? (1 - LV.f) * LV.dur : 0;
+  const askLayer = d => buf.press(() => tryLayer(d), lvRemain(), LV.dur);
   const zd = { id: null, y: 0, done: false };
   addEventListener('pointerdown', e => { if (zd.id !== null || !inZone(e.clientX, e.clientY)) return; zd.id = e.pointerId; zd.y = e.clientY; zd.done = false; }, true);
   addEventListener('pointermove', e => { if (e.pointerId !== zd.id || zd.done) return; const dy = e.clientY - zd.y; if (Math.abs(dy) > 34) { zd.done = true; askLayer(dy < 0 ? 1 : -1); } });
@@ -137,7 +131,7 @@ export async function start(canvas, onProgress = () => {}) {
   const up = e => { if (e.pointerId === look.id) look.id = null; }; addEventListener('pointerup', up); addEventListener('pointercancel', up);
 
   let Wd = 2, Hd = 2; const perf = makePerf(st => { bloom.setSamples(st.aa ? 4 : 0); size(); });
-  function size() { const r = canvas.getBoundingClientRect(); [Wd, Hd] = perf.size(r.width, r.height); renderer.setSize(Wd, Hd, false); bloom.size(Wd, Hd); camera.aspect = Wd / Hd; camera.updateProjectionMatrix();
+  function size() { const r = canvas.getBoundingClientRect(); [Wd, Hd] = perf.size(r.width, r.height); renderer.setSize(Wd, Hd, false); bloom.size(Wd, Hd); lfx.size(Wd, Hd); camera.aspect = Wd / Hd; camera.updateProjectionMatrix();
     const px = Hd / (2 * Math.tan(camera.fov * Math.PI / 360)); isle.setPx(px); fly.userData.setPx?.(px); }
   addEventListener('resize', size); size(); bloom.setSamples(perf.st.aa ? 4 : 0);
   /* 무게 표시 */
@@ -151,17 +145,17 @@ export async function start(canvas, onProgress = () => {}) {
   let t = 0, last = performance.now(), acc = { n: 0, ms: 0, calls: 0, tris: 0, tt: 0 };
   const v3 = new THREE.Vector3();
   renderer.setAnimationLoop(now => { try { const c0 = performance.now(); const dt = THREE.MathUtils.clamp((now - last) / 1000, 0, .05); last = now; t += dt;
-    /* 높이 바꾸는 중 (0.55초): 오를 땐 기수를 들고 조금 커지며 · 내릴 땐 숙이고 작아짐 · 카메라는 높을수록 물러나 넓게 */
-    if (LV.f < 1) { LV.f = Math.min(1, LV.f + dt / LT); const e = LV.f * LV.f * (3 - 2 * LV.f); LV.y = LV.y0 + (LY[LV.to] - LV.y0) * e;
+    /* 높이 바꾸는 중: 이동 빠르기 그대로 곧게 (움직임을 넣지 않음 · 사용자 2026-11-10) · 기수만 들고 숙이고 조금 커지거나 작아짐 · 카메라는 높을수록 물러나 넓게 */
+    if (LV.f < 1) { LV.f = Math.min(1, LV.f + dt / LV.dur); LV.y = LV.y0 + (LY[LV.to] - LV.y0) * LV.f;
       if (LV.dir < 0 && LV.f > .72 && LV.puff > 1) { LV.puff = 0; LV.puffX = FS.x; LV.puffZ = FS.z; LV.puffL = LV.to; }   /* 내려앉는 순간 그 층에 바람이 퍼짐 */
-      if (LV.f < .45 && (LV.nx !== LV.sx || LV.nz !== LV.sz)) { const k = Math.min(1, dt / Math.max(.02, (.45 - LV.f) * .55)); FS.x += (LV.nx - FS.x) * k; FS.z += (LV.nz - FS.z) * k; }   /* 비켜 주기 */
+      if (LV.f < .45 && (LV.nx !== LV.sx || LV.nz !== LV.sz)) { const k = Math.min(1, dt / Math.max(.02, (.45 - LV.f) * LV.dur)); FS.x += (LV.nx - FS.x) * k; FS.z += (LV.nz - FS.z) * k; }   /* 비켜 주기 */
       if (LV.f >= 1) LV.cur = LV.to; }
+    lfx.step(dt, { moving: LV.f < 1, f: LV.f, x: FS.x, y: LV.y, z: FS.z, left: (1 - LV.f) * LV.dur });
     buf.tick(lvRemain());   /* 기억해 둔 다음 입력: 닿자마자 이어서 */
     fly.position.y = LV.y - FLY.HOVER;
     fly.updateMatrixWorld(true); fly.userData.update(t, dt);
     { const S = fly.children[0], e = LV.f < 1 ? Math.sin(LV.f * Math.PI) : 0; S.rotateX(LV.dir * .52 * e);   /* 오르내릴 때 기수를 크게 들고 숙임 (사용자 2026-11-10: 높이감이 더 보이게 · 약 30°) */
-      const sc = [.92, 1, 1.1], a0 = sc[LV.cur], a1 = sc[LV.to], k = LV.f * LV.f * (3 - 2 * LV.f); S.scale.setScalar(a0 + (a1 - a0) * k); S.updateMatrixWorld(true);
-      stU.uA.value = e * .9; stU.uD.value = LV.dir; stU.uF.value = LV.f; stU.uC.value.set(FS.x, LV.y - .6, FS.z); }
+      const sc = [.92, 1, 1.1], a0 = sc[LV.cur], a1 = sc[LV.to], k = LV.f * LV.f * (3 - 2 * LV.f); S.scale.setScalar(a0 + (a1 - a0) * k); S.updateMatrixWorld(true); }
     FG.step(dt, t, { moving: Math.hypot(FS.vx, FS.vz) > 1.5, fire: false });
     if (look.id === null) { const k = Math.min(1, dt * 3.5); look.x -= look.x * k; look.z -= look.z * k; }
     const sp = fly.children[0].position; { const k = Math.min(1, dt * 4); cam.x += (sp.x + FS.vx * .25 - cam.x) * k; cam.z += (sp.z + FS.vz * .25 - cam.z) * k; }
@@ -179,7 +173,7 @@ export async function start(canvas, onProgress = () => {}) {
     for (const D of dummies) { const a = t * .25 + D.k * 1.7; D.g.position.set(D.cx + Math.cos(a) * D.r, LY[D.L] + Math.sin(t * 1.3 + D.k) * .08, D.cz + Math.sin(a) * D.r); D.g.rotation.y = -a; D.a += ((seeDummy(D) ? 1 : 0) - D.a) * Math.min(1, dt * 6); D.m.opacity = D.a; D.g.visible = D.a > .02; }
     { const hid = LV.cur === 0 && LV.f >= 1 && inBush(FS.x, FS.z); fly.userData.setGhost(hid, .55);   /* 숨은 내 기체: 너무 흐리지 않게 (어디 있는지는 보이게) */ if (hid) say.textContent = '1층 · 부쉬에 숨는 중'; }   /* 내가 부쉬에 숨으면 내 화면에서만 반투명 */
     FG.preRender(camera);
-    const c1 = performance.now(); renderer.setRenderTarget(bloom.scene); renderer.clear(); renderer.render(scene, camera); acc.calls = renderer.info.render.calls; acc.tris = renderer.info.render.triangles;
+    const c1 = performance.now(); lfx.render(camera, bloom.scene); acc.calls = renderer.info.render.calls; acc.tris = renderer.info.render.triangles;
     bloom.render(Wd, Hd, !perf.st.bloom); perf.tick(dt);
     acc.n++; acc.ms += c1 - c0; acc.tt += dt; if (acc.tt > .5) { info.textContent = `그리기 ${acc.calls}번 · 삼각형 ${n(acc.tris)}개 · 계산 ${(acc.ms / acc.n).toFixed(1)}ms\n섬: 낮은 식물 ${isle.stats.plants} · 땅 삼각형 ${n(isle.stats.ground.full)} → ${n(isle.stats.ground.kept)}`; info.style.whiteSpace = 'pre'; acc.n = acc.ms = acc.tt = 0; }
   } catch (e) { console.error('[초원 섬]', e); } });
