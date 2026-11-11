@@ -13,11 +13,11 @@
    · 상자 둘레로 작은 금빛 반짝이가 천천히 올라감 (동그란 티 안 나게 가는 십자 반짝임) */
 import * as THREE from 'three';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
-import { noise2 } from './islefield.js?v=11111459';
-import { carvedBlock, runeD } from './ruins.js?v=11111459';
-import { play, unlock } from './sfx.js?v=11111459';
-/* 고른 소리 (사용자 2026-11-11): 사슬 끊김 '다' (봉인 사슬 · 마법) · 빛 터짐 '가' (빛이 쏟아짐) · 아이템 날아감 '가' (반짝이 꼬리) · 내려앉음 '가' (사뿐 + 맑은 종) */
-const SND = { snap: 2, burst: 0, fly: 0, land: 0 };
+import { noise2 } from './islefield.js?v=11111504';
+import { carvedBlock, runeD } from './ruins.js?v=11111504';
+import { play, unlock } from './sfx.js?v=11111504';
+/* 고른 소리 (사용자 2026-11-11): 사슬 끊김 — 챙~ + 깨짐 (새로 만든 셋 중 '가' 먼저 · 고르면 바꿈) · 빛 터짐 '가' (빛이 쏟아짐) · 내려앉음 '가' (사뿐 + 맑은 종) · 아이템 날아가는 소리는 뺌 */
+const SND = { snap: 0, burst: 0, land: 0 };
 
 const W = 4.2, D = 2.8, BOT = .75, SEAM = 2.85, R = 1.45, AX = 3.0, LL = 4.3;   /* 몸통 너비 · 깊이 · 바닥 · 뚜껑 이음 높이 · 뚜껑 반지름 · 뚜껑 축 높이 · 뚜껑 길이 (섬 안 단위 · 0.5배 = m) */
 const ORDER = [0, 3, 1, 4, 2, 5];   /* 체력이 줄 때 끊기는 차례 (마주 보는 것끼리 번갈아) */
@@ -305,14 +305,14 @@ export function buildChest({ GL, U, S, pxU, x0, z0, cb, anchors, angles, drop, g
       gl_FragColor = vec4(mix(uGold, vec3(1.), .3) * (pool * .9 + ring * .5 + land * 1.5) * uA, 1.); }`, { ...spotU, uGold: BR.uGold })); spot.renderOrder = 7; group.add(spot);
 
   /* ── 상태 ── */
-  const brk = BR.uBrk.value, sec = SEC.uSec.value; let left = 6, open = -1, now = 0, seen = false, sBurst = false, sFly = false, sLand = false, nextSweep = 0, sweepT = -9, sweepK = 0, landed = false, opened = false, burstT = -1;
+  const brk = BR.uBrk.value, sec = SEC.uSec.value; let left = 6, open = -1, now = 0, seen = false, sBurst = false, sLand = false, nextSweep = 0, sweepT = -9, sweepK = 0, landed = false, opened = false, burstT = -1;
   const lidAt = (ang, jit) => { const piv = V(0, SEAM, -R - .02); lidU.value.makeTranslation(x0, cb, z0).multiply(new THREE.Matrix4().makeTranslation(piv.x, piv.y, piv.z)).multiply(new THREE.Matrix4().makeRotationX(-ang)).multiply(new THREE.Matrix4().makeRotationZ(jit)).multiply(new THREE.Matrix4().makeTranslation(-piv.x, -piv.y, -piv.z)); };
   lidAt(0, 0);
   const HALO = [[.25, .2, .16], [.9, .55, .25], [.8, .86, 1], [1.25, .86, .32]];
   const setGrade = k => { grade = k; const g = GRADES[k].k; CU.uKind.value = g; BR.uHalo.value.setRGB(...HALO[g]); orn.s.visible = g >= 2; orn.l.visible = g === 3; for (const m of gems.silver) m.visible = g === 2; for (const m of gems.gold) m.visible = g === 3; };
   setGrade(grade);
   const snap = c => { if (brk[c] >= 0) return; brk[c] = 0; BR.uJolt.value = 0; sfx('snap'); sec[c] = .999; left--; const ch = chains[c]; burst(ch.P(.5), 50, 6, now); burst(ch.B, 18, 3, now); burst(ch.A, 18, 3, now); };
-  const reset = () => { for (let c = 0; c < 6; c++) { brk[c] = -1; sec[c] = 1; } left = 6; open = -1; opened = landed = false; sBurst = sFly = sLand = false; burstT = -1; lidAt(0, 0); SEC.uA.value = 1; OA.uA.value = 0; SA.uA.value = 1; orbU.uA.value = 0; spotU.uA.value = 0; RU.uA.value = 1; seen = false; };
+  const reset = () => { for (let c = 0; c < 6; c++) { brk[c] = -1; sec[c] = 1; } left = 6; open = -1; opened = landed = false; sBurst = sLand = false; burstT = -1; lidAt(0, 0); SEC.uA.value = 1; OA.uA.value = 0; SA.uA.value = 1; orbU.uA.value = 0; spotU.uA.value = 0; RU.uA.value = 1; seen = false; };
   const setHP = hp => { const keep = Math.max(0, Math.ceil(hp * 6 - 1e-6)); for (let k = 0; k < 6 - keep; k++) snap(ORDER[k]); };
   let lastLeft = []; const kill = () => { lastLeft = ORDER.filter(c => brk[c] < 0); open = 0; };
   /* 내 화면에 들어오는 순간: 모서리 별빛 → 무지개 한 번 (세게) · 그 뒤 몇 초마다 은은히 */
@@ -334,7 +334,7 @@ export function buildChest({ GL, U, S, pxU, x0, z0, cb, anchors, angles, drop, g
       const t1 = tBreak + .35, t2 = t1 + .55, t3 = t2 + .7, tf = t2 + .35, tl = tf + 1.7;   /* 떨림 → 열림 → 빛 덩이 날아감 → 바닥에 떨어짐 */
       let ang = 0, jit = 0;
       if (!sBurst && o >= t2 - .35) { sBurst = true; sfx('burst'); }   /* 빛 터짐: 0.35초 차오른 뒤 뚜껑이 열리는 순간 와아 */
-      if (!sFly && o >= tf) { sFly = true; sfx('fly'); } if (!sLand && o >= tl) { sLand = true; sfx('land'); }
+      if (!sLand && o >= tl) { sLand = true; sfx('land'); }
       if (o > t1 && o < t2) { const k = (o - t1) / (t2 - t1); jit = Math.sin(o * 70) * .025 * k; ang = Math.max(0, Math.sin(o * 55)) * .04 * k; }
       if (o >= t2) { const k = Math.min(1, (o - t2) / (t3 - t2)), e = 1 + 2.7 * Math.pow(k - 1, 3) + 1.7 * Math.pow(k - 1, 2); ang = 1.95 * e; if (!opened) { opened = true; burst(V(x0, cb + SEAM + .4, z0), 120, 8, now); } }
       lidAt(ang, jit); SA.uA.value = o < t2 ? 1 + (o > t1 ? 1.5 * (o - t1) / (t2 - t1) : 0) : Math.max(0, 1 - (o - t2) * 3);

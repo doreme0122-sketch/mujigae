@@ -34,11 +34,11 @@ main{max-width:880px;margin:0 auto;display:flex;flex-direction:column;gap:14px}
 #pick{font-size:12px;color:var(--mute);max-width:880px;text-align:center;line-height:1.5}
 </style>
 </head><body>
-<header><b>SOUND · TREASURE</b><h1>보물 장소 소리 고르기</h1><p>필요한 소리 다섯 가지 · 세 가지씩. 칸을 누르면 소리가 나고 그 소리가 골라져요. 다 고른 뒤 「고른 소리로 이어 듣기」를 누르면 사슬이 끊기고 상자가 열려 아이템을 줍기까지 실제 순서대로 들려요. 이어폰이나 스피커로 들어 보세요 (좌우 · 울림이 있어요).</p></header>
+<header><b>SOUND · TREASURE</b><h1>보물 장소 소리 고르기</h1><p>필요한 소리 네 가지 · 세 가지씩. 칸을 누르면 소리가 나고 그 소리가 골라져요. 다 고른 뒤 「고른 소리로 이어 듣기」를 누르면 사슬이 끊기고 상자가 열려 아이템을 줍기까지 실제 순서대로 들려요. 이어폰이나 스피커로 들어 보세요 (좌우 · 울림이 있어요).</p></header>
 <main id="list"></main>
 <div class="bar"><button id="seq" type="button">고른 소리로 이어 듣기</button><button id="copy" class="ghost" type="button">고른 번호 복사</button><div id="pick"></div></div>
 <script type="module">
-const { SFX, play } = await import('./src/proto/sfx.js?v=11111459');
+const { SFX, play } = await import('./src/proto/sfx.js?v=11111504');
 const L = ['가', '나', '다'], pick = {}; try { Object.assign(pick, JSON.parse(localStorage.getItem('treasureSfx') || '{}')); } catch (e) {}
 const list = document.querySelector('#list'), out = document.querySelector('#pick');
 const save = () => { try { localStorage.setItem('treasureSfx', JSON.stringify(pick)); } catch (e) {} out.textContent = SFX.map(s => `${s.name.replace(/ \(.*\)/, '')} ${pick[s.id] != null ? L[pick[s.id]] : '—'}`).join(' · '); };
@@ -48,9 +48,9 @@ for (const s of SFX) { const row = document.createElement('section'); row.classN
     row.querySelector('.opts').append(b); });
   list.append(row); }
 save();
-/* 실제 순서: 공격 두 번 (사슬 둘) → 쓰러뜨림 (남은 사슬 넷이 차례로) → 빛 터짐 → 아이템 떠올라 날아감 → 내려앉음 → (1층에서 3초 머묾) → 줍기 완료 */
+/* 실제 순서: 공격 두 번 (사슬 둘) → 쓰러뜨림 (남은 사슬 넷이 차례로) → 빛 터짐 → (아이템 떠올라 날아감 · 소리 없음) → 내려앉음 → (1층에서 3초 머묾) → 줍기 완료 */
 const P = id => pick[id] ?? 0, at = (id, t) => play(id, P(id), t);
-document.querySelector('#seq').onclick = () => { at('snap', .2); at('snap', 1.4); for (let i = 0; i < 4; i++) at('snap', 2.7 + i * .16); at('burst', 3.8); at('fly', 5.4); at('land', 7.1); at('pick', 10.4); };
+document.querySelector('#seq').onclick = () => { at('snap', .2); at('snap', 1.4); for (let i = 0; i < 4; i++) at('snap', 2.7 + i * .16); at('burst', 3.8); at('land', 7.1); at('pick', 10.4); };
 document.querySelector('#copy').onclick = async () => { try { await navigator.clipboard.writeText(out.textContent); document.querySelector('#copy').textContent = '복사했어요'; } catch (e) { const r = document.createRange(); r.selectNodeContents(out); getSelection().removeAllRanges(); getSelection().addRange(r); } };
 </script>
 </body></html>

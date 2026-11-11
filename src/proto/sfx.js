@@ -1,4 +1,4 @@
-/* 보물 장소 소리 (사용자 2026-11-11: 필요한 소리는 다섯 — 사슬 끊김 · 빛 터짐 · 아이템 날아감 · 아이템 내려앉음 · 줍기 완료 · 퀄리티 좋게)
+/* 보물 장소 소리 (사용자 2026-11-11: 필요한 소리 — 사슬 끊김 · 빛 터짐 · 아이템 내려앉음 · 줍기 완료 · 퀄리티 좋게 · 아이템 날아가는 소리는 뺌)
    녹음 파일 없이 브라우저에서 만들어 냄 (Web Audio). 단순한 삐 소리가 아니라 실제 소리가 생기는 방식대로 쌓음:
    · 쇠: 짧은 충격(딸깍 + 잡음)이 쇠의 고유 울림 여러 개(서로 어긋난 높이)를 울리고, 울림마다 두 음이 살짝 어긋나 '위잉' 맥놀이 · 높은 울림일수록 빨리 사라짐
    · 줄 튕김(하프 · 류트): 잡음 한 번을 짧은 되먹임 줄에 넣어 실제 줄처럼 울리게 (카플러스-스트롱 방식) — 미리 계산해 둠
@@ -42,19 +42,29 @@ function pluck(dst, t, f, gain, { dur = 2.2, bright = .5, pan = 0 } = {}) { cons
 function bell(dst, t, f, dur, gain, pan = 0) { [[1, 1, 1], [2.0, .4, .7], [2.76, .22, .5], [5.4, .1, .3], [8.93, .05, .2]].forEach(([r, k, dk]) => osc(dst, t, f * r, dur * dk, gain * k, { a: .0015, pan })); }
 /* 반짝이 알갱이 구름: 좌우로 흩어지는 작은 종들 */
 function glitter(dst, t, dur, n, gain, lo = 2400, hi = 6200, curve = null) { for (let i = 0; i < n; i++) { const k = i / n, tt = t + (curve ? curve(k) : k) * dur + rnd(-.02, .02), f = rnd(lo, hi); bell(dst, tt, f, rnd(.15, .45), gain * rnd(.5, 1), rnd(-.8, .8)); } }
+/* 챙~ : 날카로운 쇠 울림 — 딸깍 충격 → 높은 고유 울림들이 길게 떨리며 남음 (첫 순간 살짝 음이 내려앉음 · 울림마다 두 음 어긋나 맥놀이) */
+function ching(dst, t, f0, dur, gain, modes = [1, 1.505, 2.39, 3.12, 4.48, 5.9]) { noise(dst, t, .018, .7 * gain, { type: 'highpass', f: 4500 }); osc(dst, t, f0 * 3.3, .006, .3 * gain, { type: 'square' });
+  modes.forEach((r, i) => { const f = f0 * r * (1 + rnd(-.002, .002)), d = dur * Math.pow(.7, i), g = gain * Math.pow(.66, i), pn = rnd(-.3, .3);
+    for (const [df, gk] of [[1, .6], [1.0042 + i * .0007, .45]]) { const o = A.createOscillator(), gg = A.createGain(), p = A.createStereoPanner(); o.frequency.setValueAtTime(f * df * 1.012, t); o.frequency.exponentialRampToValueAtTime(f * df, t + .05);
+      gg.gain.setValueAtTime(.0001, t); gg.gain.linearRampToValueAtTime(g * gk, t + .002); gg.gain.exponentialRampToValueAtTime(g * gk * .6, t + .08);   /* 충격 뒤에도 챙~ 이 또렷이 남게 */ gg.gain.exponentialRampToValueAtTime(.0001, t + d); p.pan.value = pn;
+      o.connect(gg); gg.connect(p); p.connect(dst); o.start(t); o.stop(t + d + .05); } }); }
+/* 깨짐: 쩍 갈라지는 순간 — 아주 짧은 딱딱 소리 여러 개가 몰려 터짐 (heavy: 낮고 굵게) */
+function crack(dst, t, gain, f = 2500, heavy = false) { for (let i = 0; i < 11; i++) { const tt = t + Math.pow(i / 10, 1.8) * .07 + rnd(0, .004); noise(dst, tt, rnd(.004, .012), gain * rnd(.4, 1) * (1 - i / 14), { f: f * rnd(.6, 1.6), q: heavy ? 1.2 : 2.5, pan: rnd(-.4, .4) }); }
+  noise(dst, t, heavy ? .12 : .06, gain * .5, { type: heavy ? 'lowpass' : 'highpass', f: heavy ? 2200 : 3000 }); }
+/* 조각: 작은 파편이 튀어 흩어지며 땡그랑 · 점점 드물게 */
+function shards(dst, t, n, gain, lo, hi, spread = .5) { for (let i = 0; i < n; i++) { const k = i / n, tt = t + Math.pow(k, 1.6) * spread + rnd(0, .02); strikeTiny(dst, tt, rnd(lo, hi), gain * (1 - k * .6), rnd(-.8, .8)); } }
+function strikeTiny(dst, t, f, g, pan) { noise(dst, t, .005, g * .8, { type: 'highpass', f: f, pan }); [1, 2.71, 5.18].forEach((r, i) => osc(dst, t, f * r, rnd(.04, .14) / (1 + i), g / (1 + i * 1.2), { a: .0008, pan })); }
 /* 공기 덩어리 (훅 · 쏴): 잡음 두 겹을 음역째 움직임 */
 function air(dst, t, dur, gain, f0, f1, a = .05) { noise(dst, t, dur, gain, { f: f0, q: .8, to: f1, a }); noise(dst, t + .01, dur * .9, gain * .6, { type: 'highpass', f: f0 * 2.5, to: f1 * 2.5, a }); }
 
-/* ── 다섯 순간 × 세 가지 (가 · 나 · 다) ── */
+/* ── 순간마다 세 가지 (가 · 나 · 다) ── */
 export const SFX = [
-  { id: 'snap', name: '사슬 끊김', len: 1.6, v: [
-    { n: '쇠사슬 끊김', d: '팽팽한 쇠가 탁 끊기며 맑게 울리고, 끊긴 고리가 짤랑 떨어짐', f(t) { const b = bus(.32); noise(b, t - .06, .07, .18, { type: 'highpass', f: 5000, to: 2500, a: .05 });   /* 끊기기 직전 끼기긱 당기는 소리 */
-        strike(b, t, 740, 1.1, .3); strike(b, t + .004, 1105, .6, .14, { click: .3 }); osc(b, t, 120, .18, .3, { to: 60 });
-        for (let i = 0; i < 4; i++) strike(b, t + .32 + i * rnd(.07, .13), rnd(2100, 2900), .16, .05 * (1 - i / 5), { modes: [1, 2.71, 5.18], click: .3 }); } },
-    { n: '굵은 사슬 (쩡)', d: '무거운 사슬이 묵직하게 끊기며 낮게 오래 울림', vol: 1.1, f(t) { const b = bus(.4); noise(b, t, .09, .35, { f: 1600, q: .7 }); strike(b, t, 310, 1.6, .34, { bright: .8 });
-        osc(b, t, 72, .5, .42, { to: 42 }); noise(b, t, .3, .12, { type: 'lowpass', f: 300 }); for (let i = 0; i < 3; i++) strike(b, t + .45 + i * rnd(.12, .2), rnd(800, 1100), .25, .06, { click: .4 }); } },
-    { n: '봉인 사슬 (마법)', d: '쇠 끊기는 소리 뒤로 봉인이 풀리는 맑은 울림이 흩어짐', vol: 1.1, f(t) { const b = bus(.55); strike(b, t, 660, .9, .25); osc(b, t, 100, .15, .25, { to: 55 });
-        bell(b, t + .03, 1568, 1.4, .1, -.3); bell(b, t + .07, 2349, 1.1, .07, .3); glitter(b, t + .05, .5, 12, .035, 3000, 7000, k => Math.sqrt(k)); noise(b, t + .04, .6, .05, { type: 'highpass', f: 6000, to: 9000, a: .02 }); } } ] },
+  { id: 'snap', name: '사슬 끊김 (챙~ + 깨짐)', len: 2.6, v: [
+    { n: '칼날 챙 + 쩍', d: '칼날끼리 부딪힌 듯 높고 날카로운 챙~이 길게 떨리고, 쇠고리가 쩍 갈라지며 조각이 튐', f(t) { const b = bus(.45); ching(b, t, 1850, 2.3, .3); crack(b, t, .34, 2600); shards(b, t + .03, 9, .05, 2600, 6000, .5); osc(b, t, 140, .12, .2, { to: 70 }); } },
+    { n: '맑은 챙 + 유리 깨짐', d: '더 높고 맑은 챙~ 뒤로 유리처럼 와장창 부서지는 조각들', vol: 1.05, f(t) { const b = bus(.5); ching(b, t, 2450, 2, .26, [1, 1.47, 2.31, 3.06, 4.3]); crack(b, t, .3, 4000);
+        shards(b, t + .02, 26, .045, 3500, 9000, .6); noise(b, t + .02, .45, .12, { type: 'highpass', f: 6000, to: 9500, a: .005 }); } },
+    { n: '묵직한 챙 + 쪼개짐', d: '낮고 굵은 챙~이 오래 울리고, 단단한 덩어리가 쩌억 쪼개지는 소리', vol: 1.05, f(t) { const b = bus(.45); ching(b, t, 1180, 2.6, .32, [1, 1.52, 2.44, 3.31, 4.7, 6.2]); crack(b, t, .38, 1500, true);
+        osc(b, t, 85, .35, .35, { to: 48 }); noise(b, t + .01, .35, .14, { type: 'lowpass', f: 1400, to: 400 }); shards(b, t + .05, 7, .05, 1500, 3800, .5); } } ] },
   { id: 'burst', name: '빛 터짐 (상자가 열린 순간)', len: 3.2, v: [
     { n: '빛이 쏟아짐', d: '숨을 들이켜듯 차오르다 밝은 화음과 반짝이가 와아 펼쳐짐', vol: 1.1, f(t) { const b = bus(.65);
         noise(b, t, .35, .12, { f: 400, q: .8, to: 3000, a: .33 });   /* 차오름 */
@@ -68,18 +78,6 @@ export const SFX = [
         strike(b, t, 196, 1.8, .12, { bright: .6, click: .2 });
         [196, 246.9, 293.7, 392, 587.3].forEach((f, i) => { const o = osc(b, t + .12, f, 3, .05, { type: 'triangle', a: .45, det: (i - 2) * 4 }); });
         glitter(b, t + .25, 1.8, 18, .025, 2000, 5200, k => Math.sqrt(k)); } } ] },
-  { id: 'fly', name: '아이템 날아감 (떠올라 둥글게 넘어감 · 약 1.7초)', len: 2.4, v: [
-    { n: '반짝이 꼬리', vol: 4, d: '빛 덩이가 떠오르며 작은 반짝이가 꼬리처럼 따라붙고, 올라갔다 내려옴', f(t) { const b = bus(.5);
-        for (let i = 0; i < 26; i++) { const k = i / 25, h = Math.sin(k * Math.PI), f = (1500 + h * 2200) * rnd(.96, 1.04); bell(b, t + k * 1.7, f, .3 + h * .2, .03 + h * .015, -.6 + k * 1.2); }   /* 높이에 따라 음이 오르내리고 · 왼쪽 → 오른쪽 */
-        noise(b, t, .9, .05, { f: 1500, q: 2, to: 4000, a: .3, pan: -.4 }); noise(b, t + .85, .85, .05, { f: 4000, q: 2, to: 1500, a: .05, pan: .4 }); } },
-    { n: '휘이익 (공기)', d: '공기를 가르며 다가올수록 높아지고 멀어지며 낮아지는 바람 소리', vol: 3, f(t) { const b = bus(.35);
-        const s = A.createBufferSource(), fl = A.createBiquadFilter(), fl2 = A.createBiquadFilter(), g = A.createGain(), p = A.createStereoPanner(); s.buffer = NOISE; s.loop = true; fl.type = 'bandpass'; fl.Q.value = 3; fl2.type = 'bandpass'; fl2.Q.value = 9;
-        fl.frequency.setValueAtTime(500, t); fl.frequency.exponentialRampToValueAtTime(2600, t + .85); fl.frequency.exponentialRampToValueAtTime(700, t + 1.7); fl2.frequency.setValueAtTime(900, t); fl2.frequency.exponentialRampToValueAtTime(4200, t + .85); fl2.frequency.exponentialRampToValueAtTime(1100, t + 1.7);
-        g.gain.setValueAtTime(.0001, t); g.gain.exponentialRampToValueAtTime(.35, t + .8); g.gain.exponentialRampToValueAtTime(.0001, t + 1.75); p.pan.setValueAtTime(-.7, t); p.pan.linearRampToValueAtTime(.7, t + 1.7);
-        s.connect(fl); s.connect(fl2); fl.connect(g); fl2.connect(g); g.connect(p); p.connect(b); s.start(t); s.stop(t + 1.8); glitter(b, t + .2, 1.3, 8, .02, 3000, 6000); } },
-    { n: '하프 둥글게', vol: 1.3, d: '하프를 위로 쓸어 올렸다 부드럽게 쓸어 내림 (진짜 줄 튕김)', f(t) { const b = bus(.55); const up = [392, 440, 523.3, 587.3, 659.3, 784, 880, 1046.5];
-        up.forEach((f, i) => pluck(b, t + i * .085, f, .32, { bright: .55, pan: -.5 + i * .08 })); up.slice(0, 6).reverse().forEach((f, i) => pluck(b, t + .9 + i * .12, f * 1.335, .22, { bright: .45, pan: .1 + i * .08 }));
-        glitter(b, t + .6, .8, 6, .018, 3000, 6000); } } ] },
   { id: 'land', name: '아이템 내려앉음', len: 2.2, v: [
     { n: '사뿐 + 맑은 종', vol: 1.6, d: '바닥에 톡 닿고, 맑은 종이 한 번 울리며 반짝이가 가라앉음', f(t) { const b = bus(.5); osc(b, t, 180, .14, .3, { to: 85 }); noise(b, t, .05, .12, { f: 900, q: 1.2 });
         bell(b, t + .015, 1318.5, 1.8, .12); bell(b, t + .02, 1975.5, 1.2, .05, .3); glitter(b, t + .05, .7, 9, .02, 2500, 5500, k => Math.sqrt(k)); } },
