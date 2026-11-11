@@ -2,14 +2,14 @@
    · 카메라 · 화면 밝기 처리 · 기체 · 조종은 새 맵(map2)과 같은 것 · 섬만 새것 */
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
-import { makeBloom } from '../core/hangar/bloom.js?v=11111743';
-import { makeForgeShip, forgeList } from './forgeship.js?v=11111743';
-import { makePerf } from './perf.js?v=11111743';
-import { makeFlight, FLY, padZone } from './flight.js?v=11111743';
-import { buildIsle } from './isle.js?v=11111743';
-import { makeInputBuffer } from './inbuf.js?v=11111743';
-import { makeLiftFx } from './liftfx.js?v=11111743';
-import { gate4 } from './gates.js?v=11111743';
+import { makeBloom } from '../core/hangar/bloom.js?v=11111804';
+import { makeForgeShip, forgeList } from './forgeship.js?v=11111804';
+import { makePerf } from './perf.js?v=11111804';
+import { makeFlight, FLY, padZone } from './flight.js?v=11111804';
+import { buildIsle } from './isle.js?v=11111804';
+import { makeInputBuffer } from './inbuf.js?v=11111804';
+import { makeLiftFx } from './liftfx.js?v=11111804';
+import { gate4 } from './gates.js?v=11111804';
 
 const $ = s => document.querySelector(s);
 export async function start(canvas, onProgress = () => {}, opt = {}) {   /* opt.layout: 섬 배치 (없으면 섬 하나 시험 · 초원 한 조각 체험판 = meadowsector.js) */
@@ -105,9 +105,9 @@ export async function start(canvas, onProgress = () => {}, opt = {}) {   /* opt.
   const ray = (L, x0, z0, dx, dz, R, me) => { const A = occ[L]; for (let d = .15; d < R; d += .15) { const o = occAt(A, x0 + dx * d, z0 + dz * d); if (o === 1 || (o >= 2 && o - 2 !== me)) return d; } return R; };
   const myZone = L => L === 0 ? isle.brushZone(FS.x, FS.z) : -1;
   let Rs = VR[1]; const D = new Float32Array(NR);
-  /* 기체가 가려졌나: 기체 → 카메라 사이를 24번 짚어 땅(산)이 그 높이보다 솟았는지 · 동굴 천장 밑이면 가려짐 */
+  /* 기체가 가려졌나: 기체 → 카메라 사이를 24번 짚어 땅(산)이 그 높이보다 솟았는지 · 머리 위 바위 높이 사이를 지나는지 · 동굴 천장 밑이면 가려짐 */
   let cutR = 0; const hidden = () => { if (isle.where && isle.where(FS.x, FS.z) === 'tunnel') return true; const cx = camera.position.x, cy = camera.position.y, cz = camera.position.z;
-    for (let i = 1; i <= 24; i++) { const k = i / 24 * .92, x = FS.x + (cx - FS.x) * k, y = LV.y + (cy - LV.y) * k, z = FS.z + (cz - FS.z) * k; if (isle.H(x, z) > y - .3) return true; } return false; };
+    for (let i = 1; i <= 24; i++) { const k = i / 24 * .92, x = FS.x + (cx - FS.x) * k, y = LV.y + (cy - LV.y) * k, z = FS.z + (cz - FS.z) * k; if (isle.H(x, z) > y - .3) return true; const q = isle.roof && isle.roof(x, z); if (q && y > q[0] - .3 && y < q[1] + .3) return true; } return false; };   /* 땅 · 머리 위 바위(동굴 천장 · 유적 · 떠 있는 바위 · 골짜기 바위) */
   const castSight = () => { const L = LV.f < .5 ? LV.cur : LV.to, me = myZone(L); Rs += (VR[L] - Rs) * .25; const R = Rs;
     if (opt.layout) { const nx = Math.round((FS.x - VS / 2) / cs0) * cs0, nz = Math.round((FS.z - VS / 2) / cs0) * cs0, di = Math.round((nx - VO[0]) / cs0), dj = Math.round((nz - VO[1]) / cs0);   /* 넓은 맵: 시야 지도 창이 기체를 따라감 (칸 단위로 옮기고 앞 장면 값도 같이 옮김) */
       if (di || dj) { visB.set(visT); for (let j = 0; j < VG; j++) for (let i = 0; i < VG; i++) { const ii = i + di, jj = j + dj; visT[j * VG + i] = ii >= 0 && jj >= 0 && ii < VG && jj < VG ? visB[jj * VG + ii] : 0; } VO[0] = nx; VO[1] = nz; } }

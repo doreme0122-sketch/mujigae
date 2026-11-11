@@ -7,9 +7,9 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { MeshoptSimplifier as MO } from '../../vendor/meshopt_simplifier.module.js';
-import { makeField, Y, SPOT, LAYERS, fbm, noise2, smoothstep } from './islefield.js?v=11111743';
-import { reedBush, vegShader } from './flora.js?v=11111743';
-import { buildRuins } from './ruins.js?v=11111743';
+import { makeField, Y, SPOT, LAYERS, fbm, noise2, smoothstep } from './islefield.js?v=11111804';
+import { reedBush, vegShader } from './flora.js?v=11111804';
+import { buildRuins } from './ruins.js?v=11111804';
 
 const SUN = new THREE.Vector3(-.45, .78, .44).normalize();   /* 왼쪽 위 앞에서 (카메라 쪽 절벽 면이 비스듬히 빛을 받아 결이 드러남) */
 const rngOf = s => () => (s = (s * 16807) % 2147483647) / 2147483647;
@@ -567,6 +567,15 @@ export async function buildIsle({ K = 1, layout = SPOT } = {}) {   /* layout: �
   G.scale.setScalar(K); U.uK.value = K;   /* 모양 · 무늬 · 안개 높이는 섬 안 좌표로 계산하고 통째로 줄임 → 들꽃 · 잎 무늬까지 같이 작아짐 */
   G.traverse(o => { if (o.isMesh || o.isPoints) { st.draws++; const g = o.geometry, n = (g.index ? g.index.count : g.attributes.position.count) / 3; st.tris += o.isInstancedMesh ? n * o.count : o.isPoints ? 0 : (g.instanceCount ? n * g.instanceCount : n); } });
   st.ground = { full: fullT, kept: I.length / 3, bottom: BI.length / 3 }; st.plants = plants.length;
-  return { GL, U, hAtL: hAt, pxU: G.userData.motes.material.uniforms.uPx,   /* 보물 장소처럼 섬 위에 따로 얹는 것이 같은 칠 · 높이를 씀 */
+  /* 머리 위 바위 지도 (사용자 2026-11-11: 기체를 가리는데 안 뚫림 — 땅이 아닌 동굴 천장 바위 · 유적 · 떠 있는 바위 · 골짜기 바위도 가림으로 봄)
+     만들 때 한 번: 그 바위들의 점을 칸(1)마다 모아 가장 낮은 · 가장 높은 높이를 적어 둠 → 매 순간 기체 → 카메라 선이 그 사이를 지나는지만 봄 (가벼움) */
+  const RF = (() => { const [x0, x1, z0, z1] = LO.box, C = 1, nx = Math.ceil((x1 - x0) / C) + 1, nz = Math.ceil((z1 - z0) / C) + 1, lo = new Float32Array(nx * nz).fill(1e9), hi = new Float32Array(nx * nz).fill(-1e9); let any = false;
+    for (const m of G.children) { if (!['cave', 'ruins', 'floats', 'arches'].includes(m.name)) continue; const p = m.geometry.attributes.position; any = true;
+      for (let i = 0; i < p.count; i++) { const x = p.getX(i), y = p.getY(i), z = p.getZ(i), ix = Math.round((x - x0) / C), iz = Math.round((z - z0) / C); if (ix < 0 || iz < 0 || ix >= nx || iz >= nz) continue; const k = iz * nx + ix; if (y < lo[k]) lo[k] = y; if (y > hi[k]) hi[k] = y; } }
+    if (!any) return null;
+    /* 점 사이가 비지 않게 이웃 칸까지 한 번 번짐 */
+    const lo2 = lo.slice(), hi2 = hi.slice(); for (let iz = 1; iz < nz - 1; iz++) for (let ix = 1; ix < nx - 1; ix++) { const k = iz * nx + ix; for (const d of [1, -1, nx, -nx]) { if (lo[k + d] < lo2[k]) lo2[k] = lo[k + d]; if (hi[k + d] > hi2[k]) hi2[k] = hi[k + d]; } }
+    return (x, z) => { const ix = Math.round((x - x0) / C), iz = Math.round((z - z0) / C); if (ix < 0 || iz < 0 || ix >= nx || iz >= nz) return null; const k = iz * nx + ix; return hi2[k] > -1e8 ? [lo2[k], hi2[k]] : null; }; })();
+  return { GL, U, hAtL: hAt, roof: (x, z) => { if (!RF) return null; const q = RF(x / K, z / K); return q && [q[0] * K, q[1] * K]; }, pxU: G.userData.motes.material.uniforms.uPx,   /* 보물 장소처럼 섬 위에 따로 얹는 것이 같은 칠 · 높이를 씀 */
     group: G, K, field: F, H: (x, z) => hAt(x / K, z / K) * K, mask: (x, z) => F.mask(x / K, z / K) * K, blocked: (x, z, L = 1) => F.blocked(x / K, z / K, L), where: (x, z) => F.where(x / K, z / K), inGorge: (x, z) => F.inGorge(x / K, z / K, .2), layout: LO, setCut: (s, c, R, amt = 1) => { U.uCutA.value.set(s.x / K, s.y / K, s.z / K, R / K); U.uCutB.value.set(c.x / K, c.y / K, c.z / K, amt); }, sightBlock: (x, z, L) => F.sightBlock(x / K, z / K, L), inBrush: (x, z) => F.brush(x / K, z / K) > 0, brushZone: (x, z) => F.brushZone(x / K, z / K), setSight: (tex, x, z, R, on) => { U.uRay.value = tex; U.uVC.value.set(x, z); U.uVR.value = R; U.uVOn.value = on; }, layers: LAYERS.map(y => y * K), push: (x, z, r, k) => U.uPush.value.set(x / K, z / K, r / K, k / K), stats: st, sky, setPx: px => { G.userData.motes.material.uniforms.uPx.value = px; }, update: t => { U.uT.value = t; } };
 }
