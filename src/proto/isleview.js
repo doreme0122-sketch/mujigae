@@ -2,14 +2,14 @@
    · 카메라 · 화면 밝기 처리 · 기체 · 조종은 새 맵(map2)과 같은 것 · 섬만 새것 */
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
-import { makeBloom } from '../core/hangar/bloom.js?v=11111652';
-import { makeForgeShip, forgeList } from './forgeship.js?v=11111652';
-import { makePerf } from './perf.js?v=11111652';
-import { makeFlight, FLY, padZone } from './flight.js?v=11111652';
-import { buildIsle } from './isle.js?v=11111652';
-import { makeInputBuffer } from './inbuf.js?v=11111652';
-import { makeLiftFx } from './liftfx.js?v=11111652';
-import { gate4 } from './gates.js?v=11111652';
+import { makeBloom } from '../core/hangar/bloom.js?v=11111714';
+import { makeForgeShip, forgeList } from './forgeship.js?v=11111714';
+import { makePerf } from './perf.js?v=11111714';
+import { makeFlight, FLY, padZone } from './flight.js?v=11111714';
+import { buildIsle } from './isle.js?v=11111714';
+import { makeInputBuffer } from './inbuf.js?v=11111714';
+import { makeLiftFx } from './liftfx.js?v=11111714';
+import { gate4 } from './gates.js?v=11111714';
 
 const $ = s => document.querySelector(s);
 export async function start(canvas, onProgress = () => {}, opt = {}) {   /* opt.layout: 섬 배치 (없으면 섬 하나 시험 · 초원 한 조각 체험판 = meadowsector.js) */
@@ -176,7 +176,7 @@ export async function start(canvas, onProgress = () => {}, opt = {}) {   /* opt.
     const sp = fly.children[0].position; { const k = Math.min(1, dt * 4); cam.x += (sp.x + FS.vx * .25 - cam.x) * k; cam.z += (sp.z + FS.vz * .25 - cam.z) * k; }
     { const cf = [.85, 1, 1.3], k = LV.f * LV.f * (3 - 2 * LV.f), f = cf[LV.cur] + (cf[LV.to] - cf[LV.cur]) * k; camD += (cfg.dist * CAMK * f - camD) * Math.min(1, dt * 3); }
     const a = cfg.ang * Math.PI / 180, vx = cam.x + look.x, vz = cam.z + look.z, cy = LV.y; camera.position.set(vx, cy + camD * Math.sin(a), vz + camD * Math.cos(a)); camera.lookAt(vx, cy, vz); camera.updateMatrixWorld();
-    isle.sky.position.copy(camera.position); isle.update(t); ext?.update?.(t, dt, { x: FS.x / K, z: FS.z / K, L: LV.cur }); if (LO.cut) isle.setCut(v3.set(FS.x, LV.y, FS.z), camera.position, LO.cut, .55);   /* 기체와 카메라 사이 높은 산 · 동굴 천장을 내 화면에서만 걷어 냄 · 확정(사용자 2026-11-11): 반투명 · 크기는 배치의 cut(7m) */ xrayM.uniforms.uT.value = t;
+    isle.sky.position.copy(camera.position); isle.update(t); ext?.update?.(t, dt, { x: FS.x / K, z: FS.z / K, L: LV.cur }); if (LO.cut) isle.setCut(v3.set(FS.x, LV.y, FS.z), camera.position, LO.cut, 1);   /* 기체와 카메라 사이 높은 산 · 동굴 천장을 내 화면에서만 걷어 냄 · 사용자 2026-11-11: 반투명 → 완전히 투명 (흐린 안개 없이) · 크기는 배치의 cut(7m) */ xrayM.uniforms.uT.value = t;
     /* 바람 고리 (1층이면 땅에 닿아 풀 · 꽃을 밂 · 2 · 3층은 그 높이 공중에서만) · 못 바꾸면 층 막대가 빨갛게 깜빡 */
     if (LV.puff < 1) { LV.puff = Math.min(1, LV.puff + dt / .7); const p = LV.puff, onGround = LV.puffL === 0, gh = isle.H(LV.puffX, LV.puffZ);
       puff.visible = !onGround || isle.mask(LV.puffX, LV.puffZ) > 0; puff.position.set(LV.puffX, onGround ? gh + .08 : LY[LV.puffL] - .45, LV.puffZ); puff.scale.setScalar(5.5); puffU.uP.value = p;

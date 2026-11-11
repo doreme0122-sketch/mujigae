@@ -91,10 +91,12 @@ export function makeField(L = SPOT) {
   const mountH = (x, z) => { const k = mountK(x, z); if (k <= 0) return 0;
     const rid = Math.max(0, 1 - Math.abs(fbm(x * .03 + 3, z * .03 - 5, 4)) * 1.8), r2 = Math.max(0, 1 - Math.abs(fbm(x * .07 - 11, z * .07 + 4, 3)) * 2);   /* 능선 둘: 큰 봉우리 줄기 · 작은 뾰족 봉우리 */
     const mh = k * MB.peak * (.32 + .62 * rid * rid + .22 * r2 * r2 * rid + .1 * fbm(x * .16, z * .16, 3)), lf = MB.lowFront ? frontK(x, z) : 0;   /* 고른 벽이 아니라 솟은 봉우리와 꺼진 안장 */
-    return lf > 0 && mh > FCAP ? FCAP + (mh - FCAP) * (1 - .92 * lf) : mh; };
+    const m2 = lf > 0 && mh > FCAP ? FCAP + (mh - FCAP) * (1 - .92 * lf) : mh, nk = MB.lowFront ? nearK(x, z) * smoothstep(.3, .65, k) : 0;
+    return Math.max(m2, MINH * nk); };   /* 길 둘레 벽은 3층보다 낮은 안장이 없게 (사용자 2026-11-11: 들어가자마자 왼쪽 3층으로 빠져나갈 수 있었음) */
   /* 카메라 쪽 벽 낮추기 (사용자 2026-11-11: 길이 옆으로 휘어 벽이 카메라와 기체 사이에 오는 곳은 3층을 겨우 못 넘을 만큼만 · 먼 쪽 벽은 높고 뾰족하게 그대로)
      카메라는 +z 쪽에서 내려다봄 → 길(골짜기 · 공터)보다 +z 쪽에 있는 산은 높이를 3층 + 여유까지로 누름 */
-  const FCAP = LAYERS[2] + CLEAR + 2.6 - Y.MEADOW;
+  const FCAP = LAYERS[2] + CLEAR + 2.6 - Y.MEADOW, MINH = LAYERS[2] + CLEAR + 1.4 - Y.MEADOW;
+  const nearK = (x, z) => { const g = gorge(x, z), dist = G0.w - g.d; let k = smoothstep(G0.w + 30, G0.w + 18, dist); if (G0.basin) { const [bx, bz, br] = G0.basin; k = Math.max(k, smoothstep(br + 26, br + 14, Math.hypot(x - bx, z - bz))); } return k; };
   const frontK = (x, z) => { if (!G0) return 0; const g = gorge(x, z), [gx, gz] = gorgeAt(g.t), dist = G0.w - g.d; let k = smoothstep(1, 9, z - gz) * smoothstep(40, 24, dist);
     if (G0.basin) { const [bx, bz, br] = G0.basin, dd = Math.hypot(x - bx, z - bz) - br; k = Math.max(k, smoothstep(.15, .5, (z - bz) / (Math.hypot(x - bx, z - bz) + 1)) * smoothstep(34, 18, dd)); }
     return k; };
