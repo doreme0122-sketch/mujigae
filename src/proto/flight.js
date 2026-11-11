@@ -11,9 +11,9 @@
 import * as THREE from 'three';
 import { buildShip, engineSpots } from '../core/ships/build.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { flameMesh } from './sortie.js?v=11111956';
-import { MAP } from './mapfloor.js?v=11111956';
-import { applyShipHeat, heatVis } from './shipheat.js?v=11111956';
+import { flameMesh } from './sortie.js?v=11112057';
+import { MAP } from './mapfloor.js?v=11112057';
+import { applyShipHeat, heatVis } from './shipheat.js?v=11112057';
 
 export const FLY = { LEN: 2, HOVER: .7, R: .8, SPEEDS: [5.25, 7, 8.75, 10.5], TURN: 7, ACC: .22, TURNMAX: 9, /* 빠르기 (사용자 2026-11-11: 너무 빨라 PVP가 재미없음 → 기본 초속 12 → 7 · 네 단계 같은 비율로) */
   BASE: 9, SHIELD: 3, BOOST: 5, BOOSTK: 1.5 };   /* 기지 고리(반지름 9m)를 벗어나는 순간: 보호막 3초 · 가속 5초(1.5배) — 기지 출구 앞 매복에 바로 당하지 않게 */

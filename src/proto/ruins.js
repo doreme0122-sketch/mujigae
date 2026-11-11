@@ -8,7 +8,7 @@
    막힘은 보이는 두께 그대로
    돌려주는 것: geos (깎은 돌 칠 하나로 한 번에 그림) · glow (빛 무늬 세모 [a, b, c, 색, 위상]) · obstacles ([x, y, z, r]) · strands (늘어진 덩굴 점 줄) */
 import * as THREE from 'three';
-import { noise2 } from './islefield.js?v=11111956';
+import { noise2 } from './islefield.js?v=11112057';
 
 const V = (x, y, z) => new THREE.Vector3(x, y, z);
 const rngOf = s => () => (s = (s * 16807) % 2147483647) / 2147483647;
@@ -57,7 +57,7 @@ export function buildRuins({ F, hAt, LAYERS, Y, LO, TUN }) {
   const R = LO.ruins; if (!R) return { geos, rock, glow, obstacles, strands };
 
   /* ① 끊어진 돌다리 ─────────────────────────────────────────── */
-  { const { a, b, w, gap } = R.bridge, A = V(a[0], 0, a[1]), B = V(b[0], 0, b[1]), dir = B.clone().sub(A), L = dir.length(); dir.normalize(); const side = V(-dir.z, 0, dir.x), ry = Math.atan2(dir.x, dir.z);
+  if (R.bridge) { const { a, b, w, gap } = R.bridge, A = V(a[0], 0, a[1]), B = V(b[0], 0, b[1]), dir = B.clone().sub(A), L = dir.length(); dir.normalize(); const side = V(-dir.z, 0, dir.x), ry = Math.atan2(dir.x, dir.z);
     const deckY = Y.MEADOW + .35, at2 = (u, s, y) => A.clone().addScaledVector(dir, u).addScaledVector(side, s).setY(y), broke = u => u > gap[0] * L && u < gap[1] * L;
     const ragged = (u, s) => { const e0 = gap[0] * L + (noise2(s * .9, 1) * 1.6 + .6), e1 = gap[1] * L - (noise2(s * .9, 7) * 1.6 + .6); return u > e0 && u < e1; };   /* 무너진 끝은 들쭉날쭉 */
     /* 다리 판: 돌판을 엇갈려 깔고 (줄눈) 군데군데 기울거나 빠짐 */
@@ -175,7 +175,8 @@ export function buildRuins({ F, hAt, LAYERS, Y, LO, TUN }) {
   /* ④ 신전 앞마당의 무너진 기둥 무더기 (사용자 2026-11-11: 입구 앞에 무너진 기둥들로 1층을 막음 · 뒤에 가리는 산이 없는 탁 트인 곳)
      거대한 홈 파인 기둥들이 여러 각도로 무너짐 — 비스듬히 누운 것 · 다른 기둥에 기댄 것 · 둘이 서로 기대 ㅅ자를 이룬 것 · 기둥 북(토막) 위에 얹힌 것 · 부러진 밑동
      머리 장식이 떨어져 뒹굴고 토막들이 흩어짐 · 맨 위는 2층 아래 → 1층은 막히고 2 · 3층으로 넘음 */
-  if (R.pile) { const [cx, cz] = R.pile.c, hw = R.pile.w / 2, gnd = (x, z) => hAt(cx + x, cz + z), L1 = LAYERS[0], CAPY = LAYERS[1] - 2.2;
+  if (R.pile) { const [cx, cz] = R.pile.c, hw = R.pile.w / 2, th = R.pile.rot != null ? (R.pile.rot + 180) * Math.PI / 180 : 0, cth = Math.cos(th), sth = Math.sin(th), g0 = geos.length, o0 = obstacles.length;   /* rot: 신전이 바라보는 방향 (한 조각 체험판: 동굴이 맵 가운데를 봄) */
+    const gnd = (x, z) => hAt(cx + x * cth + z * sth, cz - x * sth + z * cth), L1 = LAYERS[0], CAPY = LAYERS[1] - 2.2;
     const axis = (yaw, pitch) => V(Math.cos(pitch) * Math.cos(yaw), Math.sin(pitch), -Math.cos(pitch) * Math.sin(yaw));
     /* 기둥 하나: 홈 파인 몸통 (끝은 부러져 들쭉날쭉) + 한쪽 끝 머리 장식 · (base: 밑동 끝 자리 · 몸통이 axis 쪽으로 뻗음) */
     const column = (bx, bz, by, L, rad, yaw, pitch, seed, cap = true, broken = true) => { const ax = axis(yaw, pitch), parts = [], body = fluted(rad, L, 16, Math.max(4, Math.round(L / 1.4)));
@@ -204,6 +205,8 @@ export function buildRuins({ F, hAt, LAYERS, Y, LO, TUN }) {
     drum(13, 6.5, 1.4, 1.5, Math.PI / 2, 13.3); drum(-8, 6.2, 1.5, 1.3, Math.PI / 2 - .3, 14.4); drum(16, -7.5, 1.3, 1.2, 0, 16.6);
     for (let i = 0; i < 26; i++) { const x = (r() - .5) * 2 * hw, z = (r() - .5) * 16, g = block(.5 + r() * 1.2, .4 + r() * .8, .5 + r(), 1, .2, i); g.rotateY(r() * 6); g.rotateZ((r() - .5) * .6); g.translate(cx + x, gnd(x, z) + .3, cz + z); add(g); }   /* 흩어진 돌 부스러기 */
     for (let x = -hw; x <= hw; x += 2.4) obstacles.push([cx + x, L1, cz + (x < -4 ? 1 : x < 8 ? -1.5 : -1), 2.4]);   /* 1층은 무더기 전체 폭으로 막힘 (보이는 무더기 그대로 · 틈새로 빠지지 않게) */
+    if (th) { for (let k = g0; k < geos.length; k++) { geos[k].translate(-cx, 0, -cz); geos[k].rotateY(th); geos[k].translate(cx, 0, cz); }   /* 무더기를 신전 방향으로 돌림 (높이는 gnd가 돌린 자리에서 잼) */
+      for (let k = o0; k < obstacles.length; k++) { const o = obstacles[k], x = o[0] - cx, z = o[2] - cz; o[0] = cx + x * cth + z * sth; o[2] = cz - x * sth + z * cth; } }
     /* ⑤ 골짜기길에 기댄 기둥 (사용자 2026-11-11: 입구와 같은 기둥 · 셋만 · 길 곳곳에 불규칙하게 벽에 비스듬히 기댐 → 피해서 가는 재미)
        밑동은 길 가운데 쪽 바닥 · 몸통은 한쪽 벽으로 기울어 벽면에 닿은 자리에서 멈춤 (끝이 벽에 살짝 박힘)
        한 층을 꽉 막지 않음: 밑동 쪽은 1층이 막히고 벽 쪽 기둥 밑은 1층이 지나감 · 높이 기댄 것은 2층도 벽 쪽만 막힘 → 막힌 쪽만 비켜 가면 됨

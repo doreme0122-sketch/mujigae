@@ -7,9 +7,10 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { MeshoptSimplifier as MO } from '../../vendor/meshopt_simplifier.module.js';
-import { makeField, Y, SPOT, LAYERS, fbm, noise2, smoothstep } from './islefield.js?v=11111956';
-import { reedBush, vegShader } from './flora.js?v=11111956';
-import { buildRuins } from './ruins.js?v=11111956';
+import { makeField, Y, SPOT, LAYERS, fbm, noise2, smoothstep } from './islefield.js?v=11112057';
+import { reedBush, vegShader } from './flora.js?v=11112057';
+import { buildRuins } from './ruins.js?v=11112057';
+import { buildSecret } from './secret.js?v=11112057';
 
 const SUN = new THREE.Vector3(-.45, .78, .44).normalize();   /* 왼쪽 위 앞에서 (카메라 쪽 절벽 면이 비스듬히 빛을 받아 결이 드러남) */
 const rngOf = s => () => (s = (s * 16807) % 2147483647) / 2147483647;
@@ -276,12 +277,17 @@ export async function buildIsle({ K = 1, layout = SPOT } = {}) {   /* layout: �
     m.computeBoundingSphere(); m.name = 'grass'; G.add(m); }
 
   /* 동굴 입구 틀 (L.gorge.tunnel): 골짜기 들머리 [0, to]를 따라 — inner: 열린 아치 (발은 바닥 밑 · 꼭대기 = 천장 밑면 top, 3층보다 높게) · outer: 두꺼운 바위 겉면 */
-  let tunnelG = null; const TUN = LO.gorge && LO.gorge.tunnel ? (() => { const C = LO.gorge, T = C.tunnel, fl = C.floor - 2.5, wi = C.w + 1.6;
-    const frame = t => { const [x, z] = F.gorgeAt(t), q = F.gorgeAt(Math.min(1, t + .01)), p = F.gorgeAt(Math.max(0, t - .01)), dx = q[0] - p[0], dz = q[1] - p[1], l = Math.hypot(dx, dz) || 1; return { x, z, fx: dx / l, fz: dz / l, sx: -dz / l, sz: dx / l }; };
+  let tunnelG = null; const GZS = F.gorges;   /* 골짜기 여럿 (한 조각: 보물 동굴 둘) — 골짜기마다 입구 굴 · 유적 · 폭포를 따로 */
+  const TUNS = GZS.map((C, gi) => C.tunnel ? (() => { const T = C.tunnel, fl = C.floor - 2.5, wi = C.w + 1.6;
+    const frame = t => { const [x, z] = F.gorgeAtI(gi, t), q = F.gorgeAtI(gi, Math.min(1, t + .01)), p = F.gorgeAtI(gi, Math.max(0, t - .01)), dx = q[0] - p[0], dz = q[1] - p[1], l = Math.hypot(dx, dz) || 1; return { x, z, fx: dx / l, fz: dz / l, sx: -dz / l, sz: dx / l }; };
     const at = (t, th, W, H, amp, outOnly = false) => { const f = frame(t), nz = amp * noise2(th * 2.6 + t * 40, t * 30 + W) + amp * .5 * noise2(th * 7 + t * 90, W - t * 60) + amp * .25 * noise2(th * 15 + t * 170, W + t * 120), n = 1 + (outOnly ? Math.abs(nz) : nz), c = Math.cos(th) * W * n, y = fl + Math.sin(th) * H * (1 + (n - 1) * .5);
       return new THREE.Vector3(f.x + f.sx * c, y, f.z + f.sz * c); };
-    return { to: T.to, top: T.top, wi, frame, inner: (t, th) => at(t, th, wi + .8, T.top - fl, .09, true),   /* 안쪽 면은 바깥으로만 울퉁불퉁 (기둥 · 문 기둥을 뚫고 나오지 않게 — 사용자 2026-11-11 '산이 튀어나와 있어') */ outer: (t, th) => at(t, th, wi + 11, T.top - fl + 10, .2) }; })() : null;
-  const RU = buildRuins({ F, hAt, LAYERS, Y, LO, TUN }); for (const o of RU.obstacles) F.obstacles.push(o);   /* 고대 수호자 유적 (끊어진 돌다리 · 입구 · 기둥 복도) — ruins.js */
+    return { to: T.to, top: T.top, wi, frame, inner: (t, th) => at(t, th, wi + .8, T.top - fl, .09, true),   /* 안쪽 면은 바깥으로만 울퉁불퉁 (기둥 · 문 기둥을 뚫고 나오지 않게 — 사용자 2026-11-11 '산이 튀어나와 있어') */ outer: (t, th) => at(t, th, wi + 11, T.top - fl + 10, .2) }; })() : null);
+  const RU = { geos: [], rock: [], glow: [], obstacles: [], strands: [] };
+  for (let gi = 0; gi < Math.max(1, GZS.length); gi++) { F.useGorge(gi); const C = GZS[gi], R1 = buildRuins({ F, hAt, LAYERS, Y, LO: C ? { ...LO, gorge: C, ruins: C.site || (GZS.length === 1 ? LO.ruins : null) } : LO, TUN: TUNS[gi] || null });   /* 골짜기마다 신전 입구 · 앞마당 무더기 · 기댄 기둥 (site) */
+    for (const k of Object.keys(RU)) RU[k].push(...R1[k]); }
+  for (const o of RU.obstacles) F.obstacles.push(o);
+  const SEC = buildSecret({ LO, F, hAt, U }); RU.geos.push(...SEC.stone);   /* 비밀길: 터널 관 · 둔덕 판돌 · 입구 부쉬 청록 꽃 — secret.js */   /* 고대 수호자 유적 (끊어진 돌다리 · 입구 · 기둥 복도) — ruins.js */
   /* ⑩ 늘어진 뿌리 · 담쟁이 · 테두리 풀: 섬 테두리 밑과 고원 절벽에 늘어짐 (위아래 깊이 · 오래된 섬 느낌) */
   { const parts = [], ROOT = lin(0x4b3a28), IVY = [lin(0x2f5f1c), lin(0x497a22)];
     const edgeV = []; for (let v = 0; v < NV; v++) if (isEdge[v] && rnd() < .035) edgeV.push(v);   /* 테두리 점이 촘촘해져서 비율을 반으로 (뿌리 수는 그대로) */
@@ -367,7 +373,7 @@ export async function buildIsle({ K = 1, layout = SPOT } = {}) {   /* layout: �
           g.rotateY(r() * 6.28); g.translate(x, hAt(x, z) + s2 * .25, z); g.computeVertexNormals(); parts.push(g); } }
       else { seg(0, 1, false); F.archLegs.push([ax, az, R0 * .95, apex], [bx, bz, R0 * .95, apex]); } }   /* 시야: 땅에 박힌 다리 바닥 자리만 */
     /* 동굴 입구 (사용자 2026-11-11): 산 밑동이 크게 뚫린 자연 아치 · 들머리만 3층보다 높은 바위 천장 · 입구 앞면은 울퉁불퉁 튀어나온 바위 · 끝은 골짜기로 열림 */
-    if (TUN) { const NA = 44, NT = 22, P = [], ix = [], M = 2 * (NA + 1), r = rngOf(83);
+    const tunnelParts = []; for (const TUN of TUNS) if (TUN) { const NA = 44, NT = 22, P = [], ix = [], M = 2 * (NA + 1), r = rngOf(83);
       const T0 = TUN.to * .22;   /* 바위 굴은 신전 문 뒤에서 시작 (사용자 2026-11-11: 문 앞으로 산이 튀어나와 보임 → 앞면을 문 뒤로 물림) */
       for (let k = 0; k <= NT; k++) { const t = T0 + (TUN.to - T0) * k / NT; for (let a = 0; a <= NA; a++) { const q = TUN.inner(t, a / NA * Math.PI); P.push(q.x, q.y, q.z); } for (let a = NA; a >= 0; a--) { const q = TUN.outer(t, a / NA * Math.PI); P.push(q.x, q.y, q.z); } }
       for (let k = 0; k < NT; k++) for (let i = 0; i < M; i++) { const A = k * M + i, B = k * M + (i + 1) % M, C = A + M, D = B + M; ix.push(A, C, B, B, C, D); }
@@ -375,13 +381,15 @@ export async function buildIsle({ K = 1, layout = SPOT } = {}) {   /* layout: �
         for (let a = 0; a <= NA; a++) { const iv = k * M + a, ov = k * M + (M - 1 - a), th = a / NA * Math.PI, bul = (1.5 + 2.5 * Math.abs(noise2(th * 2.3 + k, 7))) * Math.sin(th) + .6;
           const x = (P[iv * 3] + P[ov * 3]) / 2 + f.fx * sg * bul, y = (P[iv * 3 + 1] + P[ov * 3 + 1]) / 2 + noise2(th * 3, k) * 1.2, z = (P[iv * 3 + 2] + P[ov * 3 + 2]) / 2 + f.fz * sg * bul; mid.push(P.length / 3); P.push(x, y, z); }
         for (let a = 0; a < NA; a++) { const i0 = k * M + a, i1 = i0 + 1, o0 = k * M + (M - 1 - a), o1 = o0 - 1, m0 = mid[a], m1 = mid[a + 1]; ix.push(i0, m0, i1, i1, m0, m1, m0, o0, m1, m1, o0, o1); } }
-      const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(P, 3)); g.setIndex(ix); g.computeVertexNormals(); g.userData.double = true; tunnelG = g;
+      const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(P, 3)); g.setIndex(ix); g.computeVertexNormals(); g.userData.double = true; tunnelParts.push(g);
 }
+    tunnelParts.push(...SEC.rock);
+    if (tunnelParts.length) tunnelG = tunnelParts.length > 1 ? mergeGeometries(tunnelParts) : tunnelParts[0];
     /* 골짜기길 바닥: 무너진 돌계단 · 쓰러진 기둥 · 벽 밑 부러진 기둥 그루터기 (오래된 길이라는 흔적 · 낮아서 1층도 막지 않음) */
-    if (LO.gorge && LO.gorge.ruins) { const C = LO.gorge, r = rngOf(91), slab = (x, y, z, w, h, d, rot) => { const gg = new THREE.BoxGeometry(w, h, d, 3, 1, 2); gg.deleteAttribute('uv'); const pp = gg.attributes.position;
+    for (let gi = 0; gi < GZS.length; gi++) if (GZS[gi].ruins) { F.useGorge(gi); const C = GZS[gi], TUN = TUNS[gi], r = rngOf(91 + gi), slab = (x, y, z, w, h, d, rot) => { const gg = new THREE.BoxGeometry(w, h, d, 3, 1, 2); gg.deleteAttribute('uv'); const pp = gg.attributes.position;
         for (let v = 0; v < pp.count; v++) { const X = pp.getX(v), Y2 = pp.getY(v), Z = pp.getZ(v); pp.setXYZ(v, X + noise2(Y2 * 3 + x, Z * 3) * .12, Y2 + (Y2 > 0 ? noise2(X * 2.4 + z, Z * 2.4) * .12 : 0), Z + noise2(X * 3, Y2 * 3 + z) * .12); }
         gg.rotateY(rot); gg.translate(x, y, z); gg.computeVertexNormals(); parts.push(gg); };
-      for (const ts of C.ruins.stairs) { const f = TUN ? TUN.frame(ts) : null; const [x, z] = F.gorgeAt(ts), q = F.gorgeAt(ts + .01), rot = Math.atan2(-(q[1] - z), q[0] - x) + Math.PI / 2;
+      for (const ts of C.ruins.stairs || []) { const f = TUN ? TUN.frame(ts) : null; const [x, z] = F.gorgeAt(ts), q = F.gorgeAt(ts + .01), rot = Math.atan2(-(q[1] - z), q[0] - x) + Math.PI / 2;
         for (let k = 0; k < 5; k++) { if (r() < .22) continue; const fx = (q[0] - x), fz = (q[1] - z), l = Math.hypot(fx, fz), ox = x + fx / l * k * 1.5, oz = z + fz / l * k * 1.5; slab(ox + (r() - .5) * .8, hAt(ox, oz) + .25 + k * .22, oz + (r() - .5) * .8, C.w * (1.1 + r() * .5), .45, 1.3, rot + (r() - .5) * .18); } }
       for (const [ts, sd] of C.ruins.columns || []) { const [x, z] = F.gorgeAt(ts), q = F.gorgeAt(ts + .01), fx = q[0] - x, fz = q[1] - z, l = Math.hypot(fx, fz), sx = -fz / l, sz = fx / l, px = x + sx * sd * (C.w - 1.6), pz = z + sz * sd * (C.w - 1.6);
         const cg = new THREE.CylinderGeometry(.85, .95, 6.5, 12, 6); cg.deleteAttribute('uv'); const pp = cg.attributes.position; for (let v = 0; v < pp.count; v++) { const X = pp.getX(v), Y2 = pp.getY(v), Z = pp.getZ(v), an = Math.atan2(Z, X), d = 1 + .06 * Math.sin(an * 12) + .07 * noise2(Y2 + ts * 9, an); pp.setXYZ(v, X * d, Y2 + (Math.abs(Y2) > 3 ? noise2(an * 2, ts) * .5 : 0), Z * d); }   /* 홈 파인 기둥 · 부러진 끝 */
@@ -411,17 +419,20 @@ export async function buildIsle({ K = 1, layout = SPOT } = {}) {   /* layout: �
     if (RU.geos.length) { const sm = new THREE.ShaderMaterial({ uniforms: U, side: THREE.DoubleSide,   /* 깎은 돌 (유적): 밝은 사암빛 · 빗물 자국 세로 얼룩 · 오목한 곳 그늘 · 윗면 이끼 · 가는 금 */
         vertexShader: `attribute float aGlow; varying vec3 vP, vN; varying float vG; void main(){ vP = position; vN = normal; vG = aGlow; gl_Position = projectionMatrix * viewMatrix * modelMatrix * vec4(position, 1.); }`,
         fragmentShader: GL + `varying vec3 vP, vN; varying float vG; void main(){ if (cutAway(vP)) discard; vec3 n = normalize(vN) * (gl_FrontFacing ? 1. : -1.), an = abs(n); an /= an.x + an.y + an.z;
+          float slabK = step(1.5, vG), gv = vG - 2. * slabK;   /* 비밀길 판돌 (aGlow = 2 + 빛): 이끼를 거의 빼고 · 무늬 홈 바닥은 어둡게 · 홈 가장자리만 빛 */
           float tr = fb(vP.zy * 1.3) * an.x + fb(vP.xz * 1.3) * an.y + fb(vP.xy * 1.3) * an.z, tr2 = vn(vP.zy * 6.) * an.x + vn(vP.xz * 6.) * an.y + vn(vP.xy * 6.) * an.z;
           vec3 st = mix(vec3(.33, .31, .27), vec3(.55, .51, .44), tr) * (.84 + .22 * tr2);   /* 산 바위와 비슷한 톤 */
           float streak = vn(vec2(vP.x * 1.7 + vP.z * 1.3, vP.y * .18)); st *= .82 + .18 * smoothstep(.25, .7, streak);   /* 빗물 자국 */
           float crack = smoothstep(.035, .0, abs(vn(vP.xz * .9 + vP.y * .4) - .5)) * (1. - an.y); st *= 1. - .35 * crack;
           float lich = smoothstep(.7, .76, vn(vP.zy * 2.6 + vP.x * 1.9) * an.x + vn(vP.xy * 2.6 + vP.z * 1.9) * an.z + vn(vP.xz * 2.6) * an.y); st = mix(st, vec3(.78, .79, .7), lich * .4);   /* 바위옷 (희끗한 점무늬) */
-          float moss = smoothstep(.62, .92, n.y + (tr2 - .5) * .4) * smoothstep(.42, .78, vn(vP.xz * .32 + vP.y * .1)) * .85; st = mix(st, mix(vec3(.14, .25, .08), vec3(.28, .40, .13), tr2), moss);   /* 이끼는 위를 보는 면에만 · 군데군데 */
+          float moss = smoothstep(.62, .92, n.y + (tr2 - .5) * .4) * smoothstep(.42, .78, vn(vP.xz * .32 + vP.y * .1)) * .85; st = mix(st, mix(vec3(.14, .25, .08), vec3(.28, .40, .13), tr2), moss * (1. - .85 * slabK));   /* 이끼는 위를 보는 면에만 · 군데군데 */
+          st *= 1. - .7 * slabK * step(.2, gv) * step(gv, .7);
           float ao = .5 + .5 * smoothstep(-.7, .5, n.y); vec3 c = lit(st, n, 1., ao);
           float flow = .35 + .65 * pow(.5 + .5 * sin(uT * 1.3 - vP.y * .7 + vP.x * .2), 3.);   /* 룬 빛: 아래에서 위로 천천히 흐름 */
-          c += vec3(.22, .95, .8) * vG * flow * 1.4 * (.35 + .65 * seen(vP)); gl_FragColor = vec4(fogged(c, vP), 1.); }` });
+          c += vec3(.22, .95, .8) * gv * flow * (1.4 + 1.6 * slabK) * (.35 + .65 * seen(vP)); gl_FragColor = vec4(fogged(c, vP), 1.); }` });
       const rm = new THREE.Mesh(mergeAll(RU.geos), sm); rm.name = 'ruins'; G.add(rm); }
     if (tunnelG) { const tm = rockM(.55, .9); tm.side = THREE.DoubleSide; const t2 = new THREE.Mesh(tunnelG, tm); t2.name = 'cave'; G.add(t2); }
+    if (SEC.flowers) G.add(SEC.flowers); if (SEC.wind) G.add(SEC.wind);
     /* 떠 있는 바위 (오르내리는 구역 · 사용자 2026-11-11): 바위 덩이 여럿이 줄지어 그 층 높이에 떠서 한 줄을 막음 (보이는 두께 = 막히는 두께)
        팽이처럼 위는 둥근 바위 언덕(꼭대기만 이끼) · 옆은 층진 바위 결 · 아래로 길게 뾰족한 바위 뿌리 — 늘인 판 하나가 아니게 */
     if (F.floats.length) { const fp = [], r = rngOf(71); for (const f of F.floats) { const n = Math.max(2, Math.round(f.len / 8.5)), seg = f.len / n;
@@ -483,13 +494,14 @@ export async function buildIsle({ K = 1, layout = SPOT } = {}) {   /* layout: �
 
   /* ⑫-2 동굴 · 골짜기 (사용자 2026-11-11: 멋지고 신비롭게) — 벽을 타고 떨어지는 가는 폭포 · 빛 이끼 · 돌기둥 문양 · 제단 금빛 테 · 하늘 틈으로 내려오는 햇빛 줄기 */
   const extraMist = [];
-  if (LO.gorge) { const C = LO.gorge, r = rngOf(101);
+  if (GZS.length) { const r = rngOf(101);
+    for (let gi = 0; gi < GZS.length; gi++) { F.useGorge(gi); const C = GZS[gi], TUN = TUNS[gi];
     for (const [ft, sd] of C.falls || []) { const [x, z] = F.gorgeAt(ft), q = F.gorgeAt(ft + .01), fx = q[0] - x, fz = q[1] - z, l = Math.hypot(fx, fz), sx = -fz / l * sd, sz = fx / l * sd;   /* 벽 꼭대기 가장자리에서 골짜기 쪽으로 */
       let P0 = null; for (let d = C.w; d < C.w + 30; d += .3) { const px = x + sx * d, pz = z + sz * d; if (hAt(px, pz) > C.floor + 20) { P0 = new THREE.Vector3(px, hAt(px, pz) + .1, pz); break; } }
       if (!P0) continue; const out = new THREE.Vector3(-sx, 0, -sz), H = P0.y - C.floor - .3, path = fallPath(P0, out, H, .8, -.5, .5, false);
       for (const [lat, wid, dz] of [[0, 1.1, 0], [.12, .7, .08]]) fall(P0, out, H, path, lat, wid, dz, false);
       for (let k = 0; k < 5; k++) extraMist.push([x - sx * C.w * .4 + (r() - .5) * 3, C.floor + 1 + r() * 2.5, z - sz * C.w * .4 + (r() - .5) * 3, 2.2 + r() * 2, .55]); }
-    if (TUN) { const f0 = TUN.frame(0); for (let k = 0; k < 16; k++) { const d = r() * 9, o = (r() - .5) * TUN.wi * 1.4; extraMist.push([f0.x - f0.fx * d + f0.sx * o, C.floor + .6 + r() * 3.5, f0.z - f0.fz * d + f0.sz * o, 2.6 + r() * 2.8, .5 + r() * .25]); } }   /* 굴에서 숨 쉬듯 흘러나오는 차가운 안개 */
+    if (TUN) { const f0 = TUN.frame(0); for (let k = 0; k < 16; k++) { const d = r() * 9, o = (r() - .5) * TUN.wi * 1.4; extraMist.push([f0.x - f0.fx * d + f0.sx * o, C.floor + .6 + r() * 3.5, f0.z - f0.fz * d + f0.sz * o, 2.6 + r() * 2.8, .5 + r() * .25]); } }   /* 굴에서 숨 쉬듯 흘러나오는 차가운 안개 */ }
     if (LO.mount) for (const [cx, cz, rr] of LO.mount.blobs) for (let k = 0; k < Math.round(rr / 6); k++) { const a = r() * 6.283, d = Math.sqrt(r()) * rr; extraMist.push([cx + Math.cos(a) * d, Y.MEADOW + LO.mount.peak * (.38 + r() * .22), cz + Math.sin(a) * d, 8 + r() * 7, .3 + r() * .15]); }   /* 산 중턱에 걸린 안개 띠 */
     /* 빛 무늬 (빛 번짐에 걸려 은은히 빛남): 유적 문양 */
     const gp = [], gc = [], gs = [], tri = (A, B, C2, col, ph) => { for (const v of [A, B, C2]) { gp.push(v.x, v.y, v.z); gc.push(...col); gs.push(ph); } };
@@ -499,9 +511,9 @@ export async function buildIsle({ K = 1, layout = SPOT } = {}) {   /* layout: �
         vertexShader: `attribute vec3 color; attribute float aS; varying vec3 vC, vP; varying float vS; void main(){ vC = color; vS = aS; vP = position; gl_Position = projectionMatrix * viewMatrix * modelMatrix * vec4(position, 1.); }`,
         fragmentShader: GL + `varying vec3 vC, vP; varying float vS; void main(){ if (cutAway(vP)) discard; float b = .55 + .45 * sin(uT * 1.3 - vS * 6.283); gl_FragColor = vec4(vC * b * (.25 + .75 * seen(vP)), 1.); }` })); m.renderOrder = 5; m.name = 'glow'; FX.add(m); }
     /* 햇빛 줄기: 골짜기 위 하늘 틈에서 해 쪽으로 비스듬히 내려와 바닥에 닿음 · 먼지에 비친 듯 결이 흐름 · 천천히 밝아졌다 흐려짐 (늘 카메라 쪽을 봄) */
-    { const sp = [], sa = [], sc = [], ix2 = []; const n = 7; for (let k = 0; k < n; k++) { const t = (TUN ? TUN.to + .06 : .05) + (k + r() * .6) / n * (.95 - (TUN ? TUN.to + .06 : .05)), [x, z] = F.gorgeAt(t), L2 = 36 + r() * 14, w = 1.6 + r() * 2.2, o = (r() - .5) * C.w;
+    { const sp = [], sa = [], sc = [], ix2 = []; const n = 7; for (let gi = 0; gi < GZS.length; gi++) { F.useGorge(gi); const C = GZS[gi], TUN = TUNS[gi]; for (let k = 0; k < n; k++) { const t = (TUN ? TUN.to + .06 : .05) + (k + r() * .6) / n * (.95 - (TUN ? TUN.to + .06 : .05)), [x, z] = F.gorgeAt(t), L2 = 36 + r() * 14, w = 1.6 + r() * 2.2, o = (r() - .5) * C.w;
         const q = F.gorgeAt(Math.min(1, t + .01)), fx = q[0] - x, fz = q[1] - z, l = Math.hypot(fx, fz), bx = x - fz / l * o, bz = z + fx / l * o, b = sp.length / 3;
-        for (const [u, v] of [[-1, 0], [1, 0], [1, 1], [-1, 1]]) { sp.push(bx, C.floor + .2, bz); sa.push(u * w, v * L2); sc.push(r() * 10); } ix2.push(b, b + 1, b + 2, b, b + 2, b + 3); }
+        for (const [u, v] of [[-1, 0], [1, 0], [1, 1], [-1, 1]]) { sp.push(bx, C.floor + .2, bz); sa.push(u * w, v * L2); sc.push(r() * 10); } ix2.push(b, b + 1, b + 2, b, b + 2, b + 3); } }
       const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(sp, 3)); g.setAttribute('aQ', new THREE.Float32BufferAttribute(sa, 2)); g.setAttribute('aS', new THREE.Float32BufferAttribute(sc, 1)); g.setIndex(ix2);
       const m = new THREE.Mesh(g, new THREE.ShaderMaterial({ uniforms: U, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide,
         vertexShader: `attribute vec2 aQ; attribute float aS; uniform vec3 uSun; varying vec2 vQ; varying float vS; varying vec3 vP; void main(){ vec3 ax = normalize(uSun), base = position + ax * aQ.y;
@@ -526,7 +538,7 @@ export async function buildIsle({ K = 1, layout = SPOT } = {}) {   /* layout: �
 
   /* ⑭ 작은 빛: 숲 · 연못 · 폭포 둘레에 떠다니는 빛 알갱이 (신비로움) — 깜빡이며 천천히 오르내림 */
   { const L4 = []; const pick = (cx, cz, r, n, y0, y1) => { for (let k = 0; k < n; k++) { const a = rnd() * 6.283, d = Math.sqrt(rnd()) * r, x = cx + Math.cos(a) * d, z = cz + Math.sin(a) * d; if (F.mask(x, z) < 0) continue; L4.push(x, hAt(x, z) + y0 + rnd() * (y1 - y0), z, rnd()); } };
-    for (const Z of LO.brush) pick(Z[0][0], Z[0][1], Z[0][2] + 2.5, 22, .8, 4.5); if (LO.pond) pick(LO.pond[0], LO.pond[1], 9, 30, .3, 3); if (LO.gorge) { for (let t = .05; t < 1; t += .06) { const [x, z] = F.gorgeAt(t); pick(x, z, LO.gorge.w, 6, 1, 12); } if (LO.gorge.basin) pick(LO.gorge.basin[0], LO.gorge.basin[1], LO.gorge.basin[2], 50, .8, 10); }   /* 골짜기 · 공터: 떠다니는 꽃가루가 빛을 받아 반짝임 */ if (best) pick(best.x, best.z, 6, 16, 1, 9);
+    for (const Z of LO.brush) pick(Z[0][0], Z[0][1], Z[0][2] + 2.5, 22, .8, 4.5); if (LO.pond) pick(LO.pond[0], LO.pond[1], 9, 30, .3, 3); for (let gi = 0; gi < GZS.length; gi++) { const C = GZS[gi]; F.useGorge(gi); for (let t = .05; t < 1; t += .06) { const [x, z] = F.gorgeAt(t); pick(x, z, C.w, 6, 1, 12); } if (C.basin) pick(C.basin[0], C.basin[1], C.basin[2], 50, .8, 10); }   /* 골짜기 · 공터: 떠다니는 꽃가루가 빛을 받아 반짝임 */ if (best) pick(best.x, best.z, 6, 16, 1, 9);
     const g = new THREE.BufferGeometry(); const a = new Float32Array(L4); g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(L4.length / 4 * 3), 3)); g.setAttribute('iP', new THREE.BufferAttribute(a, 4));
     for (let k = 0; k < L4.length / 4; k++) g.attributes.position.setXYZ(k, L4[k * 4], L4[k * 4 + 1], L4[k * 4 + 2]);
     const m = new THREE.Points(g, new THREE.ShaderMaterial({ uniforms: { ...U, uPx: { value: 800 } }, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,

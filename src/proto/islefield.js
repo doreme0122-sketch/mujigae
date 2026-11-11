@@ -53,7 +53,7 @@ export function makeField(L = SPOT) {
   const mask = (x, z) => { let near = false; for (const [cx, cz, R] of hulls) if ((x - cx) ** 2 + (z - cz) ** 2 < R * R) { near = true; break; } if (!near) return -20;
     const [u, w] = warp(x, z); let d = -99;
     for (const C of L.islands) { let e = circ(u, w, C[0][0], C[0][1], C[0][2]); for (let k = 1; k < C.length; k++) e = smax(e, circ(u, w, C[k][0], C[k][1], C[k][2]), 6); d = Math.max(d, e); }
-    return d + 2.2 * fbm(x * .09, z * .09, 3) + .7 * fbm(x * .35, z * .35, 2) + .55 * (Math.abs(fbm(x * .55 + 7, z * .55, 2)) - .22) + .25 * fbm(x * 1.4, z * 1.4, 2); };   /* 마지막 둘: 부서져 떨어져 나간 듯 오목오목한 테두리 (칼로 자른 둥근 선이 아니게) */
+    const e = d + 2.2 * fbm(x * .09, z * .09, 3) + .7 * fbm(x * .35, z * .35, 2) + .55 * (Math.abs(fbm(x * .55 + 7, z * .55, 2)) - .22) + .25 * fbm(x * 1.4, z * 1.4, 2); return L.clipR ? Math.min(e, L.clipR - Math.hypot(x, z)) : e; };   /* clipR: 맵 테두리(무지개 벽) 밖으로 땅이 나가지 않게 */   /* 마지막 둘: 부서져 떨어져 나간 듯 오목오목한 테두리 (칼로 자른 둥근 선이 아니게) */
   const plateau = (x, z) => { const [u, w] = warp(x * 1.1, z * 1.1); let d = -99; for (const [cx, cz, r] of L.plateau) d = smax(d, circ(u, w, cx * 1.1, cz * 1.1, r * 1.1), 5); return d / 1.1 + .9 * fbm(x * .21, z * .21, 3); };
   /* 돌탑 층 쌓기: 생김새마다 층(동그라미 · 높이)을 따로 쌓음 → 높이장으로 만든 땅이라 아래 층이 위 층을 받치는 모양(넘어 튀어나온 곳 없음) */
   const tierCache = new Map();
@@ -77,29 +77,48 @@ export function makeField(L = SPOT) {
   /* 골짜기 (L.gorge): 꺾은선 pts를 따라 폭 w(반) · 바닥 높이 floor — 고원 · 산맥을 가르는 길 (위는 하늘이 트임 · 사용자 2026-11-11)
      tunnel: 들머리 [0, to] 구간만 3층보다 높은 바위 천장(동굴 입구 · top = 천장 밑면 높이) · basin: 길 끝 넓은 공터 [x, z, r]
      gorge(x, z) → d(안쪽 +, 벽까지 거리) · t(꺾은선 따라 얼마나 왔는지 0~1) */
-  const G0 = L.gorge, GP = G0 ? G0.pts : [], GL = [0]; for (let k = 1; k < GP.length; k++) GL.push(GL[k - 1] + Math.hypot(GP[k][0] - GP[k - 1][0], GP[k][1] - GP[k - 1][1]));
-  const gorgeAt = t => { const s = t * GL[GL.length - 1]; let k = 1; while (k < GL.length - 1 && GL[k] < s) k++; const f = (s - GL[k - 1]) / (GL[k] - GL[k - 1]); return [GP[k - 1][0] + (GP[k][0] - GP[k - 1][0]) * f, GP[k - 1][1] + (GP[k][1] - GP[k - 1][1]) * f]; };
-    const gorge = (x, z) => { let best = 1e9, bt = 0; for (let k = 1; k < GP.length; k++) { const [ax, az] = GP[k - 1], [bx, bz] = GP[k], dx = bx - ax, dz = bz - az, q = Math.max(0, Math.min(1, ((x - ax) * dx + (z - az) * dz) / (dx * dx + dz * dz))), d = Math.hypot(x - ax - dx * q, z - az - dz * q); if (d < best) { best = d; bt = (GL[k - 1] + (GL[k] - GL[k - 1]) * q) / GL[GL.length - 1]; } }
-    return { d: G0.w + .6 * fbm(x * .25, z * .25, 2) - best, t: bt }; };
-  const basinD = (x, z) => G0 && G0.basin ? circ(x, z, G0.basin[0], G0.basin[1], G0.basin[2]) + 2.2 * fbm(x * .08, z * .08, 3) : -99;
-  const openD = (x, z) => G0 ? Math.max(gorge(x, z).d, basinD(x, z)) : -99;   /* 골짜기 · 공터 안 (+) */
+  /* 골짜기 여럿 (사용자 2026-11-11 한 조각: 양옆 보물 동굴 둘) — L.gorges = [{ pts, w, floor, tunnel, basin, ruins, falls, hump }] (하나면 L.gorge)
+     만들기 쪽은 F.useGorge(i)로 지금 다루는 골짜기를 고른 뒤 gorgeAt을 씀 · gorge(x, z)는 가장 가까운 골짜기 (i 포함) */
+  const GS = (L.gorges || (L.gorge ? [L.gorge] : [])).map(g => { const GP = g.pts, GL = [0]; for (let k = 1; k < GP.length; k++) GL.push(GL[k - 1] + Math.hypot(GP[k][0] - GP[k - 1][0], GP[k][1] - GP[k - 1][1]));
+    let x0 = 1e9, x1 = -1e9, z0 = 1e9, z1 = -1e9; for (const [x, z] of GP) { x0 = Math.min(x0, x); x1 = Math.max(x1, x); z0 = Math.min(z0, z); z1 = Math.max(z1, z); } if (g.basin) { x0 = Math.min(x0, g.basin[0] - g.basin[2]); x1 = Math.max(x1, g.basin[0] + g.basin[2]); z0 = Math.min(z0, g.basin[1] - g.basin[2]); z1 = Math.max(z1, g.basin[1] + g.basin[2]); }
+    return { g, GP, GL, bb: [x0, x1, z0, z1] }; });
+  let CUR = 0;
+  const useGorge = i => { CUR = i; };
+  const gorgeAtI = (i, t) => { const { GP, GL } = GS[i], s = t * GL[GL.length - 1]; let k = 1; while (k < GL.length - 1 && GL[k] < s) k++; const f = (s - GL[k - 1]) / (GL[k] - GL[k - 1]); return [GP[k - 1][0] + (GP[k][0] - GP[k - 1][0]) * f, GP[k - 1][1] + (GP[k][1] - GP[k - 1][1]) * f]; };
+  const gorgeAt = t => gorgeAtI(CUR, t);
+  const gorgeI = (i, x, z) => { const { g, GP, GL } = GS[i]; let best = 1e9, bt = 0; for (let k = 1; k < GP.length; k++) { const [ax, az] = GP[k - 1], [bx, bz] = GP[k], dx = bx - ax, dz = bz - az, q = Math.max(0, Math.min(1, ((x - ax) * dx + (z - az) * dz) / (dx * dx + dz * dz))), d = Math.hypot(x - ax - dx * q, z - az - dz * q); if (d < best) { best = d; bt = (GL[k - 1] + (GL[k] - GL[k - 1]) * q) / GL[GL.length - 1]; } }
+    return { d: g.w + .6 * fbm(x * .25, z * .25, 2) - best, t: bt, i }; };
+  const far = (i, x, z, m) => { const b = GS[i].bb; return x < b[0] - m || x > b[1] + m || z < b[2] - m || z > b[3] + m; };
+  const gorge = (x, z) => { let r = { d: -1e9, t: 0, i: 0 }; for (let i = 0; i < GS.length; i++) { if (GS.length > 1 && far(i, x, z, 70)) continue; const c = gorgeI(i, x, z); if (c.d > r.d) r = c; } return r; };
+  const basinI = (i, x, z) => { const b = GS[i].g.basin; return b ? circ(x, z, b[0], b[1], b[2]) + 2.2 * fbm(x * .08, z * .08, 3) : -99; };
+  const basinD = (x, z) => { let d = -99; for (let i = 0; i < GS.length; i++) d = Math.max(d, basinI(i, x, z)); return d; };
+  const openD = (x, z) => GS.length ? Math.max(gorge(x, z).d, basinD(x, z)) : -99;   /* 골짜기 · 공터 안 (+) */
   /* 산맥 (L.mount: { blobs: [[x, z, r]…], peak }) — 3층도 못 넘는 땅의 테두리 (사용자 2026-11-11)
      · 고른 벽이 아니라 들쭉날쭉한 봉우리 · 사이사이 안장처럼 꺼진 곳 · 층진 바위 턱 · 골짜기와 공터 쪽은 깎아지른 벽 */
   const MB = L.mount;
-  const mountK = (x, z) => { if (!MB) return 0; let d = -99; for (const [cx, cz, r] of MB.blobs) d = smax(d, circ(x, z, cx, cz, r), 8); d += 5 * fbm(x * .05, z * .05, 3);
-    return smoothstep(-2, MB.ramp || 14, d) * (1 - smoothstep(-9, .5, openD(x, z))); };   /* ramp: 산이 솟는 거리 (작을수록 절벽처럼 가파름) */
+  const mountD = (x, z, raw = false) => { let d = -99; for (const [cx, cz, r] of MB.blobs) { if (Math.abs(x - cx) > r + 20 || Math.abs(z - cz) > r + 20) continue; d = smax(d, circ(x, z, cx, cz, r), 8); } return raw ? d : d + 5 * fbm(x * .05, z * .05, 3); };
+  const mountK = (x, z) => { if (!MB) return 0; const d = mountD(x, z); if (d < -2) return 0;
+    return smoothstep(-2, MB.ramp || 14, d) * (1 - smoothstep(-(MB.edge || 9), .5, openD(x, z))); };   /* edge: 골짜기 · 공터 둘레를 얼마나 깎는지 (얇은 산맥이면 작게) */   /* ramp: 산이 솟는 거리 (작을수록 절벽처럼 가파름) */
   const mountH = (x, z) => { const k = mountK(x, z); if (k <= 0) return 0;
     const rid = Math.max(0, 1 - Math.abs(fbm(x * .03 + 3, z * .03 - 5, 4)) * 1.8), r2 = Math.max(0, 1 - Math.abs(fbm(x * .07 - 11, z * .07 + 4, 3)) * 2);   /* 능선 둘: 큰 봉우리 줄기 · 작은 뾰족 봉우리 */
     const mh = k * MB.peak * (.32 + .62 * rid * rid + .22 * r2 * r2 * rid + .1 * fbm(x * .16, z * .16, 3)), lf = MB.lowFront ? frontK(x, z) : 0;   /* 고른 벽이 아니라 솟은 봉우리와 꺼진 안장 */
     const m2 = lf > 0 && mh > FCAP ? FCAP + (mh - FCAP) * (1 - .92 * lf) : mh, nk = MB.lowFront ? nearK(x, z) * smoothstep(.3, .65, k) : 0;
-    return Math.max(m2, MINH * nk); };   /* 길 둘레 벽은 3층보다 낮은 안장이 없게 (사용자 2026-11-11: 들어가자마자 왼쪽 3층으로 빠져나갈 수 있었음) */
+    let out = Math.max(m2, MINH * nk);
+    if (MB.solid) { const d = mountD(x, z, true) + .8 * fbm(x * .3, z * .3, 2), sk = smoothstep(.5, 4.5, d) * (1 - smoothstep(-(MB.edge || 9) * .5, .5, openD(x, z))); if (sk > 0) out = Math.max(out, MB.solid * sk * (1 + .12 * fbm(x * .09 + 5, z * .09, 3)) + 3 * Math.max(0, fbm(x * .2, z * .2, 2)) * sk); }   /* solid: 얇은 산맥도 3층을 못 넘는 벽으로 (한 조각 체험판 · 산맥을 얇게 하기로 해서) */
+    return out; };   /* 길 둘레 벽은 3층보다 낮은 안장이 없게 (사용자 2026-11-11: 들어가자마자 왼쪽 3층으로 빠져나갈 수 있었음) */
   /* 카메라 쪽 벽 낮추기 (사용자 2026-11-11: 길이 옆으로 휘어 벽이 카메라와 기체 사이에 오는 곳은 3층을 겨우 못 넘을 만큼만 · 먼 쪽 벽은 높고 뾰족하게 그대로)
      카메라는 +z 쪽에서 내려다봄 → 길(골짜기 · 공터)보다 +z 쪽에 있는 산은 높이를 3층 + 여유까지로 누름 */
   const FCAP = LAYERS[2] + CLEAR + 2.6 - Y.MEADOW, MINH = LAYERS[2] + CLEAR + 1.4 - Y.MEADOW;
-  const nearK = (x, z) => { const g = gorge(x, z), dist = G0.w - g.d; let k = smoothstep(G0.w + 30, G0.w + 18, dist); if (G0.basin) { const [bx, bz, br] = G0.basin; k = Math.max(k, smoothstep(br + 26, br + 14, Math.hypot(x - bx, z - bz))); } return k; };
-  const frontK = (x, z) => { if (!G0) return 0; const g = gorge(x, z), [gx, gz] = gorgeAt(g.t), dist = G0.w - g.d; let k = smoothstep(1, 9, z - gz) * smoothstep(40, 24, dist);
-    if (G0.basin) { const [bx, bz, br] = G0.basin, dd = Math.hypot(x - bx, z - bz) - br; k = Math.max(k, smoothstep(.15, .5, (z - bz) / (Math.hypot(x - bx, z - bz) + 1)) * smoothstep(34, 18, dd)); }
+  const nearK = (x, z) => { let k = 0; for (let i = 0; i < GS.length; i++) { if (GS.length > 1 && far(i, x, z, 60)) continue; const G = GS[i].g, g = gorgeI(i, x, z), dist = G.w - g.d; k = Math.max(k, smoothstep(G.w + 30, G.w + 18, dist)); if (G.basin) { const [bx, bz, br] = G.basin; k = Math.max(k, smoothstep(br + 26, br + 14, Math.hypot(x - bx, z - bz))); } } return k; };
+  const frontK = (x, z) => { let k = 0; for (let i = 0; i < GS.length; i++) { if (GS.length > 1 && far(i, x, z, 60)) continue; const G = GS[i].g, g = gorgeI(i, x, z), [gx, gz] = gorgeAtI(i, g.t), dist = G.w - g.d; k = Math.max(k, smoothstep(1, 9, z - gz) * smoothstep(40, 24, dist));
+      if (G.basin) { const [bx, bz, br] = G.basin, dd = Math.hypot(x - bx, z - bz) - br; k = Math.max(k, smoothstep(.15, .5, (z - bz) / (Math.hypot(x - bx, z - bz) + 1)) * smoothstep(34, 18, dd)); } }
     return k; };
+  /* 비밀길 (사용자 2026-11-11): 동굴 산을 가로로 뚫는 1층 터널 — L.secret: [{ pts: [[x, z]…], w: 반 폭 }] · 산 속에선 땅(산) 높이와 상관없이 1층만 트임 (터널 관은 isle.js가 그림)
+     둔덕 (gorge.hump: { t, len, top }): 터널이 협곡 밑을 지나는 자리 — 협곡 바닥이 2층 아래까지 솟음 → 협곡은 그 구간 1층이 막혀 2층으로 넘음 · 터널 띠 안 1층은 열림 (서로 다른 길) */
+  const SEC = (L.secret || []).map(s => ({ ...s, L: s.pts.slice(1).map((p, k) => [s.pts[k], p]) }));
+  const secretD = (x, z) => { let best = -99; for (const s of SEC) for (const [[ax, az], [bx, bz]] of s.L) { const dx = bx - ax, dz = bz - az, q = Math.max(0, Math.min(1, ((x - ax) * dx + (z - az) * dz) / (dx * dx + dz * dz))); best = Math.max(best, s.w - Math.hypot(x - ax - dx * q, z - az - dz * q)); } return best; };
+  const humpK = (x, z) => { let k = 0; for (let i = 0; i < GS.length; i++) { const H = GS[i].g.hump; if (!H) continue; if (far(i, x, z, 30)) continue; const g = gorgeI(i, x, z); if (g.d < -4) continue; const tl = H.len / GS[i].GL[GS[i].GL.length - 1]; k = Math.max(k, smoothstep(tl * .5 + .012, tl * .5 - .006, Math.abs(g.t - H.t))); } return k; };
+  const humpTop = i => GS[i] && GS[i].g.hump ? GS[i].g.hump.top : 0;
   /* 떠 있는 바위 (오르내리는 구역 · L.floats: [x, z, 층, 길이, 방향, 두께]) — 그 층 높이에만 걸림 */
   const floats = (L.floats || []).map(([x, z, Ly, len, rot, r]) => ({ x, z, L: Ly, len, rot, r, dx: Math.cos(rot), dz: Math.sin(rot) }));
   const floatD = (f, x, z) => { const px = x - f.x, pz = z - f.z, a = Math.max(-f.len / 2, Math.min(f.len / 2, px * f.dx + pz * f.dz)); return f.r - Math.hypot(px - f.dx * a, pz - f.dz * a); };
@@ -113,7 +132,7 @@ export function makeField(L = SPOT) {
     const ch = chan(x, z), kc = smoothstep(-.9, .7, ch) * (1 - smoothstep(-.5, 2, pd)); h = Math.min(h, h * (1 - kc) + (Y.WATER - .55) * kc);
     const pl = plateau(x, z), kP = ledges(smoothstep(-1.4, 3.6, pl), 3, x, z);
     h += (Y.PLATEAU + .7 * fbm(x * .07, z * .07, 3) - h) * kP;
-    if (G0) { const o = openD(x, z); if (o > -3) { const k = ledges(smoothstep(-2.2, .9, o), 3, x, z), fl = G0.floor + .35 * fbm(x * .2, z * .2, 2); if (h > fl) h += (fl - h) * k; } }   /* 골짜기 · 공터: 고원을 깊게 가른 길 · 벽은 층진 바위 턱 */
+    if (GS.length) { const o = openD(x, z); if (o > -3) { const gi = gorge(x, z), GF = GS[gi.i].g, k = ledges(smoothstep(-2.2, .9, o), 3, x, z), hk = humpK(x, z), fl = GF.floor + .35 * fbm(x * .2, z * .2, 2); if (h > fl) h += (fl - h) * k; if (hk > 0) { const ht = humpTop(gi.i) + .35 * fbm(x * .5, z * .5, 2) - .5 * (1 - hk); h += (ht - h) * Math.min(1, hk * 1.4) * k; } } }   /* 둔덕: 터널 위 협곡 바닥이 바위 언덕처럼 솟음 */   /* 골짜기 · 공터: 고원을 깊게 가른 길 · 벽은 층진 바위 턱 */
     if (MB) { const mh = mountH(x, z); if (mh > .05) { const t = Math.min(1.4, mh / MB.peak), st = ledges(Math.min(1, t), 5, x, z) * MB.peak; h = Math.max(h, Y.MEADOW + mh * .45 + st * .55 * (mh / Math.max(1e-3, Math.min(1, t) * MB.peak)) + .5 * fbm(x * .3, z * .3, 2) * (1 - Math.min(1, t))); } }   /* 산맥: 비탈 반 · 층진 바위 턱 반 (계단처럼 고르지 않게 · 위로 갈수록 바위가 드러남) */
     for (const S of L.spires) { if (spire(x, z, S) < -2) continue; const g = h, soft = S[4] === 'fat';   /* 층마다 깎아지른 벽 + 평평한 턱 (굵은 탑은 둥근 어깨) */
       for (const t of tiers(S)) { const d = circ(x, z, t.x, t.z, t.r) + rough(x, z, t), k = soft ? smoothstep(-1.1, 1., d) : smoothstep(-.45, .6, d); if (k <= 0) continue;
@@ -137,6 +156,8 @@ export function makeField(L = SPOT) {
   const inGorge = (x, z, e = .8) => openD(x, z) > e;   /* 골짜기 · 공터 안 (벽에서 조금 떨어진 곳) */   /* SHIP_H: 기체 몸 두께의 반 (위아래로 이만큼은 닿음) */
   const plateauS = (x, z) => { const [u, w] = warp(x * 1.1, z * 1.1); let d = -99; for (const [cx, cz, r] of L.plateau) d = smax(d, circ(u, w, cx * 1.1, cz * 1.1, r * 1.1), 5); return d / 1.1; };
   const blocked = (x, z, Li = 1) => { const y = LAYERS[Li];
+    if (Li === 0 && SEC.length && secretD(x, z) > .3) return false;   /* 비밀길 안 1층: 산 속이라도 트임 */
+    if (GS.length && humpK(x, z) > .15 && openD(x, z) > -2) { const gi = gorge(x, z); if (humpTop(gi.i) > y - CLEAR - SHIP_H) return true; }   /* 둔덕: 그 높이까지 솟은 곳 */
     if (Y.PLATEAU > y - CLEAR && plateauS(x, z) > IN && !inGorge(x, z)) return true;
     if (MB && Y.MEADOW + mountH(x, z) > y - CLEAR + .6) return true;   /* 산맥: 그 높이까지 솟은 곳 (3층도 막힘) */
     for (const f of floats) if (f.L === Li && floatD(f, x, z) > IN * .5) return true;   /* 오르내리는 구역: 그 층 높이에 떠 있는 바위 */
@@ -147,6 +168,8 @@ export function makeField(L = SPOT) {
      · 고원 · 돌탑은 절벽 몸통 둘레대로 · 아치는 땅에 박힌 다리 두 곳만 (가운데 휜 부분은 바닥 모양이 아니라서 안 가림) */
   const archLegs = [];
   const sightBlock = (x, z, Li) => { const y = LAYERS[Li];
+    if (Li === 0 && SEC.length && secretD(x, z) > 0) return false;
+    if (GS.length && humpK(x, z) > .3 && openD(x, z) > -1) { const gi = gorge(x, z); if (humpTop(gi.i) > y - CLEAR) return true; }
     if (Y.PLATEAU > y - CLEAR && plateau(x, z) > .8 && !inGorge(x, z, .2)) return true;
     if (MB && Y.MEADOW + mountH(x, z) > y - CLEAR) return true;
     for (const f of floats) if (f.L === Li && floatD(f, x, z) > 0) return true;
@@ -156,6 +179,6 @@ export function makeField(L = SPOT) {
   const brush = (x, z) => { let d = -99; for (let k = 0; k < L.brush.length; k++) d = Math.max(d, brushZ(k, x, z)); return d; };
   const brushZone = (x, z) => { for (let k = 0; k < L.brush.length; k++) if (brushZ(k, x, z) > 0) return k; return -1; };   /* 몇 번째 부쉬 안인지 (밖이면 −1) */   /* 부쉬 안 + (가장자리가 덤불 뭉치처럼 물결) */
   /* 지금 자리가 어디인지: 동굴 입구 · 골짜기길 · 공터 */
-  const where = (x, z) => { if (!G0) return null; const c = gorge(x, z); if (c.d > 0) return G0.tunnel && c.t <= G0.tunnel.to ? 'tunnel' : 'gorge'; return basinD(x, z) > 0 ? 'basin' : null; };
-  return { L, mask, plateau, pond, chan, brush, brushZ, brushZone, spireMoss, top, bottom, blocked, sightBlock, obstacles, archLegs, gorge, gorgeAt, basinD, inGorge, where, mountH, floats, floatD };
+  const where = (x, z) => { if (SEC.length && secretD(x, z) > 0 && (openD(x, z) < 0 || humpK(x, z) > .3)) return 'secret'; if (!GS.length) return null; const c = gorge(x, z), T = GS[c.i].g.tunnel; if (c.d > 0) return T && c.t <= T.to ? 'tunnel' : 'gorge'; return basinD(x, z) > 0 ? 'basin' : null; };
+  return { L, mask, plateau, pond, chan, brush, brushZ, brushZone, spireMoss, top, bottom, blocked, sightBlock, obstacles, archLegs, gorge, gorgeAt, gorgeAtI, basinD, inGorge, where, mountH, floats, floatD, useGorge, gorges: GS.map(q => q.g), secretD, humpK };
 }
