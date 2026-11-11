@@ -48,7 +48,7 @@ input[type=range]{flex:1;min-width:0;accent-color:#b9ff4a;height:18px;margin:0}
 </style>
 <script>
 window.__ver = fetch('ver.json?t=' + Date.now(), { cache: 'no-store' }).then(r => r.json()).then(j => {
-  const f = location.pathname.split('/').pop() || 'index.html', want = j[f], mine = window.__mine = '11111829';
+  const f = location.pathname.split('/').pop() || 'index.html', want = j[f], mine = window.__mine = '11111847';
   if (want && +want > +mine) { location.replace(f + '?v=' + want + '&r=' + Date.now() + location.hash); return new Promise(() => {}); } }).catch(() => {});
 </script>
 <script type="importmap">{"imports":{"three":"./vendor/three.module.js","three/addons/":"./vendor/addons/"}}</script>
@@ -70,9 +70,9 @@ window.__ver = fetch('ver.json?t=' + Date.now(), { cache: 'no-store' }).then(r =
 <div id="rot">기기를 가로로 돌려 주세요</div>
 <script type="module">
 await window.__ver;
-const { start } = await import('./src/proto/isleview.js?v=11111829');
-const { TLAB } = await import('./src/proto/treasurelab.js?v=11111829');
-const { buildTreasure, THEMES } = await import('./src/proto/treasure.js?v=11111829');
+const { start } = await import('./src/proto/isleview.js?v=11111847');
+const { TLAB } = await import('./src/proto/treasurelab.js?v=11111847');
+const { buildTreasure, THEMES } = await import('./src/proto/treasure.js?v=11111847');
 /* 보물 장소 (몬스터 · 아이템 없음 — 장소만) · 분위기 넷 · 쓰러뜨림 보기 · 다시 놓기 */
 let TS = null; const extra = ({ isle, camera }) => { TS = window.__TS = buildTreasure(isle, TLAB.site[0], TLAB.site[1], 'meadow', { camera, grade: 'bronze' }); return TS; };
 const bar2 = document.createElement('div'); bar2.style.cssText = 'position:fixed;left:50%;bottom:calc(62px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);display:flex;gap:6px;flex-wrap:wrap;justify-content:center;z-index:5;max-width:92vw';

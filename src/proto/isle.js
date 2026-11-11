@@ -7,9 +7,9 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { MeshoptSimplifier as MO } from '../../vendor/meshopt_simplifier.module.js';
-import { makeField, Y, SPOT, LAYERS, fbm, noise2, smoothstep } from './islefield.js?v=11111829';
-import { reedBush, vegShader } from './flora.js?v=11111829';
-import { buildRuins } from './ruins.js?v=11111829';
+import { makeField, Y, SPOT, LAYERS, fbm, noise2, smoothstep } from './islefield.js?v=11111847';
+import { reedBush, vegShader } from './flora.js?v=11111847';
+import { buildRuins } from './ruins.js?v=11111847';
 
 const SUN = new THREE.Vector3(-.45, .78, .44).normalize();   /* 왼쪽 위 앞에서 (카메라 쪽 절벽 면이 비스듬히 빛을 받아 결이 드러남) */
 const rngOf = s => () => (s = (s * 16807) % 2147483647) / 2147483647;
@@ -383,7 +383,7 @@ export async function buildIsle({ K = 1, layout = SPOT } = {}) {   /* layout: �
         gg.rotateY(rot); gg.translate(x, y, z); gg.computeVertexNormals(); parts.push(gg); };
       for (const ts of C.ruins.stairs) { const f = TUN ? TUN.frame(ts) : null; const [x, z] = F.gorgeAt(ts), q = F.gorgeAt(ts + .01), rot = Math.atan2(-(q[1] - z), q[0] - x) + Math.PI / 2;
         for (let k = 0; k < 5; k++) { if (r() < .22) continue; const fx = (q[0] - x), fz = (q[1] - z), l = Math.hypot(fx, fz), ox = x + fx / l * k * 1.5, oz = z + fz / l * k * 1.5; slab(ox + (r() - .5) * .8, hAt(ox, oz) + .25 + k * .22, oz + (r() - .5) * .8, C.w * (1.1 + r() * .5), .45, 1.3, rot + (r() - .5) * .18); } }
-      for (const [ts, sd] of C.ruins.columns) { const [x, z] = F.gorgeAt(ts), q = F.gorgeAt(ts + .01), fx = q[0] - x, fz = q[1] - z, l = Math.hypot(fx, fz), sx = -fz / l, sz = fx / l, px = x + sx * sd * (C.w - 1.6), pz = z + sz * sd * (C.w - 1.6);
+      for (const [ts, sd] of C.ruins.columns || []) { const [x, z] = F.gorgeAt(ts), q = F.gorgeAt(ts + .01), fx = q[0] - x, fz = q[1] - z, l = Math.hypot(fx, fz), sx = -fz / l, sz = fx / l, px = x + sx * sd * (C.w - 1.6), pz = z + sz * sd * (C.w - 1.6);
         const cg = new THREE.CylinderGeometry(.85, .95, 6.5, 12, 6); cg.deleteAttribute('uv'); const pp = cg.attributes.position; for (let v = 0; v < pp.count; v++) { const X = pp.getX(v), Y2 = pp.getY(v), Z = pp.getZ(v), an = Math.atan2(Z, X), d = 1 + .06 * Math.sin(an * 12) + .07 * noise2(Y2 + ts * 9, an); pp.setXYZ(v, X * d, Y2 + (Math.abs(Y2) > 3 ? noise2(an * 2, ts) * .5 : 0), Z * d); }   /* 홈 파인 기둥 · 부러진 끝 */
         cg.rotateZ(Math.PI / 2); cg.rotateY(Math.atan2(-fz, fx) + (r() - .5) * .6); cg.translate(px, hAt(px, pz) + .55, pz); cg.computeVertexNormals(); parts.push(cg);
         const st = new THREE.CylinderGeometry(.9, 1.05, 1.8, 12, 2); st.deleteAttribute('uv'); const sp = st.attributes.position; for (let v = 0; v < sp.count; v++) { const X = sp.getX(v), Y2 = sp.getY(v), Z = sp.getZ(v); sp.setY(v, Y2 > 0 ? Y2 + (noise2(X * 2, Z * 2 + ts) - .2) * .6 : Y2); }
