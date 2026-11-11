@@ -11,9 +11,9 @@
 import * as THREE from 'three';
 import { buildShip, engineSpots } from '../core/ships/build.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { flameMesh } from './sortie.js?v=11111554';
-import { MAP } from './mapfloor.js?v=11111554';
-import { applyShipHeat, heatVis } from './shipheat.js?v=11111554';
+import { flameMesh } from './sortie.js?v=11111614';
+import { MAP } from './mapfloor.js?v=11111614';
+import { applyShipHeat, heatVis } from './shipheat.js?v=11111614';
 
 export const FLY = { LEN: 2, HOVER: .7, R: .8, SPEEDS: [9, 12, 15, 18], TURN: 7, ACC: .22, TURNMAX: 9,
   BASE: 9, SHIELD: 3, BOOST: 5, BOOSTK: 1.5 };   /* 기지 고리(반지름 9m)를 벗어나는 순간: 보호막 3초 · 가속 5초(1.5배) — 기지 출구 앞 매복에 바로 당하지 않게 */

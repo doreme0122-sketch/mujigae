@@ -9,11 +9,11 @@
    상태: 지킴(맵 색으로 은은히 숨 쉼) → 싸움(붉게 · 빠르게 · 기둥 룬이 아래부터 깨어남 · 사슬 떨림 · 몬스터 체력 1/6마다 사슬 하나 끊김) → 쓰러뜨림(남은 사슬 끊김 → 봉인 원 깨짐 → 뚜껑 열림 → 빛 터짐 · 충격파 · 룬 번쩍 → 빛 덩이가 제단 앞 바닥에 떨어짐)
    분위기(맵마다): 돌 색 · 덮개(이끼 · 재 · 서리 · 짙은 이끼) · 빛 색 · 틈 불빛(용암) — 싸움 빨강은 모든 맵 같음 */
 import * as THREE from 'three';
-import { noise2 } from './islefield.js?v=11111554';
-import { carvedBlock, runeD } from './ruins.js?v=11111554';
-import { buildChest, GRADES } from './chest.js?v=11111554';
-import { buildMystic } from './mystic.js?v=11111554';
-import { makeOffMark } from './offmark.js?v=11111554';
+import { noise2 } from './islefield.js?v=11111614';
+import { carvedBlock, runeD } from './ruins.js?v=11111614';
+import { buildChest, GRADES } from './chest.js?v=11111614';
+import { buildMystic } from './mystic.js?v=11111614';
+import { makeOffMark } from './offmark.js?v=11111614';
 
 export const THEMES = {
   meadow: { name: '초원', a: [.36, .34, .29], b: [.58, .54, .46], cover: [.2, .36, .1], coverAmt: .85, glow: [.22, .95, .8], crack: [0, 0, 0], mist: [.82, .9, .88], mistA: .3, fly: [1, .9, .45], shaft: [1, .93, .72] },
@@ -127,6 +127,6 @@ export function buildTreasure(isle, x0, z0, theme = 'meadow', { camera = null, g
     const dS = ship ? Math.hypot(ship.x - x0, ship.z - z0) * .5 : 0; chest.update(t, dt, state, camera, Math.max(0, Math.min(1, 1.25 - dS / 60)));   /* 소리: 30m 안은 그대로 · 75m 밖은 안 들림 */ mystic.update(t, rel);
     if (mark) { const c = chest.center.clone(); group.localToWorld(c); const n = c.clone().project(camera), back = n.z > 1;   /* 화면 밖 표시기 (카메라 뒤쪽이면 방향을 뒤집음) */
       const sx = (back ? -n.x : n.x) * innerWidth / 2 + innerWidth / 2, sy = (back ? n.y : -n.y) * innerHeight / 2 + innerHeight / 2, dm = ship ? Math.hypot(ship.x - x0, ship.z - z0) * .5 : 99;
-      mark.update({ on: chest.onScreen, sx, sy, grade: chest.grade, fight: state === 'fight', open: chest.opened, near: Math.max(0, Math.min(1, 1 - dm / 160)), t }); } };
+      mark.update({ on: chest.onScreen, sx, sy, grade: chest.grade, fight: state === 'fight', off: state === 'dead', near: Math.max(0, Math.min(1, 1 - dm / 160)), t }); } };
   isle.group.add(group); return { group, chest, mystic, setTheme, setState, setHP, setGrade: k => chest.setGrade(k), GRADES, get hp() { return hp; }, update, get state() { return state; }, center: [x0, gy, z0], TOPY };
 }

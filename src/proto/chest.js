@@ -13,9 +13,9 @@
    · 상자 둘레로 작은 금빛 반짝이가 천천히 올라감 (동그란 티 안 나게 가는 십자 반짝임) */
 import * as THREE from 'three';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
-import { noise2 } from './islefield.js?v=11111554';
-import { carvedBlock, runeD } from './ruins.js?v=11111554';
-import { play, unlock } from './sfx.js?v=11111554';
+import { noise2 } from './islefield.js?v=11111614';
+import { carvedBlock, runeD } from './ruins.js?v=11111614';
+import { play, unlock } from './sfx.js?v=11111614';
 /* 고른 소리 (사용자 2026-11-11): 사슬 끊김 — 챙~ + 깨짐 (새로 만든 셋 중 '가' 먼저 · 고르면 바꿈) · 빛 터짐 '가' (빛이 쏟아짐) · 내려앉음 '가' (사뿐 + 맑은 종) · 아이템 날아가는 소리는 뺌 */
 const SND = { snap: 0, burst: 0, land: 0 };   /* 사슬 끊김: '가' 확정 */
 
@@ -324,8 +324,8 @@ export function buildChest({ GL, U, S, pxU, x0, z0, cb, anchors, angles, drop, g
     BR.uJolt.value += dt;
     /* 화면 안에 있나 (상자 가운데가 화면 안쪽 · 카메라 앞) */
     let onScr = false; if (cam) { C0.set(x0, cb + 2, z0); group.localToWorld(C0); ndc.copy(C0).project(cam); onScr = ndc.z < 1 && Math.abs(ndc.x) < .9 && Math.abs(ndc.y) < .9; }
-    if (onScr && !seen) shine(); seen = onScr;
-    if (seen && t > nextSweep) { sweepT = t; sweepK = .45; nextSweep = t + 5.5 + Math.random() * 2; }
+    if (onScr && !seen && open < 0) shine(); seen = onScr;   /* 이미 열린 상자는 반짝이지 않음 (사용자 2026-11-11) */
+    if (seen && open < 0 && t > nextSweep) { sweepT = t; sweepK = .45; nextSweep = t + 5.5 + Math.random() * 2; }
     const sp = (t - sweepT) / 1.3; CU.uSweep.value.set(-3 + sp * 9, sp >= 0 && sp <= 1 ? sweepK * Math.sin(sp * Math.PI) : 0, 0);   /* 무지개 띠가 왼쪽 아래 → 오른쪽 위로 지나감 */
     if (open >= 0) { open += dt; const o = open;
       lastLeft.forEach((c, i) => { if (o > i * .16) snap(c); });   /* 남은 사슬이 차례로 끊김 */
