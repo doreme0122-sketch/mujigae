@@ -95,7 +95,9 @@ export const SFX = [
     { n: '승리 화음', d: '밝은 세 음 화음이 힘차게 울리고 반짝이가 흩어짐', vol: 1.05, f(t) { const b = bus(.55); [523.3, 659.3, 784, 1046.5].forEach((f, i) => { pluck(b, t + i * .025, f / 2, .3, { bright: .7, pan: -.4 + i * .27 }); bell(b, t + i * .025, f * 2, 1.2, .06, -.4 + i * .27); osc(b, t + i * .025, f, 1.4, .05, { type: 'triangle', a: .01 }); });
         osc(b, t, 130.8, .5, .3, { type: 'triangle' }); glitter(b, t + .1, 1, 16, .022, 3000, 7000, k => Math.sqrt(k)); } } ] },
 ];
-export const play = (id, k, t0 = 0) => { audio(); if (A.state === 'suspended') A.resume(); const s = SFX.find(x => x.id === id); VOL = s.v[k].vol || 1; s.v[k].f(A.currentTime + .08 + t0); VOL = 1; };
+export const play = (id, k, t0 = 0, amp = 1) => { audio(); if (A.state === 'suspended') A.resume(); const s = SFX.find(x => x.id === id); VOL = (s.v[k].vol || 1) * amp; s.v[k].f(A.currentTime + .08 + t0); VOL = 1; };   /* amp: 멀리 있으면 작게 */
+/* 브라우저는 화면을 한 번 눌러야 소리를 냄 → 처음 누를 때 소리 장치를 깨움 */
+export function unlock() { const go = () => { audio(); if (A.state === 'suspended') A.resume(); removeEventListener('pointerdown', go); removeEventListener('keydown', go); }; addEventListener('pointerdown', go); addEventListener('keydown', go); }
 /* 검수용: 소리 하나를 화면 밖에서 만들어 크기를 잼 (가장 큰 소리 · 평균 크기) */
 export async function measure(id, k) { const keep = [A, OUT, VERB, NOISE], s = SFX.find(x => x.id === id), oc = new OfflineAudioContext(2, 44100 * (s.len + 2.8), 44100); audio(oc); VOL = s.v[k].vol || 1; s.v[k].f(.12); VOL = 1;
   const buf = await oc.startRendering(); [A, OUT, VERB, NOISE] = keep; KS.clear(); let pk = 0, ss = 0; const d = buf.getChannelData(0); for (let i = 0; i < d.length; i++) { const v = Math.abs(d[i]); if (v > pk) pk = v; ss += v * v; } return { pk: +pk.toFixed(3), rms: +Math.sqrt(ss / d.length).toFixed(4), buf }; }
