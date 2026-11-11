@@ -9,11 +9,12 @@
    상태: 지킴(맵 색으로 은은히 숨 쉼) → 싸움(붉게 · 빠르게 · 기둥 룬이 아래부터 깨어남 · 사슬 떨림 · 몬스터 체력 1/6마다 사슬 하나 끊김) → 쓰러뜨림(남은 사슬 끊김 → 봉인 원 깨짐 → 뚜껑 열림 → 빛 터짐 · 충격파 · 룬 번쩍 → 빛 덩이가 제단 앞 바닥에 떨어짐)
    분위기(맵마다): 돌 색 · 덮개(이끼 · 재 · 서리 · 짙은 이끼) · 빛 색 · 틈 불빛(용암) — 싸움 빨강은 모든 맵 같음 */
 import * as THREE from 'three';
-import { noise2 } from './islefield.js?v=11111514';
-import { carvedBlock, runeD } from './ruins.js?v=11111514';
-import { buildChest, GRADES } from './chest.js?v=11111514';
-import { buildMystic } from './mystic.js?v=11111514';
-import { makeOffMark } from './offmark.js?v=11111514';
+import { noise2 } from './islefield.js?v=11111535';
+import { carvedBlock, runeD } from './ruins.js?v=11111535';
+import { buildChest, GRADES } from './chest.js?v=11111535';
+import { buildMystic } from './mystic.js?v=11111535';
+import { makeOffMark } from './offmark.js?v=11111535';
+import { buildCavern } from './cavern.js?v=11111535';
 
 export const THEMES = {
   meadow: { name: '초원', a: [.36, .34, .29], b: [.58, .54, .46], cover: [.2, .36, .1], coverAmt: .85, glow: [.22, .95, .8], crack: [0, 0, 0], mist: [.82, .9, .88], mistA: .3, fly: [1, .9, .45], shaft: [1, .93, .72] },
@@ -52,7 +53,7 @@ function tierWall(r, h, a0, a1, seed, glow) { const arc = (a1 - a0) * r, nA = Ma
   const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(P, 3)); g.setAttribute('aGlow', new THREE.Float32BufferAttribute(Gw, 1)); g.setIndex(I); g.computeVertexNormals(); return g; }
 
 /* 보물 장소 만들기 — isle: buildIsle 결과 (GL · U · hAtL · field) · x z: 가운데 (섬 안 단위) · 돌려줌: { group, setTheme(name), setState('guard'|'fight'|'dead'), update(t, dt, shipLocal) } */
-export function buildTreasure(isle, x0, z0, theme = 'meadow', { camera = null, grade = 'bronze' } = {}) {
+export function buildTreasure(isle, x0, z0, theme = 'meadow', { camera = null, grade = 'bronze', cave = null } = {}) {   /* cave: { R, gap } — 동굴 끝 보물방에 놓을 때 (둘레 바위 턱 · 종유석 · 벽 그늘) */
   const anchors = [], angles = [], group = new THREE.Group(); group.name = 'treasure';
   const { GL, U } = isle, r = rngOf(911), geos = [], gy = isle.hAtL(x0, z0), obstacles = isle.field.obstacles;
   const add = (g, x = 0, y = 0, z = 0, ry = 0) => { if (!g.attributes.aGlow) g.setAttribute('aGlow', new THREE.BufferAttribute(new Float32Array(g.attributes.position.count), 1)); g.rotateY(ry); g.translate(x0 + x, gy + y, z0 + z); geos.push(g.index ? g.toNonIndexed() : g); };
@@ -102,6 +103,7 @@ export function buildTreasure(isle, x0, z0, theme = 'meadow', { camera = null, g
     fragmentShader: GL + SFRAG });
   /* 봉인된 상자 (제단 꼭대기 가운데) · 아이템 떨어질 자리: 제단 앞(카메라 쪽) 바닥 — 1층에서 주울 수 있는 높이 (사용자 2026-11-11: 높이 '나') */
   const CBr = y + .05, drop = V(x0, gy + .46, z0 + 13), chest = buildChest({ GL, U, S, pxU: isle.pxU, x0, z0, cb: gy + CBr, anchors, angles, drop, group, grade });
+  const cavern = cave ? buildCavern({ GL, U, S, SFRAG, x0, z0, R: cave.R, floor: gy, gap: cave.gap, hAt: isle.hAtL, group }) : null;
   const mystic = buildMystic({ GL, U, S, SFRAG, pxU: isle.pxU, x0, z0, gy, angles, group, glow: chest.C }), mark = camera && typeof document !== 'undefined' ? makeOffMark() : null;
   /* 한 번에 그리기: 모두 같은 속성 (position · normal · aGlow) */
   const P = [], N = [], Gl = []; for (const g of geos) { if (!g.attributes.normal) g.computeVertexNormals(); P.push(...g.attributes.position.array); N.push(...g.attributes.normal.array); Gl.push(...g.attributes.aGlow.array); }
