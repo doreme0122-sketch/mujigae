@@ -38,7 +38,7 @@ main{max-width:880px;margin:0 auto;display:flex;flex-direction:column;gap:14px}
 <main id="list"></main>
 <div class="bar"><button id="seq" type="button">고른 소리로 이어 듣기</button><button id="copy" class="ghost" type="button">고른 번호 복사</button><div id="pick"></div></div>
 <script type="module">
-const { SFX, play } = await import('./src/proto/sfx.js?v=11111714');
+const { SFX, play } = await import('./src/proto/sfx.js?v=11111739');
 const L = ['가', '나', '다'], pick = {}; try { Object.assign(pick, JSON.parse(localStorage.getItem('treasureSfx') || '{}')); } catch (e) {}
 const list = document.querySelector('#list'), out = document.querySelector('#pick');
 const save = () => { try { localStorage.setItem('treasureSfx', JSON.stringify(pick)); } catch (e) {} out.textContent = SFX.map(s => `${s.name.replace(/ \(.*\)/, '')} ${pick[s.id] != null ? L[pick[s.id]] : '—'}`).join(' · '); };
