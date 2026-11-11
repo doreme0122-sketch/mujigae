@@ -8,7 +8,7 @@
    막힘은 보이는 두께 그대로 (기둥 · 석상 · 난간 기둥 위 석상은 그 높이까지)
    돌려주는 것: geos (깎은 돌 칠 하나로 한 번에 그림) · glow (빛 무늬 세모 [a, b, c, 색, 위상]) · obstacles ([x, y, z, r]) · strands (늘어진 덩굴 점 줄) */
 import * as THREE from 'three';
-import { noise2 } from './islefield.js?v=11111359';
+import { noise2 } from './islefield.js?v=11111445';
 
 const V = (x, y, z) => new THREE.Vector3(x, y, z);
 const rngOf = s => () => (s = (s * 16807) % 2147483647) / 2147483647;
