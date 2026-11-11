@@ -5,8 +5,8 @@
    · 반딧불: 느리게 떠다니며 깜빡임 (맵마다 색)
    · 비스듬한 빛줄기: 해 쪽에서 장소로 내려오는 옅은 빛 다섯 줄기 (천천히 숨 쉼) */
 import * as THREE from 'three';
-import { noise2 } from './islefield.js?v=11111635';
-import { carvedBlock } from './ruins.js?v=11111635';
+import { noise2 } from './islefield.js?v=11111652';
+import { carvedBlock } from './ruins.js?v=11111652';
 
 const V = (x, y, z) => new THREE.Vector3(x, y, z);
 const rngOf = s => () => (s = (s * 16807) % 2147483647) / 2147483647;
