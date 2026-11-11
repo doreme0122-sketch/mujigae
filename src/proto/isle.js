@@ -7,9 +7,9 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { MeshoptSimplifier as MO } from '../../vendor/meshopt_simplifier.module.js';
-import { makeField, Y, SPOT, LAYERS, fbm, noise2, smoothstep } from './islefield.js?v=11111614';
-import { reedBush, vegShader } from './flora.js?v=11111614';
-import { buildRuins } from './ruins.js?v=11111614';
+import { makeField, Y, SPOT, LAYERS, fbm, noise2, smoothstep } from './islefield.js?v=11111635';
+import { reedBush, vegShader } from './flora.js?v=11111635';
+import { buildRuins } from './ruins.js?v=11111635';
 
 const SUN = new THREE.Vector3(-.45, .78, .44).normalize();   /* 왼쪽 위 앞에서 (카메라 쪽 절벽 면이 비스듬히 빛을 받아 결이 드러남) */
 const rngOf = s => () => (s = (s * 16807) % 2147483647) / 2147483647;
