@@ -7,9 +7,9 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { MeshoptSimplifier as MO } from '../../vendor/meshopt_simplifier.module.js';
-import { makeField, Y, SPOT, LAYERS, fbm, noise2, smoothstep } from './islefield.js?v=11111057';
-import { reedBush, vegShader } from './flora.js?v=11111057';
-import { buildRuins } from './ruins.js?v=11111057';
+import { makeField, Y, SPOT, LAYERS, fbm, noise2, smoothstep } from './islefield.js?v=11111134';
+import { reedBush, vegShader } from './flora.js?v=11111134';
+import { buildRuins } from './ruins.js?v=11111134';
 
 const SUN = new THREE.Vector3(-.45, .78, .44).normalize();   /* 왼쪽 위 앞에서 (카메라 쪽 절벽 면이 비스듬히 빛을 받아 결이 드러남) */
 const rngOf = s => () => (s = (s * 16807) % 2147483647) / 2147483647;
@@ -406,7 +406,7 @@ export async function buildIsle({ K = 1, layout = SPOT } = {}) {   /* layout: �
         float moss = smoothstep(${lo.toFixed(2)}, ${hi.toFixed(2)}, n.y + (tr2 - .5) * .5); rock = mix(rock, mix(vec3(.12, .27, .06), vec3(.30, .45, .12), tr2), moss);   /* 위쪽 면엔 이끼 */
         float ao = .55 + .45 * smoothstep(-.8, .4, n.y); gl_FragColor = vec4(fogged(lit(rock, n, 1., ao), vP), 1.); }` });
     parts.push(...RU.rock);   /* 동굴 들머리 종유석 */
-    const m = new THREE.Mesh(mergeAll(parts), rockM(.35, .75)); m.name = 'arches'; G.add(m);
+    if (parts.length) { const m = new THREE.Mesh(mergeAll(parts), rockM(.35, .75)); m.name = 'arches'; G.add(m); }   /* 바위가 하나도 없는 배치도 있음 */
     if (RU.geos.length) { const sm = new THREE.ShaderMaterial({ uniforms: U, side: THREE.DoubleSide,   /* 깎은 돌 (유적): 밝은 사암빛 · 빗물 자국 세로 얼룩 · 오목한 곳 그늘 · 윗면 이끼 · 가는 금 */
         vertexShader: `attribute float aGlow; varying vec3 vP, vN; varying float vG; void main(){ vP = position; vN = normal; vG = aGlow; gl_Position = projectionMatrix * viewMatrix * modelMatrix * vec4(position, 1.); }`,
         fragmentShader: GL + `varying vec3 vP, vN; varying float vG; void main(){ if (cutAway(vP)) discard; vec3 n = normalize(vN) * (gl_FrontFacing ? 1. : -1.), an = abs(n); an /= an.x + an.y + an.z;
@@ -561,5 +561,6 @@ export async function buildIsle({ K = 1, layout = SPOT } = {}) {   /* layout: �
   G.scale.setScalar(K); U.uK.value = K;   /* 모양 · 무늬 · 안개 높이는 섬 안 좌표로 계산하고 통째로 줄임 → 들꽃 · 잎 무늬까지 같이 작아짐 */
   G.traverse(o => { if (o.isMesh || o.isPoints) { st.draws++; const g = o.geometry, n = (g.index ? g.index.count : g.attributes.position.count) / 3; st.tris += o.isInstancedMesh ? n * o.count : o.isPoints ? 0 : (g.instanceCount ? n * g.instanceCount : n); } });
   st.ground = { full: fullT, kept: I.length / 3, bottom: BI.length / 3 }; st.plants = plants.length;
-  return { group: G, K, field: F, H: (x, z) => hAt(x / K, z / K) * K, mask: (x, z) => F.mask(x / K, z / K) * K, blocked: (x, z, L = 1) => F.blocked(x / K, z / K, L), where: (x, z) => F.where(x / K, z / K), inGorge: (x, z) => F.inGorge(x / K, z / K, .2), layout: LO, setCut: (s, c, R, amt = 1) => { U.uCutA.value.set(s.x / K, s.y / K, s.z / K, R / K); U.uCutB.value.set(c.x / K, c.y / K, c.z / K, amt); }, sightBlock: (x, z, L) => F.sightBlock(x / K, z / K, L), inBrush: (x, z) => F.brush(x / K, z / K) > 0, brushZone: (x, z) => F.brushZone(x / K, z / K), setSight: (tex, x, z, R, on) => { U.uRay.value = tex; U.uVC.value.set(x, z); U.uVR.value = R; U.uVOn.value = on; }, layers: LAYERS.map(y => y * K), push: (x, z, r, k) => U.uPush.value.set(x / K, z / K, r / K, k / K), stats: st, sky, setPx: px => { G.userData.motes.material.uniforms.uPx.value = px; }, update: t => { U.uT.value = t; } };
+  return { GL, U, hAtL: hAt, pxU: G.userData.motes.material.uniforms.uPx,   /* 보물 장소처럼 섬 위에 따로 얹는 것이 같은 칠 · 높이를 씀 */
+    group: G, K, field: F, H: (x, z) => hAt(x / K, z / K) * K, mask: (x, z) => F.mask(x / K, z / K) * K, blocked: (x, z, L = 1) => F.blocked(x / K, z / K, L), where: (x, z) => F.where(x / K, z / K), inGorge: (x, z) => F.inGorge(x / K, z / K, .2), layout: LO, setCut: (s, c, R, amt = 1) => { U.uCutA.value.set(s.x / K, s.y / K, s.z / K, R / K); U.uCutB.value.set(c.x / K, c.y / K, c.z / K, amt); }, sightBlock: (x, z, L) => F.sightBlock(x / K, z / K, L), inBrush: (x, z) => F.brush(x / K, z / K) > 0, brushZone: (x, z) => F.brushZone(x / K, z / K), setSight: (tex, x, z, R, on) => { U.uRay.value = tex; U.uVC.value.set(x, z); U.uVR.value = R; U.uVOn.value = on; }, layers: LAYERS.map(y => y * K), push: (x, z, r, k) => U.uPush.value.set(x / K, z / K, r / K, k / K), stats: st, sky, setPx: px => { G.userData.motes.material.uniforms.uPx.value = px; }, update: t => { U.uT.value = t; } };
 }

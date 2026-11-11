@@ -6,7 +6,7 @@
 #ld{position:fixed;inset:0;display:grid;place-items:center;color:#cfd2f2;font:500 14px system-ui,sans-serif;z-index:9;background:#120e26;transition:opacity .5s}#ld i{display:block;width:160px;height:2px;margin-top:10px;background:#2c2850;border-radius:2px;overflow:hidden}#ld b{display:block;height:100%;width:0;background:#ff8a96;transition:width .3s}</style>
 <script>
 window.__ver = fetch('ver.json?t=' + Date.now(), { cache: 'no-store' }).then(r => r.json()).then(j => {
-  const f = location.pathname.split('/').pop() || 'index.html', want = j[f], mine = window.__mine = '11111057';
+  const f = location.pathname.split('/').pop() || 'index.html', want = j[f], mine = window.__mine = '11111134';
   if (want && +want > +mine) { location.replace(f + '?v=' + want + '&r=' + Date.now() + location.hash); return new Promise(() => {}); } }).catch(() => {});
 </script>
 <script type="importmap">{"imports":{"three":"./vendor/three.module.js","three/addons/":"./vendor/addons/"}}</script>
@@ -15,7 +15,7 @@ window.__ver = fetch('ver.json?t=' + Date.now(), { cache: 'no-store' }).then(r =
 <div id="ld"><div>타겟팅 시험장 불러오는 중<i><b id="lb"></b></i></div></div>
 <script type="module">
 await window.__ver;
-const { start } = await import('./src/proto/tlab.js?v=11111057');
+const { start } = await import('./src/proto/tlab.js?v=11111134');
 const lb = document.getElementById('lb'), ld = document.getElementById('ld');
 try { await start(document.getElementById('cv'), p => lb.style.width = (p * 100) + '%'); ld.style.opacity = 0; setTimeout(() => ld.remove(), 600); }
 catch (e) { ld.textContent = '오류: ' + e.message; console.error(e); }
