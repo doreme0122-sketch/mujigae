@@ -13,11 +13,11 @@
    · 상자 둘레로 작은 금빛 반짝이가 천천히 올라감 (동그란 티 안 나게 가는 십자 반짝임) */
 import * as THREE from 'three';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
-import { noise2 } from './islefield.js?v=11111504';
-import { carvedBlock, runeD } from './ruins.js?v=11111504';
-import { play, unlock } from './sfx.js?v=11111504';
+import { noise2 } from './islefield.js?v=11111511';
+import { carvedBlock, runeD } from './ruins.js?v=11111511';
+import { play, unlock } from './sfx.js?v=11111511';
 /* 고른 소리 (사용자 2026-11-11): 사슬 끊김 — 챙~ + 깨짐 (새로 만든 셋 중 '가' 먼저 · 고르면 바꿈) · 빛 터짐 '가' (빛이 쏟아짐) · 내려앉음 '가' (사뿐 + 맑은 종) · 아이템 날아가는 소리는 뺌 */
-const SND = { snap: 0, burst: 0, land: 0 };
+const SND = { snap: 0, burst: 0, land: 0 };   /* 사슬 끊김: '가' 확정 */
 
 const W = 4.2, D = 2.8, BOT = .75, SEAM = 2.85, R = 1.45, AX = 3.0, LL = 4.3;   /* 몸통 너비 · 깊이 · 바닥 · 뚜껑 이음 높이 · 뚜껑 반지름 · 뚜껑 축 높이 · 뚜껑 길이 (섬 안 단위 · 0.5배 = m) */
 const ORDER = [0, 3, 1, 4, 2, 5];   /* 체력이 줄 때 끊기는 차례 (마주 보는 것끼리 번갈아) */
@@ -100,7 +100,8 @@ const GEM_F = SHARE + `varying vec3 vP, vN, vW, vC, vL; void main(){ vec3 n = no
 /* x0 z0: 제단 가운데 · cb: 상자 바닥 높이 (섬 안) · anchors: 기둥 여섯 사슬 거는 자리 (기둥 각도 순) · drop: 아이템 떨어질 자리 (섬 안 · 1층에서 주울 수 있는 바닥) */
 export function buildChest({ GL, U, S, pxU, x0, z0, cb, anchors, angles, drop, group, grade = 'bronze' }) {
   if (typeof window !== 'undefined') unlock(); let amp = 1;   /* amp: 기체와 상자 거리에 따라 소리 크기 */
-  const sfx = (id, t0 = 0) => { if (amp > .02) try { play(id, SND[id], t0, amp); } catch (e) {} };
+  const sfx = (id, t0 = 0, pitch = 1) => { if (amp > .02) try { play(id, SND[id], t0, amp, pitch); } catch (e) {} };
+  const STEP = [-7, -5, -3, 0, 2, 5].map(s => Math.pow(2, s / 12));   /* 사슬이 끊길 때마다 한 계단씩 높게 (사용자 2026-11-11: 낮은 음 → 높은 음 · 봉인이 약해질수록 긴장) */
   const body = [], bodyL = [], trim = [], trimL = [], ornS = [], ornL = [];   /* 몸통 (가만히 · 뚜껑) · 테 (가만히 · 뚜껑) · 은 · 금 등급 장식 */
   /* ── 몸통 ── */
   body.push(at(carvedBlock(4.9, .4, 3.5, 'band', .05, 51), 0, .2, 0));                                  /* 받침 */
@@ -311,7 +312,7 @@ export function buildChest({ GL, U, S, pxU, x0, z0, cb, anchors, angles, drop, g
   const HALO = [[.25, .2, .16], [.9, .55, .25], [.8, .86, 1], [1.25, .86, .32]];
   const setGrade = k => { grade = k; const g = GRADES[k].k; CU.uKind.value = g; BR.uHalo.value.setRGB(...HALO[g]); orn.s.visible = g >= 2; orn.l.visible = g === 3; for (const m of gems.silver) m.visible = g === 2; for (const m of gems.gold) m.visible = g === 3; };
   setGrade(grade);
-  const snap = c => { if (brk[c] >= 0) return; brk[c] = 0; BR.uJolt.value = 0; sfx('snap'); sec[c] = .999; left--; const ch = chains[c]; burst(ch.P(.5), 50, 6, now); burst(ch.B, 18, 3, now); burst(ch.A, 18, 3, now); };
+  const snap = c => { if (brk[c] >= 0) return; brk[c] = 0; BR.uJolt.value = 0; sfx('snap', 0, STEP[6 - left]); sec[c] = .999; left--; const ch = chains[c]; burst(ch.P(.5), 50, 6, now); burst(ch.B, 18, 3, now); burst(ch.A, 18, 3, now); };
   const reset = () => { for (let c = 0; c < 6; c++) { brk[c] = -1; sec[c] = 1; } left = 6; open = -1; opened = landed = false; sBurst = sLand = false; burstT = -1; lidAt(0, 0); SEC.uA.value = 1; OA.uA.value = 0; SA.uA.value = 1; orbU.uA.value = 0; spotU.uA.value = 0; RU.uA.value = 1; seen = false; };
   const setHP = hp => { const keep = Math.max(0, Math.ceil(hp * 6 - 1e-6)); for (let k = 0; k < 6 - keep; k++) snap(ORDER[k]); };
   let lastLeft = []; const kill = () => { lastLeft = ORDER.filter(c => brk[c] < 0); open = 0; };

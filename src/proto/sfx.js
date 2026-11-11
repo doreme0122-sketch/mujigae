@@ -5,7 +5,7 @@
    · 종 · 반짝이: 맑은 배음 + 좌우로 흩어지는 작은 알갱이들
    · 바람 · 공기: 걸러 낸 잡음을 음역째 움직임 (날아갈 때는 다가오며 높아지고 멀어지며 낮아짐)
    · 공간: 돌 마당 울림 — 앞쪽 반사 몇 개 + 좌우가 다른 꼬리, 꼬리는 시간이 갈수록 높은 소리부터 사라짐 */
-let A = null, OUT = null, VERB = null, NOISE = null, VOL = 1;
+let A = null, OUT = null, VERB = null, NOISE = null, VOL = 1, PIT = 1;   /* PIT: 음 높이 배수 (사슬이 끊길 때마다 한 계단씩 높임) */
 const KS = new Map();
 export function audio(ctx) { if (A && !ctx) return A; A = ctx || new (window.AudioContext || window.webkitAudioContext)(); KS.clear();
   const comp = A.createDynamicsCompressor(); comp.threshold.value = -16; comp.knee.value = 12; comp.ratio.value = 3; comp.attack.value = .004; comp.release.value = .2; comp.connect(A.destination);
@@ -23,7 +23,7 @@ const rnd = (a, b) => a + Math.random() * (b - a);
 /* 보내는 길: 크기 · 좌우 · 울림 양 */
 const bus = (wet = .3, pan = 0) => { const g = A.createGain(); g.gain.value = VOL; const p = A.createStereoPanner(), s = A.createGain(); s.gain.value = wet; p.pan.value = pan; g.connect(p); p.connect(OUT); p.connect(s); s.connect(VERB.pre); return g; };
 const env = (param, t, a, peak, d) => { param.setValueAtTime(.0001, t); param.linearRampToValueAtTime(peak, t + a); param.exponentialRampToValueAtTime(.0001, t + a + d); };
-function osc(dst, t, f, dur, gain, { type = 'sine', a = .003, to = 0, det = 0, pan = null } = {}) { const o = A.createOscillator(), g = A.createGain(); o.type = type; o.frequency.setValueAtTime(f, t); if (to) o.frequency.exponentialRampToValueAtTime(to, t + a + dur); o.detune.value = det;
+function osc(dst, t, f, dur, gain, { type = 'sine', a = .003, to = 0, det = 0, pan = null } = {}) { const o = A.createOscillator(), g = A.createGain(); o.type = type; o.frequency.setValueAtTime(f * PIT, t); if (to) o.frequency.exponentialRampToValueAtTime(to * PIT, t + a + dur); o.detune.value = det;
   env(g.gain, t, a, gain, dur); o.connect(g); if (pan !== null) { const p = A.createStereoPanner(); p.pan.value = pan; g.connect(p); p.connect(dst); } else g.connect(dst); o.start(t); o.stop(t + a + dur + .05); return o; }
 function noise(dst, t, dur, gain, { type = 'bandpass', f = 1000, q = 1, to = 0, a = .002, pan = null } = {}) { const s = A.createBufferSource(), fl = A.createBiquadFilter(), g = A.createGain(); s.buffer = NOISE; s.loop = true;
   fl.type = type; fl.frequency.setValueAtTime(f, t); if (to) fl.frequency.exponentialRampToValueAtTime(to, t + a + dur); fl.Q.value = q; env(g.gain, t, a, gain, dur); s.connect(fl); fl.connect(g);
@@ -44,7 +44,7 @@ function bell(dst, t, f, dur, gain, pan = 0) { [[1, 1, 1], [2.0, .4, .7], [2.76,
 function glitter(dst, t, dur, n, gain, lo = 2400, hi = 6200, curve = null) { for (let i = 0; i < n; i++) { const k = i / n, tt = t + (curve ? curve(k) : k) * dur + rnd(-.02, .02), f = rnd(lo, hi); bell(dst, tt, f, rnd(.15, .45), gain * rnd(.5, 1), rnd(-.8, .8)); } }
 /* 챙~ : 날카로운 쇠 울림 — 딸깍 충격 → 높은 고유 울림들이 길게 떨리며 남음 (첫 순간 살짝 음이 내려앉음 · 울림마다 두 음 어긋나 맥놀이) */
 function ching(dst, t, f0, dur, gain, modes = [1, 1.505, 2.39, 3.12, 4.48, 5.9]) { noise(dst, t, .018, .7 * gain, { type: 'highpass', f: 4500 }); osc(dst, t, f0 * 3.3, .006, .3 * gain, { type: 'square' });
-  modes.forEach((r, i) => { const f = f0 * r * (1 + rnd(-.002, .002)), d = dur * Math.pow(.7, i), g = gain * Math.pow(.66, i), pn = rnd(-.3, .3);
+  modes.forEach((r, i) => { const f = f0 * PIT * r * (1 + rnd(-.002, .002)), d = dur * Math.pow(.7, i), g = gain * Math.pow(.66, i), pn = rnd(-.3, .3);
     for (const [df, gk] of [[1, .6], [1.0042 + i * .0007, .45]]) { const o = A.createOscillator(), gg = A.createGain(), p = A.createStereoPanner(); o.frequency.setValueAtTime(f * df * 1.012, t); o.frequency.exponentialRampToValueAtTime(f * df, t + .05);
       gg.gain.setValueAtTime(.0001, t); gg.gain.linearRampToValueAtTime(g * gk, t + .002); gg.gain.exponentialRampToValueAtTime(g * gk * .6, t + .08);   /* 충격 뒤에도 챙~ 이 또렷이 남게 */ gg.gain.exponentialRampToValueAtTime(.0001, t + d); p.pan.value = pn;
       o.connect(gg); gg.connect(p); p.connect(dst); o.start(t); o.stop(t + d + .05); } }); }
@@ -93,7 +93,7 @@ export const SFX = [
     { n: '승리 화음', d: '밝은 세 음 화음이 힘차게 울리고 반짝이가 흩어짐', vol: 1.05, f(t) { const b = bus(.55); [523.3, 659.3, 784, 1046.5].forEach((f, i) => { pluck(b, t + i * .025, f / 2, .3, { bright: .7, pan: -.4 + i * .27 }); bell(b, t + i * .025, f * 2, 1.2, .06, -.4 + i * .27); osc(b, t + i * .025, f, 1.4, .05, { type: 'triangle', a: .01 }); });
         osc(b, t, 130.8, .5, .3, { type: 'triangle' }); glitter(b, t + .1, 1, 16, .022, 3000, 7000, k => Math.sqrt(k)); } } ] },
 ];
-export const play = (id, k, t0 = 0, amp = 1) => { audio(); if (A.state === 'suspended') A.resume(); const s = SFX.find(x => x.id === id); VOL = (s.v[k].vol || 1) * amp; s.v[k].f(A.currentTime + .08 + t0); VOL = 1; };   /* amp: 멀리 있으면 작게 */
+export const play = (id, k, t0 = 0, amp = 1, pitch = 1) => { audio(); if (A.state === 'suspended') A.resume(); const s = SFX.find(x => x.id === id); VOL = (s.v[k].vol || 1) * amp; PIT = pitch; s.v[k].f(A.currentTime + .08 + t0); VOL = 1; PIT = 1; };   /* amp: 멀리 있으면 작게 · pitch: 음 높이 배수 */
 /* 브라우저는 화면을 한 번 눌러야 소리를 냄 → 처음 누를 때 소리 장치를 깨움 */
 export function unlock() { const go = () => { audio(); if (A.state === 'suspended') A.resume(); removeEventListener('pointerdown', go); removeEventListener('keydown', go); }; addEventListener('pointerdown', go); addEventListener('keydown', go); }
 /* 검수용: 소리 하나를 화면 밖에서 만들어 크기를 잼 (가장 큰 소리 · 평균 크기) */

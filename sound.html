@@ -38,7 +38,7 @@ main{max-width:880px;margin:0 auto;display:flex;flex-direction:column;gap:14px}
 <main id="list"></main>
 <div class="bar"><button id="seq" type="button">고른 소리로 이어 듣기</button><button id="copy" class="ghost" type="button">고른 번호 복사</button><div id="pick"></div></div>
 <script type="module">
-const { SFX, play } = await import('./src/proto/sfx.js?v=11111504');
+const { SFX, play } = await import('./src/proto/sfx.js?v=11111511');
 const L = ['가', '나', '다'], pick = {}; try { Object.assign(pick, JSON.parse(localStorage.getItem('treasureSfx') || '{}')); } catch (e) {}
 const list = document.querySelector('#list'), out = document.querySelector('#pick');
 const save = () => { try { localStorage.setItem('treasureSfx', JSON.stringify(pick)); } catch (e) {} out.textContent = SFX.map(s => `${s.name.replace(/ \(.*\)/, '')} ${pick[s.id] != null ? L[pick[s.id]] : '—'}`).join(' · '); };
@@ -49,8 +49,8 @@ for (const s of SFX) { const row = document.createElement('section'); row.classN
   list.append(row); }
 save();
 /* 실제 순서: 공격 두 번 (사슬 둘) → 쓰러뜨림 (남은 사슬 넷이 차례로) → 빛 터짐 → (아이템 떠올라 날아감 · 소리 없음) → 내려앉음 → (1층에서 3초 머묾) → 줍기 완료 */
-const P = id => pick[id] ?? 0, at = (id, t) => play(id, P(id), t);
-document.querySelector('#seq').onclick = () => { at('snap', .2); at('snap', 1.4); for (let i = 0; i < 4; i++) at('snap', 2.7 + i * .16); at('burst', 3.8); at('land', 7.1); at('pick', 10.4); };
+const P = id => pick[id] ?? 0, at = (id, t, pt = 1) => play(id, P(id), t, 1, pt), ST = [-7, -5, -3, 0, 2, 5].map(x => Math.pow(2, x / 12));   /* 사슬은 끊길 때마다 한 계단씩 높게 */
+document.querySelector('#seq').onclick = () => { at('snap', .2, ST[0]); at('snap', 1.4, ST[1]); for (let i = 0; i < 4; i++) at('snap', 2.7 + i * .16, ST[2 + i]); at('burst', 3.8); at('land', 7.1); at('pick', 10.4); };
 document.querySelector('#copy').onclick = async () => { try { await navigator.clipboard.writeText(out.textContent); document.querySelector('#copy').textContent = '복사했어요'; } catch (e) { const r = document.createRange(); r.selectNodeContents(out); getSelection().removeAllRanges(); getSelection().addRange(r); } };
 </script>
 </body></html>
