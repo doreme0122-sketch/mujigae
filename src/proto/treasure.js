@@ -4,20 +4,22 @@
    · 룬 고리: 가운데 겹 바깥 둘레에 룬을 새긴 돌 띠 — 상태 빛이 흐름
    · 제단: 세 단 둥근 돌 제단 (지름 약 8m) — 단마다 바깥 벽에 룬 띠 · 꼭대기 넓은 받침에 룬 원
    · 돌기둥 여섯: 가운데에서 약 11m · 위로 좁아지는 네모 기둥 (돌을 층층이 · 앞면 룬 세로 띠 · 머리 장식) — 하나는 기울고 하나는 부러져 윗동이 쓰러짐
-   · 제단 꼭대기: 봉인된 보물 상자 (chest.js — 기둥 여섯에서 빛 사슬 · 떠 도는 봉인 원 · 상자 위 빛기둥) · 몬스터는 제단 둘레를 배회 (사용자 2026-11-11)
-   · 떠오르는 빛 알갱이 · 뚜껑이 열릴 때 바닥으로 퍼지는 충격파
-   상태: 지킴(맵 색으로 은은히 숨 쉼) → 싸움(붉게 · 빠르게 · 기둥 룬이 아래부터 깨어남 · 사슬 떨림 · 빛기둥 굵고 떨림 · 몬스터 체력 1/6마다 사슬 하나 끊김) → 쓰러뜨림(남은 사슬 끊김 → 봉인 원 깨짐 → 뚜껑 열림 → 빛 터짐 · 충격파 · 룬 번쩍 → 빛기둥이 보물 빛(금빛)으로 남음)
+   · 제단 꼭대기: 봉인된 보물 상자 (chest.js — 등급 넷 · 기둥 여섯에서 금빛 사슬 · 떠 도는 봉인 원 · 화면에 들어오면 별빛 + 무지개) · 몬스터는 제단 둘레를 배회 (사용자 2026-11-11)
+   · 아이템 떨어질 자리: 제단 앞 바닥 (1층에서 주움) · 신비 다섯 (mystic.js) · 화면 밖 표시기 (offmark.js) · 뚜껑이 열릴 때 바닥으로 퍼지는 충격파
+   상태: 지킴(맵 색으로 은은히 숨 쉼) → 싸움(붉게 · 빠르게 · 기둥 룬이 아래부터 깨어남 · 사슬 떨림 · 몬스터 체력 1/6마다 사슬 하나 끊김) → 쓰러뜨림(남은 사슬 끊김 → 봉인 원 깨짐 → 뚜껑 열림 → 빛 터짐 · 충격파 · 룬 번쩍 → 빛 덩이가 제단 앞 바닥에 떨어짐)
    분위기(맵마다): 돌 색 · 덮개(이끼 · 재 · 서리 · 짙은 이끼) · 빛 색 · 틈 불빛(용암) · 늘어진 덩굴/뿌리(초원 · 정글) — 싸움 빨강은 모든 맵 같음 */
 import * as THREE from 'three';
-import { noise2 } from './islefield.js?v=11111214';
-import { carvedBlock, runeD } from './ruins.js?v=11111214';
-import { buildChest } from './chest.js?v=11111214';
+import { noise2 } from './islefield.js?v=11111308';
+import { carvedBlock, runeD } from './ruins.js?v=11111308';
+import { buildChest, GRADES } from './chest.js?v=11111308';
+import { buildMystic } from './mystic.js?v=11111308';
+import { makeOffMark } from './offmark.js?v=11111308';
 
 export const THEMES = {
-  meadow: { name: '초원', a: [.36, .34, .29], b: [.58, .54, .46], cover: [.2, .36, .1], coverAmt: .85, glow: [.22, .95, .8], crack: [0, 0, 0], vines: 'vine' },
-  lava: { name: '용암', a: [.13, .12, .12], b: [.27, .25, .24], cover: [.2, .18, .17], coverAmt: .45, glow: [1.2, .5, .12], crack: [1.4, .45, .08], vines: null },
-  ice: { name: '얼음', a: [.62, .66, .7], b: [.86, .89, .92], cover: [.95, .97, 1], coverAmt: 1, glow: [.45, .8, 1.25], crack: [0, 0, 0], vines: null },
-  jungle: { name: '정글', a: [.17, .22, .17], b: [.33, .38, .3], cover: [.1, .2, .08], coverAmt: 1, glow: [.75, .35, 1.15], crack: [0, 0, 0], vines: 'root' },
+  meadow: { name: '초원', a: [.36, .34, .29], b: [.58, .54, .46], cover: [.2, .36, .1], coverAmt: .85, glow: [.22, .95, .8], crack: [0, 0, 0], vines: 'vine', mist: [.82, .9, .88], mistA: .3, fly: [1, .9, .45], shaft: [1, .93, .72] },
+  lava: { name: '용암', a: [.13, .12, .12], b: [.27, .25, .24], cover: [.2, .18, .17], coverAmt: .45, glow: [1.2, .5, .12], crack: [1.4, .45, .08], vines: null, mist: [.3, .2, .18], mistA: .38, fly: [1.3, .5, .12], shaft: [1, .58, .3] },
+  ice: { name: '얼음', a: [.62, .66, .7], b: [.86, .89, .92], cover: [.95, .97, 1], coverAmt: 1, glow: [.45, .8, 1.25], crack: [0, 0, 0], vines: null, mist: [.9, .95, 1], mistA: .36, fly: [.6, .85, 1.3], shaft: [.85, .93, 1] },
+  jungle: { name: '정글', a: [.17, .22, .17], b: [.33, .38, .3], cover: [.1, .2, .08], coverAmt: 1, glow: [.75, .35, 1.15], crack: [0, 0, 0], vines: 'root', mist: [.5, .66, .5], mistA: .34, fly: [.8, 1.1, .35], shaft: [.9, 1, .7] },
 };
 const rngOf = s => () => (s = (s * 16807) % 2147483647) / 2147483647;
 const V = (x, y, z) => new THREE.Vector3(x, y, z);
@@ -50,7 +52,7 @@ function tierWall(r, h, a0, a1, seed, glow) { const arc = (a1 - a0) * r, nA = Ma
   const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(P, 3)); g.setAttribute('aGlow', new THREE.Float32BufferAttribute(Gw, 1)); g.setIndex(I); g.computeVertexNormals(); return g; }
 
 /* 보물 장소 만들기 — isle: buildIsle 결과 (GL · U · hAtL · field) · x z: 가운데 (섬 안 단위) · 돌려줌: { group, setTheme(name), setState('guard'|'fight'|'dead'), update(t, dt, shipLocal) } */
-export function buildTreasure(isle, x0, z0, theme = 'meadow') {
+export function buildTreasure(isle, x0, z0, theme = 'meadow', { camera = null, grade = 'bronze' } = {}) {
   const anchors = [], angles = [], group = new THREE.Group(); group.name = 'treasure';
   const { GL, U } = isle, r = rngOf(911), geos = [], vines = { vine: [], root: [] }, gy = isle.hAtL(x0, z0), obstacles = isle.field.obstacles;
   const add = (g, x = 0, y = 0, z = 0, ry = 0) => { if (!g.attributes.aGlow) g.setAttribute('aGlow', new THREE.BufferAttribute(new Float32Array(g.attributes.position.count), 1)); g.rotateY(ry); g.translate(x0 + x, gy + y, z0 + z); geos.push(g.index ? g.toNonIndexed() : g); };
@@ -100,8 +102,9 @@ export function buildTreasure(isle, x0, z0, theme = 'meadow') {
   const mat = new THREE.ShaderMaterial({ uniforms: { ...U, ...S }, side: THREE.DoubleSide,
     vertexShader: `attribute float aGlow; varying vec3 vP, vN; varying float vG; void main(){ vP = position; vN = normal; vG = aGlow; gl_Position = projectionMatrix * viewMatrix * modelMatrix * vec4(position, 1.); }`,
     fragmentShader: GL + SFRAG });
-  /* 봉인된 상자 (제단 꼭대기 가운데 · 돌 몸통은 장소 돌에 합쳐 한 번에 그림) */
-  const CBr = y + .05, chest = buildChest({ GL, U, S, pxU: isle.pxU, x0, z0, cb: gy + CBr, anchors, angles, stoneFrag: SFRAG, add: g => add(g, 0, CBr, 0), group });
+  /* 봉인된 상자 (제단 꼭대기 가운데) · 아이템 떨어질 자리: 제단 앞(카메라 쪽) 바닥 — 1층에서 주울 수 있는 높이 (사용자 2026-11-11: 높이 '나') */
+  const CBr = y + .05, drop = V(x0, gy + .46, z0 + 13), chest = buildChest({ GL, U, S, pxU: isle.pxU, x0, z0, cb: gy + CBr, anchors, angles, drop, group, grade });
+  const mystic = buildMystic({ GL, U, S, SFRAG, pxU: isle.pxU, x0, z0, gy, angles, group, glow: chest.C }), mark = camera && typeof document !== 'undefined' ? makeOffMark() : null;
   /* 한 번에 그리기: 모두 같은 속성 (position · normal · aGlow) */
   const P = [], N = [], Gl = []; for (const g of geos) { if (!g.attributes.normal) g.computeVertexNormals(); P.push(...g.attributes.position.array); N.push(...g.attributes.normal.array); Gl.push(...g.attributes.aGlow.array); }
   const bg = new THREE.BufferGeometry(); bg.setAttribute('position', new THREE.Float32BufferAttribute(P, 3)); bg.setAttribute('normal', new THREE.Float32BufferAttribute(N, 3)); bg.setAttribute('aGlow', new THREE.Float32BufferAttribute(Gl, 1));
@@ -112,15 +115,6 @@ export function buildTreasure(isle, x0, z0, theme = 'meadow') {
     const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(P2, 3)); g.computeVertexNormals();
     vm[k] = new THREE.Mesh(g, new THREE.ShaderMaterial({ uniforms: U, vertexShader: `varying vec3 vP, vN; void main(){ vP = position; vN = normal; gl_Position = projectionMatrix * viewMatrix * modelMatrix * vec4(position, 1.); }`,
       fragmentShader: GL + `varying vec3 vP, vN; void main(){ vec3 n = normalize(vN); vec3 c = ${k === 'vine' ? 'mix(vec3(.12, .26, .07), vec3(.25, .42, .12), vn(vP.xy * 3.))' : 'mix(vec3(.2, .14, .09), vec3(.36, .27, .18), vn(vP.xy * 2.))'}; gl_FragColor = vec4(fogged(lit(c, n, 1., .8), vP), 1.); }` })); group.add(vm[k]); }
-  /* 떠오르는 빛 알갱이 */
-  const NM = 90, mp = new Float32Array(NM * 3), ms = new Float32Array(NM); for (let i = 0; i < NM; i++) { const a = r() * 6.283, d = 2 + r() * 9; mp.set([x0 + Math.cos(a) * d, gy + r() * 14, z0 + Math.sin(a) * d], i * 3); ms[i] = r(); }
-  const mg = new THREE.BufferGeometry(); mg.setAttribute('position', new THREE.BufferAttribute(mp, 3)); mg.setAttribute('aS', new THREE.BufferAttribute(ms, 1));
-  const MU = { uT: U.uT, uC: { value: chest.C }, uA: { value: .6 }, uPx: isle.pxU, uY0: { value: gy } };
-  const motes = new THREE.Points(mg, new THREE.ShaderMaterial({ uniforms: MU, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
-    vertexShader: `attribute float aS; uniform float uT, uPx, uY0; varying float vA; void main(){ vec3 p = position; float t = fract(aS + uT * (.05 + aS * .04)); p.y = uY0 + 1. + t * 16.; p.x += sin(uT * .7 + aS * 20.) * .6; p.z += cos(uT * .6 + aS * 17.) * .6;
-      vA = sin(t * 3.1416); vec4 mv = modelViewMatrix * vec4(p, 1.); gl_PointSize = uPx * .32 / -mv.z; gl_Position = projectionMatrix * mv; }`,
-    fragmentShader: `uniform vec3 uC; uniform float uA; varying float vA; void main(){ vec2 q = gl_PointCoord - .5; float d = dot(q, q); if (d > .25) discard; gl_FragColor = vec4(uC * (1. - d * 4.) * vA * uA * 1.6, 1.); }` }));
-  motes.frustumCulled = false; group.add(motes);
   /* 쓰러뜨림 충격파: 바닥을 따라 퍼지는 빛 고리 */
   const ring = new THREE.Mesh(new THREE.RingGeometry(.9, 1, 96), new THREE.ShaderMaterial({ uniforms: { uC: { value: chest.C }, uA: { value: 0 } }, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide,
     vertexShader: `varying vec2 vU; void main(){ vU = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.); }`, fragmentShader: `uniform vec3 uC; uniform float uA; void main(){ gl_FragColor = vec4(uC * uA * 1.5, 1.); }` }));
@@ -128,7 +122,7 @@ export function buildTreasure(isle, x0, z0, theme = 'meadow') {
 
   /* 분위기 · 상태 */
   const RED = new THREE.Color(1.35, .2, .12), GOLD = new THREE.Color(1.5, 1.12, .45), base = new THREE.Color(), cur = new THREE.Color(); let TH = THEMES.meadow, state = 'guard', st = 0, hp = 1;
-  const setTheme = k => { TH = THEMES[k]; S.uSA.value.setRGB(...TH.a); S.uSB.value.setRGB(...TH.b); S.uCov.value.setRGB(...TH.cover); S.uCovA.value = TH.coverAmt; S.uCrack.value.setRGB(...TH.crack); base.setRGB(...TH.glow); vm.vine.visible = TH.vines === 'vine'; vm.root.visible = TH.vines === 'root'; };
+  const setTheme = k => { TH = THEMES[k]; S.uSA.value.setRGB(...TH.a); S.uSB.value.setRGB(...TH.b); S.uCov.value.setRGB(...TH.cover); S.uCovA.value = TH.coverAmt; S.uCrack.value.setRGB(...TH.crack); base.setRGB(...TH.glow); vm.vine.visible = TH.vines === 'vine'; vm.root.visible = TH.vines === 'root'; mystic.setTheme(TH); };
   const setState = s => { if (s === state && s !== 'guard') return; state = s; st = 0; if (s === 'dead') chest.kill(); if (s === 'guard') { ring.visible = false; hp = 1; chest.reset(); } };
   /* 몬스터 체력 (0~1): 1/6 줄 때마다 사슬 하나 끊김 · 0이면 쓰러뜨림 */
   const setHP = v => { if (state === 'dead') return; hp = Math.max(0, Math.min(1, v)); if (state === 'guard') setState('fight'); chest.setHP(hp); if (hp <= 0) setState('dead'); };
@@ -141,7 +135,10 @@ export function buildTreasure(isle, x0, z0, theme = 'meadow') {
     else { tc = bt >= 0 ? GOLD : RED; ga = bt >= 0 ? .8 : 1; fl = bt >= 0 ? 1.3 : 6; wk = 18; ma = bt >= 0 ? .9 : .9;
       if (bt >= 0) { if (!ring.visible && bt < .1) ring.visible = true; S.uFlash.value = 2.2 * Math.exp(-bt * 3); ring.scale.setScalar(2 + bt * 32); ring.material.uniforms.uA.value = Math.max(0, 1 - bt / .9); if (bt > 1) ring.visible = false; } }
     if (!(state === 'dead' && bt >= 0)) S.uFlash.value = 0;
-    cur.lerp(tc, Math.min(1, dt * 4)); chest.C.copy(cur); S.uGlowC.value.copy(cur); S.uGlowA.value += (ga - S.uGlowA.value) * Math.min(1, dt * 4); S.uFlow.value = fl; S.uWake.value = state === 'guard' ? 99 : wk; MU.uA.value = ma;
-    chest.update(t, dt, state); };
-  isle.group.add(group); return { group, chest, setTheme, setState, setHP, get hp() { return hp; }, update, get state() { return state; }, center: [x0, gy, z0], TOPY };
+    cur.lerp(tc, Math.min(1, dt * 4)); chest.C.copy(cur); S.uGlowC.value.copy(cur); S.uGlowA.value += (ga - S.uGlowA.value) * Math.min(1, dt * 4); S.uFlow.value = fl; S.uWake.value = state === 'guard' ? 99 : wk; 
+    chest.update(t, dt, state, camera); mystic.update(t);
+    if (mark) { const c = chest.center.clone(); group.localToWorld(c); const n = c.clone().project(camera), back = n.z > 1;   /* 화면 밖 표시기 (카메라 뒤쪽이면 방향을 뒤집음) */
+      const sx = (back ? -n.x : n.x) * innerWidth / 2 + innerWidth / 2, sy = (back ? n.y : -n.y) * innerHeight / 2 + innerHeight / 2, dm = ship ? Math.hypot(ship.x - x0, ship.z - z0) * .5 : 99;
+      mark.update({ on: chest.onScreen, sx, sy, grade: chest.grade, fight: state === 'fight', open: chest.opened, near: Math.max(0, Math.min(1, 1 - dm / 160)), t }); } };
+  isle.group.add(group); return { group, chest, mystic, setTheme, setState, setHP, setGrade: k => chest.setGrade(k), GRADES, get hp() { return hp; }, update, get state() { return state; }, center: [x0, gy, z0], TOPY };
 }

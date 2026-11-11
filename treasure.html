@@ -48,14 +48,14 @@ input[type=range]{flex:1;min-width:0;accent-color:#b9ff4a;height:18px;margin:0}
 </style>
 <script>
 window.__ver = fetch('ver.json?t=' + Date.now(), { cache: 'no-store' }).then(r => r.json()).then(j => {
-  const f = location.pathname.split('/').pop() || 'index.html', want = j[f], mine = window.__mine = '11111214';
+  const f = location.pathname.split('/').pop() || 'index.html', want = j[f], mine = window.__mine = '11111308';
   if (want && +want > +mine) { location.replace(f + '?v=' + want + '&r=' + Date.now() + location.hash); return new Promise(() => {}); } }).catch(() => {});
 </script>
 <script type="importmap">{"imports":{"three":"./vendor/three.module.js","three/addons/":"./vendor/addons/"}}</script>
 </head><body>
 <canvas id="cv"></canvas>
 <div id="ui">
-  <div id="head"><b>보물 장소</b><span>왼쪽 아래 끌어 몰기 · 층 바꾸기(E·Q) · 약 12m 안으로 들어가면 싸움 빛 · 공격 = 몬스터 체력 1/6 (사슬 하나 끊김) · 쓰러뜨림 = 봉인 풀림 · 상자 열림</span></div>
+  <div id="head"><b>보물 장소</b><span>왼쪽 아래 끌어 몰기 · 층 바꾸기(E·Q) · 약 12m 안으로 들어가면 싸움 빛 · 공격 = 몬스터 체력 1/6 (사슬 하나 끊김) · 쓰러뜨림 = 봉인 풀림 · 상자 열림 · 아이템 자리 · 상자 등급 넷 · 상자가 화면 밖이면 화면 끝 표시기</span></div>
   <div id="fps"></div>
   <div id="where"></div>
   <div id="view"><button id="tog" type="button">설정 접기 ▴</button>
@@ -70,14 +70,15 @@ window.__ver = fetch('ver.json?t=' + Date.now(), { cache: 'no-store' }).then(r =
 <div id="rot">기기를 가로로 돌려 주세요</div>
 <script type="module">
 await window.__ver;
-const { start } = await import('./src/proto/isleview.js?v=11111214');
-const { TLAB } = await import('./src/proto/treasurelab.js?v=11111214');
-const { buildTreasure, THEMES } = await import('./src/proto/treasure.js?v=11111214');
+const { start } = await import('./src/proto/isleview.js?v=11111308');
+const { TLAB } = await import('./src/proto/treasurelab.js?v=11111308');
+const { buildTreasure, THEMES } = await import('./src/proto/treasure.js?v=11111308');
 /* 보물 장소 (몬스터 · 아이템 없음 — 장소만) · 분위기 넷 · 쓰러뜨림 보기 · 다시 놓기 */
-let TS = null; const extra = ({ isle }) => { TS = window.__TS = buildTreasure(isle, TLAB.site[0], TLAB.site[1], 'meadow'); return TS; };
+let TS = null; const extra = ({ isle, camera }) => { TS = window.__TS = buildTreasure(isle, TLAB.site[0], TLAB.site[1], 'meadow', { camera, grade: 'bronze' }); return TS; };
 const bar2 = document.createElement('div'); bar2.style.cssText = 'position:fixed;left:50%;bottom:calc(62px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);display:flex;gap:6px;flex-wrap:wrap;justify-content:center;z-index:5;max-width:92vw';
 const btn = (t, f) => { const b = document.createElement('button'); b.type = 'button'; b.textContent = t; b.style.cssText = 'font:600 12px/1 system-ui;padding:8px 11px;border-radius:10px;border:1px solid rgba(185,255,74,.45);background:rgba(10,20,14,.7);color:#e8ffd0'; b.onclick = f; bar2.append(b); return b; };
 for (const k of Object.keys(THEMES)) btn(THEMES[k].name, () => TS && TS.setTheme(k));
+for (const [k, n] of [['wood', '나무'], ['bronze', '청동'], ['silver', '은'], ['gold', '금']]) btn('상자 ' + n, () => TS && TS.setGrade(k));
 btn('공격 (체력 −1/6)', () => TS && TS.setHP(TS.hp - 1 / 6)); btn('쓰러뜨림 보기', () => TS && TS.setState('dead')); btn('다시 놓기', () => TS && TS.setState('guard')); document.body.append(bar2);
 const bar = document.querySelector('#load i');
 document.querySelector('#tog').onclick = () => { const v = document.querySelector('#view'); v.classList.toggle('shut'); document.querySelector('#tog').textContent = v.classList.contains('shut') ? '설정 펴기 ▾' : '설정 접기 ▴'; };

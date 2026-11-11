@@ -2,14 +2,14 @@
    · 카메라 · 화면 밝기 처리 · 기체 · 조종은 새 맵(map2)과 같은 것 · 섬만 새것 */
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
-import { makeBloom } from '../core/hangar/bloom.js?v=11111214';
-import { makeForgeShip, forgeList } from './forgeship.js?v=11111214';
-import { makePerf } from './perf.js?v=11111214';
-import { makeFlight, FLY, padZone } from './flight.js?v=11111214';
-import { buildIsle } from './isle.js?v=11111214';
-import { makeInputBuffer } from './inbuf.js?v=11111214';
-import { makeLiftFx } from './liftfx.js?v=11111214';
-import { gate4 } from './gates.js?v=11111214';
+import { makeBloom } from '../core/hangar/bloom.js?v=11111308';
+import { makeForgeShip, forgeList } from './forgeship.js?v=11111308';
+import { makePerf } from './perf.js?v=11111308';
+import { makeFlight, FLY, padZone } from './flight.js?v=11111308';
+import { buildIsle } from './isle.js?v=11111308';
+import { makeInputBuffer } from './inbuf.js?v=11111308';
+import { makeLiftFx } from './liftfx.js?v=11111308';
+import { gate4 } from './gates.js?v=11111308';
 
 const $ = s => document.querySelector(s);
 export async function start(canvas, onProgress = () => {}, opt = {}) {   /* opt.layout: 섬 배치 (없으면 섬 하나 시험 · 초원 한 조각 체험판 = meadowsector.js) */
@@ -116,7 +116,7 @@ export async function start(canvas, onProgress = () => {}, opt = {}) {   /* opt.
       for (let j = 0; j < VG; j++) for (let i = 0; i < VG; i++) { let t = 0, n = 0; for (let o = -2; o <= 2; o++) { const jj = j + o; if (jj >= 0 && jj < VG) { t += visB[jj * VG + i]; n++; } } visA[j * VG + i] = t / n; } }   /* 번지게 */
     const px = visTex.image.data; for (let k = 0; k < VG * VG; k++) { visT[k] += (visA[k] - visT[k]) * .45; px[k * 4] = visT[k] * 255 | 0; }   /* 앞 장면과 섞어 들썩임 없앰 */ visTex.needsUpdate = true; isle.setSight(visTex, VO[0], VO[1], VS, 1); };
   /* 연습 표적 4대: 1층 부쉬 안 · 1층 트인 풀밭 · 2층 돌탑 둘레 · 3층 하늘 — 보이는지 시험용 (안 보이면 스르륵 사라짐) */
-  const ext = opt.extra ? await opt.extra({ THREE, scene, isle, K, FS, LV }) : null;   /* 섬 위에 따로 얹는 것 (보물 장소 등) */
+  const ext = opt.extra ? await opt.extra({ THREE, scene, camera, isle, K, FS, LV }) : null;   /* 섬 위에 따로 얹는 것 (보물 장소 등) */
   const dummies = (opt.dummies ? opt.dummies(isle) : [[0, 6.5, 0, 0], [0, -2, 6, 3], [1, 11, -1.5, 4.5], [2, 0, 0, 11]]).map(([L, cx, cz, r, big], k) => {   /* big: 센 몹 자리 (크고 붉게) */
     const g = new THREE.Group(), c = big ? [1, .32, .22] : LC[L], m = new THREE.MeshBasicMaterial({ color: new THREE.Color(...c).multiplyScalar(1.3), transparent: true }); if (big) g.scale.setScalar(1.7);
     const body = new THREE.Mesh(new THREE.ConeGeometry(.5, 1.6, 6).rotateX(-Math.PI / 2), m), ring = new THREE.Mesh(new THREE.RingGeometry(.9, 1.05, 32).rotateX(-Math.PI / 2), m); ring.position.y = -.3; g.add(body, ring); scene.add(g);

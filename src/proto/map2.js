@@ -4,18 +4,18 @@
    · 화면 무게 재기 칸에서 부분마다 끄고 켜며 폰에서 프레임을 숫자로 확인 */
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
-import { makeBloom } from '../core/hangar/bloom.js?v=11111214';
-import { makePad } from '../core/hangar/pad.js?v=11111214';
-import { makeMag } from '../core/hangar/mag.js?v=11111214';
-import { makeForgeShip, forgeList } from './forgeship.js?v=11111214';
-import { makeGoldStar } from './goldstar.js?v=11111214';
-import { makeArena, SPEED, WAVE_R0 } from './arena.js?v=11111214';
-import { makeGuardians, GUARD } from './guardian.js?v=11111214';
-import { makeBirth, BIRTH } from './birth.js?v=11111214';
-import { makePerf } from './perf.js?v=11111214';
-import { autoMerge } from './automerge.js?v=11111214';
+import { makeBloom } from '../core/hangar/bloom.js?v=11111308';
+import { makePad } from '../core/hangar/pad.js?v=11111308';
+import { makeMag } from '../core/hangar/mag.js?v=11111308';
+import { makeForgeShip, forgeList } from './forgeship.js?v=11111308';
+import { makeGoldStar } from './goldstar.js?v=11111308';
+import { makeArena, SPEED, WAVE_R0 } from './arena.js?v=11111308';
+import { makeGuardians, GUARD } from './guardian.js?v=11111308';
+import { makeBirth, BIRTH } from './birth.js?v=11111308';
+import { makePerf } from './perf.js?v=11111308';
+import { autoMerge } from './automerge.js?v=11111308';
 import { makeGlow } from '../preview/glow.js';
-import { makeFlight, FLY, PADZ, padZone } from './flight.js?v=11111214';
+import { makeFlight, FLY, PADZ, padZone } from './flight.js?v=11111308';
 
 const $ = s => document.querySelector(s), clamp = THREE.MathUtils.clamp, HOVER = FLY.HOVER;
 const R = 240, NB = 10, GAPH = 5.6, BASE_D = 0;     /* 맵 반지름 · 기지 수 · 벽 틈 반 폭(= 기지 반지름) · 기지 가운데는 벽 선 위 (앞 절반은 맵 안, 뒤 절반은 맵 밖 · 사용자 2026-11-06) */
