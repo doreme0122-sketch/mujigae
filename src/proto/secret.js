@@ -5,7 +5,7 @@
      모든 비밀길에 똑같은 무늬 → 한 번 배우면 '이게 있으면 밑은 무조건 터널' (사용자)
    · 청록 꽃: 비밀길 입구 부쉬에만 몇 송이 (판돌 빛과 같은 색 · 가까이 가야 보임) — 다른 부쉬엔 절대 없음 */
 import * as THREE from 'three';
-import { noise2, smoothstep } from './islefield.js?v=11112336';
+import { noise2, smoothstep } from './islefield.js?v=11120129';
 
 export const SECRET = { FLOOR: -7.4, TOP: -1.2, WALL: 2.4, TEAL: [.22, .95, .8] };
 
@@ -58,7 +58,13 @@ function slab(x, y, z, Rs, seed) { const NR = 46, NS = 200, pos = [], gl = [], i
 
 export function buildSecret({ LO, F, hAt, U, GL }) {
   const rock = [], stone = [], obstacles = [], TB = []; if (!LO.secret) return { rock, stone, flowers: null, wind: null, decor: [] };
-  LO.secret.forEach((S, k) => { const T = tube(S, k * 7.3 + 1, hAt); rock.push(T.g, T.fg); TB.push({ ...T, w: S.w + .9, seed: k * 7.3 + 1 }); });
+  LO.secret.forEach((S, k) => { const T = tube(S, k * 7.3 + 1, hAt); rock.push(T.g, T.fg); TB.push({ ...T, w: S.w + .9, seed: k * 7.3 + 1 });
+    /* 입구 아치 테 (사용자 2026-11-12 · 그림 ⑤): 절벽 면에 박힌 큰 바위 덩이들이 아치를 두름 — 오래된 돌문 같지 않게 거칠고 크기가 저마다 다름 */
+    const P = T.P; for (const [e, n] of [[0, 1], [P.length - 1, P.length - 2]]) { const fx = P[e][0] - P[n][0], fz = P[e][1] - P[n][1], fl = Math.hypot(fx, fz) || 1, ux = fx / fl, uz = fz / fl, sx = -uz, sz = ux, wi = S.w + .9, Hh = SECRET.TOP - SECRET.FLOOR;
+      for (let i = 0; i <= 8; i++) { const th = i / 8 * Math.PI, sd = k * 31 + e * 7 + i, rx = 1.1 + .5 * Math.abs(noise2(sd, 1)), ry = .9 + .4 * Math.abs(noise2(sd, 2)), g = new THREE.BoxGeometry(rx * 2, ry * 2, 1.6 + .6 * Math.abs(noise2(sd, 3)), 2, 2, 2); g.deleteAttribute('uv');
+        const pa = g.attributes.position; for (let v = 0; v < pa.count; v++) { const a = pa.getX(v), b = pa.getY(v), c = pa.getZ(v), m = 1 + .22 * noise2(a * 1.7 + sd, b * 1.7 + c); pa.setXYZ(v, a * m, b * m, c * m); }
+        const cx = Math.cos(th) * (wi + .55), cy = SECRET.FLOOR - .2 + Math.sin(th) * (Hh + .5), M4 = new THREE.Matrix4().makeBasis(new THREE.Vector3(-Math.sin(th) * sx, Math.cos(th), -Math.sin(th) * sz), new THREE.Vector3(Math.cos(th) * sx, Math.sin(th), Math.cos(th) * sz), new THREE.Vector3(ux, 0, uz));
+        M4.setPosition(P[e][0] + sx * cx - ux * .35, cy, P[e][1] + sz * cx - uz * .35); g.applyMatrix4(M4); g.computeVertexNormals(); rock.push(g); } } });
   /* 둔덕 판돌: 협곡이 비밀길 위를 지나는 자리 (gorge.rune.t) 둔덕 꼭대기 한가운데 */
   const slabs = []; (F.gorges || []).forEach((C, gi) => { if (!C.rune) return; const [x, z] = F.gorgeAtI(gi, C.rune.t); let y = -99; for (let a = 0; a < 6.283; a += .4) for (const d of [0, 2, 4]) y = Math.max(y, hAt(x + Math.cos(a) * d, z + Math.sin(a) * d)); stone.push(slab(x, y - .15, z, 4.2, gi * 13 + 5));   /* 판돌 밑 가장 높은 땅에 맞춰 얹음 (울퉁불퉁한 둔덕에 묻히지 않게) */ slabs.push([x, y, z, gi]); });
   /* 판돌 둘레 틈 바람: 몇 초마다 한 번 옅은 바람 줄기가 틈에서 훅 새어 올라 흩어짐 (밑의 터널로 바람이 지나서 · 아는 사람에겐 확인 도장) */

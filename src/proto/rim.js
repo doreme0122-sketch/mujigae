@@ -6,11 +6,11 @@
    · 기지 안에선 판(계단 단 안쪽)과 출구 길만 다님 · 벽과 그 바깥은 막힘 (blocked) */
 import * as THREE from 'three';
 import { makePad } from '../core/hangar/pad.js';
-import { makeGoldStar } from './goldstar.js?v=11112336';
-import { makeArena } from './arena.js?v=11112336';
-import { makeGuardians, GUARD } from './guardian.js?v=11112336';
-import { FLY } from './flight.js?v=11112336';
-import { autoMerge } from './automerge.js?v=11112336';
+import { makeGoldStar } from './goldstar.js?v=11120129';
+import { makeArena } from './arena.js?v=11120129';
+import { makeGuardians, GUARD } from './guardian.js?v=11120129';
+import { FLY } from './flight.js?v=11120129';
+import { autoMerge } from './automerge.js?v=11120129';
 
 const SHIPL = 2.9, BS = 2 / SHIPL, BASE_Y = .42, GAPH = 5.6;
 function skyTone(root) { root.traverse(o => { if (!o.isMesh) return; for (const m of (Array.isArray(o.material) ? o.material : [o.material])) { if (!m || !m.color || m.userData.toned || m.isShaderMaterial || m.isMeshBasicMaterial) continue;

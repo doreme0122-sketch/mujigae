@@ -2,16 +2,16 @@
    · 카메라 · 화면 밝기 처리 · 기체 · 조종은 새 맵(map2)과 같은 것 · 섬만 새것 */
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
-import { makeBloom } from '../core/hangar/bloom.js?v=11112336';
-import { makeForgeShip, forgeList } from './forgeship.js?v=11112336';
-import { makePerf } from './perf.js?v=11112336';
-import { makeFlight, FLY, padZone } from './flight.js?v=11112336';
-import { buildIsle } from './isle.js?v=11112336';
-import { makeInputBuffer } from './inbuf.js?v=11112336';
-import { makeLiftFx } from './liftfx.js?v=11112336';
-import { gate4 } from './gates.js?v=11112336';
-import { tunnelSound } from './secret.js?v=11112336';
-import { audio as sfxCtx, unlock as sfxUnlock } from './sfx.js?v=11112336';
+import { makeBloom } from '../core/hangar/bloom.js?v=11120129';
+import { makeForgeShip, forgeList } from './forgeship.js?v=11120129';
+import { makePerf } from './perf.js?v=11120129';
+import { makeFlight, FLY, padZone } from './flight.js?v=11120129';
+import { buildIsle } from './isle.js?v=11120129';
+import { makeInputBuffer } from './inbuf.js?v=11120129';
+import { makeLiftFx } from './liftfx.js?v=11120129';
+import { gate4 } from './gates.js?v=11120129';
+import { tunnelSound } from './secret.js?v=11120129';
+import { audio as sfxCtx, unlock as sfxUnlock } from './sfx.js?v=11120129';
 
 const $ = s => document.querySelector(s);
 export async function start(canvas, onProgress = () => {}, opt = {}) {   /* opt.layout: 섬 배치 (없으면 섬 하나 시험 · 초원 한 조각 체험판 = meadowsector.js) */
@@ -75,6 +75,7 @@ export async function start(canvas, onProgress = () => {}, opt = {}) {   /* opt.
   /* 층 바꾸기는 너그럽게 (사용자: 걸려서 멈추는 일이 없어야): 그 자리 위·아래에 돌탑·다리가 있으면 거절하지 않고 가까운 빈 곳(2m 안)으로 비켜 주며 바꿈 · 빈 곳이 없을 때만 빨갛게 깜빡 */
   const bodyFree = (x, z, L) => { if (isle.blocked(x, z, L)) return false; for (let k = 0; k < 8; k++) if (isle.blocked(x + Math.cos(k * .785) * FLY.R * .55, z + Math.sin(k * .785) * FLY.R * .55, L)) return false; return true; };
   const tryLayer = d => { if (LV.cur !== LV.to) return; const to = LV.cur + d; if (to < 0 || to > 2) { LV.flash = 1; return; }
+    if (d > 0 && secNow) { LV.flash = 1; shake = .35; bump(); return; }   /* 비밀길 안: 천장에 막혀 위층으로 못 올라감 (사용자 2026-11-12) — 쿵 소리 + 화면 살짝 흔들림 · 나가는 길은 양쪽 입구뿐 */
     let spot = bodyFree(FS.x, FS.z, to) ? [FS.x, FS.z] : null;
     for (let r = .3; !spot && r <= 2; r += .3) for (let k = 0; k < 16; k++) { const x = FS.x + Math.cos(k * .3927) * r, z = FS.z + Math.sin(k * .3927) * r; if (bodyFree(x, z, to) && bodyFree(x, z, LV.cur)) { spot = [x, z]; break; } }
     if (!spot) { LV.flash = 1; return; }
@@ -101,11 +102,13 @@ export async function start(canvas, onProgress = () => {}, opt = {}) {   /* opt.
     for (let j = 0; j < VM; j++) for (let i = 0; i < VN; i++) { const x = VX0 + i * VC, z = VZ0 + j * VC; let b = isle.sightBlock(x, z, L) ? 1 : 0;
       if (!b && L === 0) { const k = isle.brushZone(x, z); if (k >= 0) b = 2 + k; }
       A[j * VN + i] = b; } return A; });
-  /* 동굴 안 지도 (0.5m 칸 · 사용자 2026-11-11: 산맥 밖에서 붙으면 산맥 안이 비쳐 보임 → 산맥에 둘러싸인 골짜기 · 보물방 · 비밀길은 안 보이면 완전히 까맣게) */
-  const IC = .5, INX = Math.ceil(((opt.layout ? BOX[1] - BOX[0] : 60)) / IC) + 1, INZ = Math.ceil(((opt.layout ? BOX[3] - BOX[2] : 56)) / IC) + 1, inner = new Uint8Array(INX * INZ);
-  const innerAt = (x, z) => { const i = Math.round((x - VX0) / IC), j = Math.round((z - VZ0) / IC); return i < 0 || j < 0 || i >= INX || j >= INZ ? 0 : inner[j * INX + i]; };
   /* 비밀길 안 시야: 터널 띠 밖은 모두 가림 (사용자: 터널 안에선 터널 속만 보이고 나머지는 까맣게) */
-  const occT = LO.secret ? (() => { const A = new Uint8Array(VN * VM); for (let j = 0; j < VM; j++) for (let i = 0; i < VN; i++) A[j * VN + i] = isle.secretIn(VX0 + i * VC, VZ0 + j * VC) ? 0 : 1; return A; })() : null; let secNow = false, caveNow = 0; const TSND = LO.secret ? tunnelSound(() => { try { return sfxCtx(); } catch (e) { return null; } }) : null; let underK = 0; if (TSND) sfxUnlock();
+  const occT = LO.secret ? (() => { const A = new Uint8Array(VN * VM); for (let j = 0; j < VM; j++) for (let i = 0; i < VN; i++) A[j * VN + i] = isle.secretIn(VX0 + i * VC, VZ0 + j * VC) ? 0 : 1; return A; })() : null; let secNow = false, caveNow = 0, shake = 0;
+  /* 천장에 부딪힘: 낮은 '쿵' (흙 · 바위가 받는 둔한 소리) + 부스스 흙 떨어지는 소리 */
+  const bump = () => { let A; try { A = sfxCtx(); if (A.state === 'suspended') A.resume(); } catch (e) { return; } const t = A.currentTime + .01, o = A.createOscillator(), g = A.createGain(); o.frequency.setValueAtTime(95, t); o.frequency.exponentialRampToValueAtTime(42, t + .18);
+    g.gain.setValueAtTime(.0001, t); g.gain.linearRampToValueAtTime(.5, t + .008); g.gain.exponentialRampToValueAtTime(.0001, t + .32); o.connect(g); g.connect(A.destination); o.start(t); o.stop(t + .4);
+    const n = A.createBuffer(1, A.sampleRate * .5 | 0, A.sampleRate), d = n.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / d.length, 2) * (Math.random() < .3 ? 1 : .2);
+    const s = A.createBufferSource(), f = A.createBiquadFilter(), g2 = A.createGain(); s.buffer = n; f.type = 'bandpass'; f.frequency.value = 2400; f.Q.value = .8; g2.gain.value = .12; s.connect(f); f.connect(g2); g2.connect(A.destination); s.start(t + .05); }; const TSND = LO.secret ? tunnelSound(() => { try { return sfxCtx(); } catch (e) { return null; } }) : null; let underK = 0; if (TSND) sfxUnlock();
   const occAt = (A, x, z) => { const i = Math.round((x - VX0) / VC), j = Math.round((z - VZ0) / VC); return i < 0 || j < 0 || i >= VN || j >= VM ? 0 : A[j * VN + i]; };
   const NR = 256, VG = 144, VS = 56, VO = [-28, -28], cs0 = VS / VG, visA = new Float32Array(VG * VG), visB = new Float32Array(VG * VG), visT = new Float32Array(VG * VG), visTex = new THREE.DataTexture(new Uint8Array(VG * VG * 4), VG, VG, THREE.RGBAFormat);
   visTex.magFilter = visTex.minFilter = THREE.LinearFilter; visTex.needsUpdate = true;
@@ -113,13 +116,9 @@ export async function start(canvas, onProgress = () => {}, opt = {}) {   /* opt.
   const ray = (L, x0, z0, dx, dz, R, me) => { const A = L === 0 && secNow && occT ? occT : occ[L]; for (let d = .15; d < R; d += .15) { const o = occAt(A, x0 + dx * d, z0 + dz * d); if (o === 1 || (o >= 2 && o - 2 !== me)) return d; } return R; };
   const myZone = L => L === 0 ? isle.brushZone(FS.x, FS.z) : -1;
   let Rs = VR[1]; const D = new Float32Array(NR);
-  /* 기체가 가려졌나: 기체 → 카메라 사이를 24번 짚어 땅(산)이 그 높이보다 솟았는지 · 머리 위 바위 높이 사이를 지나는지 · 동굴 천장 밑이면 가려짐 */
-  let cutR = 0; const inSecret = () => LV.cur === 0 && isle.where && isle.where(FS.x, FS.z) === 'secret';   /* 비밀길 터널 안 (1층) */
-  const hidden = () => { if (isle.where && isle.where(FS.x, FS.z) === 'tunnel') return true; if (inSecret()) return true; const cx = camera.position.x, cy = camera.position.y, cz = camera.position.z;
-    for (let i = 1; i <= 24; i++) { const k = i / 24 * .92, x = FS.x + (cx - FS.x) * k, y = LV.y + (cy - LV.y) * k, z = FS.z + (cz - FS.z) * k; if (isle.H(x, z) > y - .3) return true; const q = isle.roof && isle.roof(x, z); if (q && y > q[0] - .3 && y < q[1] + .3) return true; } return false; };   /* 땅 · 머리 위 바위(동굴 천장 · 유적 · 떠 있는 바위 · 골짜기 바위) */
   /* 그 자리가 지금 보이는지 (0~1 · 세상 좌표) — 섬 밖에 얹은 것(보물 장소 등)도 같은 시야를 따르게 */
   const seenAt = (x, z) => { if (secNow && !isle.secretIn(x, z)) return 0; if (caveNow && isle.caveAt(x, z) !== caveNow) return 0; const i = Math.floor((x - VO[0]) / cs0), j = Math.floor((z - VO[1]) / cs0); return i < 0 || j < 0 || i >= VG || j >= VG ? 0 : visT[j * VG + i]; };
-  const castSight = () => { const L = LV.f < .5 ? LV.cur : LV.to, me = myZone(L); secNow = L === 0 && isle.where && isle.where(FS.x, FS.z) === 'secret'; isle.setBlack && isle.setBlack(secNow ? 1 : 0); caveNow = !secNow && isle.caveAt ? isle.caveAt(FS.x, FS.z) : 0; isle.setCave && isle.setCave(caveNow, LV.y + 1.3);   /* 걷는 높이: 기체 바로 위 (그 위 산 · 지붕 · 유적 윗부분은 내 화면에서 걷힘 — 터널처럼 양옆 벽만) */   /* 보물 동굴 안: 지붕 · 동굴 밖은 그리지 않음 */ Rs += (VR[L] - Rs) * .25; const R = Rs;
+  const castSight = () => { const L = LV.f < .5 ? LV.cur : LV.to, me = myZone(L); secNow = L === 0 && isle.where && isle.where(FS.x, FS.z) === 'secret'; isle.setBlack && isle.setBlack(secNow ? 1 : 0); caveNow = !secNow && isle.caveAt ? isle.caveAt(FS.x, FS.z) : 0; isle.setCave && isle.setCave(caveNow);   /* 걷는 높이: 3층 고정 · 카메라 쪽 벽은 밑동만 (층과 상관없이 같은 모습) */   /* 보물 동굴 안: 지붕 · 동굴 밖은 그리지 않음 */ Rs += (VR[L] - Rs) * .25; const R = Rs;
     if (opt.layout) { const nx = Math.round((FS.x - VS / 2) / cs0) * cs0, nz = Math.round((FS.z - VS / 2) / cs0) * cs0, di = Math.round((nx - VO[0]) / cs0), dj = Math.round((nz - VO[1]) / cs0);   /* 넓은 맵: 시야 지도 창이 기체를 따라감 (칸 단위로 옮기고 앞 장면 값도 같이 옮김) */
       if (di || dj) { visB.set(visT); for (let j = 0; j < VG; j++) for (let i = 0; i < VG; i++) { const ii = i + di, jj = j + dj; visT[j * VG + i] = ii >= 0 && jj >= 0 && ii < VG && jj < VG ? visB[jj * VG + ii] : 0; } VO[0] = nx; VO[1] = nz; } }
     for (let k = 0; k < NR; k++) { const an = k / NR * 6.2831853; D[k] = ray(L, FS.x, FS.z, Math.cos(an), Math.sin(an), R, me); }
@@ -135,7 +134,12 @@ export async function start(canvas, onProgress = () => {}, opt = {}) {   /* opt.
   const dummies = (opt.dummies ? opt.dummies(isle) : [[0, 6.5, 0, 0], [0, -2, 6, 3], [1, 11, -1.5, 4.5], [2, 0, 0, 11]]).map(([L, cx, cz, r, big], k) => {   /* big: 센 몹 자리 (크고 붉게) */
     const g = new THREE.Group(), c = big ? [1, .32, .22] : LC[L], m = new THREE.MeshBasicMaterial({ color: new THREE.Color(...c).multiplyScalar(1.3), transparent: true }); if (big) g.scale.setScalar(1.7);
     const body = new THREE.Mesh(new THREE.ConeGeometry(.5, 1.6, 6).rotateX(-Math.PI / 2), m), ring = new THREE.Mesh(new THREE.RingGeometry(.9, 1.05, 32).rotateX(-Math.PI / 2), m); ring.position.y = -.3; g.add(body, ring); scene.add(g);
-    return { g, m, L, cx, cz, r, k, a: 1 }; });
+    /* 가려지면 실루엣 (사용자 2026-11-12): 산 · 유적 뒤에 있어도 시야 안이면 빛 테두리로 비쳐 보임 · 적은 빨강 (나는 내 색) */
+    const xm = new THREE.ShaderMaterial({ transparent: true, depthWrite: false, depthFunc: THREE.GreaterDepth, uniforms: { uA: { value: 1 } },
+      vertexShader: 'varying vec3 vN, vV; void main(){ vec4 mv = modelViewMatrix * vec4(position, 1.); vN = normalize(normalMatrix * normal); vV = normalize(-mv.xyz); gl_Position = projectionMatrix * mv; }',
+      fragmentShader: 'uniform float uA; varying vec3 vN, vV; void main(){ float f = 1. - abs(dot(normalize(vN), normalize(vV))), rim = f * f; gl_FragColor = vec4(mix(vec3(1., .28, .24), vec3(1., .75, .7), rim), (.35 + rim * .65) * uA); }' });
+    const xb = new THREE.Mesh(body.geometry, xm); xb.renderOrder = 60; g.add(xb);
+    return { g, m, xm, L, cx, cz, r, k, a: 1 }; });
   const seeDummy = D => { const L = LV.f < .5 ? LV.cur : LV.to, x = D.g.position.x, z = D.g.position.z, dx = x - FS.x, dz = z - FS.z, dist = Math.hypot(dx, dz);
     const me = myZone(L); if (D.L === 0 && me >= 0 && isle.brushZone(x, z) === me) return true;   /* 같은 부쉬 안이면 보임 */
     if (D.L === 0 && inBush(x, z) && dist > 2.2) return false;                  /* 부쉬 안: 바로 옆이 아니면 어느 층에서도 안 보임 */
@@ -190,7 +194,7 @@ export async function start(canvas, onProgress = () => {}, opt = {}) {   /* opt.
     if (look.id === null) { const k = Math.min(1, dt * 3.5); look.x -= look.x * k; look.z -= look.z * k; }
     const sp = fly.children[0].position; { const k = Math.min(1, dt * 4); cam.x += (sp.x + FS.vx * .25 - cam.x) * k; cam.z += (sp.z + FS.vz * .25 - cam.z) * k; }
     { const cf = [.85, 1, 1.3], k = LV.f * LV.f * (3 - 2 * LV.f), f = cf[LV.cur] + (cf[LV.to] - cf[LV.cur]) * k; camD += (cfg.dist * CAMK * f - camD) * Math.min(1, dt * 3); }
-    const a = cfg.ang * Math.PI / 180, vx = cam.x + look.x, vz = cam.z + look.z, cy = LV.y; camera.position.set(vx, cy + camD * Math.sin(a), vz + camD * Math.cos(a)); camera.lookAt(vx, cy, vz); camera.updateMatrixWorld();
+    const a = cfg.ang * Math.PI / 180, vx = cam.x + look.x, vz = cam.z + look.z, cy = LV.y; shake = Math.max(0, shake - dt * 1.6); const sh = shake * shake * .5, jx = (Math.random() - .5) * sh, jy = (Math.random() - .5) * sh; camera.position.set(vx + jx, cy + camD * Math.sin(a) + jy, vz + camD * Math.cos(a)); camera.lookAt(vx + jx, cy + jy, vz); camera.updateMatrixWorld();
     if (TSND) { underK += ((secNow && isle.inGorge(FS.x, FS.z) ? 1 : 0) - underK) * Math.min(1, dt * 2); TSND(secNow, underK); }   /* 터널 소리: 협곡 밑에선 위 싸움 소리가 먹먹하게 */
     isle.sky.position.copy(camera.position); isle.update(t); ext?.update?.(t, dt, { x: FS.x / K, z: FS.z / K, L: LV.cur, cam: camera.position, blk: secNow, cave: caveNow, seen: seenAt });   /* 기체를 가리는 지형을 투명하게 걷던 것은 없앰 (사용자 2026-11-11 밤: 지형이 헷갈림) — 산 뒤에 숨은 내 기체는 빛 테두리(xray)로 보임 */    /* 기체를 가리는 건 투명하게 (사용자 2026-11-11) · 비밀 터널 안: 천장과 카메라 쪽 벽까지 걷도록 기준을 터널 바닥 가까이로 (바닥은 남김) */   /* 기체와 카메라 사이 산 · 동굴 천장을 내 화면에서만 걷어 냄 · 사용자 2026-11-11: 기체가 가려질 때만 · 가리는 부분만 (기체와 카메라 사이 9m 원기둥) · 완전히 투명 */ xrayM.uniforms.uT.value = t;
     /* 바람 고리 (1층이면 땅에 닿아 풀 · 꽃을 밂 · 2 · 3층은 그 높이 공중에서만) · 못 바꾸면 층 막대가 빨갛게 깜빡 */
@@ -212,7 +216,7 @@ export async function start(canvas, onProgress = () => {}, opt = {}) {   /* opt.
     { const w = isle.where(FS.x, FS.z), ly = LN[LV.f < .5 ? LV.cur : LV.to].split(' · ')[0];   /* 동굴 입구 · 골짜기길 · 공터 */
       if (w === 'tunnel') say.textContent = ly + ' · 동굴 입구'; else if (w === 'secret' && LV.cur === 0) say.textContent = '1층 · 비밀길'; else if (w === 'gorge') say.textContent = ly + ' · 산맥 사이 골짜기길'; else if (w === 'basin') say.textContent = ly + ' · 공터 · 보물 자리 (아직 비어 있음)'; }
     castSight();   /* 매 장면 (깜빡임 없게) */
-    for (const D of dummies) { const a = t * .25 + D.k * 1.7; D.g.position.set(D.cx + Math.cos(a) * D.r, LY[D.L] + Math.sin(t * 1.3 + D.k) * .08, D.cz + Math.sin(a) * D.r); D.g.rotation.y = -a; D.a += ((seeDummy(D) && !(secNow && !isle.secretIn(D.g.position.x, D.g.position.z)) && !(caveNow && isle.caveAt(D.g.position.x, D.g.position.z) !== caveNow) ? 1 : 0) - D.a) * Math.min(1, dt * 6); D.m.opacity = D.a; D.g.visible = D.a > .02; }
+    for (const D of dummies) { const a = t * .25 + D.k * 1.7; D.g.position.set(D.cx + Math.cos(a) * D.r, LY[D.L] + Math.sin(t * 1.3 + D.k) * .08, D.cz + Math.sin(a) * D.r); D.g.rotation.y = -a; D.a += ((seeDummy(D) && !(secNow && !isle.secretIn(D.g.position.x, D.g.position.z)) && !(caveNow && isle.caveAt(D.g.position.x, D.g.position.z) !== caveNow) ? 1 : 0) - D.a) * Math.min(1, dt * 6); D.m.opacity = D.a; D.xm.uniforms.uA.value = D.a; D.g.visible = D.a > .02; }
     { const hid = LV.cur === 0 && LV.f >= 1 && inBush(FS.x, FS.z); fly.userData.setGhost(hid, .55);   /* 숨은 내 기체: 너무 흐리지 않게 (어디 있는지는 보이게) */ if (hid) say.textContent = '1층 · 부쉬에 숨는 중'; }   /* 내가 부쉬에 숨으면 내 화면에서만 반투명 */
     FG.preRender(camera);
     const c1 = performance.now(); lfx.render(camera, bloom.scene); acc.calls = renderer.info.render.calls; acc.tris = renderer.info.render.triangles;

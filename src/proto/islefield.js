@@ -92,20 +92,33 @@ export function makeField(L = SPOT) {
   const gorge = (x, z) => { let r = { d: -1e9, t: 0, i: 0 }; for (let i = 0; i < GS.length; i++) { if (GS.length > 1 && far(i, x, z, 70)) continue; const c = gorgeI(i, x, z); if (c.d > r.d) r = c; } return r; };
   const basinI = (i, x, z) => { const b = GS[i].g.basin; return b ? circ(x, z, b[0], b[1], b[2]) + 2.2 * fbm(x * .08, z * .08, 3) : -99; };
   const basinD = (x, z) => { let d = -99; for (let i = 0; i < GS.length; i++) d = Math.max(d, basinI(i, x, z)); return d; };
-  const openD = (x, z) => GS.length ? Math.max(gorge(x, z).d, basinD(x, z)) : -99;   /* 골짜기 · 공터 안 (+) */
+  /* 비밀길 입구 틈 (L.notch: [x, z, r]…): 남쪽(카메라 쪽)을 보는 절벽 밑동을 둥글게 파 낸 작은 빈터 → 터널 입구 아치가 정면으로 보임 (사용자 2026-11-12) */
+  const NOT = L.notch || [], notchD = (x, z) => { let d = -99; for (const [cx, cz, r] of NOT) { if (Math.abs(x - cx) > r + 12 || Math.abs(z - cz) > r + 12) continue; d = Math.max(d, circ(x, z, cx, cz, r) + .6 * fbm(x * .4, z * .4, 2)); } return d; };
+  const openD = (x, z) => GS.length ? Math.max(gorge(x, z).d, basinD(x, z), NOT.length ? notchD(x, z) : -99) : -99;   /* 골짜기 · 공터 · 입구 틈 안 (+) */
   /* 산맥 (L.mount: { blobs: [[x, z, r]…], peak }) — 3층도 못 넘는 땅의 테두리 (사용자 2026-11-11)
      · 고른 벽이 아니라 들쭉날쭉한 봉우리 · 사이사이 안장처럼 꺼진 곳 · 층진 바위 턱 · 골짜기와 공터 쪽은 깎아지른 벽 */
   const MB = L.mount;
   const mountD = (x, z, raw = false) => { let d = -99; for (const [cx, cz, r] of MB.blobs) { if (Math.abs(x - cx) > r + 20 || Math.abs(z - cz) > r + 20) continue; d = smax(d, circ(x, z, cx, cz, r), 8); } return raw ? d : d + 5 * fbm(x * .05, z * .05, 3); };
   const mountK = (x, z) => { if (!MB) return 0; const d = mountD(x, z); if (d < -2) return 0;
     return smoothstep(-2, MB.ramp || 14, d) * (1 - smoothstep(-(MB.edge || 9), .5, openD(x, z))); };   /* edge: 골짜기 · 공터 둘레를 얼마나 깎는지 (얇은 산맥이면 작게) */   /* ramp: 산이 솟는 거리 (작을수록 절벽처럼 가파름) */
-  const mountH = (x, z) => { const k = mountK(x, z); if (k <= 0) return 0;
+  const mountHraw = (x, z) => { const k = mountK(x, z); if (k <= 0) return 0;
     const rid = Math.max(0, 1 - Math.abs(fbm(x * .03 + 3, z * .03 - 5, 4)) * 1.8), r2 = Math.max(0, 1 - Math.abs(fbm(x * .07 - 11, z * .07 + 4, 3)) * 2);   /* 능선 둘: 큰 봉우리 줄기 · 작은 뾰족 봉우리 */
     const mh = k * MB.peak * (.32 + .62 * rid * rid + .22 * r2 * r2 * rid + .1 * fbm(x * .16, z * .16, 3)), lf = MB.lowFront ? frontK(x, z) : 0;   /* 고른 벽이 아니라 솟은 봉우리와 꺼진 안장 */
     const m2 = lf > 0 && mh > FCAP ? FCAP + (mh - FCAP) * (1 - .92 * lf) : mh, nk = MB.lowFront ? nearK(x, z) * smoothstep(.3, .65, k) : 0;
     let out = Math.max(m2, MINH * nk);
     if (MB.solid) { const d = mountD(x, z, true) + .8 * fbm(x * .3, z * .3, 2), sk = smoothstep(.5, 4.5, d) * (1 - smoothstep(-(MB.edge || 9) * .5, .5, openD(x, z))); if (sk > 0) out = Math.max(out, MB.solid * sk * (1 + .12 * fbm(x * .09 + 5, z * .09, 3)) + 3 * Math.max(0, fbm(x * .2, z * .2, 2)) * sk); }   /* solid: 얇은 산맥도 3층을 못 넘는 벽으로 (한 조각 체험판 · 산맥을 얇게 하기로 해서) */
     return out; };   /* 길 둘레 벽은 3층보다 낮은 안장이 없게 (사용자 2026-11-11: 들어가자마자 왼쪽 3층으로 빠져나갈 수 있었음) */
+  /* 북쪽 비탈 자동 완만 (사용자 2026-11-12 · 그림 확인): 카메라는 남쪽(+z) 위에서 45°로 내려다봄 → 산의 북쪽(−z) 면이 45°보다 가파르면 그 뒤가 가려짐
+     산 높이를 격자로 한 번 구워 두고, 남쪽에서 북쪽으로 훑으며 '남쪽 이웃 높이 − 거리 × NS' 아래로는 안 떨어지게 채움 → 북쪽 면은 늘 완만한 비탈 · 남쪽 절벽은 그대로
+     골짜기 · 보물방 · 비밀길 입구 틈(열린 곳)은 채우지 않음 (동굴 안은 동굴 보기 규칙이 따로 맡음) · 막힘 · 시야 · 땅 모양이 모두 같은 격자를 씀 */
+  const NS = 1; let MG; const bakeMG = () => { if (!MB || !L.box || MB.north === false) return null; const [bx0, bx1, bz0, bz1] = L.box, C = .5, W = Math.ceil((bx1 - bx0) / C) + 1, D = Math.ceil((bz1 - bz0) / C) + 1, g = new Float32Array(W * D);
+    for (let j = 0; j < D; j++) for (let k = 0; k < W; k++) { const x = bx0 + k * C, z = bz0 + j * C; g[j * W + k] = mountHraw(x, z); }
+    const raw = g.slice(), dg = NS * C, dd = NS * C * Math.SQRT2;   /* 남쪽 세 이웃(바로 남 · 남서 · 남동)에서 부채꼴로 내려옴 → 줄무늬 없이 둥근 비탈 */
+    for (let j = D - 2; j >= 0; j--) for (let k = 0; k < W; k++) { const q = j * W + k, s0 = q + W, c = Math.max(g[s0] - dg, k > 0 ? g[s0 - 1] - dd : 0, k < W - 1 ? g[s0 + 1] - dd : 0); if (c <= g[q] + .01) continue; if (openD(bx0 + k * C, bz0 + j * C) > -1.5) continue; g[q] = c; }
+    for (let j = 0; j < D; j++) { const row = new Float32Array(W); for (let k = 0; k < W; k++) { let a = 0, n = 0; for (let t = -3; t <= 3; t++) { const kk = Math.min(W - 1, Math.max(0, k + t)); a += g[j * W + kk] - raw[j * W + kk]; n++; } row[k] = a / n; } for (let k = 0; k < W; k++) g[j * W + k] = raw[j * W + k] + row[k]; }   /* 채운 양만 옆으로 살짝 고르게 */
+    return { g, W, D, C, bx0, bz0 }; };
+  const mountH = (x, z) => { if (MG === undefined) MG = bakeMG(); if (!MG) return mountHraw(x, z); const u = (x - MG.bx0) / MG.C, w = (z - MG.bz0) / MG.C; if (u < 0 || w < 0 || u >= MG.W - 1 || w >= MG.D - 1) return mountHraw(x, z); const i = u | 0, j = w | 0, a = u - i, b = w - j, g = MG.g, W = MG.W, q = j * W + i;
+    return (g[q] * (1 - a) + g[q + 1] * a) * (1 - b) + (g[q + W] * (1 - a) + g[q + W + 1] * a) * b; };
   /* 카메라 쪽 벽 낮추기 (사용자 2026-11-11: 길이 옆으로 휘어 벽이 카메라와 기체 사이에 오는 곳은 3층을 겨우 못 넘을 만큼만 · 먼 쪽 벽은 높고 뾰족하게 그대로)
      카메라는 +z 쪽에서 내려다봄 → 길(골짜기 · 공터)보다 +z 쪽에 있는 산은 높이를 3층 + 여유까지로 누름 */
   const FCAP = LAYERS[2] + CLEAR + 2.6 - Y.MEADOW, MINH = LAYERS[2] + CLEAR + 1.4 - Y.MEADOW;
