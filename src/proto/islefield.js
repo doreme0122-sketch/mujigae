@@ -87,7 +87,7 @@ export function makeField(L = SPOT) {
      · 고른 벽이 아니라 들쭉날쭉한 봉우리 · 사이사이 안장처럼 꺼진 곳 · 층진 바위 턱 · 골짜기와 공터 쪽은 깎아지른 벽 */
   const MB = L.mount;
   const mountK = (x, z) => { if (!MB) return 0; let d = -99; for (const [cx, cz, r] of MB.blobs) d = smax(d, circ(x, z, cx, cz, r), 8); d += 5 * fbm(x * .05, z * .05, 3);
-    return smoothstep(-2, 14, d) * (1 - smoothstep(-9, .5, openD(x, z))); };
+    return smoothstep(-2, MB.ramp || 14, d) * (1 - smoothstep(-9, .5, openD(x, z))); };   /* ramp: 산이 솟는 거리 (작을수록 절벽처럼 가파름) */
   const mountH = (x, z) => { const k = mountK(x, z); if (k <= 0) return 0;
     const rid = Math.max(0, 1 - Math.abs(fbm(x * .03 + 3, z * .03 - 5, 4)) * 1.8), r2 = Math.max(0, 1 - Math.abs(fbm(x * .07 - 11, z * .07 + 4, 3)) * 2);   /* 능선 둘: 큰 봉우리 줄기 · 작은 뾰족 봉우리 */
     return k * MB.peak * (.32 + .62 * rid * rid + .22 * r2 * r2 * rid + .1 * fbm(x * .16, z * .16, 3)); };   /* 고른 벽이 아니라 솟은 봉우리와 꺼진 안장 */

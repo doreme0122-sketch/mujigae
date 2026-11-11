@@ -7,9 +7,9 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { MeshoptSimplifier as MO } from '../../vendor/meshopt_simplifier.module.js';
-import { makeField, Y, SPOT, LAYERS, fbm, noise2, smoothstep } from './islefield.js?v=11111031';
-import { reedBush, vegShader } from './flora.js?v=11111031';
-import { buildRuins } from './ruins.js?v=11111031';
+import { makeField, Y, SPOT, LAYERS, fbm, noise2, smoothstep } from './islefield.js?v=11111057';
+import { reedBush, vegShader } from './flora.js?v=11111057';
+import { buildRuins } from './ruins.js?v=11111057';
 
 const SUN = new THREE.Vector3(-.45, .78, .44).normalize();   /* 왼쪽 위 앞에서 (카메라 쪽 절벽 면이 비스듬히 빛을 받아 결이 드러남) */
 const rngOf = s => () => (s = (s * 16807) % 2147483647) / 2147483647;
@@ -408,15 +408,17 @@ export async function buildIsle({ K = 1, layout = SPOT } = {}) {   /* layout: �
     parts.push(...RU.rock);   /* 동굴 들머리 종유석 */
     const m = new THREE.Mesh(mergeAll(parts), rockM(.35, .75)); m.name = 'arches'; G.add(m);
     if (RU.geos.length) { const sm = new THREE.ShaderMaterial({ uniforms: U, side: THREE.DoubleSide,   /* 깎은 돌 (유적): 밝은 사암빛 · 빗물 자국 세로 얼룩 · 오목한 곳 그늘 · 윗면 이끼 · 가는 금 */
-        vertexShader: `varying vec3 vP, vN; void main(){ vP = position; vN = normal; gl_Position = projectionMatrix * viewMatrix * modelMatrix * vec4(position, 1.); }`,
-        fragmentShader: GL + `varying vec3 vP, vN; void main(){ if (cutAway(vP)) discard; vec3 n = normalize(vN) * (gl_FrontFacing ? 1. : -1.), an = abs(n); an /= an.x + an.y + an.z;
+        vertexShader: `attribute float aGlow; varying vec3 vP, vN; varying float vG; void main(){ vP = position; vN = normal; vG = aGlow; gl_Position = projectionMatrix * viewMatrix * modelMatrix * vec4(position, 1.); }`,
+        fragmentShader: GL + `varying vec3 vP, vN; varying float vG; void main(){ if (cutAway(vP)) discard; vec3 n = normalize(vN) * (gl_FrontFacing ? 1. : -1.), an = abs(n); an /= an.x + an.y + an.z;
           float tr = fb(vP.zy * 1.3) * an.x + fb(vP.xz * 1.3) * an.y + fb(vP.xy * 1.3) * an.z, tr2 = vn(vP.zy * 6.) * an.x + vn(vP.xz * 6.) * an.y + vn(vP.xy * 6.) * an.z;
-          vec3 st = mix(vec3(.38, .36, .31), vec3(.60, .56, .48), tr) * (.86 + .22 * tr2);
+          vec3 st = mix(vec3(.33, .31, .27), vec3(.55, .51, .44), tr) * (.84 + .22 * tr2);   /* 산 바위와 비슷한 톤 */
           float streak = vn(vec2(vP.x * 1.7 + vP.z * 1.3, vP.y * .18)); st *= .82 + .18 * smoothstep(.25, .7, streak);   /* 빗물 자국 */
           float crack = smoothstep(.035, .0, abs(vn(vP.xz * .9 + vP.y * .4) - .5)) * (1. - an.y); st *= 1. - .35 * crack;
           float lich = smoothstep(.7, .76, vn(vP.zy * 2.6 + vP.x * 1.9) * an.x + vn(vP.xy * 2.6 + vP.z * 1.9) * an.z + vn(vP.xz * 2.6) * an.y); st = mix(st, vec3(.78, .79, .7), lich * .4);   /* 바위옷 (희끗한 점무늬) */
           float moss = smoothstep(.62, .92, n.y + (tr2 - .5) * .4) * smoothstep(.42, .78, vn(vP.xz * .32 + vP.y * .1)) * .85; st = mix(st, mix(vec3(.14, .25, .08), vec3(.28, .40, .13), tr2), moss);   /* 이끼는 위를 보는 면에만 · 군데군데 */
-          float ao = .5 + .5 * smoothstep(-.7, .5, n.y); gl_FragColor = vec4(fogged(lit(st, n, 1., ao), vP), 1.); }` });
+          float ao = .5 + .5 * smoothstep(-.7, .5, n.y); vec3 c = lit(st, n, 1., ao);
+          float flow = .35 + .65 * pow(.5 + .5 * sin(uT * 1.3 - vP.y * .7 + vP.x * .2), 3.);   /* 룬 빛: 아래에서 위로 천천히 흐름 */
+          c += vec3(.22, .95, .8) * vG * flow * 1.4 * (.35 + .65 * seen(vP)); gl_FragColor = vec4(fogged(c, vP), 1.); }` });
       const rm = new THREE.Mesh(mergeAll(RU.geos), sm); rm.name = 'ruins'; G.add(rm); }
     if (tunnelG) { const tm = rockM(.55, .9); tm.side = THREE.DoubleSide; const t2 = new THREE.Mesh(tunnelG, tm); t2.name = 'cave'; G.add(t2); }
     /* 떠 있는 바위 (오르내리는 구역 · 사용자 2026-11-11): 바위 덩이 여럿이 줄지어 그 층 높이에 떠서 한 줄을 막음 (보이는 두께 = 막히는 두께)
