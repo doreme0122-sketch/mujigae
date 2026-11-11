@@ -6,7 +6,7 @@
    · 덮개는 화면 위 한 장: 화면 칸마다 '눈높이 1.5m 땅'의 보임 값을 읽어 어둡게 덮음 → 벽·바닥·알갱이 모두 한 번에 가려짐
    · 무게: 빛줄기 320가닥 × 60걸음 (가벼움) · 시야 지도 250×250 한 장 */
 import * as THREE from 'three';
-import { MAP } from './mapfloor.js?v=11111134';
+import { MAP } from './mapfloor.js?v=11111135';
 
 export const SIGHT = 30;
 export function makeVision(B, bushes, floorNoise) {
