@@ -13,8 +13,8 @@
    · 상자 둘레로 작은 금빛 반짝이가 천천히 올라감 (동그란 티 안 나게 가는 십자 반짝임) */
 import * as THREE from 'three';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
-import { noise2 } from './islefield.js?v=11111345';
-import { carvedBlock, runeD } from './ruins.js?v=11111345';
+import { noise2 } from './islefield.js?v=11111349';
+import { carvedBlock, runeD } from './ruins.js?v=11111349';
 
 const W = 4.2, D = 2.8, BOT = .75, SEAM = 2.85, R = 1.45, AX = 3.0, LL = 4.3;   /* 몸통 너비 · 깊이 · 바닥 · 뚜껑 이음 높이 · 뚜껑 반지름 · 뚜껑 축 높이 · 뚜껑 길이 (섬 안 단위 · 0.5배 = m) */
 const ORDER = [0, 3, 1, 4, 2, 5];   /* 체력이 줄 때 끊기는 차례 (마주 보는 것끼리 번갈아) */
@@ -179,8 +179,9 @@ export function buildChest({ GL, U, S, pxU, x0, z0, cb, anchors, angles, drop, g
        float beam = exp(-fk * fk * 7.) * smoothstep(len, .0, r) * smoothstep(.0, .12, r) * br;
        float mass = exp(-(vQ.x * vQ.x * 1.3 + pow(max(vQ.y - .1, 0.), 2.) * 2.6) * 6.) * .75 * smoothstep(-.12, .05, vQ.y), core = exp(-r * r * 70.) * .6;   /* 입구 위 금빛 덩어리 · 작은 가운데 */
        vec3 col = mix(uC * vec3(1., .85, .5), vec3(1., .95, .78), clamp(.75 - r * 1.6, 0., 1.));
-       gl_FragColor = vec4(col * max(0., beam * up * 1.6 + mass * .8 + core) * uA, 1.); }`, { ...OA, uO: { value: V(x0, cb + SEAM + .15, z0) } }));
-  fan.frustumCulled = false; fan.renderOrder = 9; group.add(fan);
+       gl_FragColor = vec4(col * max(0., beam * up * 1.6 + mass * .8 + core) * uA, 1.); }`, { ...OA, uO: { value: V(x0, cb + SEAM - .25, z0) } }));   /* 빛 가운데는 입구 안쪽 조금 아래 (상자 안에서 솟아남) */
+  fan.material.depthTest = false;   /* 뚜껑에 잘리지 않게: 강한 빛은 물체 가장자리 너머로 번짐 (사용자 2026-11-11 '빛이 뚜껑에 가려서 잘려') */
+  fan.frustumCulled = false; fan.renderOrder = 11; group.add(fan);
 
   /* 봉인 원: 상자 위에 떠서 천천히 돎 · 여섯 조각 = 사슬 여섯 (끊기면 그 조각이 깜빡이다 꺼짐) · 다 끊기면 깨짐 */
   const SEC = { uSec: { value: [1, 1, 1, 1, 1, 1] }, uA: { value: 1 }, uRot: { value: 0 }, uA0: { value: angles[0] } };
