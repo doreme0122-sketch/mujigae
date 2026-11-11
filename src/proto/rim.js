@@ -6,11 +6,11 @@
    · 기지 안에선 판(계단 단 안쪽)과 출구 길만 다님 · 벽과 그 바깥은 막힘 (blocked) */
 import * as THREE from 'three';
 import { makePad } from '../core/hangar/pad.js';
-import { makeGoldStar } from './goldstar.js?v=11112144';
-import { makeArena } from './arena.js?v=11112144';
-import { makeGuardians, GUARD } from './guardian.js?v=11112144';
-import { FLY } from './flight.js?v=11112144';
-import { autoMerge } from './automerge.js?v=11112144';
+import { makeGoldStar } from './goldstar.js?v=11112236';
+import { makeArena } from './arena.js?v=11112236';
+import { makeGuardians, GUARD } from './guardian.js?v=11112236';
+import { FLY } from './flight.js?v=11112236';
+import { autoMerge } from './automerge.js?v=11112236';
 
 const SHIPL = 2.9, BS = 2 / SHIPL, BASE_Y = .42, GAPH = 5.6;
 function skyTone(root) { root.traverse(o => { if (!o.isMesh) return; for (const m of (Array.isArray(o.material) ? o.material : [o.material])) { if (!m || !m.color || m.userData.toned || m.isShaderMaterial || m.isMeshBasicMaterial) continue;
@@ -20,6 +20,7 @@ function skyTone(root) { root.traverse(o => { if (!o.isMesh) return; for (const 
   if ('clearcoat' in m) { m.clearcoat = .15; m.sheen = 0; } m.needsUpdate = true; } }); }
 
 export async function buildRim({ scene, isle, K, LV }, LO) {
+  const HIDE = [];   /* 비밀 터널 안에선 감춤 (터널 밖은 모두 까맣게 · 사용자 2026-11-11) */
   const RM = LO.rim, R = RM.R * K, Y0 = isle.layers[1] - FLY.HOVER;   /* Y0: 기지 판이 2층(태어나는 높이)에 오게 */
   const A0 = Math.atan2(RM.base[1], RM.base[0]);   /* 내 기지 각도 (기지 10곳은 여기서 36°마다) */
   /* ── 무지개 홀로그램 벽 (map2 그대로 · 기지 각도만 맞춤) ── */
@@ -45,7 +46,7 @@ export async function buildRim({ scene, isle, K, LV }, LO) {
         float graze=smoothstep(.03,.28,nv), far=smoothstep(170.,70.,distance(vW.xz,uP));
         float nearC=smoothstep(3.,-4.,dot(vW.xz-uP,normalize(uC-uP+vec2(1e-4))));   /* 카메라와 기체 사이에 걸린 벽은 걷어 냄 (내 기지가 테두리라 카메라가 벽 밖에 있음) */
         gl_FragColor=vec4(col*1.15,clamp(al,0.,.9)*vf*open*graze*far*nearC); }` });
-  const wall = new THREE.Mesh(new THREE.CylinderGeometry(R, R, 90, 1080, 1, true).translate(0, Y0 - 4, 0), wallM); wall.renderOrder = 20; wall.frustumCulled = false; scene.add(wall);
+  const wall = new THREE.Mesh(new THREE.CylinderGeometry(R, R, 90, 1080, 1, true).translate(0, Y0 - 4, 0), wallM); wall.renderOrder = 20; wall.frustumCulled = false; scene.add(wall); HIDE.push(wall);
   /* 맵 바깥 = 검은 우주 (설계: 테두리 밖은 별만 · 구름 바다 없음) — 테두리 밖 아래로 넓은 고리 판 하나 (그리기 1번) · 깊은 검푸른 바탕 · 화면 점 크기 별 · 테두리 쪽은 옅은 대기 빛 띠 */
   { const g = new THREE.RingGeometry(R + .5, R + 900, 256, 1).rotateX(-Math.PI / 2).translate(0, Y0 - 34, 0);
     const m = new THREE.Mesh(g, new THREE.ShaderMaterial({ uniforms: { uR: { value: R }, uT: wallM.uniforms.uT }, depthWrite: false,
@@ -56,20 +57,20 @@ export async function buildRim({ scene, isle, K, LV }, LO) {
         void main(){ float r = length(vW.xz), e = r - uR; vec3 c = mix(vec3(.02, .035, .09), vec3(.012, .016, .04), smoothstep(0., 140., e));
           c += vec3(.12, .3, .55) * exp(-e / 9.) * .55;   /* 테두리 쪽 옅은 대기 빛 */
           c += stars(vW.xz, .09, .06, 1.) + stars(vW.xz, .25, .03, .4); gl_FragColor = vec4(c, 1.); }` }));
-    m.renderOrder = -5; m.frustumCulled = false; scene.add(m); }
+    m.renderOrder = -5; m.frustumCulled = false; scene.add(m); HIDE.push(m); }
   /* 틈 양옆 기둥 (흰 돌 · 금 띠 · 수정 머리 · 틈 쪽 무지개 줄) */
   const postM = new THREE.MeshStandardMaterial({ color: 0xe6dfcf, roughness: .7, flatShading: true }), goldM = new THREE.MeshStandardMaterial({ color: 0xe2b35c, metalness: 1, roughness: .3 });
   const seamM = new THREE.ShaderMaterial({ transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, uniforms: { uT: { value: 0 } }, vertexShader: 'varying vec2 vU; void main(){ vU=uv; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.); }',
     fragmentShader: 'uniform float uT; varying vec2 vU; void main(){ float x=abs(vU.x-.5)*2.; vec3 c=.5+.5*cos(6.2832*(vU.y*1.5-uT*.3+vec3(0.,.33,.67))); gl_FragColor=vec4(c*exp(-x*x*6.)*1.2,1.); }' });
   const BASES = (RM.bases || [0]).map(d => A0 + d * Math.PI / 180);
-  for (const ang of BASES) for (const s of [-1, 1]) { const a = ang + s * (GAPH + .9) / R, g = new THREE.Group(); g.position.set(Math.cos(a) * R, Y0, Math.sin(a) * R); g.rotation.y = -a; scene.add(g);
+  for (const ang of BASES) for (const s of [-1, 1]) { const a = ang + s * (GAPH + .9) / R, g = new THREE.Group(); g.position.set(Math.cos(a) * R, Y0, Math.sin(a) * R); g.rotation.y = -a; scene.add(g); HIDE.push(g);
     g.add(new THREE.Mesh(new THREE.CylinderGeometry(.5, .7, 7, 6).translate(0, -1, 0), postM)); for (const y of [-3.6, 1.2]) g.add(new THREE.Mesh(new THREE.CylinderGeometry(.82, .82, .32, 6).translate(0, y, 0), goldM));
     const cap = new THREE.Mesh(new THREE.OctahedronGeometry(.6, 0), new THREE.MeshStandardMaterial({ color: 0xbfe6ff, emissive: 0x223355, roughness: .15, flatShading: true })); cap.scale.y = 1.6; cap.position.y = 3.3; g.add(cap);
     const seam = new THREE.Mesh(new THREE.PlaneGeometry(.3, 6).translate(0, -1, 0), seamM); seam.position.z = -s * .62; seam.rotation.y = s * Math.PI / 2; g.add(seam);
     g.add(new THREE.Mesh(new THREE.ConeGeometry(.7, 5, 6).rotateX(Math.PI).translate(0, -7, 0), postM)); }
   /* ── 기지 ('빛의 닻' 하늘빛 · 받침) — 내 기지만 (이웃 기지는 이 조각 밖) ── */
   const keelM = new THREE.MeshStandardMaterial({ color: 0xe4ddcd, roughness: .7, metalness: .05, flatShading: true }), seamGlow = new THREE.MeshBasicMaterial({ color: new THREE.Color(.45, .72, 1.35), toneMapped: false });
-  const mk = ang => { const b = { ang, x: Math.cos(ang) * R, z: Math.sin(ang) * R }, root = new THREE.Group(); root.position.set(b.x, Y0, b.z); scene.add(root);
+  const mk = ang => { const b = { ang, x: Math.cos(ang) * R, z: Math.sin(ang) * R }, root = new THREE.Group(); root.position.set(b.x, Y0, b.z); scene.add(root); HIDE.push(root);
     const w = new THREE.Group(); w.position.y = BASE_Y; w.scale.setScalar(BS); const dx = -Math.cos(ang), dz = -Math.sin(ang); w.rotation.y = Math.atan2(-dz, dx); root.add(w);
     const pad = makePad(), star = makeGoldStar(), ring = makeArena(), guards = makeGuardians(); w.add(pad, star, ring, guards); skyTone(w);
     const k = new THREE.Group(); k.position.y = BASE_Y - .02; k.rotation.y = w.rotation.y; root.add(k);
@@ -88,5 +89,5 @@ export async function buildRim({ scene, isle, K, LV }, LO) {
   const blocked = (x, z) => { const b = ME; if (Math.hypot(x - b.x, z - b.z) < 6.2) { const lx = (x - b.x) * b.dx + (z - b.z) * b.dz, lz = -(x - b.x) * b.dz + (z - b.z) * b.dx; return !(Math.hypot(lx, lz) < FL || (lx > 0 && Math.abs(lz) < EXH)); }
     return Math.hypot(x, z) > R - .9; };
   return { blocked, base: ME, hit: (x, y, z, t) => HITS[hitI++ % HITS.length].set(x, y, z, t),
-    update: (t, dt, st) => { wallM.uniforms.uT.value = t; seamM.uniforms.uT.value = t; wallM.uniforms.uP.value.set(st.x * K, st.z * K); if (st.cam) wallM.uniforms.uC.value.set(st.cam.x, st.cam.z); ME.pad.userData.update(t); ME.star.userData.update(t); ME.ring.userData.update(t); ME.guards.userData.update(t, false); } };
+    update: (t, dt, st) => { const show = !st.blk; if (HIDE[0].visible !== show) for (const o of HIDE) o.visible = show; wallM.uniforms.uT.value = t; seamM.uniforms.uT.value = t; wallM.uniforms.uP.value.set(st.x * K, st.z * K); if (st.cam) wallM.uniforms.uC.value.set(st.cam.x, st.cam.z); ME.pad.userData.update(t); ME.star.userData.update(t); ME.ring.userData.update(t); ME.guards.userData.update(t, false); } };
 }
