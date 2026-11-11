@@ -5,8 +5,8 @@
    · 반딧불: 느리게 떠다니며 깜빡임 (맵마다 색)
    · 비스듬한 빛줄기: 해 쪽에서 장소로 내려오는 옅은 빛 다섯 줄기 (천천히 숨 쉼) */
 import * as THREE from 'three';
-import { noise2 } from './islefield.js?v=11111325';
-import { carvedBlock } from './ruins.js?v=11111325';
+import { noise2 } from './islefield.js?v=11111345';
+import { carvedBlock } from './ruins.js?v=11111345';
 
 const V = (x, y, z) => new THREE.Vector3(x, y, z);
 const rngOf = s => () => (s = (s * 16807) % 2147483647) / 2147483647;
@@ -72,7 +72,7 @@ export function buildMystic({ GL, U, S, SFRAG, pxU, x0, z0, gy, angles, group, g
   const shafts = new THREE.Mesh(shG, new THREE.ShaderMaterial({ uniforms: { ...U, ...MU }, ...add, side: THREE.DoubleSide,
     vertexShader: `attribute vec4 aS; attribute float aR; uniform vec3 uSun; varying vec2 vU; varying float vR; void main(){ vU = position.xy + vec2(.5, 0.); vR = aR; vec3 ax = normalize(uSun), base = aS.xyz;
       vec3 w = (modelMatrix * vec4(base, 1.)).xyz, sd = normalize(cross(ax, cameraPosition - w)); vec3 p = base + ax * position.y * 70. + sd * position.x * aS.w; gl_Position = projectionMatrix * viewMatrix * modelMatrix * vec4(p, 1.); }`,
-    fragmentShader: `uniform vec3 uShaft; uniform float uT; varying vec2 vU; varying float vR; void main(){ float x = abs(vU.x - .5) * 2., e = pow(1. - x, 1.6), along = smoothstep(0., .08, vU.y) * smoothstep(1., .45, vU.y);
+    fragmentShader: `uniform vec3 uShaft; uniform float uT; varying vec2 vU; varying float vR; void main(){ float x = min(1., abs(vU.x - .5) * 2.), e = pow(max(0., 1. - x), 1.6),   /* 가장자리 계산이 1을 넘으면 검은 점선이 찍혔음 → 0 아래로 안 내려가게 */ along = smoothstep(0., .08, vU.y) * smoothstep(1., .45, vU.y);
       float br = .55 + .45 * sin(uT * (.25 + vR * .2) + vR * 20.), dust = .85 + .15 * sin(vU.y * 40. - uT * .6 + vR * 9.);
       gl_FragColor = vec4(uShaft * e * along * br * dust * .075, 1.); }` }));
   shafts.frustumCulled = false; shafts.renderOrder = 9; group.add(shafts);

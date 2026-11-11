@@ -13,8 +13,8 @@
    · 상자 둘레로 작은 금빛 반짝이가 천천히 올라감 (동그란 티 안 나게 가는 십자 반짝임) */
 import * as THREE from 'three';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
-import { noise2 } from './islefield.js?v=11111325';
-import { carvedBlock, runeD } from './ruins.js?v=11111325';
+import { noise2 } from './islefield.js?v=11111345';
+import { carvedBlock, runeD } from './ruins.js?v=11111345';
 
 const W = 4.2, D = 2.8, BOT = .75, SEAM = 2.85, R = 1.45, AX = 3.0, LL = 4.3;   /* 몸통 너비 · 깊이 · 바닥 · 뚜껑 이음 높이 · 뚜껑 반지름 · 뚜껑 축 높이 · 뚜껑 길이 (섬 안 단위 · 0.5배 = m) */
 const ORDER = [0, 3, 1, 4, 2, 5];   /* 체력이 줄 때 끊기는 차례 (마주 보는 것끼리 번갈아) */
@@ -167,20 +167,19 @@ export function buildChest({ GL, U, S, pxU, x0, z0, cb, anchors, angles, drop, g
   const rayG = new THREE.BufferGeometry(); rayG.setAttribute('position', new THREE.Float32BufferAttribute(RP, 3)); rayG.setAttribute('uv', new THREE.Float32BufferAttribute(RV, 2)); rayG.setIndex(RI);
   group.add(new THREE.Mesh(rayG, glowMat(`varying vec2 vU; void main(){ vU = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.); }`,
     `uniform vec3 uC; uniform float uA, uT; varying vec2 vU; void main(){ float u = vU.x * 7.3, s = .45 + .55 * pow(.5 + .5 * sin(u * 6.2832 + sin(u * 2.3) * 1.5), 3.) * (.85 + .15 * sin(uT * 1.3 + u * 4.));   /* 가는 빛살 (천천히 숨 쉼) */
-      gl_FragColor = vec4(mix(uC, vec3(1.), .55) * pow(1. - vU.y, 2.2) * s * uA * .75, 1.); }`, OA)));
+      gl_FragColor = vec4(mix(uC, vec3(1.), .55) * pow(max(0., 1. - vU.y), 2.2) * s * uA * .75, 1.); }`, OA)));
 
-  /* 열린 상자에서 부채처럼 퍼져 나오는 빛살 (사용자 2026-11-11 참고 그림: 안에서 금빛이 쏟아져 위 · 옆으로 뻗음 · 금화 없음)
-     늘 카메라를 보는 판 하나 · 입구 가운데에서 위쪽 반원으로만 · 빛살 길이와 굵기가 제각각 · 천천히 숨 쉬고 아주 조금씩 돎 · 가운데는 하얗게 */
+  /* 열린 상자에서 쏟아져 나오는 빛 (사용자 2026-11-11 참고 그림 · 금화 없음 · '선 같고 너무 길다' → 넓고 부드러운 빛줄기 여덟 · 상자 높이 한 배 반쯤까지만)
+     늘 카메라를 보는 판 하나 · 입구 가운데에서 위쪽 반원으로만 · 천천히 숨 쉼 · 입구 위에 금빛 덩어리 */
   const fan = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), glowMat(`uniform vec3 uO; varying vec2 vQ; void main(){ vQ = position.xy; vec3 w = (modelMatrix * vec4(uO, 1.)).xyz, f = normalize(cameraPosition - w), sd = normalize(cross(vec3(0., 1., 0.), f)), uu = cross(f, sd);
-      gl_Position = projectionMatrix * viewMatrix * modelMatrix * vec4(uO + (sd * position.x + uu * position.y) * 11., 1.); }`,
+      gl_Position = projectionMatrix * viewMatrix * modelMatrix * vec4(uO + (sd * position.x + uu * position.y) * 6.5, 1.); }`,
     `uniform vec3 uC; uniform float uA, uT; varying vec2 vQ; float h1(float n){ return fract(sin(n * 78.233) * 43758.5); }
-     void main(){ float r = length(vQ), a = atan(vQ.x, vQ.y), up = smoothstep(1.62, 1.15, abs(a)) * smoothstep(-.08, .06, vQ.y + .02);   /* 위쪽 반원 (입구 위로만) */
-       float k = a * 9.5 + .5, id = floor(k), fk = fract(k) - .5, len = .35 + .65 * h1(id), wid = .1 + .22 * h1(id + 3.), br = .5 + .5 * sin(uT * (.6 + h1(id + 7.)) + id * 2.);   /* 굵은 빛살 하나하나 */
-       float ray = smoothstep(wid, wid * .2, abs(fk)) * smoothstep(len, len * .25, r) * (.55 + .45 * br);
-       float k2 = a * 23. - uT * .05, id2 = floor(k2), ray2 = smoothstep(.12, .0, abs(fract(k2) - .5)) * smoothstep(.55 + .4 * h1(id2 + 11.), .05, r) * .45;   /* 가는 빛살 */
-       float core = exp(-r * r * 60.) * .9 + exp(-r * r * 9.) * .25, halo = exp(-r * 3.2) * .18;
-       vec3 col = mix(uC * vec3(1., .82, .45), vec3(1., .95, .75), clamp(.8 - r * 1.8, 0., 1.));   /* 바깥은 짙은 금빛 · 안쪽만 하얗게 */
-       gl_FragColor = vec4(col * ((ray * 1.5 + ray2) * up + core * smoothstep(-.25, .05, vQ.y) + halo * up) * uA * 1.2, 1.); }`, { ...OA, uO: { value: V(x0, cb + SEAM + .15, z0) } }));
+     void main(){ float r = length(vQ), a = atan(vQ.x, vQ.y), up = smoothstep(1.55, 1.05, abs(a)) * smoothstep(-.1, .08, vQ.y + .02);   /* 위쪽 반원 (입구 위로만) */
+       float k = a / .36, id = floor(k + .5), fk = k - id, len = .5 + .35 * h1(id + 5.), br = .65 + .35 * sin(uT * (.5 + .4 * h1(id + 7.)) + id * 2.3);   /* 넓고 부드러운 빛줄기 여덟 (가장자리는 흐리게 번짐) */
+       float beam = exp(-fk * fk * 7.) * smoothstep(len, .0, r) * smoothstep(.0, .12, r) * br;
+       float mass = exp(-(vQ.x * vQ.x * 1.3 + pow(max(vQ.y - .1, 0.), 2.) * 2.6) * 6.) * .75 * smoothstep(-.12, .05, vQ.y), core = exp(-r * r * 70.) * .6;   /* 입구 위 금빛 덩어리 · 작은 가운데 */
+       vec3 col = mix(uC * vec3(1., .85, .5), vec3(1., .95, .78), clamp(.75 - r * 1.6, 0., 1.));
+       gl_FragColor = vec4(col * max(0., beam * up * 1.6 + mass * .8 + core) * uA, 1.); }`, { ...OA, uO: { value: V(x0, cb + SEAM + .15, z0) } }));
   fan.frustumCulled = false; fan.renderOrder = 9; group.add(fan);
 
   /* 봉인 원: 상자 위에 떠서 천천히 돎 · 여섯 조각 = 사슬 여섯 (끊기면 그 조각이 깜빡이다 꺼짐) · 다 끊기면 깨짐 */
@@ -283,7 +282,7 @@ export function buildChest({ GL, U, S, pxU, x0, z0, cb, anchors, angles, drop, g
       vec3 c = uO + aC, w = (modelMatrix * vec4(c, 1.)).xyz, f = normalize(cameraPosition - w), sd = normalize(cross(vec3(0., 1., 0.), f)), uu = cross(f, sd); float s = 3.4 * vK + .01, r = a * .6;
       vec2 xy = mat2(cos(r), -sin(r), sin(r), cos(r)) * position.xy; gl_Position = projectionMatrix * viewMatrix * modelMatrix * vec4(c + (sd * xy.x + uu * xy.y) * s, 1.); }`,
     `uniform vec3 uGold; varying vec2 vQ; varying float vK; void main(){ vec2 q = abs(vQ); float r = length(vQ);
-      float ray = max(0., 1. - q.x * 14.) * (1. - q.y) + max(0., 1. - q.y * 14.) * (1. - q.x), ray2 = max(0., 1. - abs(q.x - q.y) * 10.) * (1. - r) * .35, core = exp(-r * r * 40.) * 2.;
+      float ray = max(0., 1. - q.x * 14.) * (1. - q.y) + max(0., 1. - q.y * 14.) * (1. - q.x), ray2 = max(0., 1. - abs(q.x - q.y) * 10.) * max(0., 1. - r) * .35, core = exp(-r * r * 40.) * 2.;
       gl_FragColor = vec4(mix(uGold, vec3(1.), .75) * (ray + ray2 + core) * vK * 2.4, 1.); }`, { ...STU, uGold: BR.uGold }));
   stars.frustumCulled = false; stars.renderOrder = 10; group.add(stars);
 
