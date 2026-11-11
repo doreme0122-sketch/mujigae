@@ -5,11 +5,11 @@
    크기: 지름 약 4.5m, 높이 약 4.7m */
 import * as THREE from 'three';
 import * as A from '../core/audio.js';
-import { makeWardBase } from './wardbase.js?v=11111847';
-import { makeWardCore } from './wardcore.js?v=11111847';
-import { makeWardRing } from './wardring.js?v=11111847';
-import { makeWardSpires } from './wardspire.js?v=11111847';
-import { makeWardEye } from './wardeye.js?v=11111847';
+import { makeWardBase } from './wardbase.js?v=11111956';
+import { makeWardCore } from './wardcore.js?v=11111956';
+import { makeWardRing } from './wardring.js?v=11111956';
+import { makeWardSpires } from './wardspire.js?v=11111956';
+import { makeWardEye } from './wardeye.js?v=11111956';
 
 export const WCOL = { none: new THREE.Vector3(.35, .85, 1.0), mine: new THREE.Vector3(.62, 1.0, .32), foe: new THREE.Vector3(1.0, .36, .24) };
 function bell(f, vol = .1, dec = 1.4, at = 0) { if (!A.live()) return; const c = A.ctx, t0 = c.currentTime + at;
