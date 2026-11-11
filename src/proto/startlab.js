@@ -5,7 +5,7 @@
    · 내 앞마당: 양옆 = 동굴 산 · 뒤 = 테두리 · 화산 쪽 = 1차 산맥 (불규칙) · 산맥 양 끝과 동굴 산 사이 좁은 협곡 (부쉬로 꽉 참)으로만 나감
    · 보물 동굴: 산맥 얇게 · 골짜기 짧게 (깊이 약 79m) · 입구 하나가 맵 가운데를 봄 · 동굴마다 굽이 · 보물방 비킴 · 산 두께가 다름
    · 비밀길: 보물방 바로 앞을 가로지르는 1층 터널 (살짝 지그재그) · 위 협곡 바닥은 둔덕 (2층 아래까지 솟음) · 둔덕에 '턱과 굴' 판돌 · 입구는 부쉬로 덮임 (청록 꽃) */
-import { makeField } from './islefield.js?v=11112057';
+import { makeField } from './islefield.js?v=11112144';
 const R = 480, D2R = Math.PI / 180;
 const polar = (deg, r) => [r * Math.sin(deg * D2R), r * Math.cos(deg * D2R)];
 /* 동굴 하나: 바깥 방향(테두리 쪽) 기준 로컬 좌표 (u = 가로 · v = 맵 가운데에서 거리) → 섬 좌표 */
@@ -34,7 +34,7 @@ function cave(deg, o) {
       hump: { t: tc, len: 34, top: 2.2 },                                   /* 비밀길 위 둔덕: 꼭대기 2.2 (2층 4.4 − 여유) → 협곡 1층은 막히고 2층으로 넘음 */
       site: { pile: { c: W(0, o.cp[0][1] - 15), w: 44, rot: deg } },        /* 신전 앞마당 무너진 기둥 무더기 */
       rune: { t: tc }, treasure: SITE },
-    secret: { pts: sec, w: 5, mid: zig.findIndex(([u]) => u === 0), cave: deg },
+    secret: { pts: sec, w: 3.8, mid: zig.findIndex(([u]) => u === 0), cave: deg },
     MB, ISL, SITE };
 }
 /* 왼쪽 동굴 (−18°) · 오른쪽 동굴 (+18°): 크기는 같고 생김새는 다르게 (사용자: 같은 모양 복사 금지) */
@@ -51,7 +51,7 @@ const RIDGE = []; for (let a = -6.2; a <= 6.21; a += .9) { const r = 344 + 9 * M
 const exitBrush = sd => [0, 1, 2, 3].map(k => [...polar(sd * (8.6 + k * .25), 322 + k * 11), 5.2 - (k % 2) * .8]);
 export const START = {
   box: [-250, 250, 248, 500], dens: 2.4, tile: 40, cut: 1, clipR: R - 3,
-  rim: { R, base: [0, R], caves: [-18, 18], bases: [0, -36, 36] },   /* 무지개 벽 · 기지 (내 기지 6시 · 이웃은 화면 밖) */
+  rim: { R, base: [0, R], caves: [-18, 18], bases: [0, -36, 36] },   /* 무지개 벽 · 기지 (아래에서 12시로 뒤집음 · 이웃은 화면 밖) */
   islands: [[...[-23, -17, -11, -5, 0, 5, 11, 17, 23].map(a => [...polar(a, 398), a % 2 ? 78 : 84]), [...polar(-26, 424), 44], [...polar(26, 426), 42], ...A.ISL, ...B.ISL]],
   mount: { peak: 42, ramp: 6, edge: 3.5, solid: 22, lowFront: true, blobs: [...A.MB, ...B.MB, ...RIDGE] },
   gorges: [A.gorge, B.gorge],
@@ -63,10 +63,19 @@ export const START = {
   start: [0, R - 5],
   sites: [A.SITE, B.SITE],
 };
+/* 12시로 뒤집기 (사용자 2026-11-11: 모든 플레이어 시야는 12시 · 6시로 만들어 동굴 입구가 카메라 반대쪽을 봤음)
+   위에서 6시(+z)로 만든 것을 z만 뒤집어 12시(−z)로 → 내 기지는 위쪽 테두리 · 동굴 입구는 아래(맵 가운데 · 카메라 쪽)를 봄 */
+{ const fz = p => [p[0], -p[1], ...p.slice(2)];
+  START.box = [START.box[0], START.box[1], -START.box[3], -START.box[2]];
+  START.rim.base = fz(START.rim.base); START.start = fz(START.start); START.face = Math.PI;   /* 처음 방향: 맵 가운데(화면 아래) */
+  START.islands = START.islands.map(C => C.map(fz)); START.mount.blobs = START.mount.blobs.map(fz);
+  START.spires = START.spires.map(fz); START.brush = START.brush.map(Z => Z.map(fz)); START.pond = fz(START.pond); START.sites = START.sites.map(fz);
+  START.gorges = START.gorges.map(G => ({ ...G, pts: G.pts.map(fz), basin: fz(G.basin), treasure: fz(G.treasure), site: { pile: { ...G.site.pile, c: fz(G.site.pile.c), rot: -G.site.pile.rot - 180 } } }));   /* 무더기 방향도 (돌림 각 = −동굴 각) */
+  START.secret = START.secret.map(S => ({ ...S, pts: S.pts.map(fz) })); }
 
 /* 비밀길 입구 = 산이 끝나는 바로 그 자리 (사용자: 입구에서 떨어지면 안 됨) — 땅 높이를 재서, 터널 가운데(협곡 밑)에서 양쪽으로 걸어가며
    땅이 터널 천장보다 낮아지는 첫 자리에서 자름 → 그 자리에 부쉬를 덮음 (청록 꽃) */
-{ const F0 = makeField(START), TOPY = -1.2 + 1.4;
+{ const F0 = makeField(START), TOPY = -3.8;   /* 산 비탈 밑동 (풀밭 −6 · 터널 천장 −1.2) — 입구가 비탈 중간이 아니라 밑동에 나게 */
   const BR = []; START.secretBrush = [];
   for (const S of START.secret) { const P = S.pts, fine = []; for (let k = 0; k < P.length - 1; k++) for (let i = 0; i < 8; i++) fine.push([P[k][0] + (P[k + 1][0] - P[k][0]) * i / 8, P[k][1] + (P[k + 1][1] - P[k][1]) * i / 8, k + i / 8]); fine.push([...P[P.length - 1], P.length - 1]);
     const mid = fine.findIndex(q => q[2] >= S.mid), ends = [];
@@ -74,5 +83,10 @@ export const START = {
     const cut = fine.slice(ends[0], ends[1] + 1), pick = [cut[0]]; for (let k = 1; k < cut.length - 1; k++) if (Math.abs(cut[k][2] - Math.round(cut[k][2])) < 1e-6) pick.push(cut[k]); pick.push(cut[cut.length - 1]);
     S.pts = pick.map(q => [q[0], q[1]]);
     S.mouths = [0, S.pts.length - 1].map(k => { const p = S.pts[k], q = S.pts[k ? k - 1 : 1], dx = p[0] - q[0], dz = p[1] - q[1], l = Math.hypot(dx, dz) || 1; return [p[0], p[1], dx / l, dz / l]; });
-    for (const [x, z, dx, dz] of S.mouths) { START.secretBrush.push(START.brush.length + BR.length); BR.push([[x + dx * 1.5, z + dz * 1.5, 5.2], [x + dx * 5.5 - dz * 3.2, z + dz * 5.5 + dx * 3.2, 3.8], [x + dx * 4.5 + dz * 3.6, z + dz * 4.5 - dx * 3.6, 3.4]]); } }   /* 입구를 통째로 덮음 · 덤불 모양은 입구마다 조금씩 */
+    /* 입구 부쉬 (사용자: 벽에 올라타 티가 남 → 입구 앞 평평한 땅에만): 덩이마다 산 비탈에 닿지 않을 때까지 밖으로 밀고, 둘레가 비탈에 닿으면 반지름을 줄임 */
+    const flatOK = (x, z, r) => { if (F0.top(x, z) > -5) return false; for (let a = 0; a < 6.283; a += .4) if (F0.top(x + Math.cos(a) * r, z + Math.sin(a) * r) > -4.2) return false; return true; };   /* 덤불 둘레가 벽 밑동(풀밭 위 약 1m)까지만 닿게 */
+    const place = (x, z, dx, dz, r) => { for (let o = 0; o < 10; o += .4) { let rr = r; while (rr > r * .75 && !flatOK(x + dx * o, z + dz * o, rr)) rr -= .25; if (flatOK(x + dx * o, z + dz * o, rr)) return [x + dx * o, z + dz * o, rr]; } return [x + dx * 10, z + dz * 10, r * .75]; };
+    S.mouths.forEach(([x, z, dx, dz], mi) => { START.secretBrush.push(START.brush.length + BR.length); const b0 = place(x, z, dx, dz, 5), gap = Math.hypot(b0[0] - x, b0[1] - z) - b0[2] + 1;
+      if (gap > 0) { const k = mi ? S.pts.length - 1 : 0; S.pts[k] = [x + dx * gap, z + dz * gap]; S.mouths[mi] = [x + dx * gap, z + dz * gap, dx, dz]; }   /* 덤불이 조금 떨어지면 터널을 그만큼 늘려 덤불 속에서 끝나게 (입구와 덤불 사이 틈 없음) */
+      BR.push([b0, place(b0[0] + dx * 2.5 - dz * 3.6, b0[1] + dz * 2.5 + dx * 3.6, dx, dz, 3.4), place(b0[0] + dx * 2 + dz * 3.4, b0[1] + dz * 2 - dx * 3.4, dx, dz, 3.1)]); }); }   /* 입구 바로 앞을 가림 · 덤불 모양은 입구마다 조금씩 */
   START.brush.push(...BR); }
