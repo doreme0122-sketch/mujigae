@@ -7,9 +7,9 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { MeshoptSimplifier as MO } from '../../vendor/meshopt_simplifier.module.js';
-import { makeField, Y, SPOT, LAYERS, fbm, noise2, smoothstep } from './islefield.js?v=11111311';
-import { reedBush, vegShader } from './flora.js?v=11111311';
-import { buildRuins } from './ruins.js?v=11111311';
+import { makeField, Y, SPOT, LAYERS, fbm, noise2, smoothstep } from './islefield.js?v=11111325';
+import { reedBush, vegShader } from './flora.js?v=11111325';
+import { buildRuins } from './ruins.js?v=11111325';
 
 const SUN = new THREE.Vector3(-.45, .78, .44).normalize();   /* 왼쪽 위 앞에서 (카메라 쪽 절벽 면이 비스듬히 빛을 받아 결이 드러남) */
 const rngOf = s => () => (s = (s * 16807) % 2147483647) / 2147483647;
@@ -35,7 +35,7 @@ vec3 fogged(vec3 c, vec3 wp){ float k = smoothstep(-16., -64., wp.y); c = mix(c,
 /* 가림 걷기 무게 (꼭짓점 · 칸 공용): 기체 → 카메라 선에서 얼마나 가까운지 (1 = 한가운데) */
 const CUTW = `uniform vec4 uCutA, uCutB; float cutW(vec3 p){ if (uCutA.w <= 0.) return 0.; vec3 ab = uCutB.xyz - uCutA.xyz; float t = clamp(dot(p - uCutA.xyz, ab) / dot(ab, ab), 0., 1.);
   float r = uCutA.w * (.7 + .3 * smoothstep(0., .25, t)); return smoothstep(r, r * .7, length(p - uCutA.xyz - ab * t)) * step(.01, t); }`;
-const U = { uSun: { value: SUN }, uT: { value: 0 }, uPush: { value: new THREE.Vector4(0, 0, 1, 0) }, uRay: { value: null }, uVC: { value: new THREE.Vector2() }, uVR: { value: 12 }, uK: { value: 1 }, uVOn: { value: 0 }, uCutA: { value: new THREE.Vector4() }, uCutB: { value: new THREE.Vector4() } };   /* uPush: 기체가 오르내릴 때 밑의 풀·덤불을 미는 바람 (x, z, 반지름, 세기 · 섬 안 단위) */
+const U = { uSun: { value: SUN }, uT: { value: 0 }, uPush: { value: new THREE.Vector4(0, 0, 1, 0) }, uWave: { value: new THREE.Vector4(0, 0, 0, 0) }, uRay: { value: null }, uVC: { value: new THREE.Vector2() }, uVR: { value: 12 }, uK: { value: 1 }, uVOn: { value: 0 }, uCutA: { value: new THREE.Vector4() }, uCutB: { value: new THREE.Vector4() } };   /* uPush: 기체가 오르내릴 때 밑의 풀·덤불을 미는 바람 (x, z, 반지름, 세기 · 섬 안 단위) · uWave: 한 점에서 둥글게 퍼지는 바람 (x, z, 앞머리 반지름, 세기 · 보물 상자가 열릴 때) */
 
 export async function buildIsle({ K = 1, layout = SPOT } = {}) {   /* layout: 섬 배치 (기본 = 섬 하나 시험 · 초원 한 조각 체험판은 meadowsector.js) */
   const LO = layout, D = LO.dens || 1;   /* D: 넓이에 맞춰 식물 수를 늘림 */   /* K: 섬 전체 크기 (기체는 그대로 · 사용자 2026-11-10: 기체에 비해 땅이 너무 큼) */
@@ -218,10 +218,11 @@ export async function buildIsle({ K = 1, layout = SPOT } = {}) {   /* layout: �
     const water = new THREE.Mesh(wg, wm); water.renderOrder = 2; water.name = 'water'; G.add(water); }
 
   /* ⑧ 낮은 식물 칠 (고사리 · 꽃 · 이끼 돌 · 풀): 바람에 끝이 흔들림 · 오르내리는 바람에 눌림 */
-  const VEG = { v: `attribute vec3 color; attribute float aS; uniform float uT; uniform vec4 uPush; varying vec3 vC, vN, vP; varying float vS;
+  const VEG = { v: `attribute vec3 color; attribute float aS; uniform float uT; uniform vec4 uPush, uWave; varying vec3 vC, vN, vP; varying float vS;
       void main(){ vec4 w = instanceMatrix * vec4(position, 1.); float ph = instanceMatrix[3].x * .37 + instanceMatrix[3].z * .23;
         w.xz += vec2(sin(uT * 1.3 + ph + position.y * .4), cos(uT * 1.1 + ph * 1.3)) * .07 * aS * aS * length(instanceMatrix[1].xyz);   /* 바람: 위로 갈수록 */
         { vec2 d = w.xz - uPush.xy; float r2 = dot(d, d), k = uPush.w * exp(-r2 / (uPush.z * uPush.z)); w.xz += d / sqrt(r2 + .5) * k * aS * min(2.5, length(instanceMatrix[1].xyz)); w.y -= k * aS * .25; }   /* 오르내리는 바람에 밀려 눕고 다시 일어남 */
+        if (uWave.w > 0.) { vec2 d = w.xz - uWave.xy; float r = length(d) + .01, k = uWave.w * smoothstep(uWave.z + 3., uWave.z - 1.5, r) * exp(-max(0., uWave.z - r) / 10.); w.xz += d / r * k * aS * 1.4; w.y -= k * aS * .35; }   /* 퍼지는 바람: 앞머리가 지나가며 바깥으로 눕고 뒤에서 다시 일어남 */
         vC = color; vN = normalize(mat3(instanceMatrix) * normal); vP = w.xyz; vS = aS; gl_Position = projectionMatrix * viewMatrix * modelMatrix * w; }`,
     f: GL + `varying vec3 vC, vN, vP; varying float vS;
       void main(){ vec3 n = normalize(vN); vec3 an = abs(n); an /= an.x + an.y + an.z;

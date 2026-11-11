@@ -5,8 +5,8 @@
    · 반딧불: 느리게 떠다니며 깜빡임 (맵마다 색)
    · 비스듬한 빛줄기: 해 쪽에서 장소로 내려오는 옅은 빛 다섯 줄기 (천천히 숨 쉼) */
 import * as THREE from 'three';
-import { noise2 } from './islefield.js?v=11111311';
-import { carvedBlock } from './ruins.js?v=11111311';
+import { noise2 } from './islefield.js?v=11111325';
+import { carvedBlock } from './ruins.js?v=11111325';
 
 const V = (x, y, z) => new THREE.Vector3(x, y, z);
 const rngOf = s => () => (s = (s * 16807) % 2147483647) / 2147483647;
@@ -14,7 +14,7 @@ const rngOf = s => () => (s = (s * 16807) % 2147483647) / 2147483647;
 /* x0 z0 gy: 장소 가운데 · angles: 돌기둥 각도 · S/SFRAG: 장소 돌 칠 (떠 도는 돌도 같은 돌) · glow: 상태 빛 색 (Color — 매 프레임 바뀜) */
 export function buildMystic({ GL, U, S, SFRAG, pxU, x0, z0, gy, angles, group, glow }) {
   const r = rngOf(4242), add = { blending: THREE.AdditiveBlending, transparent: true, depthWrite: false };
-  const MU = { uT: U.uT, uGlow: { value: glow }, uMist: { value: new THREE.Color() }, uFly: { value: new THREE.Color() }, uShaft: { value: new THREE.Color() }, uMistA: { value: .3 } };
+  const MU = { uT: U.uT, uGlow: { value: glow }, uMist: { value: new THREE.Color() }, uFly: { value: new THREE.Color() }, uShaft: { value: new THREE.Color() }, uMistA: { value: .3 }, uRel: { value: -1 } };   /* uRel: 상자가 열린 뒤 흐른 초 (풀려난 힘이 가운데서 바깥으로 초당 14 퍼짐) */
 
   /* ── 땅속 빛줄기 ── 기둥마다 두 갈래 (구불구불 · 곁가지) · 바닥 높이(안쪽 겹 0.44 · 룬 고리 0.52) 위에 살짝 */
   const LP = [], LA = [], LI = [], floorY = rr => (rr > 19 ? .58 : .5);
@@ -30,9 +30,10 @@ export function buildMystic({ GL, U, S, SFRAG, pxU, x0, z0, gy, angles, group, g
   const lg = new THREE.BufferGeometry(); lg.setAttribute('position', new THREE.Float32BufferAttribute(LP, 3)); lg.setAttribute('aA', new THREE.Float32BufferAttribute(LA, 3)); lg.setIndex(LI);
   const ley = new THREE.Mesh(lg, new THREE.ShaderMaterial({ uniforms: MU, ...add, polygonOffset: true, polygonOffsetFactor: -4,
     vertexShader: `attribute vec3 aA; varying vec3 vA; void main(){ vA = aA; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.); }`,
-    fragmentShader: `uniform vec3 uGlow; uniform float uT; varying vec3 vA; void main(){ float x = abs(vA.x), core = exp(-x * x * 18.), soft = (1. - x) * .35;
+    fragmentShader: `uniform vec3 uGlow; uniform float uT, uRel; varying vec3 vA; void main(){ float x = abs(vA.x), core = exp(-x * x * 18.), soft = (1. - x) * .35;
+      float rr = 20.4 - vA.y * 11.4, rel = uRel < 0. ? 0. : exp(-pow((rr - uRel * 14.) / 1.5, 2.)) * 4. + step(rr, uRel * 14.) * exp(-uRel * .7) * 1.2;   /* 풀려난 힘이 빛줄기를 타고 기둥 쪽으로 거꾸로 달려감 */
       float pulse = pow(fract(vA.y * 1.6 - uT * .22 + vA.z * .37), 10.) * 1.6, fadeEnds = smoothstep(0., .06, vA.y) * smoothstep(1., .9, vA.y);   /* 빛 덩이가 천천히 제단 쪽으로 흘러감 */
-      gl_FragColor = vec4(mix(uGlow, vec3(1.), .2) * (core * (.55 + pulse) + soft * (.3 + pulse * .4)) * fadeEnds, 1.); }` }));
+      gl_FragColor = vec4(mix(uGlow, vec3(1.), .2 + .3 * min(1., rel)) * (core * (.55 + pulse + rel) + soft * (.3 + pulse * .4 + rel * .5)) * fadeEnds, 1.); }` }));
   ley.renderOrder = 6; group.add(ley);
 
   /* ── 떠 도는 돌 조각 ── 룬 새긴 옛 돌 부스러기 (위쪽은 부서진 면) · 장소 바깥을 천천히 맴돎 */
@@ -50,8 +51,9 @@ export function buildMystic({ GL, U, S, SFRAG, pxU, x0, z0, gy, angles, group, g
   /* ── 낮게 깔린 안개 ── 두 겹 · 천천히 흘러감 · 가장자리로 갈수록 옅어짐 */
   for (const [h, k, sp] of [[.95, 1, 1], [2.1, .7, -.7]]) { const mist = new THREE.Mesh(new THREE.CircleGeometry(38, 64).rotateX(-Math.PI / 2).translate(x0, gy + h, z0), new THREE.ShaderMaterial({ uniforms: { ...U, ...MU, uLk: { value: k }, uSp: { value: sp } }, transparent: true, depthWrite: false,
       vertexShader: `varying vec3 vP; void main(){ vP = position; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.); }`,
-      fragmentShader: GL + `uniform vec3 uMist; uniform float uMistA, uLk, uSp; varying vec3 vP; void main(){ vec2 p = vP.xz - vec2(${x0.toFixed(2)}, ${z0.toFixed(2)}); float r = length(p);
-        float n = fb(p * .07 + vec2(uT * .018, uT * .011) * uSp) * .65 + fb(p * .16 - vec2(uT * .02, -uT * .014) * uSp) * .35, a = smoothstep(.38, .78, n) * smoothstep(38., 22., r) * uMistA * uLk;
+      fragmentShader: GL + `uniform vec3 uMist; uniform float uMistA, uLk, uSp, uRel; varying vec3 vP; void main(){ vec2 p = vP.xz - vec2(${x0.toFixed(2)}, ${z0.toFixed(2)}); float r = length(p) + .01;
+        float push = uRel < 0. ? 0. : min(uRel * 14., 30.) * exp(-uRel * .25), clear = uRel < 0. ? 0. : smoothstep(uRel * 14. + 2., uRel * 14. - 6., r) * exp(-uRel * .35); p -= p / r * push * .6;   /* 바람에 안개가 바깥으로 밀려나고 가운데가 걷혔다 천천히 다시 참 */
+        float n = fb(p * .07 + vec2(uT * .018, uT * .011) * uSp) * .65 + fb(p * .16 - vec2(uT * .02, -uT * .014) * uSp) * .35, a = smoothstep(.38, .78, n) * smoothstep(38., 22., r) * uMistA * uLk * (1. - clear) * (1. + .8 * (uRel < 0. ? 0. : exp(-pow((r - uRel * 14.) / 3., 2.)) * exp(-uRel * .4)));
         gl_FragColor = vec4(uMist, a); }` })); mist.renderOrder = 5; group.add(mist); }
 
   /* ── 반딧불 ── 느리게 떠다니며 깜빡임 */
@@ -76,7 +78,7 @@ export function buildMystic({ GL, U, S, SFRAG, pxU, x0, z0, gy, angles, group, g
   shafts.frustumCulled = false; shafts.renderOrder = 9; group.add(shafts);
 
   const setTheme = TH => { MU.uMist.value.setRGB(...TH.mist); MU.uFly.value.setRGB(...TH.fly); MU.uShaft.value.setRGB(...TH.shaft); MU.uMistA.value = TH.mistA; };
-  const update = t => { const cnt = [0, 0, 0];
+  const update = (t, rel = -1) => { MU.uRel.value = rel; const cnt = [0, 0, 0];
     for (const R of rocks) { const a = R.a + t * R.w, y = R.y + Math.sin(t * .45 + R.ph) * .7; e.set(R.rx + t * R.sp * .3, R.ry + t * R.sp, R.rz); q.setFromEuler(e); sc.setScalar(R.s);
       m4.compose(V(x0 + Math.cos(a) * R.rr, gy + y, z0 + Math.sin(a) * R.rr), q, sc); inst[R.v].setMatrixAt(cnt[R.v]++, m4); }
     for (const m of inst) m.instanceMatrix.needsUpdate = true; };

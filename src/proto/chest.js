@@ -7,14 +7,14 @@
    · 봉인: 돌기둥 여섯에서 사슬 여섯 줄 — 상자 등급 재질 (나무: 검은 쇠 · 청동 · 은 · 금 · 흐르는 빛 없이 은은히 빛남) · 상자 위에 떠서 도는 봉인 원 (여섯 조각 = 사슬 여섯) · 앞 자물쇠 봉인 문양
    · 왜 풀리나: 몬스터 체력과 사슬을 이음 — 체력 1/6이 줄 때마다 사슬 하나가 끊어짐
    · 쓰러뜨리면: 남은 사슬이 차례로 끊김 → 봉인 원이 깨짐 → 뚜껑이 떨다가 젖혀 열림 → 안에서 빛이 터짐
-                 → 빛 덩이가 튀어나와 제단 앞 바닥(1층에서 주울 수 있는 높이)에 떨어짐 = 아이템 떨어질 자리 (아이템은 따로 받음)
+                 → 빛 덩이가 천천히 떠올라 위로 둥글게 넘어가 제단 앞 바닥(1층에서 주울 수 있는 높이)에 사뿐히 내려앉음 = 아이템 떨어질 자리 (아이템은 따로 받음)
    · 빛기둥은 없앰 (사용자 2026-11-11: 위에서 비스듬히 보는 카메라라 화면 밖 위치를 못 알려 줌 → 화면 밖 표시기가 대신함)
    · 상자가 내 화면에 들어오는 순간: 모서리가 별처럼 아주 밝게 번쩍했다 줄어듦 → 겉면에 무지개빛이 한 번 지나감 · 그 뒤 몇 초마다 은은히 다시 지나감
    · 상자 둘레로 작은 금빛 반짝이가 천천히 올라감 (동그란 티 안 나게 가는 십자 반짝임) */
 import * as THREE from 'three';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
-import { noise2 } from './islefield.js?v=11111311';
-import { carvedBlock, runeD } from './ruins.js?v=11111311';
+import { noise2 } from './islefield.js?v=11111325';
+import { carvedBlock, runeD } from './ruins.js?v=11111325';
 
 const W = 4.2, D = 2.8, BOT = .75, SEAM = 2.85, R = 1.45, AX = 3.0, LL = 4.3;   /* 몸통 너비 · 깊이 · 바닥 · 뚜껑 이음 높이 · 뚜껑 반지름 · 뚜껑 축 높이 · 뚜껑 길이 (섬 안 단위 · 0.5배 = m) */
 const ORDER = [0, 3, 1, 4, 2, 5];   /* 체력이 줄 때 끊기는 차례 (마주 보는 것끼리 번갈아) */
@@ -158,9 +158,30 @@ export function buildChest({ GL, U, S, pxU, x0, z0, cb, anchors, angles, drop, g
   /* 열렸을 때 안에서 쏟아지는 빛 */
   const OA = { uA: { value: 0 } };
   group.add(new THREE.Mesh(new THREE.PlaneGeometry(W - .3, D - .3).rotateX(-Math.PI / 2).translate(x0, cb + SEAM + .03, z0), glowMat(`varying vec2 vU; void main(){ vU = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.); }`,
-    `uniform vec3 uC; uniform float uA, uT; varying vec2 vU; void main(){ vec2 q = abs(vU - .5) * 2.; float e = (1. - pow(q.x, 6.)) * (1. - pow(q.y, 6.)); gl_FragColor = vec4(mix(uC, vec3(1.), .65) * e * uA * 2.4, 1.); }`, OA)));
-  group.add(new THREE.Mesh(new THREE.CylinderGeometry(1.6, 2.1, 4, 24, 1, true).translate(x0, cb + SEAM + 2, z0), glowMat(`varying vec2 vU; void main(){ vU = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.); }`,
-    `uniform vec3 uC; uniform float uA, uT; varying vec2 vU; void main(){ float s = .55 + .45 * sin(vU.x * 60. + uT * 3.) * sin(vU.x * 23. - uT * 2.); gl_FragColor = vec4(mix(uC, vec3(1.), .4) * pow(1. - vU.y, 2.) * s * uA * .7, 1.); }`, OA)));
+    `uniform vec3 uC; uniform float uA, uT; varying vec2 vU; void main(){ vec2 q = abs(vU - .5) * 2.; float e = (1. - pow(q.x, 6.)) * (1. - pow(q.y, 6.)); gl_FragColor = vec4(mix(uC, vec3(1.), .45) * e * uA * 1.3, 1.); }`, OA)));
+  /* 열린 입구 테두리에서 넘쳐 오르는 빛 (입구 네모 그대로 · 낮게) */
+  const RP = [], RV = [], RI = [], hw = (W - .4) / 2, hd = (D - .4) / 2, HH = 1.1, FL = .2;
+  [[-hw, hd, hw, hd], [hw, hd, hw, -hd], [hw, -hd, -hw, -hd], [-hw, -hd, -hw, hd]].forEach(([ax, az, bx, bz], e) => { const b = RP.length / 3, n = 12;
+    for (let i = 0; i <= n; i++) { const t = i / n, x = ax + (bx - ax) * t, z = az + (bz - az) * t; for (const v of [0, 1]) { RP.push(x0 + x * (1 + FL * v), cb + SEAM + .05 + v * HH, z0 + z * (1 + FL * v)); RV.push(e + t, v); } }
+    for (let i = 0; i < n; i++) { const a = b + i * 2; RI.push(a, a + 1, a + 2, a + 1, a + 3, a + 2); } });
+  const rayG = new THREE.BufferGeometry(); rayG.setAttribute('position', new THREE.Float32BufferAttribute(RP, 3)); rayG.setAttribute('uv', new THREE.Float32BufferAttribute(RV, 2)); rayG.setIndex(RI);
+  group.add(new THREE.Mesh(rayG, glowMat(`varying vec2 vU; void main(){ vU = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.); }`,
+    `uniform vec3 uC; uniform float uA, uT; varying vec2 vU; void main(){ float u = vU.x * 7.3, s = .45 + .55 * pow(.5 + .5 * sin(u * 6.2832 + sin(u * 2.3) * 1.5), 3.) * (.85 + .15 * sin(uT * 1.3 + u * 4.));   /* 가는 빛살 (천천히 숨 쉼) */
+      gl_FragColor = vec4(mix(uC, vec3(1.), .55) * pow(1. - vU.y, 2.2) * s * uA * .75, 1.); }`, OA)));
+
+  /* 열린 상자에서 부채처럼 퍼져 나오는 빛살 (사용자 2026-11-11 참고 그림: 안에서 금빛이 쏟아져 위 · 옆으로 뻗음 · 금화 없음)
+     늘 카메라를 보는 판 하나 · 입구 가운데에서 위쪽 반원으로만 · 빛살 길이와 굵기가 제각각 · 천천히 숨 쉬고 아주 조금씩 돎 · 가운데는 하얗게 */
+  const fan = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), glowMat(`uniform vec3 uO; varying vec2 vQ; void main(){ vQ = position.xy; vec3 w = (modelMatrix * vec4(uO, 1.)).xyz, f = normalize(cameraPosition - w), sd = normalize(cross(vec3(0., 1., 0.), f)), uu = cross(f, sd);
+      gl_Position = projectionMatrix * viewMatrix * modelMatrix * vec4(uO + (sd * position.x + uu * position.y) * 11., 1.); }`,
+    `uniform vec3 uC; uniform float uA, uT; varying vec2 vQ; float h1(float n){ return fract(sin(n * 78.233) * 43758.5); }
+     void main(){ float r = length(vQ), a = atan(vQ.x, vQ.y), up = smoothstep(1.62, 1.15, abs(a)) * smoothstep(-.08, .06, vQ.y + .02);   /* 위쪽 반원 (입구 위로만) */
+       float k = a * 9.5 + .5, id = floor(k), fk = fract(k) - .5, len = .35 + .65 * h1(id), wid = .1 + .22 * h1(id + 3.), br = .5 + .5 * sin(uT * (.6 + h1(id + 7.)) + id * 2.);   /* 굵은 빛살 하나하나 */
+       float ray = smoothstep(wid, wid * .2, abs(fk)) * smoothstep(len, len * .25, r) * (.55 + .45 * br);
+       float k2 = a * 23. - uT * .05, id2 = floor(k2), ray2 = smoothstep(.12, .0, abs(fract(k2) - .5)) * smoothstep(.55 + .4 * h1(id2 + 11.), .05, r) * .45;   /* 가는 빛살 */
+       float core = exp(-r * r * 60.) * .9 + exp(-r * r * 9.) * .25, halo = exp(-r * 3.2) * .18;
+       vec3 col = mix(uC * vec3(1., .82, .45), vec3(1., .95, .75), clamp(.8 - r * 1.8, 0., 1.));   /* 바깥은 짙은 금빛 · 안쪽만 하얗게 */
+       gl_FragColor = vec4(col * ((ray * 1.5 + ray2) * up + core * smoothstep(-.25, .05, vQ.y) + halo * up) * uA * 1.2, 1.); }`, { ...OA, uO: { value: V(x0, cb + SEAM + .15, z0) } }));
+  fan.frustumCulled = false; fan.renderOrder = 9; group.add(fan);
 
   /* 봉인 원: 상자 위에 떠서 천천히 돎 · 여섯 조각 = 사슬 여섯 (끊기면 그 조각이 깜빡이다 꺼짐) · 다 끊기면 깨짐 */
   const SEC = { uSec: { value: [1, 1, 1, 1, 1, 1] }, uA: { value: 1 }, uRot: { value: 0 }, uA0: { value: angles[0] } };
@@ -194,13 +215,13 @@ export function buildChest({ GL, U, S, pxU, x0, z0, cb, anchors, angles, drop, g
   links.forEach(([c, t, i], k) => { const ch = chains[c], p = ch.P(t), q = ch.P(Math.min(1, t + .01)).sub(ch.P(Math.max(0, t - .01))).normalize(); X.copy(q); Y.crossVectors(q, up).normalize(); Z.crossVectors(X, Y);
     if (i % 2) { const tmp = Y.clone(); Y.copy(Z); Z.copy(tmp).negate(); } m4.makeBasis(X, Y, Z).setPosition(p); mats.push(m4.clone()); iA.set([c, t, i], k * 3); });
   const ig = new THREE.InstancedBufferGeometry().copy(link); ig.instanceCount = NL; ig.setAttribute('aI', new THREE.InstancedBufferAttribute(iA, 3));
-  const BR = { uBrk: { value: [-1, -1, -1, -1, -1, -1] }, uShake: { value: 0 }, uGold: { value: GOLD }, uHalo: { value: new THREE.Color() } };
+  const BR = { uBrk: { value: [-1, -1, -1, -1, -1, -1] }, uJolt: { value: 99 }, uGold: { value: GOLD }, uHalo: { value: new THREE.Color() } };
   const chainM = new THREE.InstancedMesh(ig, new THREE.ShaderMaterial({ uniforms: { ...U, ...BR, uKind: CU.uKind },
-    vertexShader: `attribute vec3 aI; uniform float uBrk[6]; uniform float uShake, uT; varying vec3 vP, vN, vW; varying float vB;
+    vertexShader: `attribute vec3 aI; uniform float uBrk[6]; uniform float uJolt, uT; varying vec3 vP, vN, vW; varying float vB;
       float h1(float n){ return fract(sin(n * 127.1) * 43758.5); }
       void main(){ int c = int(aI.x + .5); float b = -1.; for (int i = 0; i < 6; i++) if (i == c) b = uBrk[i];
         vB = -1.; vec4 w = instanceMatrix * vec4(position, 1.); vec3 nn = mat3(instanceMatrix) * normal;
-        w.xyz += vec3(sin(uT * 23. + aI.z * .9), sin(uT * 19. + aI.z * 1.3), cos(uT * 21. + aI.z)) * .05 * uShake * sin(aI.y * 3.1416);   /* 싸움: 사슬이 팽팽히 떨림 */
+        if (b < 0.) w.y += sin(uJolt * 16. - aI.y * 6.) * exp(-uJolt * 3.5) * .45 * sin(aI.y * 3.1416);   /* 다른 사슬이 끊기는 순간: 힘이 남은 사슬로 몰려 한 번 출렁임 (평소엔 가만히) */
         if (b >= 0.) { float snap = .5 + (h1(aI.x * 7.) - .5) * .4, bl = b - abs(aI.y - snap) * .35; vB = bl;   /* 끊긴 자리에서 양쪽으로 차례로 흩어짐 */
           if (bl > 0.) { float s = h1(aI.z + aI.x * 31.), s2 = h1(aI.z * 1.7 + aI.x * 13.); vec3 ctr = (instanceMatrix * vec4(0., 0., 0., 1.)).xyz;
             vec3 v = vec3(s - .5, .4 + s2 * .8, s2 - .5) * 5.; float ang = bl * (4. + s * 8.), ca = cos(ang), sa = sin(ang);
@@ -221,9 +242,10 @@ export function buildChest({ GL, U, S, pxU, x0, z0, cb, anchors, angles, drop, g
   const HP = [], HT = [], HS = [], HI = []; chains.forEach((ch, c) => { const n = 40, b0 = HP.length / 3; for (let i = 0; i <= n; i++) { const t = i / n, p = ch.P(t), q = ch.P(Math.min(1, t + .02)).sub(ch.P(Math.max(0, t - .02))).normalize(); for (const s of [-1, 1]) { HP.push(p.x, p.y, p.z); HT.push(q.x, q.y, q.z, t); HS.push(s, c); } }
     for (let i = 0; i < n; i++) { const a = b0 + i * 2; HI.push(a, a + 1, a + 2, a + 1, a + 3, a + 2); } });
   const hg = new THREE.BufferGeometry(); hg.setAttribute('position', new THREE.Float32BufferAttribute(HP, 3)); hg.setAttribute('aT', new THREE.Float32BufferAttribute(HT, 4)); hg.setAttribute('aS', new THREE.Float32BufferAttribute(HS, 2)); hg.setIndex(HI);
-  const halo = new THREE.Mesh(hg, glowMat(`attribute vec4 aT; attribute vec2 aS; uniform float uBrk[6]; varying float vS, vK; void main(){ int c = int(aS.y + .5); float b = -1.; for (int i = 0; i < 6; i++) if (i == c) b = uBrk[i];
+  const halo = new THREE.Mesh(hg, glowMat(`attribute vec4 aT; attribute vec2 aS; uniform float uBrk[6]; uniform float uJolt; varying float vS, vK; void main(){ int c = int(aS.y + .5); float b = -1.; for (int i = 0; i < 6; i++) if (i == c) b = uBrk[i];
       vec3 w = (modelMatrix * vec4(position, 1.)).xyz, sd = normalize(cross(aT.xyz, cameraPosition - w)); vS = aS.x; vK = b < 0. ? 1. : max(0., 1. - b * 4.);
-      gl_Position = projectionMatrix * viewMatrix * modelMatrix * vec4(position + sd * aS.x * .5, 1.); }`,
+      vec3 p = position + sd * aS.x * .5; if (b < 0.) p.y += sin(uJolt * 16. - aT.w * 6.) * exp(-uJolt * 3.5) * .45 * sin(aT.w * 3.1416);
+      gl_Position = projectionMatrix * viewMatrix * modelMatrix * vec4(p, 1.); }`,
     `uniform vec3 uHalo; varying float vS, vK; void main(){ float x = 1. - abs(vS); gl_FragColor = vec4(uHalo * x * x * .18 * vK, 1.); }`, BR)); halo.frustumCulled = false; group.add(halo);
   /* 기둥 쪽 걸쇠 (사슬과 같은 재질) */
   const anch = new THREE.Mesh(merge(anchors.map(A => { const d = V(x0 - A.x, 0, z0 - A.z).normalize(), g = new THREE.TorusGeometry(.42, .1, 6, 18); g.rotateY(Math.atan2(d.x, d.z)); return at(g, A.x - x0, A.y - cb, A.z - z0); }), true), mk(TRIM_F, CV, still));
@@ -284,7 +306,7 @@ export function buildChest({ GL, U, S, pxU, x0, z0, cb, anchors, angles, drop, g
   const HALO = [[.25, .2, .16], [.9, .55, .25], [.8, .86, 1], [1.25, .86, .32]];
   const setGrade = k => { grade = k; const g = GRADES[k].k; CU.uKind.value = g; BR.uHalo.value.setRGB(...HALO[g]); orn.s.visible = g >= 2; orn.l.visible = g === 3; for (const m of gems.silver) m.visible = g === 2; for (const m of gems.gold) m.visible = g === 3; };
   setGrade(grade);
-  const snap = c => { if (brk[c] >= 0) return; brk[c] = 0; sec[c] = .999; left--; const ch = chains[c]; burst(ch.P(.5), 50, 6, now); burst(ch.B, 18, 3, now); burst(ch.A, 18, 3, now); };
+  const snap = c => { if (brk[c] >= 0) return; brk[c] = 0; BR.uJolt.value = 0; sec[c] = .999; left--; const ch = chains[c]; burst(ch.P(.5), 50, 6, now); burst(ch.B, 18, 3, now); burst(ch.A, 18, 3, now); };
   const reset = () => { for (let c = 0; c < 6; c++) { brk[c] = -1; sec[c] = 1; } left = 6; open = -1; opened = landed = false; burstT = -1; lidAt(0, 0); SEC.uA.value = 1; OA.uA.value = 0; SA.uA.value = 1; orbU.uA.value = 0; spotU.uA.value = 0; RU.uA.value = 1; seen = false; };
   const setHP = hp => { const keep = Math.max(0, Math.ceil(hp * 6 - 1e-6)); for (let k = 0; k < 6 - keep; k++) snap(ORDER[k]); };
   let lastLeft = []; const kill = () => { lastLeft = ORDER.filter(c => brk[c] < 0); open = 0; };
@@ -293,7 +315,7 @@ export function buildChest({ GL, U, S, pxU, x0, z0, cb, anchors, angles, drop, g
   const C0 = V(), ndc = V();
   const update = (t, dt, st, cam) => { now = t; SEC.uRot.value = t * .12;
     for (let c = 0; c < 6; c++) if (brk[c] >= 0) { brk[c] += dt; sec[c] = Math.max(0, sec[c] - dt * .9); }
-    BR.uShake.value = st === 'fight' ? 1 : 0;
+    BR.uJolt.value += dt;
     /* 화면 안에 있나 (상자 가운데가 화면 안쪽 · 카메라 앞) */
     let onScr = false; if (cam) { C0.set(x0, cb + 2, z0); group.localToWorld(C0); ndc.copy(C0).project(cam); onScr = ndc.z < 1 && Math.abs(ndc.x) < .9 && Math.abs(ndc.y) < .9; }
     if (onScr && !seen) shine(); seen = onScr;
@@ -304,14 +326,15 @@ export function buildChest({ GL, U, S, pxU, x0, z0, cb, anchors, angles, drop, g
       const tBreak = lastLeft.length * .16 + .25;
       if (o > tBreak && SEC.uA.value === 1) { SEC.uA.value = .999; burst(V(x0, SY, z0), 90, 9, now); }   /* 봉인 원이 깨짐 */
       if (o > tBreak) SEC.uA.value = Math.max(0, 1.6 * Math.exp(-(o - tBreak) * 6) * (o - tBreak < .08 ? 1 : .6));
-      const t1 = tBreak + .35, t2 = t1 + .55, t3 = t2 + .7, tf = t2 + .25, tl = tf + .9;   /* 떨림 → 열림 → 빛 덩이 날아감 → 바닥에 떨어짐 */
+      const t1 = tBreak + .35, t2 = t1 + .55, t3 = t2 + .7, tf = t2 + .35, tl = tf + 1.7;   /* 떨림 → 열림 → 빛 덩이 날아감 → 바닥에 떨어짐 */
       let ang = 0, jit = 0;
       if (o > t1 && o < t2) { const k = (o - t1) / (t2 - t1); jit = Math.sin(o * 70) * .025 * k; ang = Math.max(0, Math.sin(o * 55)) * .04 * k; }
       if (o >= t2) { const k = Math.min(1, (o - t2) / (t3 - t2)), e = 1 + 2.7 * Math.pow(k - 1, 3) + 1.7 * Math.pow(k - 1, 2); ang = 1.95 * e; if (!opened) { opened = true; burst(V(x0, cb + SEAM + .4, z0), 120, 8, now); } }
       lidAt(ang, jit); SA.uA.value = o < t2 ? 1 + (o > t1 ? 1.5 * (o - t1) / (t2 - t1) : 0) : Math.max(0, 1 - (o - t2) * 3);
       OA.uA.value = o < t2 ? 0 : Math.min(1, (o - t2) * 4) * (.6 + 1.5 * Math.exp(-(o - t2) * 3));
       burstT = o >= t2 ? o - t2 : -1; RU.uA.value = o < t2 ? 1 : Math.max(.35, 1 - (o - t2) * .3);
-      if (o >= tf && o < tl) { const k = (o - tf) / (tl - tf), A = V(x0, cb + SEAM + .6, z0), B = V(drop.x, DY + 1.1, drop.z); orbU.uP.value.copy(A).lerp(B, k).add(V(0, 9 * k * (1 - k), 0)); orbU.uA.value = 1;
+      if (o >= tf && o < tl) { const u = (o - tf) / (tl - tf), k = u * u * (3 - 2 * u), A = V(x0, cb + SEAM + .6, z0), B = V(drop.x, DY + 1.1, drop.z), P1 = A.clone().add(V(0, 6, 0)), P2 = B.clone().add(V(0, 7.5, 0)), m = 1 - k;   /* 툭 뱉지 않고: 상자에서 천천히 떠올라 위로 둥글게 넘어가 사뿐히 내려앉음 */
+        orbU.uP.value.set(0, 0, 0).addScaledVector(A, m * m * m).addScaledVector(P1, 3 * m * m * k).addScaledVector(P2, 3 * m * k * k).addScaledVector(B, k * k * k); orbU.uA.value = 1;
         if (Math.random() < dt * 30) burst(orbU.uP.value, 2, 1.2, now); }   /* 빛 덩이 날아감 (꼬리 불꽃) */
       if (o >= tl) { if (!landed) { landed = true; burst(V(drop.x, DY + .6, drop.z), 70, 5, now); } const k = Math.min(1, (o - tl) / 1.2);
         orbU.uP.value.set(drop.x, DY + 1.1 + .25 * Math.sin(t * 2.4), drop.z); orbU.uA.value = .75 + .25 * Math.sin(t * 3.); spotU.uA.value = Math.min(1, (o - tl) * 3); spotU.uK.value = k; } }
