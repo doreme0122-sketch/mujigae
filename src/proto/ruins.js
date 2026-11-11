@@ -8,7 +8,7 @@
    막힘은 보이는 두께 그대로
    돌려주는 것: geos (깎은 돌 칠 하나로 한 번에 그림) · glow (빛 무늬 세모 [a, b, c, 색, 위상]) · obstacles ([x, y, z, r]) · strands (늘어진 덩굴 점 줄) */
 import * as THREE from 'three';
-import { noise2 } from './islefield.js?v=11111804';
+import { noise2 } from './islefield.js?v=11111829';
 
 const V = (x, y, z) => new THREE.Vector3(x, y, z);
 const rngOf = s => () => (s = (s * 16807) % 2147483647) / 2147483647;
@@ -149,9 +149,9 @@ export function buildRuins({ F, hAt, LAYERS, Y, LO, TUN }) {
     const boulder = (c, sx, sy, sz, sd2, keelDown = .6) => { const g = new THREE.IcosahedronGeometry(1, 4); g.deleteAttribute('uv'); const pp = g.attributes.position;
       for (let v = 0; v < pp.count; v++) { const x = pp.getX(v), y2 = pp.getY(v), z = pp.getZ(v), n = 1 + .22 * noise2(x * 1.7 + sd2, z * 1.7 + y2 * 1.3) + .1 * noise2(x * 4.1 - sd2, y2 * 4.3 + z) + .04 * noise2(y2 * 9, x * 9 + sd2);
         pp.setXYZ(v, x * n * sx, (y2 < 0 ? y2 * keelDown : y2) * n * sy, z * n * sz); } g.rotateY(ry + (r() - .5) * .3); g.translate(c.x, c.y, c.z); g.computeVertexNormals(); rock.push(g); };
-    boulder(P(0, y + 4.5, -4.5), DW + 9, 7.5, 9, 3, .45);   /* 처마 위를 덮은 바위 (아래는 처마에 걸침) */
-    for (const s of [-1, 1]) { boulder(P(s * (DW + 23), base + 9, -2.5), 7.5, 13, 8, s * 5 + 9, .9); boulder(P(s * (DW + 14), TOP + 7, -4), 9, 6, 7, s * 7 + 2, .5);   /* 벽 끝을 삼킨 바위 · 벽 위에 얹힌 바위 */
-      boulder(P(s * (DW + 26), base + 3, 3), 4, 4, 4.5, s * 11, .8); }
+    boulder(P(0, y + 4.5, -9.5), DW + 9, 7.5, 9, 3, .45);   /* 처마 위를 덮은 바위 (문 뒤에서 · 앞으로 안 튀어나옴 — 사용자 2026-11-11) */
+    for (const s of [-1, 1]) { boulder(P(s * (DW + 23), base + 9, -8.5), 7.5, 13, 8, s * 5 + 9, .9); boulder(P(s * (DW + 14), TOP + 7, -7.5), 9, 6, 7, s * 7 + 2, .5);   /* 벽 끝을 삼킨 바위 · 벽 위에 얹힌 바위 */
+      boulder(P(s * (DW + 26), base + 3, -4), 4, 4, 4.5, s * 11, .8); }
     /* 종유석: 동굴 천장 들머리에서 늘어짐 (3층 높이엔 안 닿게) */
     for (let k = 0; k < 46; k++) { const t = r() * TUN.to * .7, th = (.28 + r() * .44) * Math.PI, q = TUN.inner(t, th), lim = q.y - (LAYERS[2] + 1.6); if (lim < .6) continue;
       const L2 = Math.min(lim, .8 + r() * r() * 3.5), g = new THREE.ConeGeometry(.22 + r() * .35, L2, 7, 4); g.deleteAttribute('uv'); weather(g, .05, 4, k); g.rotateX(Math.PI); g.translate(q.x, q.y - L2 / 2 + .25, q.z); rock.push(g); }
@@ -172,10 +172,10 @@ export function buildRuins({ F, hAt, LAYERS, Y, LO, TUN }) {
       while (s < s1) { const w2 = Math.min(1.8 + r() * 2.4, s1 - s); if (w2 < .5) break; const mid = s + w2 / 2; if (!skip(mid, y2 + h2 / 2) && r() > .05) put(carved(w2 - .07, h2 - .06, d, r() < .15 ? 'panel' : 'none', .06, row * 37 + s), mid, y2 + h2 / 2, f + (r() - .5) * .22, (r() - .5) * .03, 0, (r() - .5) * .03); s += w2; }
       y2 += h2; } }
   }
-  /* ④ 신전 앞마당의 무너진 기둥 무더기 (사용자 2026-11-11: 입구 앞에 무너진 기둥들로 1층을 막음 · 뒤에 가리는 산이 없는 탁 트인 곳)
-     거대한 홈 파인 기둥들이 여러 각도로 무너짐 — 비스듬히 누운 것 · 다른 기둥에 기댄 것 · 둘이 서로 기대 ㅅ자를 이룬 것 · 기둥 북(토막) 위에 얹힌 것 · 부러진 밑동
-     머리 장식이 떨어져 뒹굴고 토막들이 흩어짐 · 맨 위는 2층 아래 → 1층은 막히고 2 · 3층으로 넘음 */
-  if (R.pile) { const [cx, cz] = R.pile.c, hw = R.pile.w / 2, gnd = (x, z) => hAt(cx + x, cz + z), L1 = LAYERS[0], CAPY = LAYERS[1] - 2.2;
+  /* ④ 신전 앞마당의 무너진 기둥 무더기 (사용자 2026-11-11: 입구 앞 · 뒤에 가리는 산이 없는 탁 트인 곳)
+     기둥 넷이 쓰러지다 양옆 벽(산벽 · 입구 돌벽)에 비스듬히 기대 멈춤 — 각도 · 높이 · 굵기 제각각 (사용자 2026-11-11)
+     기둥 밑이나 옆으로 지나감 · 1층을 통째로 막지 않음 · 벽 앞 길에서는 2층이 지나감 */
+  if (R.pile) { const [cx, cz] = R.pile.c, gnd = (x, z) => hAt(cx + x, cz + z), CAPY = LAYERS[1] - 2.2;
     const axis = (yaw, pitch) => V(Math.cos(pitch) * Math.cos(yaw), Math.sin(pitch), -Math.cos(pitch) * Math.sin(yaw));
     /* 기둥 하나: 홈 파인 몸통 (끝은 부러져 들쭉날쭉) + 한쪽 끝 머리 장식 · (base: 밑동 끝 자리 · 몸통이 axis 쪽으로 뻗음) */
     const column = (bx, bz, by, L, rad, yaw, pitch, seed, cap = true, broken = true) => { const ax = axis(yaw, pitch), parts = [], body = fluted(rad, L, 16, Math.max(4, Math.round(L / 1.4)));
@@ -186,24 +186,22 @@ export function buildRuins({ F, hAt, LAYERS, Y, LO, TUN }) {
       for (const g of parts) { g.applyQuaternion(spin); g.applyQuaternion(q); g.translate(cx + C0.x, C0.y, cz + C0.z); add(g); }
       for (let t = 0; t <= L; t += 1.5) { const p = V(bx, by, bz).add(ax.clone().multiplyScalar(t)); obstacles.push([cx + p.x, p.y, cz + p.z, rad * .95]); }
       return V(bx, by, bz).add(ax.clone().multiplyScalar(L)); };
-    const lie = (x, z, L, rad, yaw, seed, lift = 0) => { const ax = axis(yaw, 0), bx = x - ax.x * L / 2, bz = z - ax.z * L / 2; return column(bx, bz, Math.max(gnd(bx, bz), gnd(x, z)) + rad * .85 + lift, L, rad, yaw, 0, seed); };
-    const lean = (bx, bz, tx, tz, ty, rad, seed) => { const by = gnd(bx, bz) + .3, dx = tx - bx, dz = tz - bz, hd = Math.hypot(dx, dz), yaw = Math.atan2(-dz, dx), pitch = Math.atan2(ty - by, hd), L = Math.hypot(hd, ty - by); return column(bx, bz, by, L, rad, yaw, pitch, seed, true, true); };
     const drum = (x, z, rad, h, rx, seed) => { const g = fluted(rad, h, 16, 2); weather(g, .05, 1.4, seed); g.computeVertexNormals(); g.rotateX(rx); g.rotateY(seed); const y = gnd(x, z) + (rx ? rad * .8 : h / 2 - .1); g.translate(cx + x, y, cz + z); add(g); obstacles.push([cx + x, y, cz + z, Math.max(rad, h / 2) * .9]); return y + (rx ? rad : h / 2); };
-    const top = () => Math.min(CAPY, gnd(0, 0) + 8.4);   /* 기둥 끝 높이 한계 (2층은 지나감) */
-    /* 왼쪽: 길게 누운 기둥 · 거기에 기댄 기둥 · 부러진 밑동 */
-    lie(-12, 2, 17, 1.55, .22, 3.1);
-    lean(-3, -5, -15, 4, top() - 1.2, 1.45, 4.7);
-    column(-20, -3, gnd(-20, -3) - .2, 5.4, 1.7, 0, Math.PI / 2, 9.3, true, true);   /* 부러진 밑동 (서 있음) */
-    drum(-20.6, 1.6, 1.7, 1.7, 1.45, 2.2);
-    /* 가운데: 토막 둘 위에 얹힌 긴 기둥 (밑은 낮게 막힘) */
-    const d1 = drum(-1, -1.5, 1.5, 1.6, 0, 5.5), d2 = drum(7, 1.8, 1.5, 1.4, 0, 6.6);
-    column(-6, -3.4, Math.max(d1, d2) + 1.3, 19, 1.6, -.28, .02, 7.7, true, true);
-    /* 오른쪽: 둘이 서로 기대 ㅅ자 · 떨어진 머리 장식 */
-    lean(9, -6, 14.2, -.6, top(), 1.4, 11.1); lean(20, 4, 14.8, -.3, top() - .3, 1.4, 12.4);
-    { const g = carved(4.2, 1.1, 4.2, 'lozenge', .06, 15); g.rotateZ(.5); g.rotateY(.8); const y = gnd(4, 6) + 1.4; g.translate(cx + 4, y, cz + 6); add(g); obstacles.push([cx + 4, y, cz + 6, 2.2]); }
-    drum(13, 6.5, 1.4, 1.5, Math.PI / 2, 13.3); drum(-8, 6.2, 1.5, 1.3, Math.PI / 2 - .3, 14.4); drum(16, -7.5, 1.3, 1.2, 0, 16.6);
-    for (let i = 0; i < 26; i++) { const x = (r() - .5) * 2 * hw, z = (r() - .5) * 16, g = block(.5 + r() * 1.2, .4 + r() * .8, .5 + r(), 1, .2, i); g.rotateY(r() * 6); g.rotateZ((r() - .5) * .6); g.translate(cx + x, gnd(x, z) + .3, cz + z); add(g); }   /* 흩어진 돌 부스러기 */
-    for (let x = -hw; x <= hw; x += 2.4) obstacles.push([cx + x, L1, cz + (x < -4 ? 1 : x < 8 ? -1.5 : -1), 2.4]);   /* 1층은 무더기 전체 폭으로 막힘 (보이는 무더기 그대로 · 틈새로 빠지지 않게) */
+    /* 벽에 기댄 기둥: 밑동은 바닥 · 몸통이 (dx, dz) 쪽으로 기울어 벽면(산 · 입구 돌벽)에 닿은 자리에서 멈춤 — 끝은 벽에 살짝 박힘 (사용자 2026-11-11)
+       ty: 기댄 높이 (기둥마다 다르게 · 2층보다 높은 끝은 이미 산이 2층을 막는 벽 위에만 닿음) · 벽을 못 찾으면 그 거리에서 땅에 걸침 */
+    const rest = (bx, bz, dx, dz, ty, rad, seed, cap) => { const n = Math.hypot(dx, dz), ux = dx / n, uz = dz / n; let tx = bx + ux * 16, tz = bz + uz * 16;
+      for (let t = 5; t < 40; t += .4) { const x = bx + ux * t, z = bz + uz * t; if (gnd(x, z) > ty - rad * .7) { tx = x + ux * .5; tz = z + uz * .5; break; } }
+      const by = gnd(bx, bz) + .3, hd = Math.hypot(tx - bx, tz - bz); return column(bx, bz, by, Math.hypot(hd, ty - by), rad, Math.atan2(-(tz - bz), tx - bx), Math.atan2(ty - by, hd), seed, cap, true); };
+    const F0 = gnd(0, 0);
+    /* 넷 · 각도 · 높이 · 굵기 모두 다르게 — 쓰러지다 벽에 걸린 모습 · 밑으로나 옆으로 지나감 (1층을 통째로 막지 않음) */
+    rest(-15, 6, -1, -.3, F0 + 12.5, 1.55, 3.1, true);     /* 왼쪽 산벽에 높이 기댐 */
+    rest(-14, -7, -1, -.95, F0 + 9, 1.3, 4.7, false);   /* 왼쪽 안쪽 · 입구 쪽으로 비틀려 낮게 · 밑받침 없이 부러진 채 */
+    rest(13, 5, 1, -.55, F0 + 11, 1.45, 11.1, true);     /* 오른쪽 산벽에 가파르게 */
+    rest(14, -8, 1, .15, F0 + 8, 1.25, 12.4, false);    /* 오른쪽 안쪽에 짧고 낮게 */
+    /* 밑에 떨어진 것 몇 개: 머리 장식 하나 · 토막 둘 · 부스러기 */
+    { const g = carved(4.2, 1.1, 4.2, 'lozenge', .06, 15); g.rotateZ(.5); g.rotateY(.8); const y = gnd(-9, 10) + 1.4; g.translate(cx - 9, y, cz + 10); add(g); obstacles.push([cx - 9, y, cz + 10, 2.2]); }
+    drum(9, 9, 1.4, 1.5, Math.PI / 2, 13.3); drum(-9, -3, 1.3, 1.2, 0, 16.6);
+    for (let i = 0; i < 12; i++) { const sd = r() < .5 ? -1 : 1, x = sd * (9 + r() * 12), z = (r() - .5) * 18, g = block(.5 + r() * 1.1, .4 + r() * .7, .5 + r(), 1, .2, i); g.rotateY(r() * 6); g.rotateZ((r() - .5) * .6); g.translate(cx + x, gnd(x, z) + .3, cz + z); add(g); }   /* 흩어진 돌 부스러기 (가운데 길은 비움) */
   }
   return { geos, rock, glow, obstacles, strands };
 }
