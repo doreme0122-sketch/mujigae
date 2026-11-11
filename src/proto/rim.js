@@ -6,11 +6,11 @@
    · 기지 안에선 판(계단 단 안쪽)과 출구 길만 다님 · 벽과 그 바깥은 막힘 (blocked) */
 import * as THREE from 'three';
 import { makePad } from '../core/hangar/pad.js';
-import { makeGoldStar } from './goldstar.js?v=11112236';
-import { makeArena } from './arena.js?v=11112236';
-import { makeGuardians, GUARD } from './guardian.js?v=11112236';
-import { FLY } from './flight.js?v=11112236';
-import { autoMerge } from './automerge.js?v=11112236';
+import { makeGoldStar } from './goldstar.js?v=11112336';
+import { makeArena } from './arena.js?v=11112336';
+import { makeGuardians, GUARD } from './guardian.js?v=11112336';
+import { FLY } from './flight.js?v=11112336';
+import { autoMerge } from './automerge.js?v=11112336';
 
 const SHIPL = 2.9, BS = 2 / SHIPL, BASE_Y = .42, GAPH = 5.6;
 function skyTone(root) { root.traverse(o => { if (!o.isMesh) return; for (const m of (Array.isArray(o.material) ? o.material : [o.material])) { if (!m || !m.color || m.userData.toned || m.isShaderMaterial || m.isMeshBasicMaterial) continue;
@@ -89,5 +89,5 @@ export async function buildRim({ scene, isle, K, LV }, LO) {
   const blocked = (x, z) => { const b = ME; if (Math.hypot(x - b.x, z - b.z) < 6.2) { const lx = (x - b.x) * b.dx + (z - b.z) * b.dz, lz = -(x - b.x) * b.dz + (z - b.z) * b.dx; return !(Math.hypot(lx, lz) < FL || (lx > 0 && Math.abs(lz) < EXH)); }
     return Math.hypot(x, z) > R - .9; };
   return { blocked, base: ME, hit: (x, y, z, t) => HITS[hitI++ % HITS.length].set(x, y, z, t),
-    update: (t, dt, st) => { const show = !st.blk; if (HIDE[0].visible !== show) for (const o of HIDE) o.visible = show; wallM.uniforms.uT.value = t; seamM.uniforms.uT.value = t; wallM.uniforms.uP.value.set(st.x * K, st.z * K); if (st.cam) wallM.uniforms.uC.value.set(st.cam.x, st.cam.z); ME.pad.userData.update(t); ME.star.userData.update(t); ME.ring.userData.update(t); ME.guards.userData.update(t, false); } };
+    update: (t, dt, st) => { const show = !st.blk && !st.cave;   /* 비밀 터널 · 보물 동굴 안: 밖은 까맣게 */ if (HIDE[0].visible !== show) for (const o of HIDE) o.visible = show; wallM.uniforms.uT.value = t; seamM.uniforms.uT.value = t; wallM.uniforms.uP.value.set(st.x * K, st.z * K); if (st.cam) wallM.uniforms.uC.value.set(st.cam.x, st.cam.z); ME.pad.userData.update(t); ME.star.userData.update(t); ME.ring.userData.update(t); ME.guards.userData.update(t, false); } };
 }

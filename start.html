@@ -48,7 +48,7 @@ input[type=range]{flex:1;min-width:0;accent-color:#b9ff4a;height:18px;margin:0}
 </style>
 <script>
 window.__ver = fetch('ver.json?t=' + Date.now(), { cache: 'no-store' }).then(r => r.json()).then(j => {
-  const f = location.pathname.split('/').pop() || 'index.html', want = j[f], mine = window.__mine = '11112236';
+  const f = location.pathname.split('/').pop() || 'index.html', want = j[f], mine = window.__mine = '11112336';
   if (want && +want > +mine) { location.replace(f + '?v=' + want + '&r=' + Date.now() + location.hash); return new Promise(() => {}); } }).catch(() => {});
 </script>
 <script type="importmap">{"imports":{"three":"./vendor/three.module.js","three/addons/":"./vendor/addons/"}}</script>
@@ -70,16 +70,16 @@ window.__ver = fetch('ver.json?t=' + Date.now(), { cache: 'no-store' }).then(r =
 <div id="rot">기기를 가로로 돌려 주세요</div>
 <script type="module">
 await window.__ver;
-const { start } = await import('./src/proto/isleview.js?v=11112236');
-const { START } = await import('./src/proto/startlab.js?v=11112236');
-const { buildRim } = await import('./src/proto/rim.js?v=11112236');
-const { buildTreasure } = await import('./src/proto/treasure.js?v=11112236');
+const { start } = await import('./src/proto/isleview.js?v=11112336');
+const { START } = await import('./src/proto/startlab.js?v=11112336');
+const { buildRim } = await import('./src/proto/rim.js?v=11112336');
+const { buildTreasure } = await import('./src/proto/treasure.js?v=11112336');
 /* 양옆 보물방마다 보물 장소 · 지키는 몬스터 자리 (붉은 표적) */
 const dummies = isle => START.sites.map(([x, z]) => [1, x * .5, z * .5, 7, true]);
 let TS = []; const extra = async a => { const rim = await buildRim(a, START); TS = START.sites.map(([x, z], k) => buildTreasure(a.isle, x, z, 'meadow', { camera: a.camera, grade: k ? 'silver' : 'bronze' })); window.__TS = TS;
   /* 보물 장소도 같은 시야를 따름 (사용자 2026-11-11: 산맥 너머로 안개 · 사슬 · 룬이 비쳐 보였음): 보물방 둘레 여러 자리 중 한 곳이라도 보이면 보임 · 비밀 터널 안이면 감춤 */
-  const vis = (st, x, z) => { let v = 0; for (let k = 0; k < 9; k++) { const a = k * .785, d = k ? 13 : 0; v = Math.max(v, st.seen((x + Math.cos(a) * d * 2) * .5, (z + Math.sin(a) * d * 2) * .5)); } return v > .04 && !st.blk; };
-  return { blocked: rim.blocked, update: (t, dt, st) => { rim.update(t, dt, st); TS.forEach((T, k) => { const on = vis(st, ...START.sites[k]); if (T.group.visible !== on) T.group.visible = on; T.update(t, dt, st); }); } }; };
+  const vis = (st, x, z) => { let v = 0; for (let k = 0; k < 9; k++) { const a = k * .785, d = k ? 13 : 0; v = Math.max(v, st.seen((x + Math.cos(a) * d * 2) * .5, (z + Math.sin(a) * d * 2) * .5)); } return v > .04 && !st.blk && !st.cave; };
+  return { blocked: rim.blocked, update: (t, dt, st) => { rim.update(t, dt, st); TS.forEach((T, k) => { const on = st.cave ? st.cave === k + 1 : vis(st, ...START.sites[k]);   /* 동굴 안이면 그 동굴 보물만 */ if (T.group.visible !== on) T.group.visible = on; T.update(t, dt, st); }); } }; };
 const bar = document.querySelector('#load i');
 document.querySelector('#tog').onclick = () => { const v = document.querySelector('#view'); v.classList.toggle('shut'); document.querySelector('#tog').textContent = v.classList.contains('shut') ? '설정 펴기 ▾' : '설정 접기 ▴'; };
 start(document.querySelector('#cv'), p => { bar.style.transform = `scaleX(${p})`; }, { layout: START, dummies, extra })

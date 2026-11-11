@@ -7,10 +7,10 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { MeshoptSimplifier as MO } from '../../vendor/meshopt_simplifier.module.js';
-import { makeField, Y, SPOT, LAYERS, fbm, noise2, smoothstep } from './islefield.js?v=11112236';
-import { reedBush, vegShader } from './flora.js?v=11112236';
-import { buildRuins } from './ruins.js?v=11112236';
-import { buildSecret, SECRET } from './secret.js?v=11112236';
+import { makeField, Y, SPOT, LAYERS, fbm, noise2, smoothstep } from './islefield.js?v=11112336';
+import { reedBush, vegShader } from './flora.js?v=11112336';
+import { buildRuins } from './ruins.js?v=11112336';
+import { buildSecret, SECRET } from './secret.js?v=11112336';
 
 const SUN = new THREE.Vector3(-.45, .78, .44).normalize();   /* 왼쪽 위 앞에서 (카메라 쪽 절벽 면이 비스듬히 빛을 받아 결이 드러남) */
 const rngOf = s => () => (s = (s * 16807) % 2147483647) / 2147483647;
@@ -28,16 +28,16 @@ vec3 lit(vec3 al, vec3 n, float sh, float ao){ float d = max(dot(n, uSun), 0.); 
 float seen(vec3 lp){ vec2 uv = (lp.xz * uK - uVC) / uVR; float v = texture2D(uRay, uv).r; return mix(1., v * step(0., uv.x) * step(uv.x, 1.) * step(0., uv.y) * step(uv.y, 1.), uVOn); }   /* 칸 지도(번지게 한 것)에서 그 자리 x, z 값을 읽음 */
 uniform vec4 uCutA, uCutB;   /* 화면 가림 걷기 (사용자 2026-11-11 · 내 화면에서만): A = 기체 자리(xyz) · 반지름(w) / B = 카메라 자리 — 기체와 카메라 사이 높은 산 · 동굴 천장을 점점이 걷어 냄 */
 float bayer(vec2 f){ vec2 q = mod(floor(f), 4.); float b = mod(q.x * 2. + q.y * 3., 4.) * 4. + mod(q.x + q.y * 2., 4.); return (b + .5) / 16.; }   /* 고른 점 무늬 (지저분한 모래알이 아니게) */
-bool cutAway(vec3 p){ if (uCutA.w <= 0.) return false; vec3 ab = uCutB.xyz - uCutA.xyz; float t = clamp(dot(p - uCutA.xyz, ab) / dot(ab, ab), 0., 1.);
-  if (t < .01 || p.y < uCutA.y + 2.5) return false; float r = uCutA.w * (.7 + .3 * smoothstep(0., .25, t)), d = length(p - uCutA.xyz - ab * t); if (d > r) return false;
-  return bayer(gl_FragCoord.xy) < smoothstep(r, r * .8, d) * uCutB.w; }   /* uCutB.w: 걷어 내는 양 (1 = 다 걷음 · 0.5 = 반쯤 비침) */
-float shut(vec3 lp){ vec2 uv = (lp.xz * uK - uVC) / uVR; return max(uBlk, texture2D(uRay, uv).g * step(0., uv.x) * step(uv.x, 1.) * step(0., uv.y) * step(uv.y, 1.)) * uVOn; }   /* 완전히 까맣게: 산맥에 둘러싸인 동굴 안(골짜기 · 보물방 · 비밀길) · 비밀길 안에선 터널 밖 전부 */
+uniform vec4 uCave, uCaveB; uniform sampler2D uCaveM;   /* 동굴 안 보기 (사용자 2026-11-11 밤): uCave.x = 들어간 동굴 번호 + 1 (0 = 밖) · uCave.y = 걷는 높이 · uCaveB = 동굴 칸 지도 범위 (x0, z0, 너비, 깊이) */
+bool cutAway(vec3 p){ if (uCave.x < .5) return false; if (p.y > uCave.y) return true; vec2 uv = (p.xz - uCaveB.xy) / uCaveB.zw; if (uv.x < 0. || uv.y < 0. || uv.x > 1. || uv.y > 1.) return true;
+  return abs(texture2D(uCaveM, uv).r * 255. - uCave.x) > .5; }   /* 동굴 안이면: 그 동굴(골짜기 · 보물방 · 안쪽 벽) 밖은 그리지 않음 → 까만 바탕 · 지붕과 산 윗부분(걷는 높이 위)도 걷음 — 기체를 가리는 지형을 투명하게 하던 것은 없앰 (사용자: 지형이 헷갈림) */
+float shut(vec3 lp){ return uBlk * uVOn; }   /* 비밀 터널 안에서만 터널 밖을 까맣게 (동굴 안을 까맣게 칠하던 것은 없앰 · 사용자: 지붕으로 가림) */   /* 완전히 까맣게: 산맥에 둘러싸인 동굴 안(골짜기 · 보물방 · 비밀길) · 비밀길 안에선 터널 밖 전부 */
 vec3 fogged(vec3 c, vec3 wp){ float k = smoothstep(-16., -64., wp.y); c = mix(c, MIST, k * .85); return mix(c * vec3(.13, .15, .24) * (1. - shut(wp) * (1. - uMine)), c, max(seen(wp), uMine * uBlk)); }   /* uMine: 비밀 터널 물체 — 터널 안에선 이것만 보임 (나머지는 uBlk로 까맣게) */
 `;
 /* 가림 걷기 무게 (꼭짓점 · 칸 공용): 기체 → 카메라 선에서 얼마나 가까운지 (1 = 한가운데) */
 const CUTW = `uniform vec4 uCutA, uCutB; float cutW(vec3 p){ if (uCutA.w <= 0.) return 0.; vec3 ab = uCutB.xyz - uCutA.xyz; float t = clamp(dot(p - uCutA.xyz, ab) / dot(ab, ab), 0., 1.);
   float r = uCutA.w * (.7 + .3 * smoothstep(0., .25, t)); return smoothstep(r, r * .7, length(p - uCutA.xyz - ab * t)) * step(.01, t); }`;
-const U = { uSun: { value: SUN }, uT: { value: 0 }, uPush: { value: new THREE.Vector4(0, 0, 1, 0) }, uWave: { value: new THREE.Vector4(0, 0, 0, 0) }, uRay: { value: null }, uVC: { value: new THREE.Vector2() }, uVR: { value: 12 }, uK: { value: 1 }, uVOn: { value: 0 }, uBlk: { value: 0 }, uMine: { value: 0 }, uCutA: { value: new THREE.Vector4() }, uCutB: { value: new THREE.Vector4() } };   /* uPush: 기체가 오르내릴 때 밑의 풀·덤불을 미는 바람 (x, z, 반지름, 세기 · 섬 안 단위) · uWave: 한 점에서 둥글게 퍼지는 바람 (x, z, 앞머리 반지름, 세기 · 보물 상자가 열릴 때) */
+const U = { uSun: { value: SUN }, uT: { value: 0 }, uPush: { value: new THREE.Vector4(0, 0, 1, 0) }, uWave: { value: new THREE.Vector4(0, 0, 0, 0) }, uRay: { value: null }, uVC: { value: new THREE.Vector2() }, uVR: { value: 12 }, uK: { value: 1 }, uVOn: { value: 0 }, uBlk: { value: 0 }, uMine: { value: 0 }, uCutA: { value: new THREE.Vector4() }, uCutB: { value: new THREE.Vector4() }, uCave: { value: new THREE.Vector4(0, 99, 0, 0) }, uCaveB: { value: new THREE.Vector4(0, 0, 1, 1) }, uCaveM: { value: null } };   /* uPush: 기체가 오르내릴 때 밑의 풀·덤불을 미는 바람 (x, z, 반지름, 세기 · 섬 안 단위) · uWave: 한 점에서 둥글게 퍼지는 바람 (x, z, 앞머리 반지름, 세기 · 보물 상자가 열릴 때) */
 
 export async function buildIsle({ K = 1, layout = SPOT } = {}) {   /* layout: 섬 배치 (기본 = 섬 하나 시험 · 초원 한 조각 체험판은 meadowsector.js) */
   const LO = layout, D = LO.dens || 1;   /* D: 넓이에 맞춰 식물 수를 늘림 */   /* K: 섬 전체 크기 (기체는 그대로 · 사용자 2026-11-10: 기체에 비해 땅이 너무 큼) */
@@ -140,7 +140,7 @@ export async function buildIsle({ K = 1, layout = SPOT } = {}) {   /* layout: �
       if (w > 0. && p.y > top) { p.y = mix(p.y, top + (p.y - top) * .04, w); n = normalize(mix(n, vec3(0., 1., 0.), w)); }
       vP = p; vN = n; vW = aW; vL = aL; gl_Position = projectionMatrix * viewMatrix * modelMatrix * vec4(p, 1.); }`,
     fragmentShader: GL + `varying vec3 vP, vN; varying vec4 vW; varying vec2 vL;
-      void main(){ vec3 n = normalize(vN); vec2 q = vP.xz;
+      void main(){ if (cutAway(vP)) discard; vec3 n = normalize(vN); vec2 q = vP.xz;
         float g1 = fb(q * .07), g2 = fb(q * .42 + 4.), g3 = vn(q * 3.3), g4 = vn(q * 11.);
         vec3 grass = mix(vec3(.16, .36, .07), vec3(.40, .58, .12), g1);                             /* 넓게 번지는 연두 · 짙은 초록 얼룩 */
         grass = mix(grass, vec3(.10, .27, .06), smoothstep(.5, .78, g2) * .55) * (.82 + .3 * g3) * (.9 + .2 * g4);   /* 풀결 */
@@ -165,7 +165,6 @@ export async function buildIsle({ K = 1, layout = SPOT } = {}) {   /* layout: �
     vertexShader: CUTW + `varying vec3 vP, vN; varying float vW; void main(){ vP = position; vN = normal; vW = cutW(position) * step(uCutA.y + 2.2, position.y); gl_Position = projectionMatrix * viewMatrix * modelMatrix * vec4(position, 1.); }`,
     fragmentShader: `uniform vec4 uCutB; varying vec3 vP, vN; varying float vW; void main(){ float a = vW * (1. - uCutB.w) * 2.; if (a < .02) discard; vec3 n = normalize(vN); float rim = 1. - abs(n.y);
       gl_FragColor = vec4(mix(vec3(.62, .78, .7), vec3(.9, 1., .95), rim), a * (.14 + .3 * rim)); }` });
-  if (LO.cut) { const gh = new THREE.Mesh(topG, ghostM); gh.name = 'isleTop'; gh.renderOrder = 8; G.add(gh); }
 
   /* ⑥ 아래 바위 몸통: 같은 꼭짓점 자리에서 아래로 (테두리는 위 땅과 꼭 맞물림) · 거의 안 보이는 안쪽은 줄임
      · 테두리 바로 밑은 흙 띠(위 땅에서 얼마나 내려왔는지 aD로) — 칼로 자른 듯한 단면이 아니라 흙 · 뿌리 · 이끼가 드러난 언덕 끝 (사용자 2026-11-10) */
@@ -264,7 +263,7 @@ export async function buildIsle({ K = 1, layout = SPOT } = {}) {   /* layout: �
     inst(stone, plants.filter(p => p.v === 'stone'), 'stones'); }
 
   /* ⑧-2 갈대 부쉬 그리기: 다섯 곳을 한 번에 (②-2에서 만든 것 · 기체가 들어가거나 오르내려도 잎이 밀리지 않음) */
-  { const m = new THREE.Mesh(mergeGeometries(BUSH.map(B => B.geo)), new THREE.ShaderMaterial({ uniforms: U, ...vegShader(GL, 'fogged(c, vL)'), side: THREE.DoubleSide })); m.name = 'brush'; G.add(m); }
+  { const m = new THREE.Mesh(mergeGeometries(BUSH.map(B => B.geo)), new THREE.ShaderMaterial({ uniforms: U, ...vegShader(GL, 'fogged(c, vL)', 'if (cutAway(vL)) discard;'), side: THREE.DoubleSide })); m.name = 'brush'; G.add(m); }
 
   /* ⑨ 풀 포기: 가장자리 · 절벽 턱 · 나무 밑에 모여 남 (평평한 풀밭은 칠로 충분) */
   { const bl = [], c = [], s = []; for (let k = 0; k < 6; k++) { const a = k * 1.05 + (k % 2) * .3, lx = Math.cos(a), lz = Math.sin(a), h = .45 + (k % 3) * .14, w = .05;
@@ -288,7 +287,7 @@ export async function buildIsle({ K = 1, layout = SPOT } = {}) {   /* layout: �
   for (let gi = 0; gi < Math.max(1, GZS.length); gi++) { F.useGorge(gi); const C = GZS[gi], R1 = buildRuins({ F, hAt, LAYERS, Y, LO: C ? { ...LO, gorge: C, ruins: C.site || (GZS.length === 1 ? LO.ruins : null) } : LO, TUN: TUNS[gi] || null });   /* 골짜기마다 신전 입구 · 앞마당 무더기 · 기댄 기둥 (site) */
     for (const k of Object.keys(RU)) RU[k].push(...R1[k]); }
   for (const o of RU.obstacles) F.obstacles.push(o);
-  const SEC = buildSecret({ LO, F, hAt, U, GL }); let TUBE = null; RU.geos.push(...SEC.stone);   /* 비밀길: 터널 관 · 둔덕 판돌 · 입구 부쉬 청록 꽃 — secret.js */   /* 고대 수호자 유적 (끊어진 돌다리 · 입구 · 기둥 복도) — ruins.js */
+  const SEC = buildSecret({ LO, F, hAt, U, GL }); let TUBE = null; let CAVE = null; const caveOff = [], BBS = new Map(), I4 = new THREE.Matrix4(); RU.geos.push(...SEC.stone);   /* 비밀길: 터널 관 · 둔덕 판돌 · 입구 부쉬 청록 꽃 — secret.js */   /* 고대 수호자 유적 (끊어진 돌다리 · 입구 · 기둥 복도) — ruins.js */
   /* ⑩ 늘어진 뿌리 · 담쟁이 · 테두리 풀: 섬 테두리 밑과 고원 절벽에 늘어짐 (위아래 깊이 · 오래된 섬 느낌) */
   { const parts = [], ROOT = lin(0x4b3a28), IVY = [lin(0x2f5f1c), lin(0x497a22)];
     const edgeV = []; for (let v = 0; v < NV; v++) if (isEdge[v] && rnd() < .035) edgeV.push(v);   /* 테두리 점이 촘촘해져서 비율을 반으로 (뿌리 수는 그대로) */
@@ -436,6 +435,34 @@ export async function buildIsle({ K = 1, layout = SPOT } = {}) {   /* layout: �
     /* 비밀 터널 관 · 안 꾸밈: 따로 한 덩이 (uMine = 1 → 터널 안에서는 이것만 보이고 나머지는 까맣게) */
     if (SEC.rock.length) { const tm = rockM(1.6, 2., `if (uBlk > .5 && vP.y > ${(SECRET.FLOOR + 3.85).toFixed(2)}) discard;`, `gl_FragColor.rgb = mix(gl_FragColor.rgb, gl_FragColor.rgb * vec3(.22, .27, .29) + rock * vec3(.03, .13, .11), uBlk);`); tm.side = THREE.DoubleSide;   /* 터널 안: 햇빛이 안 드니 어둡게 · 이끼 · 룬의 청록빛이 옅게 번짐 */ tm.uniforms = { ...U, uMine: { value: 1 } }; const st = new THREE.Mesh(mergeGeometries(SEC.rock), tm); st.name = 'secretTube'; G.add(st); TUBE = st; }   /* 터널 안에선 천장을 걷어 (보이는 것만) 양옆 벽만 남김 */
     for (const o of SEC.decor || []) G.add(o);
+    /* ── 보물 동굴 지붕 · 동굴 안 보기 (사용자 2026-11-11 밤 · 단면 그림 확인) ──
+       밖: 양쪽 산 꼭대기에서 바위 턱이 안으로 튀어나와 맞닿은 지붕 (가운데는 맞닿은 금 · 군데군데 작은 틈) · 윗면은 이끼 → 위에서 내려다봐도 지붕만 보임
+       안: 들어가면 그 동굴(바닥 · 안쪽 벽 · 유적 · 보물방)만 그리고, 지붕과 산 윗부분(걷는 높이 위) · 동굴 밖은 그리지 않음 → 까만 바탕
+       동굴 칸 지도: 땅 1칸마다 '몇 번 동굴 안쪽인지' (골짜기 · 보물방 + 안쪽 벽 둘레 6칸) — 동굴 안에서 무엇을 그릴지 정함 */
+    if (F.gorges.length) { const NG = F.gorges.length; let x0 = 1e9, x1 = -1e9, z0 = 1e9, z1 = -1e9; for (let i = 0; i < NG; i++) { const b = F.gorgeBB(i); x0 = Math.min(x0, b[0]); x1 = Math.max(x1, b[1]); z0 = Math.min(z0, b[2]); z1 = Math.max(z1, b[3]); }
+      x0 = Math.floor(x0 - 16); z0 = Math.floor(z0 - 16); const W = Math.ceil(x1 + 16 - x0), D = Math.ceil(z1 + 16 - z0), M = new Uint8Array(W * D), BAND = 6;
+      for (let i = 0; i < NG; i++) { const b = F.gorgeBB(i); for (let j = Math.max(0, Math.floor(b[2] - BAND - 12 - z0)); j < Math.min(D, Math.ceil(b[3] + BAND + 12 - z0)); j++) for (let k = Math.max(0, Math.floor(b[0] - BAND - 12 - x0)); k < Math.min(W, Math.ceil(b[1] + BAND + 12 - x0)); k++) {
+          const x = x0 + k + .5, z = z0 + j + .5; if (F.gorgeI(i, x, z).d > -BAND || F.basinI(i, x, z) > -BAND) M[j * W + k] = i + 1; } }
+      const tex = new THREE.DataTexture(M, W, D, THREE.RedFormat, THREE.UnsignedByteType); tex.magFilter = tex.minFilter = THREE.NearestFilter; tex.needsUpdate = true;
+      U.uCaveM.value = tex; U.uCaveB.value.set(x0, z0, W, D); CAVE = { M, W, D, x0, z0 };
+      /* 지붕: 2칸 격자 위 두꺼운 바위 판 (윗면 · 아랫면 · 가장자리 · 틈 가장자리) — 가장자리는 산 속으로 파묻히게 아래로 늘어뜨림 */
+      const rr = rngOf(97), pos = [], idx = [], S = 2, ROOF = LAYERS[2] + 4.4;
+      for (let i = 0; i < NG; i++) { const C = F.gorges[i], b = F.gorgeBB(i), t0 = (C.tunnel ? C.tunnel.to : 0) - .02, gx0 = b[0] - 12, gz0 = b[2] - 12, NX = Math.ceil((b[1] - b[0] + 24) / S) + 1, NZ = Math.ceil((b[3] - b[2] + 24) / S) + 1;
+        const IN = new Uint8Array(NX * NZ), CD = new Float32Array(NX * NZ);
+        for (let j = 0; j < NZ; j++) for (let k = 0; k < NX; k++) { const x = gx0 + k * S, z = gz0 + j * S, g = F.gorgeI(i, x, z), bd = F.basinI(i, x, z); const inG = g.d > -3 && g.t >= t0; IN[j * NX + k] = inG || bd > -3 ? 1 : 0; CD[j * NX + k] = Math.max(inG ? g.d / C.w : -9, C.basin ? bd / C.basin[2] * 2.2 : -9); }   /* CD: 가운데로 갈수록 큼 (1 ≈ 골짜기 한가운데) */
+        const keep = (k, j) => k >= 0 && j >= 0 && k < NX - 1 && j < NZ - 1 && IN[j * NX + k] && IN[j * NX + k + 1] && IN[(j + 1) * NX + k] && IN[(j + 1) * NX + k + 1] && !(CD[j * NX + k] > .55 && fbm((gx0 + k * S) * .11 + i * 7, (gz0 + j * S) * .11, 3) > .5);   /* 가운데 맞닿은 금 근처 군데군데 작은 틈 */
+        const vi = new Int32Array(NX * NZ * 2).fill(-1);
+        const V = (k, j, bot) => { const q = (j * NX + k) * 2 + bot; if (vi[q] >= 0) return vi[q]; const jx = noise2((gx0 + k * S) * .37 + i, (gz0 + j * S) * .37) * .8, jz = noise2((gx0 + k * S) * .37 - 5, (gz0 + j * S) * .37 + i) * .8, x = gx0 + k * S + jx, z = gz0 + j * S + jz;
+          const cd = CD[j * NX + k], crack = Math.exp(-Math.pow((Math.min(cd, 1.2) - 1) * 4, 2)) * 1.1, top = ROOF + 1.1 * fbm(x * .09, z * .09, 3) + .5 * noise2(x * .5, z * .5) - crack;   /* 양쪽 턱이 가운데서 맞닿으며 살짝 처짐 */
+          const y = bot ? top - 2.2 - .8 * Math.abs(noise2(x * .3 + 3, z * .3)) : top; vi[q] = pos.length / 3; pos.push(x, y, z); return vi[q]; };
+        const side = (a, b, ka, ja, kb, jb) => { const a2 = V(ka, ja, 1), b2 = V(kb, jb, 1), xa = pos[a * 3], za = pos[a * 3 + 2], xb = pos[b * 3], zb = pos[b * 3 + 2], dn = Math.min(pos[a2 * 3 + 1], hAt(xa, za) - 1.5, hAt(xb, zb) - 1.5);   /* 가장자리: 산에 닿을 때까지 내림 · 틈 가장자리: 판 두께만 */
+          const ext = !IN[ja * NX + ka] || !IN[jb * NX + kb] || dn < pos[a2 * 3 + 1] - .1; const c = pos.length / 3; pos.push(xa, ext ? Math.min(dn, pos[a2 * 3 + 1]) : pos[a2 * 3 + 1], za, xb, ext ? Math.min(dn, pos[b2 * 3 + 1]) : pos[b2 * 3 + 1], zb); idx.push(a, c, b, b, c, c + 1); };
+        for (let j = 0; j < NZ - 1; j++) for (let k = 0; k < NX - 1; k++) { if (!keep(k, j)) continue; const a = V(k, j, 0), b = V(k + 1, j, 0), c = V(k, j + 1, 0), d = V(k + 1, j + 1, 0); idx.push(a, c, b, b, c, d);
+          const A = V(k, j, 1), B = V(k + 1, j, 1), Cc = V(k, j + 1, 1), Dd = V(k + 1, j + 1, 1); idx.push(A, B, Cc, B, Dd, Cc);
+          if (!keep(k, j - 1)) side(b, a, k + 1, j, k, j); if (!keep(k, j + 1)) side(c, d, k, j + 1, k + 1, j + 1); if (!keep(k - 1, j)) side(a, c, k, j, k, j + 1); if (!keep(k + 1, j)) side(d, b, k + 1, j + 1, k + 1, j); } }
+      if (idx.length) { const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setIndex(idx); const g2 = g.toNonIndexed(); g2.computeVertexNormals();   /* 각진 바위 면 (턱마다 결이 보이게) */
+        const rm = new THREE.Mesh(g2, rockM(.42, .8)); rm.name = 'caveRoof'; G.add(rm); }
+    }
     /* 떠 있는 바위 (오르내리는 구역 · 사용자 2026-11-11): 바위 덩이 여럿이 줄지어 그 층 높이에 떠서 한 줄을 막음 (보이는 두께 = 막히는 두께)
        팽이처럼 위는 둥근 바위 언덕(꼭대기만 이끼) · 옆은 층진 바위 결 · 아래로 길게 뾰족한 바위 뿌리 — 늘인 판 하나가 아니게 */
     if (F.floats.length) { const fp = [], r = rngOf(71); for (const f of F.floats) { const n = Math.max(2, Math.round(f.len / 8.5)), seg = f.len / n;
@@ -560,7 +587,7 @@ export async function buildIsle({ K = 1, layout = SPOT } = {}) {   /* layout: �
       vec3 cloud = mix(vec3(.80, .86, .93), vec3(.98, .99, 1.), smoothstep(.55, .85, cl));
       deep = mix(deep, cloud, smoothstep(.48, .62, cl) * smoothstep(-.02, -.25, y));
       c = y > 0. ? c : mix(vec3(.66, .78, .90), deep, smoothstep(0., -.12, y));
-      gl_FragColor = vec4(c * (1. - uBlk), 1.); }` })); sky.renderOrder = -10; sky.frustumCulled = false; sky.name = 'sky';   /* 하늘은 섬 크기와 상관없이 카메라를 감쌈 (섬 무리에 넣지 않음) */
+      gl_FragColor = vec4(c * (1. - uBlk) * step(uCave.x, .5), 1.); }` })); sky.renderOrder = -10; sky.frustumCulled = false; sky.name = 'sky';   /* 하늘은 섬 크기와 상관없이 카메라를 감쌈 (섬 무리에 넣지 않음) */
 
   /* 넓은 맵은 칸(LO.tile)마다 나눠 그림 → 화면 밖 칸은 그리지 않음 (같은 모양 · 같은 칠 · 꼭짓점 묶음을 같이 씀) */
   if (LO.tile) { const T = LO.tile, key = (x, z) => Math.floor(x / T) + ',' + Math.floor(z / T), M4 = new THREE.Matrix4(), v = new THREE.Vector3();
@@ -585,5 +612,13 @@ export async function buildIsle({ K = 1, layout = SPOT } = {}) {   /* layout: �
     const lo2 = lo.slice(), hi2 = hi.slice(); for (let iz = 1; iz < nz - 1; iz++) for (let ix = 1; ix < nx - 1; ix++) { const k = iz * nx + ix; for (const d of [1, -1, nx, -nx]) { if (lo[k + d] < lo2[k]) lo2[k] = lo[k + d]; if (hi[k + d] > hi2[k]) hi2[k] = hi[k + d]; } }
     return (x, z) => { const ix = Math.round((x - x0) / C), iz = Math.round((z - z0) / C); if (ix < 0 || iz < 0 || ix >= nx || iz >= nz) return null; const k = iz * nx + ix; return hi2[k] > -1e8 ? [lo2[k], hi2[k]] : null; }; })();
   return { GL, U, hAtL: hAt, roof: (x, z) => { if (!RF) return null; const q = RF(x / K, z / K); return q && [q[0] * K, q[1] * K]; }, pxU: G.userData.motes.material.uniforms.uPx,   /* 보물 장소처럼 섬 위에 따로 얹는 것이 같은 칠 · 높이를 씀 */
-    group: G, K, field: F, H: (x, z) => hAt(x / K, z / K) * K, mask: (x, z) => F.mask(x / K, z / K) * K, blocked: (x, z, L = 1) => F.blocked(x / K, z / K, L), where: (x, z) => F.where(x / K, z / K), inGorge: (x, z) => F.inGorge(x / K, z / K, .2), layout: LO, setCut: (s, c, R, amt = 1) => { U.uCutA.value.set(s.x / K, s.y / K, s.z / K, R / K); U.uCutB.value.set(c.x / K, c.y / K, c.z / K, amt); }, sightBlock: (x, z, L) => F.sightBlock(x / K, z / K, L), inBrush: (x, z) => F.brush(x / K, z / K) > 0, brushZone: (x, z) => F.brushZone(x / K, z / K), setSight: (tex, x, z, R, on) => { U.uRay.value = tex; U.uVC.value.set(x, z); U.uVR.value = R; U.uVOn.value = on; }, setBlack: v => { if (U.uBlk.value === v) return; U.uBlk.value = v; const keep = new Set([TUBE, ...(SEC.decor || [])]); for (const o of G.children) if (!keep.has(o)) o.visible = !v; },   /* 비밀 터널 안 (사용자 2026-11-11): 터널 관 · 안 꾸밈만 남기고 섬의 나머지는 아예 그리지 않음 → 까만 바탕 위에 터널만 (가리는 산도 없음 · 그리는 양도 줄어듦) */ secretIn: (x, z) => !!(F.secretD && F.secretD(x / K, z / K) > 0), inner: (x, z) => { if (F.secretD && F.secretD(x / K, z / K) > 0) return true; if (!F.gorges.length) return false; const g = F.gorge(x / K, z / K); return g.d > -.5 || F.basinD(x / K, z / K) > -.5; }, layers: LAYERS.map(y => y * K), push: (x, z, r, k) => U.uPush.value.set(x / K, z / K, r / K, k / K), stats: st, sky, setPx: px => { G.userData.motes.material.uniforms.uPx.value = px; }, update: t => { U.uT.value = t; } };
+    group: G, K, field: F, H: (x, z) => hAt(x / K, z / K) * K, mask: (x, z) => F.mask(x / K, z / K) * K, blocked: (x, z, L = 1) => F.blocked(x / K, z / K, L), where: (x, z) => F.where(x / K, z / K), inGorge: (x, z) => F.inGorge(x / K, z / K, .2), layout: LO, setCut: (s, c, R, amt = 1) => { U.uCutA.value.set(s.x / K, s.y / K, s.z / K, R / K); U.uCutB.value.set(c.x / K, c.y / K, c.z / K, amt); }, sightBlock: (x, z, L) => F.sightBlock(x / K, z / K, L), inBrush: (x, z) => F.brush(x / K, z / K) > 0, brushZone: (x, z) => F.brushZone(x / K, z / K), setSight: (tex, x, z, R, on) => { U.uRay.value = tex; U.uVC.value.set(x, z); U.uVR.value = R; U.uVOn.value = on; }, caveAt: (x, z) => { if (!CAVE) return 0; x /= K; z /= K; for (let i = 0; i < F.gorges.length; i++) { const b = F.gorgeBB(i); if (x < b[0] - 20 || x > b[1] + 20 || z < b[2] - 20 || z > b[3] + 20) continue; const g = F.gorgeI(i, x, z); if ((g.d > -.5 && g.t > .004) || F.basinI(i, x, z) > -.5) return i + 1; } return 0; },   /* 지금 몇 번 동굴 안인지 (0 = 밖) */
+    setCave: (id, cap = 99) => { U.uCave.value.y = cap / K; if (U.uCave.value.x === id) return; U.uCave.value.x = id;
+      /* 동굴 안: 그 동굴과 겹치지 않는 덩이(땅 칸 · 다른 동굴 · 비밀 터널 · 바깥 꾸밈)는 아예 안 그림 → 그리는 양이 줄어듦 (나머지는 칸 지도로 걸러 냄) */
+      for (const o of caveOff) o.visible = true; caveOff.length = 0; if (!id) return;
+      const b = F.gorgeBB(id - 1), x0 = b[0] - 14, x1 = b[1] + 14, z0 = b[2] - 14, z1 = b[3] + 14, keep = new Set([TUBE, ...(SEC.decor || []), SEC.flowers, SEC.wind].filter(Boolean));
+      G.traverse(o => { if (o === G || !o.visible || !(o.isMesh || o.isPoints)) return; if (keep.has(o) || o.name === 'isleBottom') { o.visible = false; caveOff.push(o); return; }
+        let bb = BBS.get(o); if (bb === undefined) { if (o.isInstancedMesh) { o.computeBoundingBox(); bb = o.boundingBox; } else { if (!o.geometry.boundingBox) o.geometry.computeBoundingBox(); bb = o.geometry.boundingBox; }   /* 칸으로 나눈 땅은 칸 몫 범위가 이미 들어 있음 */ if (o.parent !== G || !o.matrix.equals(I4)) bb = null; BBS.set(o, bb); }
+        if (bb && (bb.max.x < x0 || bb.min.x > x1 || bb.max.z < z0 || bb.min.z > z1)) { o.visible = false; caveOff.push(o); } }); },
+    setBlack: v => { if (U.uBlk.value === v) return; U.uBlk.value = v; const keep = new Set([TUBE, ...(SEC.decor || [])]); for (const o of G.children) if (!keep.has(o)) o.visible = !v; },   /* 비밀 터널 안 (사용자 2026-11-11): 터널 관 · 안 꾸밈만 남기고 섬의 나머지는 아예 그리지 않음 → 까만 바탕 위에 터널만 (가리는 산도 없음 · 그리는 양도 줄어듦) */ secretIn: (x, z) => !!(F.secretD && F.secretD(x / K, z / K) > 0), inner: (x, z) => { if (F.secretD && F.secretD(x / K, z / K) > 0) return true; if (!F.gorges.length) return false; const g = F.gorge(x / K, z / K); return g.d > -.5 || F.basinD(x / K, z / K) > -.5; }, layers: LAYERS.map(y => y * K), push: (x, z, r, k) => U.uPush.value.set(x / K, z / K, r / K, k / K), stats: st, sky, setPx: px => { G.userData.motes.material.uniforms.uPx.value = px; }, update: t => { U.uT.value = t; } };
 }

@@ -5,7 +5,7 @@
      모든 비밀길에 똑같은 무늬 → 한 번 배우면 '이게 있으면 밑은 무조건 터널' (사용자)
    · 청록 꽃: 비밀길 입구 부쉬에만 몇 송이 (판돌 빛과 같은 색 · 가까이 가야 보임) — 다른 부쉬엔 절대 없음 */
 import * as THREE from 'three';
-import { noise2 } from './islefield.js?v=11112236';
+import { noise2, smoothstep } from './islefield.js?v=11112336';
 
 export const SECRET = { FLOOR: -7.4, TOP: -1.2, WALL: 2.4, TEAL: [.22, .95, .8] };
 
@@ -15,14 +15,21 @@ function smooth(pts, step = 1.2) { const out = []; for (let k = 0; k < pts.lengt
   out.push(pts[pts.length - 1]); return out; }
 
 /* 터널 관 하나 */
-function tube(S, seed) { const P = smooth(S.pts), fl = SECRET.FLOOR, wi = S.w + .9, H = SECRET.TOP - fl, NA = 18, M = 2 * (NA + 1), pos = [], ix = [];
+function tube(S, seed, hAt) { const P = smooth(S.pts);
+  /* 입구는 절벽 면에서 딱 끝남 (사용자 2026-11-11: 입구 바위 · 관이 산 밖으로 튀어나왔음) — 관 천장보다 땅이 낮은(산이 덮지 않는) 끝 부분은 잘라 냄 */
+  if (hAt) { const cov = (k, n) => { const p = P[k], q = P[n], dx = q[0] - p[0], dz = q[1] - p[1], l = Math.hypot(dx, dz) || 1, sx = -dz / l, sz = dx / l, r = S.w + 3.6;   /* 가운데와 양옆 겉 두께 자리까지 모두 산이 덮어야 남김 */
+      return [0, -1, 1, -.5, .5].every(u => hAt(p[0] + sx * r * u, p[1] + sz * r * u) > SECRET.TOP + 1.4); };
+    while (P.length > 4 && !cov(0, 1)) P.shift(); while (P.length > 4 && !cov(P.length - 1, P.length - 2)) P.pop(); }
+  const fl = SECRET.FLOOR, wi = S.w + .9, H = SECRET.TOP - fl, NA = 18, M = 2 * (NA + 1), pos = [], ix = [];
   const frame = k => { const a = P[Math.max(0, k - 1)], b = P[Math.min(P.length - 1, k + 1)], dx = b[0] - a[0], dz = b[1] - a[1], l = Math.hypot(dx, dz) || 1; return { x: P[k][0], z: P[k][1], fx: dx / l, fz: dz / l, sx: -dz / l, sz: dx / l }; };
   const ring = (k, outer) => { const f = frame(k), o = []; for (let a = 0; a <= NA; a++) { const th = a / NA * Math.PI, n = noise2(th * 3 + k * .7 + seed, k * .4 - seed), W = outer ? wi + SECRET.WALL + .8 * n : wi + .25 * Math.abs(n), Hh = outer ? H + SECRET.WALL + .6 * n : H * (1 + .06 * Math.abs(n));
-    const c = Math.cos(th) * W, y = fl - (outer ? .6 : .2) + Math.sin(th) * Hh; o.push([f.x + f.sx * c, y, f.z + f.sz * c]); } return o; };
+    const c = Math.cos(th) * W, y = fl - (outer ? .6 : .2) + Math.sin(th) * Hh; let x = f.x + f.sx * c, z = f.z + f.sz * c;
+    if (outer && hAt && hAt(x, z) < y + .5) { const ci = Math.cos(th) * (wi + .35), yi = fl - .2 + Math.sin(th) * (H + .3); x = f.x + f.sx * ci; z = f.z + f.sz * ci; o.push([x, Math.min(y, yi), z]); continue; }   /* 겉 두께가 땅 밖으로 나오면 안쪽 면에 바짝 붙임 (산 속에만 두께) */
+    o.push([x, y, z]); } return o; };
   for (let k = 0; k < P.length; k++) { const I = ring(k, false), O = ring(k, true); for (const q of I) pos.push(...q); for (let a = NA; a >= 0; a--) pos.push(...O[a]); }
   for (let k = 0; k < P.length - 1; k++) for (let i = 0; i < M; i++) { const A = k * M + i, B = k * M + (i + 1) % M, C = A + M, D = B + M; ix.push(A, C, B, B, C, D); }
   /* 입구 앞면: 안쪽 아치와 겉면 사이를 바위 테로 막음 (바깥으로 불룩 · 울퉁불퉁) */
-  for (const [k, sg] of [[0, -1], [P.length - 1, 1]]) { const f = frame(k), mid = []; for (let a = 0; a <= NA; a++) { const iv = k * M + a, ov = k * M + (M - 1 - a), th = a / NA * Math.PI, bul = (.6 + 1.2 * Math.abs(noise2(th * 2.7 + seed, k))) * Math.sin(th) + .3;
+  for (const [k, sg] of [[0, -1], [P.length - 1, 1]]) { const f = frame(k), mid = []; for (let a = 0; a <= NA; a++) { const iv = k * M + a, ov = k * M + (M - 1 - a), th = a / NA * Math.PI, bul = -.15 - .25 * Math.abs(noise2(th * 2.7 + seed, k));   /* 입구 테: 절벽 면 안쪽으로 살짝 들어감 (밖으로 불룩 X) */
       mid.push(pos.length / 3); pos.push((pos[iv * 3] + pos[ov * 3]) / 2 + f.fx * sg * bul, (pos[iv * 3 + 1] + pos[ov * 3 + 1]) / 2 + noise2(th * 3, seed) * .5, (pos[iv * 3 + 2] + pos[ov * 3 + 2]) / 2 + f.fz * sg * bul); }
     for (let a = 0; a < NA; a++) { const i0 = k * M + a, i1 = i0 + 1, o0 = k * M + (M - 1 - a), o1 = o0 - 1, m0 = mid[a], m1 = mid[a + 1]; ix.push(i0, m0, i1, i1, m0, m1, m0, o0, m1, m1, o0, o1); } }
   const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setIndex(ix); g.computeVertexNormals();
@@ -37,11 +44,11 @@ const LEDGE = [[-.74, -.06], [-.36, -.06], [-.24, .22], [.24, .22], [.36, -.06],
 function glyphD(x, y) { let d = 9; for (let k = 1; k < LEDGE.length; k++) { const [ax, ay] = LEDGE[k - 1], [bx, by] = LEDGE[k], dx = bx - ax, dy = by - ay, q = Math.max(0, Math.min(1, ((x - ax) * dx + (y - ay) * dy) / (dx * dx + dy * dy))); d = Math.min(d, Math.hypot(x - ax - dx * q, y - ay - dy * q) - .055); }
   const rect = Math.max(Math.abs(x) - .15, Math.max(-.52 - y, y + .34)), cap = Math.hypot(x, y + .34) - .15; return Math.min(d, rect, cap); }   /* 굴 입구 = 네모 + 둥근 지붕 */
 /* 판돌: 둥근 돌 (테두리는 깨진 듯 들쭉날쭉) · 윗면에 무늬를 파냄 · 홈 가장자리 = 빛 (aGlow) */
-function slab(x, y, z, Rs, seed) { const NR = 20, NS = 64, pos = [], gl = [], ix = [], rim = th => Rs * (1 + .06 * noise2(th * 2.2 + seed, 3) + .03 * noise2(th * 7, seed));
+function slab(x, y, z, Rs, seed) { const NR = 46, NS = 200, pos = [], gl = [], ix = [], rim = th => Rs * (1 + .06 * noise2(th * 2.2 + seed, 3) + .03 * noise2(th * 7, seed));
   pos.push(0, .42, 0); gl.push(2);
   for (let i = 1; i <= NR; i++) for (let j = 0; j < NS; j++) { const th = j / NS * Math.PI * 2, rr = rim(th) * i / NR, lx = Math.cos(th) * rr, lz = Math.sin(th) * rr, q = glyphD(lx / Rs, -lz / Rs);
-    const dish = .42 - .08 * Math.pow(i / NR, 3) + .03 * noise2(lx * 1.7 + seed, lz * 1.7), cut = q < 0 ? .38 + .06 * Math.min(1, -q * 20) : q < .02 ? .38 * (1 - q / .02) : 0;
-    pos.push(lx, dish - cut, lz); gl.push(2 + (q < .03 && q > -.035 ? 1 : q < 0 ? .45 : 0)); }   /* 2 + 빛: 판돌 표시 (isle.js 깎은 돌 칠) */
+    const dish = .42 - .08 * Math.pow(i / NR, 3) + .03 * noise2(lx * 1.7 + seed, lz * 1.7), cut = .4 * (1 - smoothstep(-.012, .022, q)) + .05 * Math.min(1, Math.max(0, -q) * 20);   /* 홈 가장자리를 부드럽게 비탈지게 (사용자 2026-11-11: 무늬가 톱니처럼 뜯겨 보였음) */
+    pos.push(lx, dish - cut, lz); gl.push(2 + Math.max(0, 1 - Math.abs(q - .004) / .03) * 1 + (q < -.02 ? .4 : 0)); }   /* 2 + 빛: 판돌 표시 (isle.js 깎은 돌 칠) */
   for (let j = 0; j < NS; j++) ix.push(0, 1 + (j + 1) % NS, 1 + j);
   for (let i = 1; i < NR; i++) for (let j = 0; j < NS; j++) { const A = 1 + (i - 1) * NS + j, B = 1 + (i - 1) * NS + (j + 1) % NS, C = A + NS, D = B + NS; ix.push(A, B, C, B, D, C); }
   const s0 = pos.length / 3; for (let j = 0; j < NS; j++) { const th = j / NS * Math.PI * 2, rr = rim(th) * 1.04; pos.push(Math.cos(th) * rr, -.35 + .1 * noise2(th * 3, seed), Math.sin(th) * rr); gl.push(2); }   /* 옆면 (땅에 반쯤 묻힘) */
@@ -51,7 +58,7 @@ function slab(x, y, z, Rs, seed) { const NR = 20, NS = 64, pos = [], gl = [], ix
 
 export function buildSecret({ LO, F, hAt, U, GL }) {
   const rock = [], stone = [], obstacles = [], TB = []; if (!LO.secret) return { rock, stone, flowers: null, wind: null, decor: [] };
-  LO.secret.forEach((S, k) => { const T = tube(S, k * 7.3 + 1); rock.push(T.g, T.fg); TB.push({ ...T, w: S.w + .9, seed: k * 7.3 + 1 }); });
+  LO.secret.forEach((S, k) => { const T = tube(S, k * 7.3 + 1, hAt); rock.push(T.g, T.fg); TB.push({ ...T, w: S.w + .9, seed: k * 7.3 + 1 }); });
   /* 둔덕 판돌: 협곡이 비밀길 위를 지나는 자리 (gorge.rune.t) 둔덕 꼭대기 한가운데 */
   const slabs = []; (F.gorges || []).forEach((C, gi) => { if (!C.rune) return; const [x, z] = F.gorgeAtI(gi, C.rune.t); let y = -99; for (let a = 0; a < 6.283; a += .4) for (const d of [0, 2, 4]) y = Math.max(y, hAt(x + Math.cos(a) * d, z + Math.sin(a) * d)); stone.push(slab(x, y - .15, z, 4.2, gi * 13 + 5));   /* 판돌 밑 가장 높은 땅에 맞춰 얹음 (울퉁불퉁한 둔덕에 묻히지 않게) */ slabs.push([x, y, z, gi]); });
   /* 판돌 둘레 틈 바람: 몇 초마다 한 번 옅은 바람 줄기가 틈에서 훅 새어 올라 흩어짐 (밑의 터널로 바람이 지나서 · 아는 사람에겐 확인 도장) */

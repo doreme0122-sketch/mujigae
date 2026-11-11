@@ -19,13 +19,13 @@ const clamp01 = t => Math.min(1, Math.max(0, t));
 
 /* ── 칠: 갈대 잎 · 이삭 · 풀잎 (꼭짓점마다 색 · 흔들림 aS · 해를 등지면 비침 aTr · 덩어리 둥근 면 aD · 햇빛 받는 정도 aU)
    GL: 쓰는 쪽의 공통 칠(lit 포함) · finish: 마지막 색에 덧입힐 것(섬은 안개 · 시야 어둠) */
-export function vegShader(GL, finish = 'c') { return {
+export function vegShader(GL, finish = 'c', pre = '') { return {
   vertexShader: `attribute vec3 color, aD; attribute float aS, aTr, aU; uniform float uT; varying vec3 vC, vN, vP, vD, vL; varying float vTr, vU;
     void main(){ vec4 w = modelMatrix * vec4(position, 1.); float ph = w.x * .7 + w.z * .4;
       w.xz += vec2(sin(uT * 1.4 + ph), cos(uT * 1.1 + ph * 1.3)) * .045 * aS + vec2(sin(uT * .6 + w.x * .25), 0.) * .06 * aS * aS;   /* 잔바람 + 큰 바람 물결 (끝으로 갈수록 크게) */
       vC = color; vN = normalize(mat3(modelMatrix) * normal); vD = aD; vU = aU; vP = w.xyz; vL = position; vTr = aTr; gl_Position = projectionMatrix * viewMatrix * w; }`,
   fragmentShader: GL + `varying vec3 vC, vN, vP, vD, vL; varying float vTr, vU;
-    void main(){ vec3 n = normalize(vN); if (!gl_FrontFacing) n = -n; if (dot(vD, vD) > .01) n = normalize(mix(n, normalize(vD), .6));   /* 잎결 자글거림을 줄이고 큰 덩어리로 부드럽게 칠한 느낌 */
+    void main(){ ${pre} vec3 n = normalize(vN); if (!gl_FrontFacing) n = -n; if (dot(vD, vD) > .01) n = normalize(mix(n, normalize(vD), .6));   /* 잎결 자글거림을 줄이고 큰 덩어리로 부드럽게 칠한 느낌 */
       float up = vU; vec3 al = vC * mix(.78, 1.12, up) + vec3(.06, .07, .0) * up * up;                 /* 밑은 짙은 풀빛 · 위는 햇빛 받은 노란 연두 */
       vec3 c = lit(al, n, 1., mix(.7, 1., up));
       c += vC * vec3(1., 1.2, .6) * pow(max(0., dot(-n, uSun)), 1.5) * vTr * .7;                     /* 해를 등진 잎 · 이삭은 빛이 비쳐 보임 */

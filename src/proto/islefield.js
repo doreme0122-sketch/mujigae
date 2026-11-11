@@ -180,5 +180,5 @@ export function makeField(L = SPOT) {
   const brushZone = (x, z) => { for (let k = 0; k < L.brush.length; k++) if (brushZ(k, x, z) > 0) return k; return -1; };   /* 몇 번째 부쉬 안인지 (밖이면 −1) */   /* 부쉬 안 + (가장자리가 덤불 뭉치처럼 물결) */
   /* 지금 자리가 어디인지: 동굴 입구 · 골짜기길 · 공터 */
   const where = (x, z) => { if (SEC.length && secretD(x, z) > 0 && (openD(x, z) < 0 || humpK(x, z) > .3)) return 'secret'; if (!GS.length) return null; const c = gorge(x, z), T = GS[c.i].g.tunnel; if (c.d > 0) return T && c.t <= T.to ? 'tunnel' : 'gorge'; return basinD(x, z) > 0 ? 'basin' : null; };
-  return { L, mask, plateau, pond, chan, brush, brushZ, brushZone, spireMoss, top, bottom, blocked, sightBlock, obstacles, archLegs, gorge, gorgeAt, gorgeAtI, basinD, inGorge, where, mountH, floats, floatD, useGorge, gorges: GS.map(q => q.g), secretD, humpK };
+  return { gorgeI, basinI, gorgeBB: i => GS[i].bb, L, mask, plateau, pond, chan, brush, brushZ, brushZone, spireMoss, top, bottom, blocked, sightBlock, obstacles, archLegs, gorge, gorgeAt, gorgeAtI, basinD, inGorge, where, mountH, floats, floatD, useGorge, gorges: GS.map(q => q.g), secretD, humpK };
 }
