@@ -9,11 +9,11 @@
    상태: 지킴(맵 색으로 은은히 숨 쉼) → 싸움(붉게 · 빠르게 · 기둥 룬이 아래부터 깨어남 · 사슬 떨림 · 몬스터 체력 1/6마다 사슬 하나 끊김) → 쓰러뜨림(남은 사슬 끊김 → 봉인 원 깨짐 → 뚜껑 열림 → 빛 터짐 · 충격파 · 룬 번쩍 → 빛 덩이가 제단 앞 바닥에 떨어짐)
    분위기(맵마다): 돌 색 · 덮개(이끼 · 재 · 서리 · 짙은 이끼) · 빛 색 · 틈 불빛(용암) · 늘어진 덩굴/뿌리(초원 · 정글) — 싸움 빨강은 모든 맵 같음 */
 import * as THREE from 'three';
-import { noise2 } from './islefield.js?v=11111308';
-import { carvedBlock, runeD } from './ruins.js?v=11111308';
-import { buildChest, GRADES } from './chest.js?v=11111308';
-import { buildMystic } from './mystic.js?v=11111308';
-import { makeOffMark } from './offmark.js?v=11111308';
+import { noise2 } from './islefield.js?v=11111311';
+import { carvedBlock, runeD } from './ruins.js?v=11111311';
+import { buildChest, GRADES } from './chest.js?v=11111311';
+import { buildMystic } from './mystic.js?v=11111311';
+import { makeOffMark } from './offmark.js?v=11111311';
 
 export const THEMES = {
   meadow: { name: '초원', a: [.36, .34, .29], b: [.58, .54, .46], cover: [.2, .36, .1], coverAmt: .85, glow: [.22, .95, .8], crack: [0, 0, 0], vines: 'vine', mist: [.82, .9, .88], mistA: .3, fly: [1, .9, .45], shaft: [1, .93, .72] },
