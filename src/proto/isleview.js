@@ -2,14 +2,14 @@
    · 카메라 · 화면 밝기 처리 · 기체 · 조종은 새 맵(map2)과 같은 것 · 섬만 새것 */
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
-import { makeBloom } from '../core/hangar/bloom.js?v=11111739';
-import { makeForgeShip, forgeList } from './forgeship.js?v=11111739';
-import { makePerf } from './perf.js?v=11111739';
-import { makeFlight, FLY, padZone } from './flight.js?v=11111739';
-import { buildIsle } from './isle.js?v=11111739';
-import { makeInputBuffer } from './inbuf.js?v=11111739';
-import { makeLiftFx } from './liftfx.js?v=11111739';
-import { gate4 } from './gates.js?v=11111739';
+import { makeBloom } from '../core/hangar/bloom.js?v=11111743';
+import { makeForgeShip, forgeList } from './forgeship.js?v=11111743';
+import { makePerf } from './perf.js?v=11111743';
+import { makeFlight, FLY, padZone } from './flight.js?v=11111743';
+import { buildIsle } from './isle.js?v=11111743';
+import { makeInputBuffer } from './inbuf.js?v=11111743';
+import { makeLiftFx } from './liftfx.js?v=11111743';
+import { gate4 } from './gates.js?v=11111743';
 
 const $ = s => document.querySelector(s);
 export async function start(canvas, onProgress = () => {}, opt = {}) {   /* opt.layout: 섬 배치 (없으면 섬 하나 시험 · 초원 한 조각 체험판 = meadowsector.js) */
@@ -105,6 +105,9 @@ export async function start(canvas, onProgress = () => {}, opt = {}) {   /* opt.
   const ray = (L, x0, z0, dx, dz, R, me) => { const A = occ[L]; for (let d = .15; d < R; d += .15) { const o = occAt(A, x0 + dx * d, z0 + dz * d); if (o === 1 || (o >= 2 && o - 2 !== me)) return d; } return R; };
   const myZone = L => L === 0 ? isle.brushZone(FS.x, FS.z) : -1;
   let Rs = VR[1]; const D = new Float32Array(NR);
+  /* 기체가 가려졌나: 기체 → 카메라 사이를 24번 짚어 땅(산)이 그 높이보다 솟았는지 · 동굴 천장 밑이면 가려짐 */
+  let cutR = 0; const hidden = () => { if (isle.where && isle.where(FS.x, FS.z) === 'tunnel') return true; const cx = camera.position.x, cy = camera.position.y, cz = camera.position.z;
+    for (let i = 1; i <= 24; i++) { const k = i / 24 * .92, x = FS.x + (cx - FS.x) * k, y = LV.y + (cy - LV.y) * k, z = FS.z + (cz - FS.z) * k; if (isle.H(x, z) > y - .3) return true; } return false; };
   const castSight = () => { const L = LV.f < .5 ? LV.cur : LV.to, me = myZone(L); Rs += (VR[L] - Rs) * .25; const R = Rs;
     if (opt.layout) { const nx = Math.round((FS.x - VS / 2) / cs0) * cs0, nz = Math.round((FS.z - VS / 2) / cs0) * cs0, di = Math.round((nx - VO[0]) / cs0), dj = Math.round((nz - VO[1]) / cs0);   /* 넓은 맵: 시야 지도 창이 기체를 따라감 (칸 단위로 옮기고 앞 장면 값도 같이 옮김) */
       if (di || dj) { visB.set(visT); for (let j = 0; j < VG; j++) for (let i = 0; i < VG; i++) { const ii = i + di, jj = j + dj; visT[j * VG + i] = ii >= 0 && jj >= 0 && ii < VG && jj < VG ? visB[jj * VG + ii] : 0; } VO[0] = nx; VO[1] = nz; } }
@@ -176,7 +179,7 @@ export async function start(canvas, onProgress = () => {}, opt = {}) {   /* opt.
     const sp = fly.children[0].position; { const k = Math.min(1, dt * 4); cam.x += (sp.x + FS.vx * .25 - cam.x) * k; cam.z += (sp.z + FS.vz * .25 - cam.z) * k; }
     { const cf = [.85, 1, 1.3], k = LV.f * LV.f * (3 - 2 * LV.f), f = cf[LV.cur] + (cf[LV.to] - cf[LV.cur]) * k; camD += (cfg.dist * CAMK * f - camD) * Math.min(1, dt * 3); }
     const a = cfg.ang * Math.PI / 180, vx = cam.x + look.x, vz = cam.z + look.z, cy = LV.y; camera.position.set(vx, cy + camD * Math.sin(a), vz + camD * Math.cos(a)); camera.lookAt(vx, cy, vz); camera.updateMatrixWorld();
-    isle.sky.position.copy(camera.position); isle.update(t); ext?.update?.(t, dt, { x: FS.x / K, z: FS.z / K, L: LV.cur }); if (LO.cut) isle.setCut(v3.set(FS.x, LV.y, FS.z), camera.position, Rs, 1);   /* 기체와 카메라 사이 높은 산 · 동굴 천장을 내 화면에서만 걷어 냄 · 사용자 2026-11-11: 완전히 투명 (흐린 안개 없이) · 크기는 시야 넓이만큼 (시야 원 반지름 Rs) */ xrayM.uniforms.uT.value = t;
+    isle.sky.position.copy(camera.position); isle.update(t); ext?.update?.(t, dt, { x: FS.x / K, z: FS.z / K, L: LV.cur }); if (LO.cut) { cutR += ((hidden() ? 9 : 0) - cutR) * Math.min(1, dt * 8); isle.setCut(v3.set(FS.x, LV.y, FS.z), camera.position, cutR, 1); }   /* 기체와 카메라 사이 산 · 동굴 천장을 내 화면에서만 걷어 냄 · 사용자 2026-11-11: 기체가 가려질 때만 · 가리는 부분만 (기체와 카메라 사이 9m 원기둥) · 완전히 투명 */ xrayM.uniforms.uT.value = t;
     /* 바람 고리 (1층이면 땅에 닿아 풀 · 꽃을 밂 · 2 · 3층은 그 높이 공중에서만) · 못 바꾸면 층 막대가 빨갛게 깜빡 */
     if (LV.puff < 1) { LV.puff = Math.min(1, LV.puff + dt / .7); const p = LV.puff, onGround = LV.puffL === 0, gh = isle.H(LV.puffX, LV.puffZ);
       puff.visible = !onGround || isle.mask(LV.puffX, LV.puffZ) > 0; puff.position.set(LV.puffX, onGround ? gh + .08 : LY[LV.puffL] - .45, LV.puffZ); puff.scale.setScalar(5.5); puffU.uP.value = p;

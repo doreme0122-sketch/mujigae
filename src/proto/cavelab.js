@@ -16,7 +16,7 @@ const along = t => { const s = t * LEN[LEN.length - 1]; let k = 1; while (k < LE
   return { x: a[0] + dx * f, z: a[1] + dz * f, rot: Math.atan2(dx / l, -dz / l) }; };   /* rot: 길을 가로지르는 방향 */
 const BASIN = 36, END = PTS[PTS.length - 1], SITE = [END[0], END[1] - BASIN];
 export const CAVE = {
-  box: [-96, 96, -304, 84], dens: 2.4, tile: 40, cut: 1,   /* 가린 산 걷기 켬 (사용자 2026-11-11: 완전히 투명 · 시야 넓이만큼 — isleview) */
+  box: [-96, 96, -304, 84], dens: 2.4, tile: 40, cut: 1,   /* 가린 산 걷기 켬 (사용자 2026-11-11: 기체가 가려질 때만 · 가리는 부분만 9m · 완전히 투명 — isleview) */
   islands: [
     [[0, 52, 30], [-30, 44, 22], [30, 44, 22], [0, 70, 20]],                                                   /* 풀밭 섬 (출발) */
     [[0, -36, 40], [-34, -36, 24], [34, -36, 24], [0, -24, 24], [-24, -22, 18], [24, -22, 18], [0, -60, 30],   /* 산 섬 앞: 신전 앞마당 (무너진 기둥 무더기) · 입구 */

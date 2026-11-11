@@ -13,9 +13,9 @@
    · 상자 둘레로 작은 금빛 반짝이가 천천히 올라감 (동그란 티 안 나게 가는 십자 반짝임) */
 import * as THREE from 'three';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
-import { noise2 } from './islefield.js?v=11111739';
-import { carvedBlock, runeD } from './ruins.js?v=11111739';
-import { play, unlock } from './sfx.js?v=11111739';
+import { noise2 } from './islefield.js?v=11111743';
+import { carvedBlock, runeD } from './ruins.js?v=11111743';
+import { play, unlock } from './sfx.js?v=11111743';
 /* 고른 소리 (사용자 2026-11-11): 사슬 끊김 — 챙~ + 깨짐 (새로 만든 셋 중 '가' 먼저 · 고르면 바꿈) · 빛 터짐 '가' (빛이 쏟아짐) · 내려앉음 '가' (사뿐 + 맑은 종) · 아이템 날아가는 소리는 뺌 */
 const SND = { snap: 0, burst: 0, land: 0 };   /* 사슬 끊김: '가' 확정 */
 
