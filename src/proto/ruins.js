@@ -8,11 +8,7 @@
    막힘은 보이는 두께 그대로 (기둥 · 석상 · 난간 기둥 위 석상은 그 높이까지)
    돌려주는 것: geos (깎은 돌 칠 하나로 한 번에 그림) · glow (빛 무늬 세모 [a, b, c, 색, 위상]) · obstacles ([x, y, z, r]) · strands (늘어진 덩굴 점 줄) */
 import * as THREE from 'three';
-import { noise2 } from './islefield.js?v=11110913';
-import { sd, sdfMesh } from './sdf.js?v=11110913';
-import { MeshoptSimplifier as MO } from '../../vendor/meshopt_simplifier.module.js';
-/* 빚은 석상 줄이기: 모양은 그대로 두고 평평한 곳 삼각형만 덜어 냄 (err: 허용 오차 · 크기 1 기준) */
-const lighten = (g, keep, err) => { const [I] = MO.simplify(new Uint32Array(g.index.array), g.attributes.position.array, 3, Math.floor(g.index.count * keep / 3) * 3, err, ['ErrorAbsolute']); g.setIndex(Array.from(I)); return g; };
+import { noise2 } from './islefield.js?v=11111031';
 
 const V = (x, y, z) => new THREE.Vector3(x, y, z);
 const rngOf = s => () => (s = (s * 16807) % 2147483647) / 2147483647;
@@ -26,67 +22,27 @@ function block(w, h, d, seg = 2, chip = .12, seed = 0) { const g = new THREE.Box
   for (let i = 0; i < p.count; i++) { let x = p.getX(i), y = p.getY(i), z = p.getZ(i); const ex = Math.abs(x) / (w / 2), ey = Math.abs(y) / (h / 2), ez = Math.abs(z) / (d / 2), edge = (ex > .99) + (ey > .99) + (ez > .99);
     if (edge >= 2) { const k = chip * (.5 + .9 * Math.max(0, noise2(x * 3.1 + seed, y * 2.7 + z * 1.9))); x -= Math.sign(x) * k * (ex > .99); y -= Math.sign(y) * k * (ey > .99); z -= Math.sign(z) * k * (ez > .99); }   /* 모서리 · 꼭짓점이 떨어져 나감 */
     p.setXYZ(i, x, y, z); } return g; }
+/* 새긴 돌덩이: 앞면(+z)에 무늬를 파냄 — panel: 테두리 안을 판판하게 · lozenge: 마름모 격자 · rosette: 여덟 잎 꽃 · band: 가로 홈 · none: 그냥 깎은 돌 · 모서리는 닳고 떨어져 나감 */
+function carved(w, h, d, kind, depth, seed) { const res = kind === 'none' ? 0 : kind === 'panel' ? 3 : 6, nU = Math.max(2, Math.ceil(w * res)), nV = Math.max(2, Math.ceil(h * res)), g = new THREE.BoxGeometry(w, h, d, nU, nV, 2); g.deleteAttribute('uv');
+  const p = g.attributes.position, fr = v => v - Math.floor(v), sm = (a, b, x) => { const t = Math.max(0, Math.min(1, (x - a) / (b - a))); return t * t * (3 - 2 * t); }, m = Math.min(.24, w * .12, h * .2);
+  for (let i = 0; i < p.count; i++) { let x = p.getX(i), y = p.getY(i), z = p.getZ(i); const ex = Math.abs(x) / (w / 2), ey = Math.abs(y) / (h / 2), ez = Math.abs(z) / (d / 2);
+    if (kind !== 'none' && z > d / 2 - 1e-4) { const inner = sm(0, .06, Math.min(w / 2 - m - Math.abs(x), h / 2 - m - Math.abs(y))); let c = 0;
+      if (kind === 'panel') c = 1; else if (kind === 'band') c = Math.abs(fr(y / .22) - .5) < .17 ? 1 : 0;
+      else if (kind === 'lozenge') c = Math.abs(fr(x / .62) - .5) + Math.abs(fr(y / .62) - .5) > .3 ? 1 : .15;
+      else if (kind === 'rosette') { const cw = Math.min(h - 2 * m, 1.3), lx = (fr(x / cw + .5) - .5) * cw, rr = Math.hypot(lx, y), a = Math.atan2(y, lx), pe = cw * (.3 + .1 * Math.cos(a * 8)); c = rr < pe && rr > cw * .07 ? .1 : 1; }
+      z -= depth * c * inner; }
+    const edge = (ex > .999) + (ey > .999) + (ez > .999);
+    if (edge >= 2) { const k = .1 * (.4 + Math.max(0, noise2(x * 2.7 + seed, y * 2.3 + z * 1.7))); x -= Math.sign(x) * k * (ex > .999); y -= Math.sign(y) * k * (ey > .999); z -= Math.sign(z) * k * (ez > .999); }
+    p.setXYZ(i, x, y, z); }
+  g.computeVertexNormals(); return g; }
 const at = (g, x, y, z, ry = 0, rx = 0, rz = 0) => { g.rotateZ(rz); g.rotateX(rx); g.rotateY(ry); g.translate(x, y, z); return g; };
 /* 홈 파인 둥근 기둥 몸통 (flutes 개의 세로 홈) */
 function fluted(r, h, flutes = 16, seg = 6) { const g = new THREE.CylinderGeometry(r, r * 1.04, h, flutes * 3, seg, false); g.deleteAttribute('uv'); const p = g.attributes.position;
   for (let i = 0; i < p.count; i++) { const x = p.getX(i), z = p.getZ(i), y = p.getY(i), l = Math.hypot(x, z); if (l < r * .5) continue; const a = Math.atan2(z, x), k = 1 - .06 * Math.pow(Math.max(0, Math.cos(a * flutes)), 2); p.setX(i, x * k); p.setZ(i, z * k); } return g; }
 
-/* ── 날개 기사 석상 (무릎 꿇고 칼을 땅에 꽂음 · 고개 숙임 · 날개는 접어 등 뒤로 깃털을 겹겹이) — 거리 함수로 빚어 녹여 붙인 깎은 돌 ──
-   사람 키 1.9 단위로 빚고 S배 · 앞 = +z · 받침 윗면 = 0 */
-function knightSDF(broken, seed) { const P = [], add = (c, R, f, k = .03, cut = false) => P.push({ c, R, f, k, cut });   /* c · R: 감싸는 공 (멀면 건너뜀) · k: 녹여 붙이는 정도 · cut: 파냄 */
-  const cone = (a, b, r0, r1, k) => add([(a[0] + b[0]) / 2, (a[1] + b[1]) / 2, (a[2] + b[2]) / 2], Math.hypot(b[0] - a[0], b[1] - a[1], b[2] - a[2]) / 2 + Math.max(r0, r1), (x, y, z) => sd.cone(x, y, z, a, b, r0, r1), k);
-  const ell = (c, rx, ry, rz, k) => add(c, Math.max(rx, ry, rz), (x, y, z) => sd.ell(x, y, z, c[0], c[1], c[2], rx, ry, rz), k);
-  const box = (c, m, hx, hy, hz, rr, k, cut) => add(c, Math.hypot(hx, hy, hz), (x, y, z) => sd.box(x, y, z, c, m, hx, hy, hz, rr), k, cut);
-  const I3 = [1, 0, 0, 0, 1, 0, 0, 0, 1];
-  /* 몸통: 엉덩이 · 허리 · 가슴판(가운데 능선) · 허리띠 */
-  ell([0, .92, 0], .21, .15, .17, .05); cone([0, .95, 0], [0, 1.22, .02], .17, .2, .06); ell([0, 1.3, .05], .25, .2, .18, .06);
-  box([0, 1.3, .2], I3, .014, .13, .03, .01, .02); for (let k = 0; k < 3; k++) box([0, 1.02 + k * .07, .01], I3, .2 - k * .004, .012, .175, .01, .02);   /* 가슴판 능선 · 배 갑옷 띠 */
-  for (let k = 0; k < 7; k++) { const a = -1.2 + k * .4; box([Math.sin(a) * .2, .78, .04 + Math.cos(a) * .17], sd.frame([Math.sin(a) * .25, -1, Math.cos(a) * .3], a), .07, .14, .015, .01, .015); }   /* 허리 아래 늘어진 갑옷 판 */
-  /* 어깨 갑옷 두 겹 · 목 · 투구 (고개 숙임) · 눈 틈 · 볏 · 옆 날개 장식 */
-  for (const s of [-1, 1]) { ell([s * .27, 1.46, 0], .15, .1, .14, .03); ell([s * .31, 1.39, 0], .13, .075, .13, .02); }
-  cone([0, 1.44, .02], [0, 1.56, .06], .075, .07, .03);
-  ell([0, 1.63, .1], .115, .13, .13, .03); box([0, 1.6, .225], I3, .085, .009, .04, .004, .01, true);   /* 투구 · 눈 틈 (파냄) */
-  box([0, 1.56, .22], I3, .012, .05, .02, .008, .015); box([0, 1.74, .07], sd.frame([0, .35, -1]), .012, .15, .06, .01, .02);   /* 코가리개 · 볏 */
-  for (const s of [-1, 1]) for (let k = 0; k < 3; k++) box([s * (.12 + k * .012), 1.68 + k * .03, .02 - k * .03], sd.frame([s * .5, .8 - k * .15, -.6]), .025, .07 - k * .01, .008, .006, .01);   /* 투구 옆 작은 날개 */
-  /* 팔: 두 손을 칼자루 머리에 겹쳐 얹음 · 팔꿈치 · 손 갑옷 */
-  for (const s of [-1, 1]) { cone([s * .27, 1.42, .02], [s * .25, 1.16, .24], .075, .065, .03); ell([s * .25, 1.16, .24], .07, .07, .075, .02); cone([s * .25, 1.16, .24], [s * .05, 1.27, .44], .065, .055, .03); ell([s * .045, 1.27, .46], .055, .05, .07, .02); }
-  /* 칼: 받침에 꽂힌 날 (끝으로 가늘게) · 코등이 · 자루 · 머리 */
-  add([0, .45, .48], .5, (x, y, z) => { const t = Math.max(0, Math.min(1, (.9 - y) / .9)); return sd.box(x, y, z, [0, .45, .48], I3, .036 * (1 - t * .45), .45, .009, .003); }, .01);
-  box([0, .92, .48], I3, .17, .02, .028, .01, .01); cone([0, .93, .48], [0, 1.2, .48], .022, .02, .01); ell([0, 1.25, .48], .04, .04, .04, .01);
-  /* 다리: 왼무릎 세움 (발을 앞에 딛음) · 오른무릎 땅에 · 무릎 갑옷 */
-  cone([-.12, .9, 0], [-.14, .82, .44], .11, .09, .05); cone([-.14, .82, .44], [-.14, .1, .48], .085, .06, .03); box([-.14, .05, .57], I3, .06, .045, .12, .02, .03); ell([-.14, .84, .5], .075, .07, .07, .02);
-  cone([.12, .88, 0], [.14, .09, .22], .11, .09, .05); cone([.14, .09, .22], [.14, .1, -.3], .085, .06, .03); box([.14, .07, -.4], sd.frame([0, .3, -1]), .05, .1, .05, .02, .03); ell([.14, .1, .25], .075, .07, .075, .02);
-  box([0, .7, .17], sd.frame([0, 1, .3]), .13, .24, .018, .01, .02);   /* 앞 천 자락 (다리 사이) */
-  /* 날개: 등에서 솟아 어깨 위로 꺾인 손목에서 깃털이 등 뒤로 길게 접혀 내려옴 · 덮깃 · 둘째깃 · 첫째깃 (부러진 쪽은 첫째깃이 짧고 깨짐) */
-  for (const s of [-1, 1]) { const root = [s * .12, 1.4, -.14], elb = [s * .32, 1.66, -.2], wr = [s * .44, 1.96, -.26];   /* 몸 옆으로 조금 벌려 앞에서도 날개가 몸을 감싸 보이게 */
-    cone(root, elb, .06, .055, .04); cone(elb, wr, .055, .045, .03);
-    const arm = t => t < .5 ? root.map((v, i) => v + (elb[i] - v) * t * 2) : elb.map((v, i) => v + (wr[i] - v) * (t - .5) * 2), bk = broken && s > 0;
-    for (let k = 0; k < 8; k++) { const t = .15 + k / 7 * .85, p = arm(t), L = .22 + t * .12; box([p[0] + s * .02, p[1] - L * .5, p[2] - .04], sd.frame([s * .05, -1, -.12], s * .2), .055, L * .5, .016, .012, .012); }   /* 덮깃 */
-    for (let k = 0; k < 9; k++) { const t = .1 + k / 8 * .9, p = arm(t), L = .55 + t * .45; box([p[0] + s * .035, p[1] - L * .5 - .05, p[2] - .06], sd.frame([s * .02, -1, -.12], s * .55), .065, L * .5, .015, .012, .012); }   /* 둘째깃 */
-    for (let k = 0; k < 7; k++) { let L = 1.25 + k * .06; if (bk) L = k < 4 ? .55 + k * .08 : 0; if (!L) continue; const p = [wr[0] + s * (.02 + k * .012), wr[1] - .05, wr[2] - .1 - k * .035];
-      box([p[0] - s * L * .03, p[1] - L * .5, p[2] - L * .08], sd.frame([-s * .05, -1, -.15 - k * .02], s * .6), .07 - k * .003, L * .5, .014, .012, .01); }   /* 첫째깃 (길게 · 몸 옆을 따라 내려옴) */
-    if (bk) box([wr[0] + s * .05, wr[1] - .75, wr[2] - .25], sd.frame([.5, -1, -.3]), .1, .06, .05, .01, .02, true); }   /* 부러진 깃 끝: 깨진 면 */
-  P.sort((a, b) => a.cut - b.cut);
-  const f = (x, y, z) => { let d = 1e9; for (const p of P) { if (p.cut) { const q = p.f(x, y, z); d = Math.max(d, -q); continue; } const b = Math.hypot(x - p.c[0], y - p.c[1], z - p.c[2]) - p.R; if (b > d + p.k) continue; d = sd.smin(d, p.f(x, y, z), p.k); }
-    return d + .004 * noise2(x * 37 + seed, y * 29 + z * 33) + .002 * noise2(y * 90, x * 80 - z * 70); };   /* 닳은 돌결 */
-  return f; }
-
-/* ── 작은 수호 석상 (다리 난간 기둥 위): 웅크린 날개 짐승 (그리핀 같은) · 하나는 머리가 깨짐 ── */
-function sentinelSDF(broken, seed) { const P = []; const add = (c, R, f, k) => P.push({ c, R, f, k });
-  const cone = (a, b, r0, r1, k = .04) => add([(a[0] + b[0]) / 2, (a[1] + b[1]) / 2, (a[2] + b[2]) / 2], Math.hypot(b[0] - a[0], b[1] - a[1], b[2] - a[2]) / 2 + Math.max(r0, r1), (x, y, z) => sd.cone(x, y, z, a, b, r0, r1), k);
-  const ell = (c, rx, ry, rz, k = .04) => add(c, Math.max(rx, ry, rz), (x, y, z) => sd.ell(x, y, z, c[0], c[1], c[2], rx, ry, rz), k);
-  const box = (c, m, hx, hy, hz, rr, k) => add(c, Math.hypot(hx, hy, hz), (x, y, z) => sd.box(x, y, z, c, m, hx, hy, hz, rr), k);
-  ell([0, .28, -.02], .2, .17, .28, .08); ell([0, .4, .16], .17, .19, .15, .06);   /* 웅크린 몸 · 가슴 */
-  for (const s of [-1, 1]) { cone([s * .1, .3, .22], [s * .1, .03, .3], .06, .045); ell([s * .1, .03, .34], .05, .03, .07, .02); cone([s * .13, .22, -.18], [s * .14, .03, -.12], .08, .05); }   /* 앞다리 · 발 · 뒷다리 */
-  if (!broken) { cone([0, .48, .22], [0, .66, .33], .09, .075); ell([0, .7, .37], .1, .1, .12, .03); cone([0, .69, .47], [0, .6, .58], .045, .01, .02); for (const s of [-1, 1]) box([s * .05, .79, .33], sd.frame([s * .2, 1, -.6]), .015, .06, .01, .006, .015); }   /* 목 · 머리 · 부리 · 귀깃 */
-  else box([0, .52, .24], sd.frame([.3, 1, .2]), .08, .05, .07, .03, .03);   /* 깨진 목 */
-  for (const s of [-1, 1]) for (let k = 0; k < 6; k++) { const a = .5 + k * .2, L = .45 - k * .04; box([s * (.18 + Math.sin(a) * L * .4), .45 + Math.cos(a) * L * .4, -.05 - k * .045], sd.frame([s * Math.sin(a), Math.cos(a), -.2]), .055, L * .5, .014, .01, .012); }   /* 반쯤 펼친 날개 */
-  return (x, y, z) => { let d = 1e9; for (const p of P) { const b = Math.hypot(x - p.c[0], y - p.c[1], z - p.c[2]) - p.R; if (b > d + p.k) continue; d = sd.smin(d, p.f(x, y, z), p.k); } return d + .005 * noise2(x * 30 + seed, y * 25 + z * 28); }; }
-
 export function buildRuins({ F, hAt, LAYERS, Y, LO, TUN }) {
-  const geos = [], glow = [], obstacles = [], strands = [], r = rngOf(131), add = (...g) => g.flat().forEach(q => geos.push(q.index ? q.toNonIndexed() : q));
-  const R = LO.ruins; if (!R) return { geos, glow, obstacles, strands };
-  const SENT = [false, true].map((br, i) => { const g = lighten(sdfMesh(sentinelSDF(br, 7 + i), [-.75, -.05, -.5, .75, .95, .75], .024), .3, .004); g.scale(2.4, 2.4, 2.4); return g; });   /* 작은 수호 석상 (온전한 것 · 머리 깨진 것) */
+  const geos = [], rock = [], glow = [], obstacles = [], strands = [], r = rngOf(131), add = (...g) => g.flat().forEach(q => geos.push(q.index ? q.toNonIndexed() : q));
+  const R = LO.ruins; if (!R) return { geos, rock, glow, obstacles, strands };
   const glyph = (c, ax, up, s, col, ph) => { const tri = (a, b, d) => glow.push([a, b, d, col, ph]);   /* 문양 하나: 고리 + 획 몇 개 (평면 ax · up 위에 · 크기 s) */
     const P = (u, v) => c.clone().addScaledVector(ax, u * s).addScaledVector(up, v * s);
     for (let e = 0; e < 12; e++) { const a0 = e / 12 * 6.283, a1 = (e + 1) / 12 * 6.283; if ((e + Math.round(ph * 7)) % 5 === 0) continue; const p = (a, R2) => P(Math.cos(a) * R2, Math.sin(a) * R2); tri(p(a0, .38), p(a0, .48), p(a1, .48)); tri(p(a0, .38), p(a1, .48), p(a1, .38)); }
@@ -119,55 +75,88 @@ export function buildRuins({ F, hAt, LAYERS, Y, LO, TUN }) {
         for (let u = u0 + .7; u < u1 - .5; u += .62) { const p = at2(u, sd * (w / 2 - .3), deckY + .5), lp = [[.13, 0], [.2, .1], [.12, .3], [.18, .55], [.1, .85], [.14, 1.05], [.16, 1.12]].map(([a2, y]) => new THREE.Vector2(a2, y));   /* 동자 기둥 (깎아 돌린 모양) */
           const g = new THREE.LatheGeometry(lp, 8); g.deleteAttribute('uv'); at(g, p.x, p.y + .3, p.z, 0, 0, tilt); add(g); }
         const m = at2((u0 + u1) / 2, sd * (w / 2 - .3), deckY + 1.95), g = block(u1 - u0 - .5, .26, .42, 3, .05, u0 * 2); at(g, m.x, m.y, m.z, ry + Math.PI / 2, 0, tilt); add(g); }
-      /* 다리 양 끝 기둥 위 작은 수호 석상 (짐승) — 한쪽은 머리가 깨짐 */
-      for (const [u, br] of [[posts[0], sd > 0], [posts[posts.length - 1], false]]) { if (u === undefined) continue; const p = at2(u, sd * (w / 2 - .3), deckY + 2.2), sg = (br ? SENT[1] : SENT[0]).clone();
-        sg.rotateY(ry + (u < L / 2 ? Math.PI : 0)); sg.translate(p.x, p.y, p.z); add(sg); obstacles.push([p.x, p.y + .9, p.z, 1.3], [p.x, p.y - .9, p.z, .8]); } }
+      /* 다리 양 끝 큰 기둥: 층층이 좁아지는 탑 모양 머리 + 연꽃 봉오리 (한쪽은 머리가 깨져 떨어짐) */
+      for (const [u, br] of [[posts[0], sd > 0], [posts[posts.length - 1], false]]) { if (u === undefined) continue; const p = at2(u, sd * (w / 2 - .3), deckY + .5); let y = p.y;
+        for (const [ww, hh] of [[1.5, .45], [1.2, 2.6], [1.55, .4], [1.3, .35], [1.05, .35], [.8, .3]]) { add(at(carved(ww, hh, ww, hh > 1 ? 'panel' : 'band', .06, u + y), p.x, y + hh / 2, p.z, ry)); y += hh; if (br && hh < .4 && y > p.y + 3.6) break; }
+        if (!br) { const g = new THREE.LatheGeometry([[0, 0], [.42, .05], [.5, .3], [.38, .62], [.16, .9], [0, 1.05]].map(([a2, b2]) => new THREE.Vector2(a2, b2)), 12); g.deleteAttribute('uv'); add(at(weather(g, .03, 3, u), p.x, y, p.z)); y += 1; }
+        else { const g = carved(.8, .3, .8, 'band', .05, u); at(g, p.x + sd * .9, deckY + .4, p.z + .6, ry + .7, .4, .3); add(g); }   /* 떨어진 머리 조각 */
+        obstacles.push([p.x, p.y + 1.6, p.z, 1], [p.x, y - .6, p.z, .9]); } }
     /* 끊긴 끝에서 늘어진 덩굴 */
     for (const g0 of gap) for (let k = 0; k < 16; k++) { const u = g0 * L + (g0 === gap[0] ? -.6 : .6) + (r() - .5) * 1.2, s = (r() - .5) * w, P0 = at2(u, s, deckY - .2), Lh = 1.5 + r() * r() * 7, pts = [];
-      for (let e = 0; e <= 8; e++) { const f = e / 8; pts.push(V(P0.x + Math.sin(f * 3 + k) * .25, P0.y - f * Lh, P0.z + Math.cos(f * 2.2 + k) * .25)); } strands.push(pts); } }
+      for (let e = 0; e <= 8; e++) { const f = e / 8; pts.push(V(P0.x + Math.sin(f * 3 + k) * .25, P0.y - f * Lh, P0.z + Math.cos(f * 2.2 + k) * .25)); } strands.push({ pts, r: .09 + r() * .06, root: false }); } }
 
-  /* ② 유적 입구 ───────────────────────────────────────────── */
-  if (TUN) { const f0 = TUN.frame(0), fwd = V(-f0.fx, 0, -f0.fz), sd = V(f0.sx, 0, f0.sz), ry = Math.atan2(fwd.x, fwd.z), fl = LO.gorge.floor, top = TUN.top, W = TUN.wi + .4;
-    const P = (s, y, f = 0) => V(f0.x, y, f0.z).addScaledVector(sd, s).addScaledVector(fwd, f);
-    /* 홈 파인 큰 기둥 둘: 두 단 받침 · 몸 · 머리 장식 (세 단) */
-    for (const s of [-1, 1]) { const c = P(s * (W + 1.5), 0, .6);
-      add(at(block(4.4, 1.2, 4, 3, .15, s), c.x, fl + .6, c.z, ry), at(block(3.7, .9, 3.4, 3, .12, s + 1), c.x, fl + 1.65, c.z, ry));
-      const sh = fluted(1.45, top - fl - 3.4, 18, 8); sh.translate(c.x, (fl + 2.1 + top - 1.3) / 2, c.z); add(weather(sh, .05, 1.1, s * 3));
-      add(at(block(3.5, .7, 3.3, 3, .12, s + 2), c.x, top - 1, c.z, ry), at(block(4.2, .8, 3.9, 3, .14, s + 3), c.x, top - .25, c.z, ry));
-      for (let y = fl + 3; y < top - 2; y += 1.5) obstacles.push([c.x, y, c.z, 1.7]);
-      for (let k = 0; k < 4; k++) glyph(P(s * (W + 1.5), fl + 5.5 + k * 2.6, 2.1), sd, V(0, 1, 0), 1, [.3, 1.05, .9], k * .17 + (s > 0 ? .5 : 0)); }   /* 기둥 앞면 문양 (아래부터 차례로 숨 쉬듯) */
-    /* 상인방 (문양 띠) · 처마돌 */
-    { const c = P(0, top + 1.4, .6), g = block(2 * (W + 3.6), 2.6, 3.4, 6, .22, 9); at(g, c.x, c.y, c.z, ry); add(weather(g, .08, .9, 2));
-      const k2 = P(0, top + 3.1, .9), g2 = block(2 * (W + 4.4), .9, 4.2, 6, .18, 10); at(g2, k2.x, k2.y, k2.z, ry); add(g2);
-      for (let k = -5; k <= 5; k++) glyph(P(k * 1.75, top + 1.4, 2.35), sd, V(0, 1, 0), .9, [.35, 1, .95], (k + 5) / 11); }
-    /* 투구 쓴 얼굴 부조 (상인방 위 · 바위에 새김): 이마 · 눈두덩 · 눈구멍 · 코 · 다문 입 · 투구 테 · 양옆 날개 깃 */
-    { const NX = 64, NY = 46, FW = 2 * (W + 2), FH = 15, c0 = P(0, top + 4 + FH / 2, -.4), pos = [], idx = [];
-      const d = (x, y) => { const ex = x / (FW * .38), ey = y / (FH * .5), dome = Math.sqrt(Math.max(0, 1 - ex * ex * .9 - ey * ey * .85)) * 2.6;
-        const g = (cx, cy, rx, ry2) => Math.exp(-((x - cx) ** 2 / (rx * rx) + (y - cy) ** 2 / (ry2 * ry2)));
-        let h = dome + .9 * g(0, 1.6, 6, 1) - 1.5 * (g(-2.6, .7, 1.25, .8) + g(2.6, .7, 1.25, .8)) + 1.1 * g(0, -1.2, .75, 2.3) - .5 * g(0, -4.1, 2.2, .22) + .35 * g(0, -5.2, 2.6, .9);
-        const helm = Math.abs(ey - .75 + .1 * ex * ex) < .06 ? .35 : 0; h += helm + .4 * Math.max(0, Math.cos(x * 1.6)) * smooth(Math.abs(ex), .62, .95) * (ey > -.3 ? 1 : 0);   /* 투구 테 · 옆 날개 깃 결 */
-        h -= .25 * Math.max(0, .06 - Math.abs(noise2(x * .3 + 4, y * .5) - .1)) * 12;   /* 금 */
-        return h * smooth(1.05, .8, Math.max(Math.abs(ex) * .85, Math.abs(ey))); };
-      for (let j = 0; j <= NY; j++) for (let i = 0; i <= NX; i++) { const x = (i / NX - .5) * FW, y = (j / NY - .5) * FH, q = c0.clone().addScaledVector(sd, x).addScaledVector(fwd, d(x, y) + .4 * noise2(x * .7, y * .7)); q.y = c0.y + y; pos.push(q.x, q.y, q.z); }
-      for (let j = 0; j < NY; j++) for (let i = 0; i < NX; i++) { const a = j * (NX + 1) + i, b = a + 1, c = a + NX + 1, e = c + 1; idx.push(a, b, c, b, e, c); }
-      const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setIndex(idx); g.computeVertexNormals(); add(g);
-      for (const s of [-1, 1]) { const e = c0.clone().addScaledVector(sd, s * 2.6).addScaledVector(fwd, .9).setY(c0.y + .7); for (let k = 0; k < 10; k++) { const a0 = k / 10 * 6.283, a1 = (k + 1) / 10 * 6.283;
-        glow.push([e, e.clone().addScaledVector(sd, Math.cos(a0) * .55).setY(e.y + Math.sin(a0) * .4), e.clone().addScaledVector(sd, Math.cos(a1) * .55).setY(e.y + Math.sin(a1) * .4), [.45, 1.1, 1], .9]); } } }   /* 눈에 남은 희미한 빛 */
-    /* 무릎 꿇은 날개 기사 석상 둘 (입구 양옆 · 앞을 봄 · 한쪽 날개 끝은 부러짐) */
-    for (const s of [-1, 1]) { const c = P(s * (W + 10.5), 0, 3), gy = hAt(c.x, c.z), S = 13.5, kn = lighten(sdfMesh(knightSDF(s > 0, 300 + s * 11), [-.72, -.05, -.85, .72, 2.12, .72], .0145), .22, .0025), b0 = gy + 1.5;
-      kn.scale(S, S, S); kn.rotateY(ry - s * .12); kn.translate(c.x, b0 + 1.2, c.z); add(kn);
-      add(at(weather(block(13.5, 1.6, 15.5, 4, .3, s), .12, .5, s), c.x, b0 - .2, c.z + 1.2, ry - s * .12), at(weather(block(11.5, 1.3, 13, 4, .25, s + 1), .1, .6, s), c.x, b0 + 1.1 - .55, c.z + 1.2, ry - s * .12));   /* 두 단 받침 */
-      for (let y = 0; y < 28; y += 2.2) obstacles.push([c.x, b0 + y, c.z, y < 4 ? 7 : y < 18 ? 4.6 : 4]); }   /* 막힘: 받침 · 몸 · 날개 (3층까지) */
-    /* ③ 기둥 복도: 양쪽에 홈 파인 기둥 · 위를 잇는 들보 (들보 밑은 3층보다 높게) · 하나는 부러져 쓰러짐 */
-    { const n = 4; for (let k = 0; k < n; k++) { const t = TUN.to * (.18 + k / n * .78), f = TUN.frame(t), hh = top - .3 - fl, fallen = k === 2;
-      for (const s of [-1, 1]) { const c = V(f.x + f.sx * s * (LO.gorge.w - .9), 0, f.z + f.sz * s * (LO.gorge.w - .9)), bry = Math.atan2(f.fx, f.fz);
-        add(at(block(2.8, .8, 2.8, 2, .12, k * 7 + s), c.x, fl + .4, c.z, bry));
-        if (fallen && s > 0) { const sh = fluted(1, hh * .62, 16, 6); sh.rotateZ(Math.PI / 2 - .08); sh.rotateY(bry + .5); sh.translate(c.x - f.sx * 3.2, fl + 1.1, c.z - f.sz * 3.2 + 2); add(weather(sh, .05, 1.3, k)); add(at(block(1.6, 2, 1.6, 2, .25, k), c.x, fl + 1.6, c.z, bry)); continue; }   /* 쓰러진 기둥 · 부러진 밑동 */
-        const broken = (k === 1 && s < 0), H2 = broken ? hh * .55 : hh - 1.4, sh = fluted(1, H2, 16, 8); sh.translate(c.x, fl + .8 + H2 / 2, c.z); add(weather(sh, .05, 1.2, k * 3 + s));
-        if (!broken) add(at(block(2.6, .7, 2.6, 2, .1, k + s * 5), c.x, fl + .8 + H2 + .35, c.z, bry)); else add(at(block(1.5, .8, 1.5, 2, .4, k), c.x, fl + .8 + H2 + .2, c.z, bry + .4, .3));
-        for (let y = fl + 1.5; y < fl + .8 + H2; y += 1.4) obstacles.push([c.x, y, c.z, 1.25]);
-        if (!broken) for (let q = 0; q < 3; q++) glyph(V(c.x - f.sx * s * 1.02, fl + 4 + q * 2.4, c.z - f.sz * s * 1.02), V(f.fx, 0, f.fz), V(0, 1, 0), .7, [.3, .95, .85], k * .2 + q * .1 + (s > 0 ? .4 : 0)); }
-      if (k !== 2) { const a2 = V(f.x, top + .2, f.z), g = block(2 * (LO.gorge.w + .4), 1.3, 1.9, 6, .15, k * 13); at(g, a2.x, a2.y, a2.z, Math.atan2(f.fx, f.fz)); add(weather(g, .05, 1, k)); } } } }   /* 들보 */
-  return { geos, glow, obstacles, strands };
+  /* ② 유적 입구 (사용자 2026-11-11 참고 그림: 바위 절벽에 반쯤 묻힌 고대 사원 문 · 안은 자연 동굴과 종유석) ─────────
+     · 문 양옆 네모 기둥: 세 단 받침 · 돌을 층층이 쌓은 몸(앞면에 마름모 무늬 판) · 띠 장식 · 겹겹이 넓어지는 머리
+     · 문 위: 큰 돌 세 줄 상인방(가운데가 내려앉고 금 감) · 층층이 앞으로 내민 처마 돌 · 그 위로 바위 속으로 물러나는 돌 쌓기
+     · 양옆 벽: 엇갈려 쌓은 큰 돌 (위쪽은 무너져 들쭉날쭉 · 군데군데 빠짐) · 가운데 막힌 문(벽감): 작은 기둥 · 상인방 · 처마
+     · 앞: 돌판 계단 (깨지고 빠짐) · 꽃무늬가 새겨진 떨어진 상인방이 비스듬히 기댐 · 이끼 낀 바위 · 위에서 늘어진 굵은 뿌리와 덩굴
+     · 동굴 천장 종유석 */
+  if (TUN) { const f0 = TUN.frame(0), fwd = V(-f0.fx, 0, -f0.fz), sdv = V(f0.sx, 0, f0.sz), ry = Math.atan2(fwd.x, fwd.z), fl = LO.gorge.floor, DW = TUN.wi - .3, TOP = TUN.top, G0 = hAt(f0.x + fwd.x * 6, f0.z + fwd.z * 6);
+    const P = (s, y, f = 0) => V(f0.x, y, f0.z).addScaledVector(sdv, s).addScaledVector(fwd, f);
+    const put = (g, s, y, f, rot = 0, tilt = 0, roll = 0) => { const p = P(s, y, f); g.rotateZ(roll); g.rotateX(tilt); g.rotateY(ry + rot); g.translate(p.x, p.y, p.z); add(g); return g; };
+    const base = Math.min(G0, fl + .6);   /* 문 앞 땅 높이 */
+    /* 문 양옆 네모 기둥 */
+    for (const s of [-1, 1]) { const cs = s * (DW + 2.4), W2 = 4.6, D2 = 3.6; let y = base - .4;
+      for (const [w2, h2, d2] of [[W2 + 1.8, .8, D2 + 1.6], [W2 + 1.1, .6, D2 + 1], [W2 + .5, .5, D2 + .5]]) { put(carved(w2, h2, d2, 'band', .05, s * 7 + y), cs, y + h2 / 2, .6); y += h2; }   /* 세 단 받침 */
+      for (let k = 0; y < TOP - 1.2; k++) { const h2 = Math.min(1.55 + r() * .4, TOP - 1.2 - y), band = k % 4 === 3;
+        if (band) { put(carved(W2 + .5, .42, D2 + .45, 'band', .05, k + s), cs, y + .21, .6); y += .42; continue; }   /* 띠 장식 */
+        put(carved(W2, h2, D2, k % 4 === 1 ? 'lozenge' : 'panel', .09, k * 3 + s), cs + (r() - .5) * .12, y + h2 / 2, .6 + (r() - .5) * .14, (r() - .5) * .02); y += h2 + .03; }
+      for (const [w2, h2, d2, fo] of [[W2 + .5, .5, D2 + .4, .7], [W2 + 1.1, .45, D2 + .9, .9], [W2 + 1.7, .55, D2 + 1.4, 1.1]]) { put(carved(w2, h2, d2, 'band', .05, s * 3 + y), cs, y + h2 / 2, fo); y += h2; }   /* 겹겹이 넓어지는 머리 */
+      for (let q = base + 1; q < TOP; q += 1.6) obstacles.push([P(cs, q, .6).x, q, P(cs, q, .6).z, 2.6]); }
+    /* 문 위 상인방: 큰 돌 세 줄 · 가운데로 갈수록 내려앉고 틈이 벌어짐 · 한 줄은 꽃무늬 */
+    let y = TOP;
+    for (let row = 0; row < 3; row++) { const h2 = 1.45 + r() * .3; let s = -(DW + 4.9);
+      while (s < DW + 4.9) { const w2 = Math.min(2.8 + r() * 2.2, DW + 4.9 - s); if (w2 < .8) break; const mid = s + w2 / 2, sag = Math.max(0, 1 - Math.abs(mid) / (DW + 1)) * (.55 - row * .12);
+        put(carved(w2 - .06, h2, 3.4 + row * .2, row === 1 ? 'rosette' : 'panel', .1, row * 11 + s), mid, y + h2 / 2 - sag, .7 + row * .12 + (r() - .5) * .1, (r() - .5) * .03, 0, (r() - .5) * .06 - Math.sign(mid) * sag * .04); s += w2; }
+      y += h2; }
+    /* 층층이 앞으로 내민 처마 돌 (네 단 · 위로 갈수록 좁고 덜 내밈) · 가운데가 조금 내려앉음 */
+    for (let k = 0; k < 4; k++) { const hw = (DW + 6.2) * (1 - k * .11), h2 = .75 + (k % 2) * .25, fo = 1.6 - k * .35; let s = -hw;
+      while (s < hw) { const w2 = Math.min(1.8 + r() * 1.6, hw - s); if (w2 < .6) break; const mid = s + w2 / 2, sag = Math.max(0, 1 - Math.abs(mid) / (DW + 2)) * .45; if (k === 3 && Math.abs(mid) < 3 && r() < .5) { s += w2; continue; }
+        put(carved(w2 - .05, h2, 3.2, k % 2 ? 'band' : 'panel', .06, k * 17 + s), mid, y + h2 / 2 - sag, fo + (r() - .5) * .12, (r() - .5) * .04, 0, (r() - .5) * .05); s += w2; }
+      y += h2; }
+    /* 그 위로 바위 속으로 물러나는 돌 쌓기 (위쪽 가장자리는 무너져 들쭉날쭉) */
+    courses(-(DW + 5), DW + 5, y, y + 6, -.6, 2.6, (s2, y2) => y2 > y + 2.2 + 3 * noise2(s2 * .18, 3) + Math.abs(s2) * .12);
+    /* 양옆 벽 · 가운데 막힌 문 (벽감) */
+    for (const s of [-1, 1]) { const s0 = s * (DW + 4.7), s1 = s * (DW + 20), lo = Math.min(s0, s1), hi = Math.max(s0, s1), nc = s * (DW + 12.2);
+      put(carved(hi - lo + 1, .7, 4.4, 'band', .05, s), (lo + hi) / 2, base + .05, .9); put(carved(hi - lo + .4, .55, 3.8, 'band', .05, s + 1), (lo + hi) / 2, base + .65, .7);   /* 두 단 받침 */
+      courses(lo, hi, base + .9, TOP + 5, 0, 3, (s2, y2) => (Math.abs(s2 - nc) < 2.6 && y2 < base + 11.5) || y2 > TOP + 1 + 3.5 * noise2(s2 * .15, s * 5) - Math.abs(s2 - s0) * .2);   /* 위쪽은 바깥으로 갈수록 무너짐 */
+      put(carved(5.2, 11, .8, 'panel', .1, s * 9), nc, base + 6.4, -1.3);   /* 벽감 안쪽 판 (깊이 들어감 · 어두움) */
+      for (const q of [-1, 1]) { let yy = base + .9; for (let k = 0; k < 6; k++) { const h2 = k === 5 ? .5 : 1.75; put(carved(1.05, h2, 1.2, k === 5 ? 'band' : 'lozenge', .06, k + q + s), nc + q * 3.1, yy + h2 / 2, .55); yy += h2; } }   /* 벽감 작은 기둥 */
+      { let yy = base + 11.4; for (const [w2, h2, fo] of [[7.6, .95, .6], [8.4, .55, .85], [7, .5, .55], [5.4, .5, .35]]) { put(carved(w2, h2, 1.8, h2 > .8 ? 'rosette' : 'band', .07, w2 * s + yy), nc, yy + h2 / 2, fo); yy += h2; } } }   /* 벽감 상인방 · 처마 (위로 겹겹이) */
+    /* 앞 계단: 넓은 돌판 계단 (네 단 · 높이 합이 1층에 닿지 않게) · 깨지고 빠지고 사이에 틈 */
+    for (let k = 0; k < 4; k++) { const f2 = 2.2 + (3 - k) * 1.7, yy = base + .18 + k * .28; let s = -(DW + 1.5);
+      while (s < DW + 1.5) { const w2 = Math.min(1.6 + r() * 1.6, DW + 1.5 - s); if (w2 < .5) break; if (r() > .1) put(carved(w2 - .1, .36, 1.75, 'none', 0, k * 13 + s), s + w2 / 2, yy, f2 + (r() - .5) * .15, (r() - .5) * .05, (r() - .5) * .04, (r() - .5) * .04); s += w2; } }
+    for (const s of [-1, 1]) for (let k = 0; k < 4; k++) put(carved(1.4, 1 + k * .28, 1.7, 'panel', .05, k * s), s * (DW + 2.3), base + (1 + k * .28) / 2, 2.2 + (3 - k) * 1.7);   /* 계단 옆 낮은 벽 */
+    /* 떨어진 상인방 (꽃무늬가 새겨진 긴 돌 · 바위에 비스듬히 기댐 · 끝은 부러짐) */
+    { const g = carved(12, 1.7, 2.3, 'rosette', .12, 77); const p = P(DW + 7.5, base + 2.4, 5.5); g.rotateZ(.32); g.rotateY(ry + .55); g.translate(p.x, p.y, p.z); add(g);
+      for (let q = -5; q <= 5; q += 2) { const d = V(Math.cos(.32), Math.sin(.32), 0).applyAxisAngle(V(0, 1, 0), ry + .55); obstacles.push([p.x + d.x * q, p.y + d.y * q, p.z + d.z * q, 1.4]); } }
+    /* 이끼 낀 바위 · 무너진 돌덩이 (문 앞 양옆) */
+    for (let k = 0; k < 14; k++) { const s = (k % 2 ? 1 : -1) * (DW + 3 + r() * 14), f2 = 2 + r() * 9, sz = 1 + r() * 2.2, g = weather(block(sz * 1.3, sz, sz * 1.1, 3, .35, k * 31), .18, .7, k);
+      const p = P(s, 0, f2); if (Math.abs(s) < DW + 2 && f2 < 9) continue; put(g, s, hAt(p.x, p.z) + sz * .35, f2, r() * 6, (r() - .5) * .3, (r() - .5) * .3); if (sz > 1.6) obstacles.push([p.x, hAt(p.x, p.z) + sz * .4, p.z, sz * .7]); }
+    /* 위에서 늘어진 굵은 뿌리 · 덩굴 (문틀 · 벽을 타고 내려옴) */
+    for (let k = 0; k < 26; k++) { const s = (r() - .5) * 2 * (DW + 16), y0 = TOP + 6 + r() * 5, root = r() < .45, Lh = (root ? 8 : 4) + r() * (y0 - base - 4), pts = [];
+      for (let e = 0; e <= 12; e++) { const t = e / 12, wob = Math.sin(t * 5 + k) * (root ? .35 : .2); pts.push(P(s + wob + t * (r() - .5) * .3, y0 - t * Lh, 1.9 + (root ? .3 : .6) + Math.sin(t * 3 + k * 2) * .25)); }
+      strands.push({ pts, r: root ? .22 + r() * .18 : .08 + r() * .06, root }); }
+    /* 종유석: 동굴 천장 들머리에서 늘어짐 (3층 높이엔 안 닿게) */
+    for (let k = 0; k < 46; k++) { const t = r() * TUN.to * .7, th = (.28 + r() * .44) * Math.PI, q = TUN.inner(t, th), lim = q.y - (LAYERS[2] + 1.6); if (lim < .6) continue;
+      const L2 = Math.min(lim, .8 + r() * r() * 3.5), g = new THREE.ConeGeometry(.22 + r() * .35, L2, 7, 4); g.deleteAttribute('uv'); weather(g, .05, 4, k); g.rotateX(Math.PI); g.translate(q.x, q.y - L2 / 2 + .25, q.z); rock.push(g); }
+    /* ③ 기둥 복도: 양쪽에 네모 띠 기둥 (돌을 층층이 · 띠 장식 · 겹겹 머리) · 위를 잇는 들보 (밑면은 3층보다 높게) · 하나는 쓰러지고 하나는 부러짐 · 기둥 문양이 희미하게 빛남 */
+    { const n = 4; for (let k = 0; k < n; k++) { const t = TUN.to * (.2 + k / n * .76), f = TUN.frame(t), bry = Math.atan2(f.fx, f.fz), hh = TOP - .3 - fl, fallen = k === 2;
+      for (const s of [-1, 1]) { const c = V(f.x + f.sx * s * (LO.gorge.w - .9), 0, f.z + f.sz * s * (LO.gorge.w - .9)), pl = (g, yy, rot = 0) => { g.rotateY(bry + rot); g.translate(c.x, yy, c.z); add(g); };
+        pl(carved(2.9, .7, 2.9, 'band', .05, k * 7 + s), fl + .35); pl(carved(2.4, .5, 2.4, 'band', .05, k * 7 + s + 1), fl + .95);
+        if (fallen && s > 0) { const g = carved(2, hh * .6, 2, 'lozenge', .07, k); g.rotateZ(Math.PI / 2 - .1); g.rotateY(bry + .5); g.translate(c.x - f.sx * 3.4, fl + 1.2, c.z - f.sz * 3.4 + 2); add(g); continue; }   /* 쓰러진 기둥 */
+        const broken = k === 1 && s < 0, top2 = broken ? fl + hh * .5 : TOP - 1.4; let yy = fl + 1.2;
+        for (let q = 0; yy < top2; q++) { const h2 = Math.min(1.7, top2 - yy); if (h2 < .3) break; pl(carved(q % 4 === 3 ? 2.3 : 2, q % 4 === 3 ? .4 : h2, q % 4 === 3 ? 2.3 : 2, q % 4 === 3 ? 'band' : 'lozenge', .07, k * 5 + q + s), yy + (q % 4 === 3 ? .2 : h2 / 2), (r() - .5) * .04); yy += q % 4 === 3 ? .4 : h2; }
+        if (!broken) for (const [w2, h2] of [[2.4, .45], [2.9, .45], [3.3, .5]]) { pl(carved(w2, h2, w2, 'band', .05, w2 + k), yy + h2 / 2); yy += h2; }
+        else { const g = carved(1.6, .9, 1.6, 'none', 0, k); g.rotateZ(.4); pl(g, yy + .4, .5); }
+        for (let q = fl + 1.5; q < yy; q += 1.4) obstacles.push([c.x, q, c.z, 1.35]);
+        if (!broken) for (let q = 0; q < 3; q++) glyph(V(c.x - f.sx * s * 1.04, fl + 4.5 + q * 2.6, c.z - f.sz * s * 1.04), V(f.fx, 0, f.fz), V(0, 1, 0), .6, [.25, .8, .7], k * .2 + q * .1 + (s > 0 ? .4 : 0)); }
+      if (k !== 2) { let s = -(LO.gorge.w + 1.4); while (s < LO.gorge.w + 1.4) { const w2 = Math.min(2.6 + r() * 1.6, LO.gorge.w + 1.4 - s); if (w2 < .7) break; const a2 = V(f.x + f.sx * (s + w2 / 2), TOP + .55, f.z + f.sz * (s + w2 / 2)), g = carved(w2 - .05, 1.3, 2.2, 'band', .05, k * 13 + s); g.rotateY(bry + Math.PI / 2); g.translate(a2.x, a2.y, a2.z); add(g); s += w2; } } } }   /* 들보 (돌 여럿) */
+    /* 돌 쌓기 (s0~s1 · y0~y1 · 앞뒤 f · 두께 d · skip(s, y): 비울 곳) — 줄마다 높이 · 돌마다 너비가 다르고 엇갈림 · 조금씩 어긋나고 가끔 빠짐 */
+    function courses(s0, s1, y0, y1, f, d, skip) { let y2 = y0; for (let row = 0; y2 < y1; row++) { const h2 = 1.2 + r() * .7; let s = s0 + (row % 2) * .9 * r();
+      while (s < s1) { const w2 = Math.min(1.8 + r() * 2.4, s1 - s); if (w2 < .5) break; const mid = s + w2 / 2; if (!skip(mid, y2 + h2 / 2) && r() > .05) put(carved(w2 - .07, h2 - .06, d, r() < .15 ? 'panel' : 'none', .06, row * 37 + s), mid, y2 + h2 / 2, f + (r() - .5) * .22, (r() - .5) * .03, 0, (r() - .5) * .03); s += w2; }
+      y2 += h2; } }
+  }
+  return { geos, rock, glow, obstacles, strands };
 }
 const smooth = (a, b, x) => { const t = Math.max(0, Math.min(1, (x - a) / (b - a))); return t * t * (3 - 2 * t); };

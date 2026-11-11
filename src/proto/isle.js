@@ -7,9 +7,9 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { MeshoptSimplifier as MO } from '../../vendor/meshopt_simplifier.module.js';
-import { makeField, Y, SPOT, LAYERS, fbm, noise2, smoothstep } from './islefield.js?v=11110913';
-import { reedBush, vegShader } from './flora.js?v=11110913';
-import { buildRuins } from './ruins.js?v=11110913';
+import { makeField, Y, SPOT, LAYERS, fbm, noise2, smoothstep } from './islefield.js?v=11111031';
+import { reedBush, vegShader } from './flora.js?v=11111031';
+import { buildRuins } from './ruins.js?v=11111031';
 
 const SUN = new THREE.Vector3(-.45, .78, .44).normalize();   /* 왼쪽 위 앞에서 (카메라 쪽 절벽 면이 비스듬히 빛을 받아 결이 드러남) */
 const rngOf = s => () => (s = (s * 16807) % 2147483647) / 2147483647;
@@ -309,7 +309,7 @@ export async function buildIsle({ K = 1, layout = SPOT } = {}) {   /* layout: �
     { const p = [], c = [], s = []; for (const [c0, out, a, sz, col] of leafG) { const up = new THREE.Vector3(0, 1, 0); const A = c0.clone().addScaledVector(up, sz), B = c0.clone().addScaledVector(a, sz * .8).addScaledVector(out, .05), C = c0.clone().addScaledVector(up, -sz * .6), D = c0.clone().addScaledVector(a, -sz * .8).addScaledVector(out, .05);
         for (const q of [A, B, C, A, C, D]) { p.push(q.x, q.y, q.z); c.push(...col); s.push(.4); } }
       const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(p, 3)); g.setAttribute('color', new THREE.Float32BufferAttribute(c, 3)); g.setAttribute('aS', new THREE.Float32BufferAttribute(s, 1)); g.computeVertexNormals(); parts.push(g); }
-    { const r = rngOf(61); for (const pts of RU.strands) parts.push(tube(pts, .09 + r() * .07, .025, 4, r() < .55 ? IVY[(r() * 2) | 0] : ROOT, .3, 1)); }   /* 끊어진 다리 끝에서 늘어진 덩굴 */
+    { const r = rngOf(61); for (const q of RU.strands) parts.push(tube(q.pts, q.r, q.root ? q.r * .25 : .025, q.root ? 6 : 4, q.root ? ROOT : r() < .6 ? IVY[(r() * 2) | 0] : ROOT, q.root ? .05 : .3, q.root ? .2 : 1)); }   /* 유적 위에서 늘어진 굵은 뿌리 · 덩굴 · 끊어진 다리 끝 덩굴 */
     { const r = rngOf(67); for (const f of F.floats) for (let k = 0; k < Math.round(f.len * .5); k++) { const a = (r() - .5) * f.len * .9, px = f.x + f.dx * a + (r() - .5) * f.r * .6, pz = f.z + f.dz * a + (r() - .5) * f.r * .6, y0 = LAYERS[f.L] - f.r * .45, Lh = .8 + r() * r() * 2.6, pts = [];   /* 떠 있는 바위 밑에 늘어진 뿌리 */
         for (let e = 0; e <= 6; e++) { const f2 = e / 6; pts.push(new THREE.Vector3(px + Math.sin(f2 * 3 + a) * .2, y0 - f2 * Lh, pz + Math.cos(f2 * 2.4 + a) * .2)); }
         parts.push(tube(pts, .1 + r() * .07, .025, 4, r() < .4 ? IVY[0] : ROOT, .2, 1)); } }
@@ -405,6 +405,7 @@ export async function buildIsle({ K = 1, layout = SPOT } = {}) {   /* layout: �
         float band = sin(vP.y * 2.4 + tr * 5.) * .5 + .5; vec3 rock = mix(vec3(.30, .25, .20), vec3(.58, .51, .42), band) * (.7 + .45 * tr) * (.85 + .25 * tr2);
         float moss = smoothstep(${lo.toFixed(2)}, ${hi.toFixed(2)}, n.y + (tr2 - .5) * .5); rock = mix(rock, mix(vec3(.12, .27, .06), vec3(.30, .45, .12), tr2), moss);   /* 위쪽 면엔 이끼 */
         float ao = .55 + .45 * smoothstep(-.8, .4, n.y); gl_FragColor = vec4(fogged(lit(rock, n, 1., ao), vP), 1.); }` });
+    parts.push(...RU.rock);   /* 동굴 들머리 종유석 */
     const m = new THREE.Mesh(mergeAll(parts), rockM(.35, .75)); m.name = 'arches'; G.add(m);
     if (RU.geos.length) { const sm = new THREE.ShaderMaterial({ uniforms: U, side: THREE.DoubleSide,   /* 깎은 돌 (유적): 밝은 사암빛 · 빗물 자국 세로 얼룩 · 오목한 곳 그늘 · 윗면 이끼 · 가는 금 */
         vertexShader: `varying vec3 vP, vN; void main(){ vP = position; vN = normal; gl_Position = projectionMatrix * viewMatrix * modelMatrix * vec4(position, 1.); }`,
@@ -413,6 +414,7 @@ export async function buildIsle({ K = 1, layout = SPOT } = {}) {   /* layout: �
           vec3 st = mix(vec3(.38, .36, .31), vec3(.60, .56, .48), tr) * (.86 + .22 * tr2);
           float streak = vn(vec2(vP.x * 1.7 + vP.z * 1.3, vP.y * .18)); st *= .82 + .18 * smoothstep(.25, .7, streak);   /* 빗물 자국 */
           float crack = smoothstep(.035, .0, abs(vn(vP.xz * .9 + vP.y * .4) - .5)) * (1. - an.y); st *= 1. - .35 * crack;
+          float lich = smoothstep(.7, .76, vn(vP.zy * 2.6 + vP.x * 1.9) * an.x + vn(vP.xy * 2.6 + vP.z * 1.9) * an.z + vn(vP.xz * 2.6) * an.y); st = mix(st, vec3(.78, .79, .7), lich * .4);   /* 바위옷 (희끗한 점무늬) */
           float moss = smoothstep(.62, .92, n.y + (tr2 - .5) * .4) * smoothstep(.42, .78, vn(vP.xz * .32 + vP.y * .1)) * .85; st = mix(st, mix(vec3(.14, .25, .08), vec3(.28, .40, .13), tr2), moss);   /* 이끼는 위를 보는 면에만 · 군데군데 */
           float ao = .5 + .5 * smoothstep(-.7, .5, n.y); gl_FragColor = vec4(fogged(lit(st, n, 1., ao), vP), 1.); }` });
       const rm = new THREE.Mesh(mergeAll(RU.geos), sm); rm.name = 'ruins'; G.add(rm); }
