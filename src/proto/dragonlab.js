@@ -6,6 +6,8 @@
      어디서 날아오든 적 공격(빛 가장자리)이 크리티컬 구간 안에 들어와 있을 때 누르면 크리티컬 롤 (길 · 시간 계산 없음 · 악용은 구간 폭을 좁혀 막음): 빠르고 멀리(5m) · 잔상 · 쿨타임 바로 초기화 (맞추면 무제한)
      그 외엔 일반 롤: 옆으로 살짝(2m) · 잔상 없음 · 유도 기본 공격은 못 피함 · 쿨타임 3초 (일찍 누르면 쿨타임이 벌이 됨)
      구르는 방향: 조이스틱을 민 쪽 · 가만있으면 날아오는 공격의 옆쪽 · 그것도 없으면 용의 오른쪽
+   · 장판 (사용자 2026-11-13): 수정 눈이 내 자리 바닥에 둥근 경고 장판 · 가운데부터 바깥으로 차오르다 다 차면 터짐 · 터질 때 맞는 원이 걸쳐 있으면 맞음
+     "지금이야" = 장판 안쪽 가장자리 가까이 그어진 신호선 · 차오르는 무늬가 그 선을 넘은 뒤 롤 → 크리티컬로 빠져나감 (그 전엔 일반 롤) · 미리 걸어 나가도 안 맞음
    · 맞음: 모든 적 공격은 보이는 빛이 맞는 원에 닿는 순간 데미지 (탄 몸 크기 = 보이는 빛 크기 · 날개 끝까지)
      직선 불덩이 = 롤 스킬샷 (바닥 경고 폭 = 불덩이 폭) · 유도 탄 = 롤 평타 (따라옴 · 크리티컬 롤로만 빗나감)
      피한 탄은 사라지지 않고 원래 길을 그대로 뚫고 지나감 · 크리티컬 원은 연습 때 늘 보임 · '판정 보기'는 맞는 원과 탄 몸 크기
@@ -15,12 +17,13 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
 const CFG = { critGap: 2.5, bodyR: 1.6, showHit: 0, zone: 1, cd: 3, rollDist: 2, rollTime: .35, critDist: 5, critTime: .3, btnTell: 1, range: 14, melee: 3.2, atkEvery: .85, speed: 7.5,
-  fireEvery: 1.7, camAng: 56, viewH: 20, camOff: 3, lean: 11, projSpeed: 25, skillEvery: 3.4, reward: 'speed', turret: 1, skill: 1 };
+  fireEvery: 1.7, camAng: 56, viewH: 20, camOff: 3, lean: 11, projSpeed: 25, skillEvery: 3.4, aoe: 1, aoeEvery: 4.6, aoeR: 4, aoeTime: 1.2, aoeSig: .8, reward: 'speed', turret: 1, skill: 1 };
 const SPEC = [['cap', '카메라'], ['camAng', '내려다보는 각도(°)', 30, 85, 1], ['viewH', '화면 세로 넓이(m)', 10, 34, .5], ['camOff', '용 위치: 가운데 아래(m)', 0, 6, .1], ['lean', '용 젖힘(°)', 0, 25, 1],
   ['cap', '크리티컬 롤'], ['critGap', '크리티컬 구간 폭(m)', .3, 8, .1], ['bodyR', '맞는 원(반지름 m)', .6, 2.4, .05], ['zone', '크리티컬 원 보기', 0, 1, 1], ['showHit', '판정 보기', 0, 1, 1], ['critDist', '크리티컬 롤 거리(m)', 2, 9, .1], ['critTime', '크리티컬 롤 시간(초)', .15, .6, .01], ['reward', '성공 보상', ['speed', '이동 속도 ↑ (1.5초)'], ['power', '다음 공격 강화 ×1.8']], ['btnTell', '롤 버튼 반짝임', 0, 1, 1],
   ['cap', '일반 롤'], ['cd', '쿨타임(초)', 1, 4, .1], ['rollDist', '롤 거리(m)', .5, 6, .1], ['rollTime', '롤 시간(초)', .2, .8, .01],
   ['cap', '기본 공격'], ['range', '원거리 사거리(m)', 4, 20, .5], ['melee', '근접 사거리(m)', 1.5, 6, .1], ['atkEvery', '공격 간격(초)', .4, 1.6, .05], ['speed', '이동 속도(m/s)', 3, 14, .5],
-  ['cap', '적'], ['turret', '수정 눈 기본 공격', 0, 1, 1], ['fireEvery', '쏘는 간격(초)', .6, 4, .1], ['projSpeed', '탄 속도(m/s)', 15, 40, .5], ['skill', '직선 불덩이(스킬)', 0, 1, 1], ['skillEvery', '스킬 간격(초)', 1.5, 8, .1]];
+  ['cap', '적'], ['turret', '수정 눈 기본 공격', 0, 1, 1], ['fireEvery', '쏘는 간격(초)', .6, 4, .1], ['projSpeed', '탄 속도(m/s)', 15, 40, .5], ['skill', '직선 불덩이(스킬)', 0, 1, 1], ['skillEvery', '스킬 간격(초)', 1.5, 8, .1],
+  ['aoe', '장판 공격', 0, 1, 1], ['aoeEvery', '장판 간격(초)', 2, 10, .1], ['aoeR', '장판 크기(반지름 m)', 2, 7, .1], ['aoeTime', '장판 차는 시간(초)', .5, 2.5, .05], ['aoeSig', '신호선 위치(가장자리 쪽 %)', .5, .95, .01]];
 const FLY = 3.2, $ = s => document.querySelector(s);
 
 /* ── 화면 ── */
@@ -99,7 +102,7 @@ function mkEye(x, z) {   /* 수정 눈: 기본 공격(유도 · 못 피함)을 �
   body.castShadow = true; g.add(body); const eye = new THREE.Mesh(new THREE.SphereGeometry(.42, 16, 12), runeM(0xd9b8ff)); eye.position.z = .78; g.add(eye);
   const halo = glow(0xb58aff, 3.2, .4); g.add(halo); const shards = []; for (let k = 0; k < 6; k++) { const s = new THREE.Mesh(new THREE.TetrahedronGeometry(.3, 0), new THREE.MeshStandardMaterial({ color: 0x9a7bff, emissive: 0x5a30ff, emissiveIntensity: 1, flatShading: true })); g.add(s); shards.push(s); }
   g.position.set(x, FLY + .4, z); scene.add(g);
-  const e = { kind: 'eye', g, body, eye, halo, shards, hp: 700, max: 700, r: 1.4, bar: hpBar(), dead: 0, flash: 0, home: new THREE.Vector3(x, FLY + .4, z), fireT: 1.2, charge: 0, skillT: 2.5, tele: null }; E.push(e); return e; }
+  const e = { kind: 'eye', g, body, eye, halo, shards, hp: 700, max: 700, r: 1.4, bar: hpBar(), dead: 0, flash: 0, home: new THREE.Vector3(x, FLY + .4, z), fireT: 1.2, charge: 0, skillT: 2.5, tele: null, aoeT: 4 }; E.push(e); return e; }
 mkDummy(-5, -6); mkDummy(4, -8); mkDummy(-1, -12); mkEye(-10, -15);
 
 /* ── 탄 ── */
@@ -135,16 +138,28 @@ const rollEl = $('#rollb'); rollEl.addEventListener('pointerdown', e => { e.prev
 const rollUp = () => rollEl.classList.remove('on'); rollEl.addEventListener('pointerup', rollUp); rollEl.addEventListener('pointercancel', rollUp); rollEl.addEventListener('pointerleave', rollUp);
 /* edge = 탄 빛 가장자리에서 맞는 원까지 거리(m) · 0 이하면 닿음 · critGap 이하면 크리티컬 구간 안 */
 const edgeOf = s => Math.hypot(s.o.position.x - P.pos.x, s.o.position.z - P.pos.z) - s.r - CFG.bodyR;
+/* 장판: 바닥 경고 → 가운데부터 차오름 → 다 차면 터짐 · 신호선을 넘은 뒤가 크리티컬 구간 */
+const AOES = [];
+const aoeMat = (c, o) => new THREE.MeshBasicMaterial({ color: c, transparent: true, opacity: o, depthWrite: false, side: THREE.DoubleSide });
+function castAoe(at) { const R = CFG.aoeR, g = new THREE.Group(); g.position.set(at.x, FLY - .55, at.z); g.rotation.x = -Math.PI / 2;
+  const base = new THREE.Mesh(new THREE.CircleGeometry(R, 64), aoeMat(0xff3a1a, .1)), edge = new THREE.Mesh(new THREE.RingGeometry(R - .14, R, 72), aoeMat(0xff5a2a, .85));
+  const sig = new THREE.Mesh(new THREE.RingGeometry(R * CFG.aoeSig - .05, R * CFG.aoeSig + .05, 72), aoeMat(0xfff0c0, .75));   /* 신호선: 여기를 넘으면 지금이야 */
+  const fill = new THREE.Mesh(new THREE.CircleGeometry(1, 64), aoeMat(0xff6a2a, .28)), front = new THREE.Mesh(new THREE.RingGeometry(.93, 1, 72), aoeMat(0xffb070, .9));   /* 차오르는 무늬와 그 앞끝 */
+  [base, edge, sig, fill, front].forEach((m, k) => { m.renderOrder = 8 + k; m.position.z = k * .01; g.add(m); }); fill.scale.setScalar(.001); front.scale.setScalar(.001); scene.add(g);
+  AOES.push({ g, base, edge, sig, fill, front, R, sigK: CFG.aoeSig, t: 0, T: CFG.aoeTime, dodged: false }); SFX.shoot(); }
+const aoeOver = a => Math.hypot(P.pos.x - a.g.position.x, P.pos.z - a.g.position.z) < a.R + CFG.bodyR;   /* 맞는 원이 장판에 걸쳐 있나 */
+const aoeNow = a => !a.dodged && aoeOver(a) && a.t / a.T >= a.sigK;
 const threats = () => SHOTS.filter(s => s.from === 'enemy' && !s.dodged && (s.kind === 'basic' || s.kind === 'skill'));
-function pressRoll() { if (P.roll) return; const live = threats(), inW = live.filter(s => edgeOf(s) <= CFG.critGap);
-  if (inW.length) { inW.forEach(dodge); startRoll(rollDir(inW), true); crit(); return; }
+function pressRoll() { if (P.roll) return; const live = threats(), inW = live.filter(s => edgeOf(s) <= CFG.critGap), aIn = AOES.filter(aoeNow);
+  if (inW.length || aIn.length) { inW.forEach(dodge); aIn.forEach(a => { a.dodged = true; }); startRoll(rollDir(inW, aIn), true); crit(); return; }
   if (P.cdLeft > 0) { note('롤 쿨타임 ' + P.cdLeft.toFixed(1) + '초'); return; }
-  if (live.some(s => edgeOf(s) <= CFG.critGap + 6)) { stats.early++; stats.combo = 0; note('빨랐어요', '#ffd36b'); }
+  if (live.some(s => edgeOf(s) <= CFG.critGap + 6) || AOES.some(a => !a.dodged && aoeOver(a))) { stats.early++; stats.combo = 0; note('빨랐어요', '#ffd36b'); }
   startRoll(rollDir(live), false); P.cdLeft = CFG.cd; }
-function rollDir(list) {   /* 조이스틱을 민 쪽 · 가만있으면 가장 가까운 공격이 오는 길의 옆쪽(용의 오른쪽에 가까운 편) · 그것도 없으면 용의 오른쪽 */
+function rollDir(list, aIn) {   /* 조이스틱을 민 쪽 · 가만있으면 가장 가까운 공격이 오는 길의 옆쪽(용의 오른쪽에 가까운 편) · 그것도 없으면 용의 오른쪽 */
   const f = fwd(), r = new THREE.Vector3(-f.z, 0, f.x), sl = Math.hypot(stick.x, stick.y);
   let mx = stick.x + ((keys.has('KeyD') || keys.has('ArrowRight')) - (keys.has('KeyA') || keys.has('ArrowLeft'))), mz = stick.y + ((keys.has('KeyS') || keys.has('ArrowDown')) - (keys.has('KeyW') || keys.has('ArrowUp')));
   if (Math.hypot(mx, mz) > .2) return new THREE.Vector3(mx, 0, mz).normalize();
+  if (aIn && aIn.length) { const c = P.pos.clone().sub(aIn[0].g.position).setY(0); if (c.lengthSq() > .04) return c.normalize(); }   /* 장판: 가운데에서 바깥쪽으로 */
   const s = list.slice().sort((a, b) => edgeOf(a) - edgeOf(b))[0]; if (s) { const c = P.pos.clone().sub(s.o.position).setY(0); if (c.lengthSq() > 1e-4) { c.normalize(); const p = new THREE.Vector3(-c.z, 0, c.x); return p.dot(r) >= 0 ? p : p.negate(); } }
   return r; }
 function dodge(s) { s.dodged = true; if (s.kind === 'basic') { const to = P.pos.clone().sub(s.o.position).setY(0); s.dir = (to.lengthSq() > 1e-6 ? to : new THREE.Vector3(0, 0, 1)).normalize(); s.life = 1.2; } s.kind = 'gone'; }   /* 피한 공격: 그대로 스쳐 지나가며 사라짐 */
@@ -249,7 +264,8 @@ function frame() { requestAnimationFrame(frame); const rdt = Math.min(.05, clock
       e.eye.material.emissiveIntensity = 1.6 + e.charge * 6 + e.flash * 10; e.halo.material.opacity = .35 + e.charge * .6; e.halo.scale.setScalar(3.2 + e.charge * 2.5);
       if (CFG.skill && near) { e.skillT -= dt; if (e.skillT < .7 && !e.tele) { e.tele = new THREE.Mesh(new THREE.PlaneGeometry(SKILL_R * 2, 30), new THREE.MeshBasicMaterial({ color: 0xff5a2a, transparent: true, opacity: .25, depthWrite: false, blending: THREE.AdditiveBlending })); e.tele.rotation.x = -Math.PI / 2; scene.add(e.tele); e.teleDir = to.clone().setY(0).normalize(); }
         if (e.tele) { const d = e.teleDir; e.tele.position.copy(g.position).addScaledVector(d, 15).setY(FLY - .55); e.tele.rotation.z = Math.atan2(-d.x, -d.z); e.tele.material.opacity = .15 + .3 * (1 - Math.max(0, e.skillT) / .7); }
-        if (e.skillT <= 0) { e.skillT = CFG.skillEvery; if (e.tele) { scene.remove(e.tele); e.tele = null; } enemySkill(e); SHOTS[SHOTS.length - 1].dir = e.teleDir || SHOTS[SHOTS.length - 1].dir; } } }
+        if (e.skillT <= 0) { e.skillT = CFG.skillEvery; if (e.tele) { scene.remove(e.tele); e.tele = null; } enemySkill(e); SHOTS[SHOTS.length - 1].dir = e.teleDir || SHOTS[SHOTS.length - 1].dir; } }
+      if (CFG.aoe && near) { e.aoeT -= dt; if (e.aoeT <= 0) { e.aoeT = CFG.aoeEvery; castAoe(P.pos); } } }
     v3.copy(g.position).setY(g.position.y + 2.2).project(cam); e.bar.style.display = 'block'; e.bar.style.left = (v3.x * .5 + .5) * innerWidth + 'px'; e.bar.style.top = (-v3.y * .5 + .5) * innerHeight + 'px'; e.bar.firstChild.style.width = Math.max(0, e.hp / e.max * 100) + '%'; }
   /* 탄 */
   for (let i = SHOTS.length - 1; i >= 0; i--) { const s = SHOTS[i]; let done = false;
@@ -265,7 +281,14 @@ function frame() { requestAnimationFrame(frame); const rdt = Math.min(.05, clock
     if (s.mark) s.mark.visible = !!CFG.showHit;
     if (done) { scene.remove(s.o); SHOTS.splice(i, 1); } else if ((s.trail += dt) > .03) { s.trail = 0; const tr = glow(s.from === 'me' ? 0xff8a3a : s.kind === 'skill' ? 0xff5a2a : 0x9a7bff, s.kind === 'skill' ? 1.6 : .8, .6); tr.position.copy(s.o.position); fx(tr, .3, k => { tr.material.opacity = .6 * (1 - k); tr.scale.multiplyScalar(.97); }); } }
   /* 타이밍 표시: 날아오는 공격이 닿기 직전 좁혀 드는 고리 · 판정 시간 안이면 금빛 */
-  const inBand = threats().some(s => edgeOf(s) <= CFG.critGap);
+  /* 장판 */
+  for (let i = AOES.length - 1; i >= 0; i--) { const a = AOES[i]; a.t += dt; const k = Math.min(1, a.t / a.T), now = k >= a.sigK, r = Math.max(.001, a.R * k);
+    a.fill.scale.setScalar(r); a.front.scale.setScalar(r); a.fill.material.opacity = now ? .42 : .22 + .1 * k; a.front.material.color.set(now ? 0xffe27a : 0xffb070);
+    a.sig.material.opacity = now ? .25 : .75; a.edge.material.color.set(now ? 0xffd34a : 0xff5a2a);   /* 선을 넘으면 장판 전체가 금빛으로 바뀜 = 지금이야 */
+    if (k >= 1) { const hit = aoeOver(a) && !a.dodged && !(P.roll && P.roll.crit); if (hit) hurt(150, P.pos.clone()); const c = a.g.position.clone().setY(FLY);
+      ring(.5, a.R, 0xff8a3a, .35, c, .12, .9); burst(c, 0xff7a2a, 26, 8, .5, .9); SFX.boom(); shake = Math.max(shake, .1);
+      scene.remove(a.g); a.g.traverse(o => { if (o.geometry) o.geometry.dispose(); if (o.material) o.material.dispose(); }); AOES.splice(i, 1); } }
+  const inBand = threats().some(s => edgeOf(s) <= CFG.critGap) || AOES.some(aoeNow);
   /* 효과 */
   for (let i = FX.length - 1; i >= 0; i--) { const f = FX[i]; f.t += dt; const k = Math.min(1, f.t / f.life); f.upd(k, dt); if (k >= 1) { scene.remove(f.o); if (f.o.material) f.o.material.dispose(); FX.splice(i, 1); } }
   /* 카메라 (게임처럼 비스듬히 위에서 · 살짝 늦게 따라옴) */
@@ -282,4 +305,4 @@ function frame() { requestAnimationFrame(frame); const rdt = Math.min(.05, clock
   $('#hp i').style.width = (P.hp / 10) + '%'; $('#st').textContent = `크리티컬 회피 ${stats.crit}${stats.combo > 1 ? ' (' + stats.combo + '연속)' : ''} · 빨랐음 ${stats.early} · 맞음 ${stats.hits}${P.speedT > 0 ? ' · 빨라짐!' : ''}${P.power ? ' · 다음 공격 강화!' : ''}`;
   R.render(scene, cam); }
 frame();
-window.__dragon = { P, CFG, E, stats, SHOTS, pressRoll, ghost, cam, lean, GH };
+window.__dragon = { P, CFG, E, stats, SHOTS, AOES, castAoe, pressRoll, ghost, cam, lean, GH };
