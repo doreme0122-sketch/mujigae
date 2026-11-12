@@ -7,11 +7,11 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
-const CFG = { critMs: 200, cd: 2.5, flickPx: 34, flickMs: 200, range: 12, melee: 4.5, rollDist: 4.2, rollTime: .42, atkEvery: .85, speed: 7.5,
-  fireEvery: 1.7, projSpeed: 13, skillEvery: 3.4, tell: 1, reward: 'speed', turret: 1, skill: 1, frontCone: 30 };
+const CFG = { critMs: 200, cd: 2.5, flickPx: 34, flickMs: 200, range: 8, melee: 3.2, rollDist: 4.2, rollTime: .42, atkEvery: .85, speed: 7.5,
+  fireEvery: 1.7, projSpeed: 13, skillEvery: 3.4, tell: 1, reward: 'speed', turret: 1, skill: 1 };
 const SPEC = [['cap', '크리티컬 회피'], ['critMs', '판정 시간(ms)', 60, 400, 10], ['cd', '롤 쿨타임(초)', .5, 6, .1], ['reward', '성공 보상', ['speed', '이동 속도 ↑ (1.5초)'], ['power', '다음 공격 강화 ×1.8']], ['tell', '타이밍 표시', 0, 1, 1],
-  ['cap', '배럴 롤 조작'], ['flickPx', '미는 거리(px)', 12, 90, 1], ['flickMs', '미는 시간(ms)', 80, 400, 10], ['frontCone', '앞뒤 제외 각도(°)', 0, 60, 1], ['rollDist', '롤 거리(m)', 1, 8, .1], ['rollTime', '롤 시간(초)', .2, .8, .01],
-  ['cap', '기본 공격'], ['range', '원거리 사거리(m)', 5, 20, .5], ['melee', '근접 사거리(m)', 2, 8, .1], ['atkEvery', '공격 간격(초)', .4, 1.6, .05], ['speed', '이동 속도(m/s)', 3, 14, .5],
+  ['cap', '배럴 롤 조작'], ['flickPx', '미는 거리(px)', 12, 90, 1], ['flickMs', '미는 시간(ms)', 80, 400, 10], ['rollDist', '롤 거리(m)', 1, 8, .1], ['rollTime', '롤 시간(초)', .2, .8, .01],
+  ['cap', '기본 공격'], ['range', '원거리 사거리(m)', 4, 16, .5], ['melee', '근접 사거리(m)', 1.5, 6, .1], ['atkEvery', '공격 간격(초)', .4, 1.6, .05], ['speed', '이동 속도(m/s)', 3, 14, .5],
   ['cap', '적'], ['turret', '수정 눈 기본 공격', 0, 1, 1], ['fireEvery', '쏘는 간격(초)', .6, 4, .1], ['projSpeed', '탄 속도(m/s)', 5, 30, .5], ['skill', '직선 불덩이(스킬)', 0, 1, 1], ['skillEvery', '스킬 간격(초)', 1.5, 8, .1]];
 const FLY = 3.2, $ = s => document.querySelector(s);
 
@@ -19,7 +19,8 @@ const FLY = 3.2, $ = s => document.querySelector(s);
 const R = new THREE.WebGLRenderer({ canvas: $('#cv'), antialias: true }); R.setPixelRatio(Math.min(devicePixelRatio, 2)); R.toneMapping = THREE.ACESFilmicToneMapping; R.toneMappingExposure = 1.05;
 R.shadowMap.enabled = true; R.shadowMap.type = THREE.PCFSoftShadowMap;
 const scene = new THREE.Scene(); scene.fog = new THREE.Fog(0x9fb6d6, 60, 170);
-const cam = new THREE.PerspectiveCamera(42, 1, .1, 600);
+const cam = new THREE.PerspectiveCamera(20, 1, 1, 900);   /* 실제 게임과 같은 화면: 시야 20° · 45° 내려다봄 · 거리 25 × 보정 (isleview) */
+const CAM_D = 25 * Math.tan(20 * Math.PI / 180) / Math.tan(10 * Math.PI / 180), CAM_A = 45 * Math.PI / 180;
 const resize = () => { R.setSize(innerWidth, innerHeight, false); cam.aspect = innerWidth / innerHeight; cam.updateProjectionMatrix(); }; addEventListener('resize', resize); resize();
 /* 하늘: 위는 짙은 파랑 · 지평선은 따뜻한 빛 */
 { const g = new THREE.SphereGeometry(400, 32, 16), m = new THREE.ShaderMaterial({ side: THREE.BackSide, depthWrite: false, fog: false,
@@ -48,7 +49,7 @@ let AC = null; const ac = () => { if (!AC) try { AC = new (window.AudioContext |
 const tone = (f0, f1, dur, type = 'sine', vol = .2, delay = 0) => { const a = ac(); if (!a) return; const t = a.currentTime + delay, o = a.createOscillator(), g = a.createGain(); o.type = type; o.frequency.setValueAtTime(f0, t); o.frequency.exponentialRampToValueAtTime(f1, t + dur); g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(.001, t + dur); o.connect(g).connect(a.destination); o.start(t); o.stop(t + dur + .02); };
 const noise = (dur, f, vol = .25, q = 1, delay = 0, f2) => { const a = ac(); if (!a) return; const t = a.currentTime + delay, n = a.sampleRate * dur, b = a.createBuffer(1, n, a.sampleRate), d = b.getChannelData(0); for (let i = 0; i < n; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / n);
   const s = a.createBufferSource(); s.buffer = b; const fl = a.createBiquadFilter(); fl.type = 'bandpass'; fl.frequency.setValueAtTime(f, t); if (f2) fl.frequency.exponentialRampToValueAtTime(f2, t + dur); fl.Q.value = q; const g = a.createGain(); g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(.001, t + dur); s.connect(fl).connect(g).connect(a.destination); s.start(t); };
-const SFX = { roll: () => noise(.35, 500, .3, .8, 0, 2200), crit: () => { [880, 1175, 1568, 2093].forEach((f, i) => tone(f, f * 1.01, .5, 'triangle', .14, i * .05)); noise(.5, 3000, .12, .5); },
+const SFX = { roll: () => { noise(.22, 900, .38, 1.4, 0, 4200); noise(.18, 3000, .14, 2, .05, 1200); tone(140, 70, .12, 'sine', .18); }, crit: n => { const st = [0, 2, 4, 7, 9, 12, 14, 16, 19, 21, 24][Math.min(10, n)], k = Math.pow(2, st / 12); [880, 1175, 1568, 2093].forEach((f, i) => tone(f * k, f * k * 1.01, .5, 'triangle', .14, i * .045)); tone(440 * k, 440 * k, .35, 'sine', .12); noise(.5, 3000, .12, .5); },   /* 연속할수록 한 음씩 올라감 (도 레 미 솔 라 …) */
   breath: () => { noise(.5, 260, .35, .6, 0, 900); tone(110, 70, .4, 'sawtooth', .06); }, claw: () => { noise(.12, 2400, .35, 1.2); noise(.12, 1800, .3, 1.2, .05); },
   hit: () => { tone(160, 60, .15, 'square', .12); noise(.1, 900, .25); }, hurt: () => { tone(220, 90, .25, 'sawtooth', .12); noise(.2, 400, .3); }, shoot: () => tone(660, 330, .25, 'triangle', .08), boom: () => { noise(.4, 300, .35, .7); tone(90, 40, .35, 'sine', .25); } };
 
@@ -88,7 +89,7 @@ function mkEye(x, z) {   /* 수정 눈: 기본 공격(유도 · 못 피함)을 �
   const halo = glow(0xb58aff, 3.2, .4); g.add(halo); const shards = []; for (let k = 0; k < 6; k++) { const s = new THREE.Mesh(new THREE.TetrahedronGeometry(.3, 0), new THREE.MeshStandardMaterial({ color: 0x9a7bff, emissive: 0x5a30ff, emissiveIntensity: 1, flatShading: true })); g.add(s); shards.push(s); }
   g.position.set(x, FLY + .4, z); scene.add(g);
   const e = { kind: 'eye', g, body, eye, halo, shards, hp: 700, max: 700, r: 1.4, bar: hpBar(), dead: 0, flash: 0, home: new THREE.Vector3(x, FLY + .4, z), fireT: 1.2, charge: 0, skillT: 2.5, tele: null }; E.push(e); return e; }
-mkDummy(-6, -8); mkDummy(5, -10); mkDummy(0, -16); mkEye(-14, -20);
+mkDummy(-5, -6); mkDummy(4, -8); mkDummy(-1, -12); mkEye(-10, -15);
 
 /* ── 탄 ── */
 const SHOTS = [];
@@ -120,12 +121,24 @@ const endAtk = e => { if (e.pointerId !== fl.id) return; fl.id = null; P.attacki
 /* ── 배럴 롤 ── */
 const fwd = () => new THREE.Vector3(Math.sin(P.yaw), 0, Math.cos(P.yaw));
 let lastNoteT = 0; const note = (t, c = '#fff') => { const now = performance.now(); if (now - lastNoteT < 250 && c === '#fff') return; lastNoteT = now; showMsg(t, c, 700, 22); };
-function tryRoll(side, dirW) {   /* side: −1 왼쪽 · 1 오른쪽 (키보드) · dirW: 화면에서 민 방향 (세상 기준) */
+function tryRoll(side, dirW) {   /* side: −1 왼쪽 · 1 오른쪽 (키보드) · dirW: 화면에서 민 방향 (세상 기준) — 앞뒤 · 좌우 · 대각선 어디로든 바로 굴러감 */
   if (P.roll) return; if (P.cdLeft > 0) { note('롤 쿨타임 ' + P.cdLeft.toFixed(1) + '초'); return; }
   const f = fwd(), r = new THREE.Vector3(-f.z, 0, f.x);   /* r = 용의 오른쪽 */
-  let d; if (dirW) { const a = Math.atan2(dirW.dot(r), dirW.dot(f)) * 180 / Math.PI; if (Math.abs(a) < CFG.frontCone || Math.abs(a) > 180 - CFG.frontCone) { note('앞뒤로는 롤이 안 돼요'); return; } d = dirW.clone(); side = a > 0 ? 1 : -1; }
+  let d; if (dirW) { d = dirW.clone(); const sd = d.dot(r); side = Math.abs(sd) > .15 ? Math.sign(sd) : (d.x >= 0 ? 1 : -1) * Math.sign(r.x || 1); }   /* 도는 방향: 민 쪽으로 (앞뒤로 밀면 살짝 기운 쪽) */
   else d = r.clone().multiplyScalar(side);
-  P.roll = { t: 0, side, d, start: performance.now(), crit: false }; P.cdLeft = CFG.cd; playOnce('roll', 1 / Math.max(.2, CFG.rollTime / .45)); SFX.roll(); }
+  P.roll = { t: 0, side, d, ghosts: 0 }; P.cdLeft = CFG.cd; playOnce('roll', 1 / Math.max(.2, CFG.rollTime / .45)); SFX.roll(); buzz(10); camNudge.addScaledVector(d, .9);
+  ring(.8, 3.2, 0xffe2b0, .3, P.pos.clone().setY(FLY - .3), .1, .5); }
+const buzz = p => { try { navigator.vibrate && navigator.vibrate(p); } catch { } };
+/* 잔상: 굴러가는 동안 그 순간 모습을 반투명하게 남김 */
+const ghostM = new THREE.MeshBasicMaterial({ color: 0xffb070, transparent: true, opacity: .45, blending: THREE.AdditiveBlending, depthWrite: false });
+const GH = []; let ghI = 0;   /* 잔상 둘: 뼈만 따로 복사해 그 순간 자세로 멈춤 (화면 카드가 그림 · 거의 공짜) */
+function mkGhosts() { model.traverse(o => { if (!o.isSkinnedMesh || GH.length) return; const B = o.skeleton.bones, rootB = B.find(b => !(b.parent && b.parent.isBone));
+  for (let k = 0; k < 2; k++) { const grp = new THREE.Group(); grp.matrixAutoUpdate = false; const rc = rootB.clone(true), map = {}; rc.traverse(q => map[q.name] = q); grp.add(rc);
+    const m = new THREE.SkinnedMesh(o.geometry, ghostM.clone()); m.frustumCulled = false; grp.add(m); m.bind(new THREE.Skeleton(B.map(b => map[b.name]), o.skeleton.boneInverses), o.bindMatrix); grp.visible = false; scene.add(grp);
+    GH.push({ grp, m, src: B, nb: m.skeleton.bones, par: rootB.parent, t: 1 }); } }); }
+function ghost() { if (!GH.length) return; const g = GH[ghI++ % GH.length]; g.src.forEach((b, i) => { g.nb[i].position.copy(b.position); g.nb[i].quaternion.copy(b.quaternion); g.nb[i].scale.copy(b.scale); });
+  g.par.updateWorldMatrix(true, false); g.grp.matrix.copy(g.par.matrixWorld); g.grp.matrixWorldNeedsUpdate = true; g.grp.visible = true; g.t = 0; }
+function ghostTick(dt) { for (const g of GH) { if (g.t >= 1) continue; g.t = Math.min(1, g.t + dt / .28); g.m.material.opacity = .45 * (1 - g.t); if (g.t >= 1) g.grp.visible = false; } }
 
 /* ── 동작 ── */
 function playOnce(name, speed = 1) { if (!A[name]) return; const a = A[name]; a.reset(); a.setLoop(THREE.LoopOnce); a.clampWhenFinished = false; a.timeScale = speed; a.setEffectiveWeight(1); a.fadeIn(.05).play();
@@ -137,14 +150,14 @@ const v3 = new THREE.Vector3(); function dmgText(pos, txt, col, big) { v3.copy(p
   d.animate([{ transform: 'translate(-50%,-50%) scale(1.3)', opacity: 1 }, { transform: 'translate(-50%,-160%) scale(1)', opacity: 0 }], { duration: 800, easing: 'ease-out' }).onfinish = () => d.remove(); }
 let shake = 0, timeScale = 1, slowT = 0, hitStop = 0;
 function crit(pos) {   /* 크리티컬 회피 성공 */
-  P.roll.crit = true; P.cdLeft = 0; slowT = .34; timeScale = .22; shake = .15; rainbowRing(P.pos.clone()); burst(P.pos, 0xfff3c0, 22, 9, .6, .7); SFX.crit();
+  P.roll.crit = true; P.cdLeft = 0; hitStop = .07; slowT = .4; timeScale = .22; shake = .18; stats.combo++; buzz([28, 35, 50]); rainbowRing(P.pos.clone()); burst(P.pos, 0xfff3c0, 22, 9, .6, .7); SFX.crit(stats.combo - 1);
   const f = $('#flash'); f.style.transition = 'none'; f.style.opacity = .9; requestAnimationFrame(() => { f.style.transition = 'opacity .45s'; f.style.opacity = 0; });
   showMsg('크리티컬 회피!', 'rainbow', 900); stats.crit++;
-  if (CFG.reward === 'speed') { P.speedT = 1.5; showMsg('크리티컬 회피! · 빨라짐', 'rainbow', 900); } else { P.power = true; showMsg('크리티컬 회피! · 다음 공격 강화', 'rainbow', 900); } }
-const stats = { crit: 0, early: 0, hits: 0 };
+  const cb = stats.combo > 1 ? ` ${stats.combo}연속!` : ''; if (CFG.reward === 'speed') { P.speedT = 1.5; showMsg('크리티컬 회피!' + cb, 'rainbow', 900); } else { P.power = true; showMsg('크리티컬 회피!' + cb, 'rainbow', 900); } }
+const stats = { crit: 0, early: 0, hits: 0, combo: 0 };
 
 /* ── 내가 맞음 ── */
-function hurt(dmg, pos) { P.hp = Math.max(0, P.hp - dmg); stats.hits++; shake = .25; P.hurtT = .25; SFX.hurt(); burst(pos, 0xff5050, 10, 5); dmgText(P.pos.clone().setY(P.pos.y + 1.5), '-' + dmg, '#ff7070'); if (!P.busy) playOnce('hit'); if (P.hp <= 0) { P.hp = 1000; showMsg('다시 시작', '#fff', 900, 24); } }
+function hurt(dmg, pos) { P.hp = Math.max(0, P.hp - dmg); stats.hits++; stats.combo = 0; shake = .25; P.hurtT = .25; SFX.hurt(); burst(pos, 0xff5050, 10, 5); dmgText(P.pos.clone().setY(P.pos.y + 1.5), '-' + dmg, '#ff7070'); if (!P.busy) playOnce('hit'); if (P.hp <= 0) { P.hp = 1000; showMsg('다시 시작', '#fff', 900, 24); } }
 
 /* ── 적 맞음 ── */
 function hitEnemy(e, dmg, pos, big) { if (e.dead) return; e.hp -= dmg; e.flash = .15; dmgText(pos || e.g.position, String(Math.round(dmg)), big ? '#ffd36b' : '#fff', big); SFX.hit();
@@ -173,10 +186,10 @@ function slash(pos) { for (let k = 0; k < 3; k++) { const m = new THREE.Mesh(new
 /* ── 불러오기 ── */
 new GLTFLoader().load('./_mf/DRAGON.glb?v=11122121', g => { model = g.scene; model.traverse(o => { if (o.isMesh) { o.castShadow = true; o.frustumCulled = false; if (o.material) o.material.side = THREE.DoubleSide; } });
   model.position.y = -.75; spin.position.y = .75; spin.add(model);   /* 몸 가운데를 축으로 돎 */
-  mixer = new THREE.AnimationMixer(model); for (const c of g.animations) A[c.name] = mixer.clipAction(c); A.fly.play(); $('#load').classList.add('done'); }, undefined, e => { $('#load').textContent = '불러오지 못했어요: ' + e.message; });
+  mixer = new THREE.AnimationMixer(model); for (const c of g.animations) A[c.name] = mixer.clipAction(c); A.fly.play(); model.updateMatrixWorld(true); mkGhosts(); $('#load').classList.add('done'); }, undefined, e => { $('#load').textContent = '불러오지 못했어요: ' + e.message; });
 
 /* ── 매 순간 ── */
-const clock = new THREE.Clock(), camPos = new THREE.Vector3(0, 30, 30), camT = new THREE.Vector3(); let bankA = 0, t = 0;
+const camNudge = new THREE.Vector3(); const clock = new THREE.Clock(), camPos = new THREE.Vector3(0, 30, 30), camT = new THREE.Vector3(); let bankA = 0, t = 0;
 function frame() { requestAnimationFrame(frame); const rdt = Math.min(.05, clock.getDelta()); if (slowT > 0) { slowT -= rdt; if (slowT <= 0) timeScale = 1; }
   let dt = rdt * timeScale; if (hitStop > 0) { hitStop -= rdt; dt *= .05; } t += dt;
   /* 이동 */
@@ -188,12 +201,12 @@ function frame() { requestAnimationFrame(frame); const rdt = Math.min(.05, clock
   bankA += ((P.roll ? 0 : -Math.max(-.6, Math.min(.6, dy * 1.4))) - bankA) * (1 - Math.exp(-dt * 6));
   P.pos.addScaledVector(P.vel, dt);
   /* 롤: 미는 쪽으로 빠르게 비켜나며 몸통 축으로 한 바퀴 */
-  if (P.roll) { const r = P.roll; r.t += dt; const k = Math.min(1, r.t / CFG.rollTime), e = k < .5 ? 2 * k * k : 1 - Math.pow(-2 * k + 2, 2) / 2, prev = r.e || 0;
-    P.pos.addScaledVector(r.d, (e - prev) * CFG.rollDist); r.e = e; spin.rotation.z = -r.side * e * Math.PI * 2; if (k >= 1) { P.roll = null; spin.rotation.z = 0; } }
+  if (P.roll) { const r = P.roll; r.t += dt; const k = Math.min(1, r.t / CFG.rollTime), e = 1 - Math.pow(1 - k, 3), es = 1 - Math.pow(1 - k, 2.2), prev = r.e || 0;   /* 미는 순간 튀어 나가고 끝은 부드럽게 */
+    P.pos.addScaledVector(r.d, (e - prev) * CFG.rollDist); r.e = e; spin.rotation.z = r.side * es * Math.PI * 2; if (r.ghosts < 2 && k > [.18, .45][r.ghosts]) { r.ghosts++; ghost(); } if (k >= 1) { P.roll = null; spin.rotation.z = 0; } }
   P.cdLeft = Math.max(0, P.cdLeft - dt); P.busy = Math.max(0, P.busy - dt);
   P.pos.y = FLY; const pl = Math.hypot(P.pos.x, P.pos.z); if (pl > 60) P.pos.multiplyScalar(60 / pl).setY(FLY);
   dragon.position.copy(P.pos); dragon.rotation.y = P.yaw; bank.rotation.z = bankA;
-  if (mixer) mixer.update(dt);
+  if (mixer) mixer.update(dt); ghostTick(dt);
   attack(dt);
   rOut.position.copy(P.pos).setY(FLY - .6); rOut.scale.setScalar(CFG.range); rIn.position.copy(rOut.position); rIn.scale.setScalar(CFG.melee); rInFill.position.copy(rOut.position); rInFill.scale.setScalar(CFG.melee);
   /* 적 */
@@ -203,7 +216,7 @@ function frame() { requestAnimationFrame(frame); const rdt = Math.min(.05, clock
     e.flash = Math.max(0, e.flash - dt); g.position.y = e.home.y + Math.sin(t * 1.6 + e.home.x) * .25;
     if (e.kind === 'dummy') { e.core.rotation.y += dt * 1.5; e.core.material.emissiveIntensity = 1.6 + e.flash * 14; e.shell.forEach((s, k) => { const a = t * .6 + k / 5 * Math.PI * 2; s.position.x = Math.cos(a) * 1.05; s.position.z = Math.sin(a) * 1.05; s.rotation.x += dt; }); g.scale.setScalar(1 + e.flash * 1.2); }
     else { const to = P.pos.clone().sub(g.position); g.rotation.y = Math.atan2(to.x, to.z); e.shards.forEach((s, k) => { const a = t * 1.3 + k / 6 * Math.PI * 2; s.position.set(Math.cos(a) * 1.7, Math.sin(a * 2) * .3, Math.sin(a) * 1.7); s.rotation.y += dt * 2; });
-      const near = to.length() < 26; if (CFG.turret && near) { e.fireT -= dt; e.charge = Math.max(0, Math.min(1, 1 - e.fireT / .55)); if (e.fireT <= 0) { e.fireT = CFG.fireEvery; e.charge = 0; enemyShot(e); } } else e.charge = 0;
+      const near = to.length() < 17; if (CFG.turret && near) { e.fireT -= dt; e.charge = Math.max(0, Math.min(1, 1 - e.fireT / .55)); if (e.fireT <= 0) { e.fireT = CFG.fireEvery; e.charge = 0; enemyShot(e); } } else e.charge = 0;
       e.eye.material.emissiveIntensity = 1.6 + e.charge * 6 + e.flash * 10; e.halo.material.opacity = .35 + e.charge * .6; e.halo.scale.setScalar(3.2 + e.charge * 2.5);
       if (CFG.skill && near) { e.skillT -= dt; if (e.skillT < .7 && !e.tele) { e.tele = new THREE.Mesh(new THREE.PlaneGeometry(2.4, 30), new THREE.MeshBasicMaterial({ color: 0xff5a2a, transparent: true, opacity: .25, depthWrite: false, blending: THREE.AdditiveBlending })); e.tele.rotation.x = -Math.PI / 2; scene.add(e.tele); e.teleDir = to.clone().setY(0).normalize(); }
         if (e.tele) { const d = e.teleDir; e.tele.position.copy(g.position).addScaledVector(d, 15).setY(FLY - .55); e.tele.rotation.z = Math.atan2(-d.x, -d.z); e.tele.material.opacity = .15 + .3 * (1 - Math.max(0, e.skillT) / .7); }
@@ -228,13 +241,13 @@ function frame() { requestAnimationFrame(frame); const rdt = Math.min(.05, clock
   /* 효과 */
   for (let i = FX.length - 1; i >= 0; i--) { const f = FX[i]; f.t += dt; const k = Math.min(1, f.t / f.life); f.upd(k, dt); if (k >= 1) { scene.remove(f.o); if (f.o.material) f.o.material.dispose(); FX.splice(i, 1); } }
   /* 카메라 (게임처럼 비스듬히 위에서 · 살짝 늦게 따라옴) */
-  camT.lerp(P.pos, 1 - Math.exp(-rdt * 8)); const want = camT.clone().add(new THREE.Vector3(0, 13.5, 10)); camPos.lerp(want, 1 - Math.exp(-rdt * 8)); cam.position.copy(camPos);
-  if (shake > 0) { shake -= rdt; cam.position.x += (Math.random() - .5) * shake * 1.6; cam.position.y += (Math.random() - .5) * shake * 1.6; }
-  cam.lookAt(camT.x, camT.y - .5, camT.z);
+  camT.lerp(P.pos, 1 - Math.exp(-rdt * 8)); const want = camT.clone().add(new THREE.Vector3(0, Math.sin(CAM_A) * CAM_D, Math.cos(CAM_A) * CAM_D)).addScaledVector(camNudge, 1); camPos.lerp(want, 1 - Math.exp(-rdt * 8)); cam.position.copy(camPos);
+  if (shake > 0) { shake -= rdt; cam.position.x += (Math.random() - .5) * shake * 2.2; cam.position.y += (Math.random() - .5) * shake * 2.2; }
+  cam.lookAt(camT.x + camNudge.x, camT.y - .5, camT.z + camNudge.z); camNudge.multiplyScalar(Math.exp(-rdt * 6));
   sun.position.copy(P.pos).add(new THREE.Vector3(-20, 40, 15)); sun.target.position.copy(P.pos);
   /* 화면 글 */
   $('#cd').style.strokeDashoffset = (383.3 * (P.cdLeft / CFG.cd)).toFixed(1); $('#cd').style.stroke = P.cdLeft > 0 ? '#5a7a88' : '#7de0ff';
-  $('#hp i').style.width = (P.hp / 10) + '%'; $('#st').textContent = `크리티컬 회피 ${stats.crit} · 빨랐음 ${stats.early} · 맞음 ${stats.hits}${P.speedT > 0 ? ' · 빨라짐!' : ''}${P.power ? ' · 다음 공격 강화!' : ''}`;
+  $('#hp i').style.width = (P.hp / 10) + '%'; $('#st').textContent = `크리티컬 회피 ${stats.crit}${stats.combo > 1 ? ' (' + stats.combo + '연속)' : ''} · 빨랐음 ${stats.early} · 맞음 ${stats.hits}${P.speedT > 0 ? ' · 빨라짐!' : ''}${P.power ? ' · 다음 공격 강화!' : ''}`;
   R.render(scene, cam); }
 frame();
-window.__dragon = { P, CFG, E, stats, SHOTS, tryRoll };
+window.__dragon = { P, CFG, E, stats, SHOTS, tryRoll, ghost };
