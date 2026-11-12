@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="ko"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<title>용 손맛 시험</title>
+<style>
+:root{--g:#ffd27a;--ink:#fff3dc;--bg:#07090f}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent;user-select:none;-webkit-user-select:none}
+html,body{margin:0;height:100%;background:var(--bg);overflow:hidden;touch-action:none;font-family:system-ui,"Noto Sans KR",sans-serif;color:var(--ink)}
+canvas{display:block;position:fixed;inset:0;width:100%;height:100%}
+#hud{position:fixed;left:max(14px,env(safe-area-inset-left,0px));top:10px;font-size:12px;line-height:1.5;text-shadow:0 1px 3px #000;pointer-events:none}
+#hud b{font-size:14px;color:var(--g)}
+#hp{width:180px;height:8px;border-radius:4px;background:rgba(255,255,255,.15);overflow:hidden;margin-top:4px}#hp i{display:block;height:100%;width:100%;background:linear-gradient(90deg,#ff5f5f,#ffb35f);transition:width .15s}
+#stick{position:fixed;left:max(24px,env(safe-area-inset-left,0px));bottom:max(24px,env(safe-area-inset-bottom,0px));width:150px;height:150px;border-radius:50%;background:radial-gradient(circle,rgba(255,255,255,.07),rgba(255,255,255,.02));border:1.5px solid rgba(255,255,255,.18)}
+#knob{position:absolute;left:50%;top:50%;width:58px;height:58px;margin:-29px 0 0 -29px;border-radius:50%;background:rgba(255,230,190,.25);border:1.5px solid rgba(255,230,190,.5)}
+#atk{position:fixed;right:max(34px,env(safe-area-inset-right,0px));bottom:max(34px,env(safe-area-inset-bottom,0px));width:112px;height:112px;border-radius:50%;background:radial-gradient(circle at 40% 35%,rgba(255,170,80,.55),rgba(170,40,10,.55));border:2px solid rgba(255,210,140,.75);display:grid;place-items:center;font-weight:700;font-size:14px;letter-spacing:.04em}
+#atk svg{position:absolute;inset:-9px;width:130px;height:130px;transform:rotate(-90deg);pointer-events:none}
+#atk.on{box-shadow:0 0 22px rgba(255,160,60,.7)}
+#rollhint{position:absolute;bottom:-22px;font-size:10px;font-weight:500;opacity:.7;white-space:nowrap}
+#msg{position:fixed;left:50%;top:22%;transform:translate(-50%,-50%);font-size:34px;font-weight:800;letter-spacing:.04em;pointer-events:none;opacity:0;white-space:nowrap;
+  background:linear-gradient(90deg,#ff6b6b,#ffd36b,#7dff8a,#6bd3ff,#b07bff);-webkit-background-clip:text;background-clip:text;color:transparent;filter:drop-shadow(0 2px 6px rgba(0,0,0,.7))}
+#flash{position:fixed;inset:0;pointer-events:none;background:radial-gradient(circle,rgba(255,255,255,0) 30%,rgba(255,240,200,.55));opacity:0}
+.dmg{position:fixed;font-weight:800;pointer-events:none;text-shadow:0 2px 3px #000;transform:translate(-50%,-50%)}
+#tog{position:fixed;right:max(12px,env(safe-area-inset-right,0px));top:10px;padding:7px 12px;border-radius:10px;border:1px solid rgba(255,210,140,.5);background:rgba(20,12,6,.7);color:var(--ink);font:600 12px system-ui}
+#panel{position:fixed;right:max(12px,env(safe-area-inset-right,0px));top:46px;width:260px;max-height:calc(100% - 200px);overflow:auto;padding:10px 12px;border-radius:12px;background:rgba(14,10,6,.86);border:1px solid rgba(255,210,140,.3);font-size:11.5px;touch-action:pan-y}
+#panel .r{display:flex;align-items:center;gap:6px;margin:5px 0}#panel label{flex:0 0 108px}#panel input[type=range]{flex:1;min-width:0;accent-color:#ffb35f}#panel output{flex:0 0 46px;text-align:right;color:var(--g)}
+#panel .cap{margin:9px 0 2px;color:var(--g);font-weight:700;font-size:11px;letter-spacing:.05em}
+#panel select{width:100%;font:inherit;background:#221608;color:var(--ink);border:1px solid rgba(255,210,140,.4);border-radius:6px;padding:3px}
+#load{position:fixed;inset:0;display:grid;place-content:center;background:var(--bg);font-size:14px;z-index:9;transition:opacity .4s}#load.done{opacity:0;pointer-events:none}
+#rot{display:none}
+@media (orientation:portrait){#rot{display:grid;place-content:center;position:fixed;inset:0;background:var(--bg);z-index:20;font-size:14px}}
+</style>
+<script type="importmap">{"imports":{"three":"./vendor/three.module.js","three/addons/":"./vendor/addons/"}}</script>
+</head><body>
+<canvas id="cv"></canvas>
+<div id="hud"><b>용 손맛 시험</b> · 화염룡<br>왼쪽: 이동 · 공격 버튼 누르고 있기: 자동 공격 · 누른 채 좌우/대각선으로 빠르게 밀기: 배럴 롤<br>
+  <span id="st"></span><div id="hp"><i></i></div></div>
+<div id="stick"><div id="knob"></div></div>
+<div id="atk"><svg viewBox="0 0 130 130"><circle cx="65" cy="65" r="61" fill="none" stroke="rgba(255,255,255,.12)" stroke-width="5"/><circle id="cd" cx="65" cy="65" r="61" fill="none" stroke="#7de0ff" stroke-width="5" stroke-linecap="round" stroke-dasharray="383.3" stroke-dashoffset="0"/></svg>공격<span id="rollhint">누른 채 밀면 롤</span></div>
+<div id="msg"></div><div id="flash"></div>
+<button id="tog" type="button">조절 칸 ▾</button>
+<div id="panel" hidden></div>
+<div id="load">용을 부르는 중…</div>
+<div id="rot">기기를 가로로 돌려 주세요</div>
+<script type="module" src="./src/proto/dragonlab.js?v=11122121"></script>
+</body></html>
