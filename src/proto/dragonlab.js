@@ -1,18 +1,21 @@
 /* 용 손맛 시험 (사용자 2026-11-12): 용 한 마리 + 허수아비 · 쏘는 수정 눈
    · 기본 공격: 공격 버튼을 누르고 있으면 사거리 원(바깥 = 원거리 · 안 = 근접)이 보이고, 원 안의 가장 가까운 적을 자동 공격
      멀면 브레스(고정 타겟 · 유도) · 가까우면 앞발 할퀴기(훨씬 셈) · 공격 박자는 하나 (원거리 ↔ 근접 바뀌어도 틈 없음) · 경계는 여유를 둠
-   · 배럴 롤: 공격 버튼을 누른 채 손가락을 빠르게 밀면 그쪽으로 롤 (용 기준 좌우 · 대각선만 · 앞뒤는 안 침) · 키보드 Q/E
-   · 크리티컬 회피: 공격이 맞기 직전(판정 시간 안)에 롤을 시작하면 원래 못 피하는 기본 공격도 피함 → 느려짐 · 번쩍 · 무지개 고리 · 쿨타임 초기화 · 보상
-   · 그냥 쓰거나 늦으면 쿨타임이 돎 · 모든 숫자는 조절 칸에서 바꿈 */
+   · 롤은 크리티컬 롤뿐 (일반 롤 없음 · 사용자 2026-11-12): 롤도 이동이라 이동 조이스틱으로 함
+     적 공격이 맞기 직전(판정 시간 안)에 조이스틱을 급하게 꺾으면(가운데→끝 · 또는 크게 꺾기) 그쪽으로 크리티컬 롤 · 평소 꺾기는 그냥 이동
+     막 흔들기 막기: 공격이 날아오는 중 판정 시간 전에 꺾으면 그 공격에 대한 기회는 끝 → 딱 맞춰 한 번 꺾어야 함
+   · 크리티컬 효과는 잔상 · 멈칫 · 느려짐 · 진동 · 오르는 음 · 글자만 (퍼지는 원 · 불꽃 · 번쩍임 없음)
+   · 카메라: 직교 · 56° · 화면 세로 20m · 용은 가운데보다 조금 아래 · 용은 카메라 쪽으로 11° 젖힘 (4분의 3 시점) · 모든 숫자는 조절 칸 */
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
-const CFG = { critMs: 200, cd: 2.5, flickPx: 34, flickMs: 200, range: 8, melee: 3.2, rollDist: 4.2, rollTime: .42, atkEvery: .85, speed: 7.5,
-  fireEvery: 1.7, camAng: 55, viewH: 18, projSpeed: 13, skillEvery: 3.4, tell: 1, reward: 'speed', turret: 1, skill: 1 };
-const SPEC = [['cap', '카메라'], ['camAng', '내려다보는 각도(°)', 30, 85, 1], ['viewH', '화면 세로 넓이(m)', 10, 34, .5], ['cap', '크리티컬 회피'], ['critMs', '판정 시간(ms)', 60, 400, 10], ['cd', '롤 쿨타임(초)', .5, 6, .1], ['reward', '성공 보상', ['speed', '이동 속도 ↑ (1.5초)'], ['power', '다음 공격 강화 ×1.8']], ['tell', '타이밍 표시', 0, 1, 1],
-  ['cap', '배럴 롤 조작'], ['flickPx', '미는 거리(px)', 12, 90, 1], ['flickMs', '미는 시간(ms)', 80, 400, 10], ['rollDist', '롤 거리(m)', 1, 8, .1], ['rollTime', '롤 시간(초)', .2, .8, .01],
+const CFG = { critMs: 300, lockMs: 800, flickMs: 100, turnDeg: 90, range: 8, melee: 3.2, rollDist: 4.2, rollTime: .42, atkEvery: .85, speed: 7.5,
+  fireEvery: 1.7, camAng: 56, viewH: 20, camOff: 3, lean: 11, projSpeed: 25, skillEvery: 3.4, tell: 1, reward: 'speed', turret: 1, skill: 1 };
+const SPEC = [['cap', '카메라'], ['camAng', '내려다보는 각도(°)', 30, 85, 1], ['viewH', '화면 세로 넓이(m)', 10, 34, .5], ['camOff', '용 위치: 가운데 아래(m)', 0, 6, .1], ['lean', '용 젖힘(°)', 0, 25, 1],
+  ['cap', '크리티컬 롤'], ['critMs', '판정 시간(ms)', 100, 500, 10], ['lockMs', '미리 꺾으면 실패(ms)', 600, 1200, 50], ['reward', '성공 보상', ['speed', '이동 속도 ↑ (1.5초)'], ['power', '다음 공격 강화 ×1.8']], ['tell', '타이밍 표시', 0, 1, 1],
+  ['cap', '꺾기 (조이스틱)'], ['flickMs', '꺾는 시간(ms)', 60, 200, 10], ['turnDeg', '꺾는 각도(°)', 45, 150, 5], ['rollDist', '롤 거리(m)', 1, 8, .1], ['rollTime', '롤 시간(초)', .2, .8, .01],
   ['cap', '기본 공격'], ['range', '원거리 사거리(m)', 4, 16, .5], ['melee', '근접 사거리(m)', 1.5, 6, .1], ['atkEvery', '공격 간격(초)', .4, 1.6, .05], ['speed', '이동 속도(m/s)', 3, 14, .5],
-  ['cap', '적'], ['turret', '수정 눈 기본 공격', 0, 1, 1], ['fireEvery', '쏘는 간격(초)', .6, 4, .1], ['projSpeed', '탄 속도(m/s)', 5, 30, .5], ['skill', '직선 불덩이(스킬)', 0, 1, 1], ['skillEvery', '스킬 간격(초)', 1.5, 8, .1]];
+  ['cap', '적'], ['turret', '수정 눈 기본 공격', 0, 1, 1], ['fireEvery', '쏘는 간격(초)', .6, 4, .1], ['projSpeed', '탄 속도(m/s)', 15, 40, .5], ['skill', '직선 불덩이(스킬)', 0, 1, 1], ['skillEvery', '스킬 간격(초)', 1.5, 8, .1]];
 const FLY = 3.2, $ = s => document.querySelector(s);
 
 /* ── 화면 ── */
@@ -64,9 +67,10 @@ const burst = (pos, col, n = 14, sp = 6, life = .45, size = .5) => { for (let i 
   fx(s, life * (.7 + Math.random() * .6), (k, dt) => { s.position.addScaledVector(v, dt); v.multiplyScalar(.9); s.material.opacity = 1 - k; }); } };
 
 /* ── 용 ── */
-const dragon = new THREE.Group(), bank = new THREE.Group(), spin = new THREE.Group(); dragon.add(bank); bank.add(spin); bank.position.y = 0; scene.add(dragon);
+const dragon = new THREE.Group(), lean = new THREE.Group(), yawG = new THREE.Group(), bank = new THREE.Group(), spin = new THREE.Group(); dragon.add(lean); lean.add(yawG); yawG.add(bank); bank.add(spin); scene.add(dragon);
+/* lean: 어느 쪽을 보든 등이 카메라 쪽으로 젖혀짐 (카메라 56° − 11° = 용 입장에선 45° · 얼굴과 옆구리가 같이 보이는 4분의 3 시점) · 겉모습만 · 판정은 그대로 */
 let mixer = null, A = {}, model = null;
-const P = { pos: new THREE.Vector3(0, FLY, 6), vel: new THREE.Vector3(), yaw: Math.PI, hp: 1000, roll: null, cdLeft: 0, atkT: 0, attacking: false, lastMelee: false, speedT: 0, power: false, busy: 0, hurtT: 0 };
+const P = { pos: new THREE.Vector3(0, FLY, 6), vel: new THREE.Vector3(), yaw: Math.PI, hp: 1000, roll: null, atkT: 0, attacking: false, lastMelee: false, speedT: 0, power: false, busy: 0, hurtT: 0 };
 dragon.position.copy(P.pos);
 /* 사거리 원 두 개 (나는 높이에 · 화면 위에 덮어 그림) */
 const mkRing = (col, w, o) => { const m = new THREE.Mesh(new THREE.RingGeometry(1 - w, 1, 96), new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: o, depthTest: false, depthWrite: false })); m.rotation.x = -Math.PI / 2; m.renderOrder = 10; m.visible = false; scene.add(m); return m; };
@@ -96,49 +100,57 @@ const SHOTS = [];
 const orb = (col, s) => { const g = new THREE.Group(); g.add(glow(col, s * 2.6, .9)); g.add(glow(0xffffff, s * 1.1, 1)); scene.add(g); return g; };
 function enemyShot(e) {   /* 기본 공격: 유도 · 고정 타겟 (크리티컬 회피로만 피함) */
   const o = orb(0xb58aff, .55); o.position.copy(e.g.position); SFX.shoot();
-  SHOTS.push({ o, from: 'enemy', kind: 'basic', speed: CFG.projSpeed, dmg: 40, trail: 0 }); }
+  SHOTS.push({ o, from: 'enemy', kind: 'basic', speed: CFG.projSpeed, dmg: 40, trail: 0, tti: 1e9 }); }
 function enemySkill(e) {   /* 스킬: 직선 불덩이 (방향만 정하고 날아감 · 비켜서 피함 · 롤 중엔 무적 · 판정 시간 안이면 크리티컬) */
   const dir = P.pos.clone().sub(e.g.position).setY(0).normalize(); const o = orb(0xff6a2a, 1.1); o.position.copy(e.g.position);
-  SHOTS.push({ o, from: 'enemy', kind: 'skill', dir, speed: CFG.projSpeed * .9, dmg: 120, life: 3.2, trail: 0 }); SFX.boom(); }
+  SHOTS.push({ o, from: 'enemy', kind: 'skill', dir, speed: CFG.projSpeed * .9, dmg: 120, life: 3.2, trail: 0, tti: 1e9 }); SFX.boom(); }
 function myShot(t, dmg) { const o = orb(0xffa24a, .7); o.position.copy(P.pos).add(new THREE.Vector3(Math.sin(P.yaw) * 2, .3, Math.cos(P.yaw) * 2)); SHOTS.push({ o, from: 'me', target: t, speed: 26, dmg, trail: 0 }); }
 
 /* ── 입력 ── */
-const keys = new Set(); addEventListener('keydown', e => { keys.add(e.code); ac(); if (e.code === 'KeyQ') tryRoll(-1, null); if (e.code === 'KeyE') tryRoll(1, null); if (e.code === 'Space') P.attacking = true; });
+const keys = new Set(); addEventListener('keydown', e => { if (e.repeat) return; keys.add(e.code); ac(); if (e.code === 'KeyQ') onFlick(new THREE.Vector3(-1, 0, 0)); if (e.code === 'KeyE') onFlick(new THREE.Vector3(1, 0, 0)); if (e.code === 'Space') P.attacking = true; });   /* 키보드 시험용: Q/E = 왼쪽/오른쪽으로 꺾기 */
 addEventListener('keyup', e => { keys.delete(e.code); if (e.code === 'Space') P.attacking = false; });
 const stick = { id: null, x: 0, y: 0, cx: 0, cy: 0 }, knob = $('#knob');
 $('#stick').addEventListener('pointerdown', e => { ac(); const r = e.currentTarget.getBoundingClientRect(); stick.id = e.pointerId; stick.cx = r.left + r.width / 2; stick.cy = r.top + r.height / 2; e.currentTarget.setPointerCapture(e.pointerId); moveStick(e); });
-const moveStick = e => { let dx = e.clientX - stick.cx, dy = e.clientY - stick.cy; const l = Math.hypot(dx, dy), m = 55; if (l > m) { dx *= m / l; dy *= m / l; } stick.x = dx / m; stick.y = dy / m; knob.style.transform = `translate(${dx}px,${dy}px)`; };
+const moveStick = e => { let dx = e.clientX - stick.cx, dy = e.clientY - stick.cy; const l = Math.hypot(dx, dy), m = 55; if (l > m) { dx *= m / l; dy *= m / l; } stick.x = dx / m; stick.y = dy / m; knob.style.transform = `translate(${dx}px,${dy}px)`; stickSample(); };
+/* 꺾기 알아채기: 최근 조이스틱 자리를 기억해 두고, 꺾는 시간 안에 (가운데 근처 → 끝) 또는 (밀던 방향 → 크게 다른 방향 · 꺾는 각도 이상)이면 꺾기
+   천천히 돌리거나 살살 미는 건 꺾기가 아님 · 꺾기는 크리티컬 판정 때만 의미가 있음 (평소엔 그냥 이동) */
+const SH = []; let lastFlick = 0;
+function stickSample() { const now = performance.now(); SH.push({ t: now, x: stick.x, y: stick.y }); while (SH.length > 2 && now - SH[0].t > 300) SH.shift();
+  if (now - lastFlick < 180) return; const c = SH[SH.length - 1], cl = Math.hypot(c.x, c.y); if (cl < .75) return; const cosT = Math.cos(CFG.turnDeg * Math.PI / 180);
+  for (const s of SH) { if (now - s.t > CFG.flickMs) continue; const sl = Math.hypot(s.x, s.y);
+    if (sl < .3 || (sl > .5 && (s.x * c.x + s.y * c.y) / (sl * cl) <= cosT)) { lastFlick = now; onFlick(new THREE.Vector3(c.x, 0, c.y).normalize()); return; } } }
 $('#stick').addEventListener('pointermove', e => { if (e.pointerId === stick.id) moveStick(e); });
-const endStick = e => { if (e.pointerId !== stick.id) return; stick.id = null; stick.x = stick.y = 0; knob.style.transform = ''; }; $('#stick').addEventListener('pointerup', endStick); $('#stick').addEventListener('pointercancel', endStick);
-/* 공격 버튼: 누르고 있으면 자동 공격 · 누른 채 빠르게 밀면 롤 (밀고 난 뒤 그 자리에서 다시 밀면 또 롤) */
-const atkEl = $('#atk'), fl = { id: null, x: 0, y: 0, t: 0 };
-atkEl.addEventListener('pointerdown', e => { ac(); fl.id = e.pointerId; fl.x = e.clientX; fl.y = e.clientY; fl.t = performance.now(); P.attacking = true; atkEl.classList.add('on'); atkEl.setPointerCapture(e.pointerId); });
-atkEl.addEventListener('pointermove', e => { if (e.pointerId !== fl.id) return; const now = performance.now(), dx = e.clientX - fl.x, dy = e.clientY - fl.y;
-  if (now - fl.t > CFG.flickMs) { fl.x = e.clientX; fl.y = e.clientY; fl.t = now; return; }   /* 천천히 밀린 건 롤 아님 → 기준을 새로 잡음 */
-  if (Math.hypot(dx, dy) >= CFG.flickPx) { tryRoll(0, new THREE.Vector3(dx, 0, dy).normalize()); fl.x = e.clientX; fl.y = e.clientY; fl.t = now; } });
+const endStick = e => { if (e.pointerId !== stick.id) return; stick.id = null; stick.x = stick.y = 0; knob.style.transform = ''; stickSample(); }; $('#stick').addEventListener('pointerup', endStick); $('#stick').addEventListener('pointercancel', endStick);
+/* 공격 버튼: 누르고 있으면 자동 공격 (롤은 조이스틱으로 옮김) */
+const atkEl = $('#atk'), fl = { id: null };
+atkEl.addEventListener('pointerdown', e => { ac(); fl.id = e.pointerId; P.attacking = true; atkEl.classList.add('on'); atkEl.setPointerCapture(e.pointerId); });
 const endAtk = e => { if (e.pointerId !== fl.id) return; fl.id = null; P.attacking = false; atkEl.classList.remove('on'); }; atkEl.addEventListener('pointerup', endAtk); atkEl.addEventListener('pointercancel', endAtk);
 
 /* ── 배럴 롤 ── */
 const fwd = () => new THREE.Vector3(Math.sin(P.yaw), 0, Math.cos(P.yaw));
 let lastNoteT = 0; const note = (t, c = '#fff') => { const now = performance.now(); if (now - lastNoteT < 250 && c === '#fff') return; lastNoteT = now; showMsg(t, c, 700, 22); };
-function tryRoll(side, dirW) {   /* side: −1 왼쪽 · 1 오른쪽 (키보드) · dirW: 화면에서 민 방향 (세상 기준) — 앞뒤 · 좌우 · 대각선 어디로든 바로 굴러감 */
-  if (P.roll) return; if (P.cdLeft > 0) { note('롤 쿨타임 ' + P.cdLeft.toFixed(1) + '초'); return; }
-  const f = fwd(), r = new THREE.Vector3(-f.z, 0, f.x);   /* r = 용의 오른쪽 */
-  let d; if (dirW) { d = dirW.clone(); const sd = d.dot(r); side = Math.abs(sd) > .15 ? Math.sign(sd) : (d.x >= 0 ? 1 : -1) * Math.sign(r.x || 1); }   /* 도는 방향: 민 쪽으로 (앞뒤로 밀면 살짝 기운 쪽) */
-  else d = r.clone().multiplyScalar(side);
-  P.roll = { t: 0, side, d, ghosts: 0 }; P.cdLeft = CFG.cd; playOnce('roll', 1 / Math.max(.2, CFG.rollTime / .45)); SFX.roll(); buzz(10); camNudge.addScaledVector(d, .9);
-  ring(.8, 3.2, 0xffe2b0, .3, P.pos.clone().setY(FLY - .3), .1, .5); }
+/* 꺾었을 때: 판정 시간 안에 닿을 공격이 있으면 크리티컬 롤 · 그보다 일찍 꺾었으면 날아오던 공격의 기회가 끝남 · 위험이 없으면 그냥 이동 */
+function onFlick(dirW) { if (P.roll) return; const live = SHOTS.filter(s => s.from === 'enemy' && !s.dodged && !s.burned && s.tti < 1e8);
+  const inW = live.filter(s => s.tti <= CFG.critMs / 1000);
+  if (inW.length) { inW.forEach(dodge); startRoll(dirW); crit(); return; }
+  const early = live.filter(s => s.tti <= CFG.lockMs / 1000); if (early.length) { early.forEach(s => { s.burned = true; s.o.children[0].material.color.set(0xff4a4a); }); stats.early++; stats.combo = 0; note('빨랐어요 · 이 공격은 못 피해요', '#ffd36b'); } }
+function dodge(s) { s.dodged = true; const to = P.pos.clone().sub(s.o.position).setY(0); s.dir = (to.lengthSq() > 1e-6 ? to : (s.dir || new THREE.Vector3(0, 0, 1))).normalize(); s.kind = 'gone'; s.life = .6; }   /* 피한 공격: 그대로 스쳐 지나가며 사라짐 */
+function startRoll(dirW) {   /* 꺾은 방향으로 굴러감 · 도는 방향도 그쪽 */
+  const f = fwd(), r = new THREE.Vector3(-f.z, 0, f.x), d = dirW.clone().setY(0).normalize(), sd = d.dot(r);   /* r = 용의 오른쪽 */
+  const side = Math.abs(sd) > .15 ? Math.sign(sd) : (d.x >= 0 ? 1 : -1) * Math.sign(r.x || 1);
+  P.roll = { t: 0, side, d, ghosts: 0 }; playOnce('roll', 1 / Math.max(.2, CFG.rollTime / .45)); SFX.roll(); camNudge.addScaledVector(d, .9); }
 const buzz = p => { try { navigator.vibrate && navigator.vibrate(p); } catch { } };
 /* 잔상: 굴러가는 동안 그 순간 모습을 반투명하게 남김 */
-const ghostM = new THREE.MeshBasicMaterial({ color: 0xffb070, transparent: true, opacity: .45, blending: THREE.AdditiveBlending, depthWrite: false });
+const ghostM = new THREE.MeshBasicMaterial({ color: 0xffb070, transparent: true, opacity: .6, depthWrite: false });   /* 보통 섞기: 풀밭 · 어두운 곳 어디서나 같은 빛깔로 또렷 */
+const GHOST_N = 4, GHOST_AT = [.15, .4, .65, .9], GHOST_COL = [0xffb070, 0xffe08a, 0x9fe8ff, 0xc8a8ff], GHOST_LIFE = .5;   /* 크리티컬 롤에만 · 넷 · 따뜻한 빛에서 무지개 끝빛으로 */
 const GH = []; let ghI = 0;   /* 잔상 둘: 뼈만 따로 복사해 그 순간 자세로 멈춤 (화면 카드가 그림 · 거의 공짜) */
 function mkGhosts() { model.traverse(o => { if (!o.isSkinnedMesh || GH.length) return; const B = o.skeleton.bones, rootB = B.find(b => !(b.parent && b.parent.isBone));
-  for (let k = 0; k < 2; k++) { const grp = new THREE.Group(); grp.matrixAutoUpdate = false; const rc = rootB.clone(true), map = {}; rc.traverse(q => map[q.name] = q); grp.add(rc);
-    const m = new THREE.SkinnedMesh(o.geometry, ghostM.clone()); m.frustumCulled = false; grp.add(m); m.bind(new THREE.Skeleton(B.map(b => map[b.name]), o.skeleton.boneInverses), o.bindMatrix); grp.visible = false; scene.add(grp);
+  for (let k = 0; k < GHOST_N; k++) { const grp = new THREE.Group(); grp.matrixAutoUpdate = false; const rc = rootB.clone(true), map = {}; rc.traverse(q => map[q.name] = q); grp.add(rc);
+    const m = new THREE.SkinnedMesh(o.geometry, ghostM.clone()); m.material.color.set(GHOST_COL[k]); m.frustumCulled = false; grp.add(m); m.bind(new THREE.Skeleton(B.map(b => map[b.name]), o.skeleton.boneInverses), o.bindMatrix); grp.visible = false; scene.add(grp);
     GH.push({ grp, m, src: B, nb: m.skeleton.bones, par: rootB.parent, t: 1 }); } }); }
 function ghost() { if (!GH.length) return; const g = GH[ghI++ % GH.length]; g.src.forEach((b, i) => { g.nb[i].position.copy(b.position); g.nb[i].quaternion.copy(b.quaternion); g.nb[i].scale.copy(b.scale); });
   g.par.updateWorldMatrix(true, false); g.grp.matrix.copy(g.par.matrixWorld); g.grp.matrixWorldNeedsUpdate = true; g.grp.visible = true; g.t = 0; }
-function ghostTick(dt) { for (const g of GH) { if (g.t >= 1) continue; g.t = Math.min(1, g.t + dt / .28); g.m.material.opacity = .45 * (1 - g.t); if (g.t >= 1) g.grp.visible = false; } }
+function ghostTick(dt) { for (const g of GH) { if (g.t >= 1) continue; g.t = Math.min(1, g.t + dt / GHOST_LIFE); g.m.material.opacity = .6 * Math.pow(1 - g.t, 1.3); if (g.t >= 1) g.grp.visible = false; } }
 
 /* ── 동작 ── */
 function playOnce(name, speed = 1) { if (!A[name]) return; const a = A[name]; a.reset(); a.setLoop(THREE.LoopOnce); a.clampWhenFinished = false; a.timeScale = speed; a.setEffectiveWeight(1); a.fadeIn(.05).play();
@@ -149,10 +161,8 @@ let msgT = 0; function showMsg(t, c, ms = 900, size = 34) { const m = $('#msg');
 const v3 = new THREE.Vector3(); function dmgText(pos, txt, col, big) { v3.copy(pos).project(cam); const d = document.createElement('div'); d.className = 'dmg'; d.textContent = txt; d.style.color = col; d.style.fontSize = (big ? 26 : 17) + 'px'; d.style.left = (v3.x * .5 + .5) * innerWidth + 'px'; d.style.top = (-v3.y * .5 + .5) * innerHeight + 'px'; document.body.append(d);
   d.animate([{ transform: 'translate(-50%,-50%) scale(1.3)', opacity: 1 }, { transform: 'translate(-50%,-160%) scale(1)', opacity: 0 }], { duration: 800, easing: 'ease-out' }).onfinish = () => d.remove(); }
 let shake = 0, timeScale = 1, slowT = 0, hitStop = 0;
-function crit(pos) {   /* 크리티컬 회피 성공 */
-  P.roll.crit = true; P.cdLeft = 0; hitStop = .07; slowT = .4; timeScale = .22; shake = .18; stats.combo++; buzz([28, 35, 50]); rainbowRing(P.pos.clone()); burst(P.pos, 0xfff3c0, 22, 9, .6, .7); SFX.crit(stats.combo - 1);
-  const f = $('#flash'); f.style.transition = 'none'; f.style.opacity = .9; requestAnimationFrame(() => { f.style.transition = 'opacity .45s'; f.style.opacity = 0; });
-  showMsg('크리티컬 회피!', 'rainbow', 900); stats.crit++;
+function crit() {   /* 크리티컬 롤 성공: 멈칫 → 느려짐 · 진동 · 오르는 음 · 잔상 (원 · 불꽃 · 번쩍임 없음 · 사용자 2026-11-12) */
+  P.roll.crit = true; hitStop = .07; slowT = .4; timeScale = .22; shake = .12; stats.combo++; buzz([28, 35, 50]); SFX.crit(stats.combo - 1); stats.crit++;
   const cb = stats.combo > 1 ? ` ${stats.combo}연속!` : ''; if (CFG.reward === 'speed') { P.speedT = 1.5; showMsg('크리티컬 회피!' + cb, 'rainbow', 900); } else { P.power = true; showMsg('크리티컬 회피!' + cb, 'rainbow', 900); } }
 const stats = { crit: 0, early: 0, hits: 0, combo: 0 };
 
@@ -202,10 +212,10 @@ function frame() { requestAnimationFrame(frame); const rdt = Math.min(.05, clock
   P.pos.addScaledVector(P.vel, dt);
   /* 롤: 미는 쪽으로 빠르게 비켜나며 몸통 축으로 한 바퀴 */
   if (P.roll) { const r = P.roll; r.t += dt; const k = Math.min(1, r.t / CFG.rollTime), e = 1 - Math.pow(1 - k, 3), es = 1 - Math.pow(1 - k, 2.2), prev = r.e || 0;   /* 미는 순간 튀어 나가고 끝은 부드럽게 */
-    P.pos.addScaledVector(r.d, (e - prev) * CFG.rollDist); r.e = e; spin.rotation.z = r.side * es * Math.PI * 2; if (r.ghosts < 2 && k > [.18, .45][r.ghosts]) { r.ghosts++; ghost(); } if (k >= 1) { P.roll = null; spin.rotation.z = 0; } }
-  P.cdLeft = Math.max(0, P.cdLeft - dt); P.busy = Math.max(0, P.busy - dt);
+    P.pos.addScaledVector(r.d, (e - prev) * CFG.rollDist); r.e = e; spin.rotation.z = r.side * es * Math.PI * 2; if (r.crit && r.ghosts < GHOST_N && e > GHOST_AT[r.ghosts]) { r.ghosts++; ghost(); }   /* 간 거리 기준으로 고르게 남김 */ if (k >= 1) { P.roll = null; spin.rotation.z = 0; } }
+  P.busy = Math.max(0, P.busy - dt);
   P.pos.y = FLY; const pl = Math.hypot(P.pos.x, P.pos.z); if (pl > 60) P.pos.multiplyScalar(60 / pl).setY(FLY);
-  dragon.position.copy(P.pos); dragon.rotation.y = P.yaw; bank.rotation.z = bankA;
+  dragon.position.copy(P.pos); lean.rotation.x = CFG.lean * Math.PI / 180; yawG.rotation.y = P.yaw; bank.rotation.z = bankA;
   if (mixer) mixer.update(dt); ghostTick(dt);
   attack(dt);
   rOut.position.copy(P.pos).setY(FLY - .6); rOut.scale.setScalar(CFG.range); rIn.position.copy(rOut.position); rIn.scale.setScalar(CFG.melee); rInFill.position.copy(rOut.position); rInFill.scale.setScalar(CFG.melee);
@@ -225,30 +235,29 @@ function frame() { requestAnimationFrame(frame); const rdt = Math.min(.05, clock
   /* 탄 */
   for (let i = SHOTS.length - 1; i >= 0; i--) { const s = SHOTS[i]; let done = false;
     if (s.from === 'me') { if (s.target.dead) done = true; else { const to = s.target.g.position.clone().sub(s.o.position), l = to.length(); s.o.position.addScaledVector(to.normalize(), Math.min(l, s.speed * dt)); if (l < 1) { hitEnemy(s.target, s.dmg, s.o.position); burst(s.o.position, 0xffa24a, 12, 6, .4, .6); done = true; } } }
-    else if (s.kind === 'basic') { const to = P.pos.clone().sub(s.o.position), l = to.length(), tti = l / s.speed; if (!incoming || tti < incoming.tti) incoming = { tti };
+    else if (s.kind === 'basic') {   /* 유도 기본 공격: 남은 시간 = 거리 ÷ 속도 */
+      const to = P.pos.clone().sub(s.o.position), l = to.length(); s.tti = Math.max(0, l - .9) / s.speed; if (!s.burned && (!incoming || s.tti < incoming.tti)) incoming = { tti: s.tti };
       s.o.position.addScaledVector(to.normalize(), Math.min(l, s.speed * dt));
-      if (l < .9) { done = true; const since = P.roll ? P.roll.t * 1000 : 1e9;   /* 게임 시간 기준 (느려짐 · 끊김과 상관없이) */
-        if (P.roll && since <= CFG.critMs + 1) crit(s.o.position);
-        else { if (P.roll) { stats.early++; note(`빨랐어요 (${Math.round(since)}ms 전 · 판정 ${CFG.critMs}ms)`, '#ffd36b'); } hurt(s.dmg, s.o.position); } } }
-    else { s.o.position.addScaledVector(s.dir, s.speed * dt); s.life -= dt; const d = Math.hypot(s.o.position.x - P.pos.x, s.o.position.z - P.pos.z);
-      const tti = Math.max(0, (s.o.position.clone().sub(P.pos).dot(s.dir) * -1) / s.speed); if (d < 6 && (!incoming || tti < incoming.tti)) incoming = { tti };
-      if (d < 1.5) { const since = P.roll ? P.roll.t * 1000 : 1e9;   /* 게임 시간 기준 (느려짐 · 끊김과 상관없이) */ done = true;
-        if (P.roll && since <= CFG.critMs + 1) crit(s.o.position); else if (P.roll) { burst(s.o.position, 0xff6a2a, 8, 5); } else hurt(s.dmg, s.o.position); }
+      if (l < .9) { done = true; if (!P.roll) hurt(s.dmg, s.o.position); } }   /* 크리티컬 롤 중엔 다른 공격도 스침 */
+    else if (s.kind === 'skill') {   /* 직선 불덩이: 내 쪽으로 오는 줄 위에 있을 때만 위험 */
+      s.o.position.addScaledVector(s.dir, s.speed * dt); s.life -= dt; const rel = P.pos.clone().sub(s.o.position).setY(0), along = rel.dot(s.dir), side = Math.sqrt(Math.max(0, rel.lengthSq() - along * along));
+      s.tti = along > -.5 && side < 1.6 ? Math.max(0, along - 1.5) / s.speed : 1e9; if (!s.burned && s.tti < 1e8 && (!incoming || s.tti < incoming.tti)) incoming = { tti: s.tti };
+      if (Math.hypot(rel.x, rel.z) < 1.5) { done = true; if (!P.roll) hurt(s.dmg, s.o.position); }
       if (s.life <= 0) done = true; }
-    if (done) { scene.remove(s.o); SHOTS.splice(i, 1); } else if ((s.trail += dt) > .03) { s.trail = 0; const tr = glow(s.from === 'me' ? 0xff8a3a : s.kind === 'skill' ? 0xff5a2a : 0x9a7bff, s.kind === 'skill' ? 1.6 : .8, .6); tr.position.copy(s.o.position); fx(tr, .3, k => { tr.material.opacity = .6 * (1 - k); tr.scale.multiplyScalar(.97); }); } }
+    else { s.o.position.addScaledVector(s.dir, s.speed * dt); s.life -= dt; s.o.scale.setScalar(Math.max(.01, s.life / .6)); if (s.life <= 0) done = true; }   /* 피한 공격: 스쳐 지나가며 작아짐 */
+    if (done) { scene.remove(s.o); SHOTS.splice(i, 1); } else if ((s.trail += dt) > .03) { s.trail = 0; const tr = glow(s.from === 'me' ? 0xff8a3a : s.burned ? 0xff4a4a : s.kind === 'skill' ? 0xff5a2a : 0x9a7bff, s.kind === 'skill' ? 1.6 : .8, .6); tr.position.copy(s.o.position); fx(tr, .3, k => { tr.material.opacity = .6 * (1 - k); tr.scale.multiplyScalar(.97); }); } }
   /* 타이밍 표시: 날아오는 공격이 닿기 직전 좁혀 드는 고리 · 판정 시간 안이면 금빛 */
   rTell.visible = !!(CFG.tell && incoming && incoming.tti < .7); if (rTell.visible) { const w = CFG.critMs / 1000; rTell.position.copy(P.pos).setY(FLY - .5); rTell.scale.setScalar(1.6 + incoming.tti * 6); const inW = incoming.tti <= w; rTell.material.color.set(inW ? 0xffd34a : 0xffffff); rTell.material.opacity = inW ? 1 : .55; }
   /* 효과 */
   for (let i = FX.length - 1; i >= 0; i--) { const f = FX[i]; f.t += dt; const k = Math.min(1, f.t / f.life); f.upd(k, dt); if (k >= 1) { scene.remove(f.o); if (f.o.material) f.o.material.dispose(); FX.splice(i, 1); } }
   /* 카메라 (게임처럼 비스듬히 위에서 · 살짝 늦게 따라옴) */
   camT.lerp(P.pos, 1 - Math.exp(-rdt * 8)); if (camH !== CFG.viewH || camA !== CFG.camAng) { camH = CFG.viewH; camA = CFG.camAng; const w = camH * innerWidth / innerHeight / 2; cam.left = -w; cam.right = w; cam.top = camH / 2; cam.bottom = -camH / 2; cam.updateProjectionMatrix(); }
-  const CA = camA * Math.PI / 180, want = camT.clone().add(new THREE.Vector3(0, Math.sin(CA) * CAM_D, Math.cos(CA) * CAM_D)).addScaledVector(camNudge, 1); camPos.lerp(want, 1 - Math.exp(-rdt * 8)); cam.position.copy(camPos);
+  const CA = camA * Math.PI / 180, aim = camT.clone().add(new THREE.Vector3(0, 0, -CFG.camOff)), want = aim.clone().add(new THREE.Vector3(0, Math.sin(CA) * CAM_D, Math.cos(CA) * CAM_D)).addScaledVector(camNudge, 1); camPos.lerp(want, 1 - Math.exp(-rdt * 8)); cam.position.copy(camPos);
   if (shake > 0) { shake -= rdt; cam.position.x += (Math.random() - .5) * shake * 1.2; cam.position.y += (Math.random() - .5) * shake * 1.2; }
-  cam.lookAt(camT.x + camNudge.x, camT.y - .5, camT.z + camNudge.z); camNudge.multiplyScalar(Math.exp(-rdt * 6));
+  cam.lookAt(aim.x + camNudge.x, aim.y - .5, aim.z + camNudge.z); camNudge.multiplyScalar(Math.exp(-rdt * 6));
   sun.position.copy(P.pos).add(new THREE.Vector3(-20, 40, 15)); sun.target.position.copy(P.pos);
   /* 화면 글 */
-  $('#cd').style.strokeDashoffset = (383.3 * (P.cdLeft / CFG.cd)).toFixed(1); $('#cd').style.stroke = P.cdLeft > 0 ? '#5a7a88' : '#7de0ff';
-  $('#hp i').style.width = (P.hp / 10) + '%'; $('#st').textContent = `크리티컬 회피 ${stats.crit}${stats.combo > 1 ? ' (' + stats.combo + '연속)' : ''} · 빨랐음 ${stats.early} · 맞음 ${stats.hits}${P.speedT > 0 ? ' · 빨라짐!' : ''}${P.power ? ' · 다음 공격 강화!' : ''}`;
+  $('#hp i').style.width = (P.hp / 10) + '%'; $('#st').textContent = `크리티컬 회피 ${stats.crit}${stats.combo > 1 ? ' (' + stats.combo + '연속)' : ''} · 일찍 꺾음 ${stats.early} · 맞음 ${stats.hits}${P.speedT > 0 ? ' · 빨라짐!' : ''}${P.power ? ' · 다음 공격 강화!' : ''}`;
   R.render(scene, cam); }
 frame();
-window.__dragon = { P, CFG, E, stats, SHOTS, tryRoll, ghost };
+window.__dragon = { P, CFG, E, stats, SHOTS, onFlick, ghost, cam, lean, GH };
