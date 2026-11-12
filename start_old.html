@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="ko"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>시작 땅 한 조각</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<meta name="theme-color" content="#04060e">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@300;400;500;600&family=Audiowide&display=swap">
+<style>
+:root{color-scheme:dark;--g:#b9ff4a;--gr:185,255,74;--ink:#d3d9ea;--mute:#8d96ad;--void:#04060e;
+  --kr:'IBM Plex Sans KR','Noto Sans KR',system-ui,sans-serif;--en:'Audiowide',ui-sans-serif,sans-serif}
+*{box-sizing:border-box} [hidden]{display:none!important}
+html,body{margin:0;height:100%;background:var(--void);color:var(--ink);font-family:var(--kr);overflow:hidden;touch-action:none;-webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent;-webkit-touch-callout:none}
+button{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:pointer}
+#cv{position:fixed;inset:0;width:100%;height:100%;display:block}
+#tags{position:fixed;inset:0;pointer-events:none}
+#ui{position:fixed;inset:0;pointer-events:none}
+#ui > *{pointer-events:auto}
+#head{position:absolute;top:calc(env(safe-area-inset-top,0px) + 12px);left:max(18px,env(safe-area-inset-left,0px));display:flex;flex-direction:column;gap:2px;pointer-events:none;text-shadow:0 0 6px rgba(0,0,0,.6)}
+#head b{font-weight:500;font-size:14px;color:var(--g);letter-spacing:.06em}
+#head span{font-size:10.5px;color:#e8eef8;letter-spacing:.04em}
+#feed{position:absolute;top:calc(env(safe-area-inset-top,0px) + 54px);left:max(18px,env(safe-area-inset-left,0px));display:flex;flex-direction:column;gap:3px;pointer-events:none}
+#feed div{font-size:11.5px;padding:3px 9px;border-radius:10px;background:rgba(4,8,16,.6);color:#c9d2dc;animation:in .3s}
+#feed b,#feed span{font-weight:500}
+@keyframes in{from{opacity:0;transform:translateX(-8px)}}
+#fps{position:absolute;top:calc(env(safe-area-inset-top,0px) + 12px);right:max(18px,env(safe-area-inset-right,0px));font-family:var(--en);font-size:10px;letter-spacing:.12em;color:rgba(var(--gr),.8);pointer-events:none;text-shadow:0 0 4px rgba(0,0,0,.8)}
+/* 오른쪽: 입구 · 빛의 길 · 보물 · 층 높이 · 카메라 */
+#view.shut > *:not(#tog){display:none}
+#tog{font-size:11px;color:var(--g);text-align:left;padding:1px 0}
+#view{position:absolute;right:max(12px,env(safe-area-inset-right,0px));top:calc(env(safe-area-inset-top,0px) + 34px);bottom:calc(env(safe-area-inset-bottom,0px) + 10px);width:min(214px,36vw);max-height:calc(100% - 44px);bottom:auto;overflow-y:auto;display:flex;flex-direction:column;gap:4px;
+  padding:7px 9px 8px;border:1px solid rgba(var(--gr),.25);border-radius:14px;background:rgba(4,8,14,.66)}
+.cap{font-size:10.5px;color:rgba(var(--gr),.75);letter-spacing:.04em;margin-top:2px}
+.seg{display:flex;gap:4px}
+.seg button{flex:1;min-width:0;font-size:10.5px;padding:3px 2px;border:1px solid rgba(var(--gr),.28);border-radius:9px;color:rgba(var(--gr),.8);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.seg button.on{border-color:var(--g);color:#f2ffe2;background:rgba(var(--gr),.18)}
+.row{display:flex;align-items:center;gap:7px}
+.row label{font-size:11px;color:rgba(var(--gr),.8);width:44px;flex:none}
+.row output{font-family:var(--en);font-size:11.5px;color:var(--g);width:40px;text-align:right;flex:none}
+input[type=range]{flex:1;min-width:0;accent-color:#b9ff4a;height:18px;margin:0}
+#where{position:absolute;left:50%;transform:translateX(-50%);bottom:calc(env(safe-area-inset-bottom,0px) + 14px);font-size:12.5px;color:#fff;padding:6px 14px;border-radius:14px;background:rgba(4,8,16,.6);white-space:nowrap;pointer-events:none}
+#perf{display:none!important}
+#load{position:fixed;inset:0;display:grid;place-content:center;gap:14px;background:var(--void);transition:opacity .6s .1s;z-index:9;text-align:center}
+#load.done{opacity:0;pointer-events:none}
+#load p{margin:0;font-size:12px;color:rgba(var(--gr),.7);letter-spacing:.1em}
+#load .b{width:180px;height:2px;background:rgba(var(--gr),.15);overflow:hidden}
+#load i{display:block;height:100%;background:var(--g);transform:scaleX(0);transform-origin:left;transition:transform .4s}
+#rot{display:none}
+@media (orientation:portrait){#rot{display:grid;place-content:center;position:fixed;inset:0;background:var(--void);z-index:20;color:var(--g);font-size:14px;letter-spacing:.06em;padding-inline:max(16px,env(safe-area-inset-left,0px)) max(16px,env(safe-area-inset-right,0px))}}
+</style>
+<script>
+window.__ver = fetch('ver.json?t=' + Date.now(), { cache: 'no-store' }).then(r => r.json()).then(j => {
+  const f = location.pathname.split('/').pop() || 'index.html', want = j[f], mine = window.__mine = '11121901';
+  if (want && +want > +mine) { location.replace(f + '?v=' + want + '&r=' + Date.now() + location.hash); return new Promise(() => {}); } }).catch(() => {});
+</script>
+<script type="importmap">{"imports":{"three":"./vendor/three.module.js","three/addons/":"./vendor/addons/"}}</script>
+</head><body>
+<canvas id="cv"></canvas>
+<div id="ui">
+  <div id="head"><b>(예전 땅) 시작 땅 한 조각</b><span>왼쪽 아래 끌어 몰기 · 오른쪽 위 칸 위아래로 쓸어 층 바꾸기(E·Q) · 앞마당 양 끝 부쉬 협곡으로 나가 양옆 동굴로 · 보물방 앞 둔덕 밑 비밀길</span></div>
+  <div id="fps"></div>
+  <div id="where"></div>
+  <div id="view"><button id="tog" type="button">설정 접기 ▴</button>
+    <div class="cap">기체 스킨</div>
+    <select id="skin" aria-label="기체 스킨" style="font:inherit;font-size:11px;padding:4px 6px;border:1px solid rgba(var(--gr),.4);border-radius:9px;color:#e8ffd0;background:rgba(20,40,10,.6)"></select>
+    <div class="cap">카메라</div>
+    <div class="row"><label for="ang">각도</label><input id="ang" type="range" min="15" max="90" step="1" value="45"><output id="angv"></output></div>
+    <div class="row"><label for="dist">거리</label><input id="dist" type="range" min="12" max="120" step="1" value="25"><output id="distv"></output></div>
+  </div>
+</div>
+<div id="load"><p>시작 땅을 만들고 있어요</p><div class="b"><i></i></div></div>
+<div id="rot">기기를 가로로 돌려 주세요</div>
+<script type="module">
+await window.__ver;
+const { start } = await import('./src/proto/isleview.js?v=11121901');
+const { START } = await import('./src/proto/startlab.js?v=11121901');
+const { buildRim } = await import('./src/proto/rim.js?v=11121901');
+const { buildTreasure } = await import('./src/proto/treasure.js?v=11121901');
+/* 양옆 보물방마다 보물 장소 · 지키는 몬스터 자리 (붉은 표적) */
+const dummies = isle => START.sites.map(([x, z]) => [1, x * .5, z * .5, 7, true]);
+let TS = []; const extra = async a => { const rim = await buildRim(a, START); TS = START.sites.map(([x, z], k) => buildTreasure(a.isle, x, z, 'meadow', { camera: a.camera, grade: k ? 'silver' : 'bronze' })); window.__TS = TS;
+  /* 보물 장소도 같은 시야를 따름 (사용자 2026-11-11: 산맥 너머로 안개 · 사슬 · 룬이 비쳐 보였음): 보물방 둘레 여러 자리 중 한 곳이라도 보이면 보임 · 비밀 터널 안이면 감춤 */
+  const vis = (st, x, z) => { let v = 0; for (let k = 0; k < 9; k++) { const a = k * .785, d = k ? 13 : 0; v = Math.max(v, st.seen((x + Math.cos(a) * d * 2) * .5, (z + Math.sin(a) * d * 2) * .5)); } return v > .04 && !st.blk && !st.cave; };
+  return { blocked: rim.blocked, update: (t, dt, st) => { rim.update(t, dt, st); TS.forEach((T, k) => { const on = st.cave ? st.cave === k + 1 : vis(st, ...START.sites[k]);   /* 동굴 안이면 그 동굴 보물만 */ if (T.group.visible !== on) T.group.visible = on; T.update(t, dt, st); }); } }; };
+const bar = document.querySelector('#load i');
+document.querySelector('#tog').onclick = () => { const v = document.querySelector('#view'); v.classList.toggle('shut'); document.querySelector('#tog').textContent = v.classList.contains('shut') ? '설정 펴기 ▾' : '설정 접기 ▴'; };
+start(document.querySelector('#cv'), p => { bar.style.transform = `scaleX(${p})`; }, { layout: START, dummies, extra })
+  .then(() => setTimeout(() => document.querySelector('#load').classList.add('done'), 300))
+  .catch(err => { document.querySelector('#load p').textContent = '불러오지 못했어요: ' + err.message; console.error(err); });
+</script>
+</body></html>

@@ -10,7 +10,7 @@
      절벽 밑동을 둥글게 파 낸 틈(notch) 안에 아치 입구 · 바로 앞 평평한 땅에 청록 꽃 부쉬 → 정면으로 보이되 부쉬에 덮임 · 산 밖으로 튀어나오지 않음
    · 비밀길 판정 = 터널 관 끝까지 (관은 산이 덮은 곳에서만)
    · 산 북쪽 면은 엔진이 자동으로 완만하게 (islefield) · 동굴은 지붕 + 동굴 보기 (isle) */
-import { makeField } from './islefield.js?v=11120129';
+import { makeField } from './islefield.js?v=11121901';
 const R = 480, D2R = Math.PI / 180;
 const polar = (deg, r) => [r * Math.sin(deg * D2R), r * Math.cos(deg * D2R)];
 /* 동굴 하나: 바깥 방향(테두리 쪽) 기준 로컬 좌표 (u = 가로 · v = 맵 가운데에서 거리) → 섬 좌표 */

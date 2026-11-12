@@ -7,10 +7,10 @@
    · 문 앞쪽으로 빛 띠 길이 뻗어 나감 (확정된 빛의 길) */
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
-import { makeBloom } from '../core/hangar/bloom.js?v=11120129';
-import { makePerf } from './perf.js?v=11120129';
-import { makeGlow } from '../preview/glow.js';
-import { buildShip, engineSpots } from '../core/ships/build.js';
+import { makeBloom } from '../core/hangar/bloom.js?v=11121901';
+import { makePerf } from './perf.js?v=11121901';
+import { makeGlow } from '../preview/glow.js?v=11121901';
+import { buildShip, engineSpots } from '../core/ships/build.js?v=11121901';
 
 const $ = s => document.querySelector(s), clamp = THREE.MathUtils.clamp;
 const SHIP_Y = 2.9;                                  /* 기체가 나는 높이 (풀밭 위) */

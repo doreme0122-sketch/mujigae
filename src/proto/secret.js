@@ -5,7 +5,7 @@
      모든 비밀길에 똑같은 무늬 → 한 번 배우면 '이게 있으면 밑은 무조건 터널' (사용자)
    · 청록 꽃: 비밀길 입구 부쉬에만 몇 송이 (판돌 빛과 같은 색 · 가까이 가야 보임) — 다른 부쉬엔 절대 없음 */
 import * as THREE from 'three';
-import { noise2, smoothstep } from './islefield.js?v=11120129';
+import { noise2, smoothstep } from './islefield.js?v=11121901';
 
 export const SECRET = { FLOOR: -7.4, TOP: -1.2, WALL: 2.4, TEAL: [.22, .95, .8] };
 
@@ -118,7 +118,7 @@ function buildDecor({ TB, slabs, rock, U, GL }) {
   TB.forEach((T, ti) => { const P = T.P, n = P.length;
     /* 가운데 = 판돌 바로 밑 (가장 가까운 점) */
     let mid = n >> 1, best = 1e9; for (const [x, , z] of slabs) for (let k = 0; k < n; k++) { const d = Math.hypot(P[k][0] - x, P[k][1] - z); if (d < best) { best = d; mid = k; } }
-    const f0 = frame(P, mid); quad([f0.x, fl + .02, f0.z], [0, 1, 0], [0, 0, -1], 3.4, 3.4, 2, 0);   /* 위 판돌과 같은 방향 (화면 위 = 12시) */   /* 바닥 큰 룬 (위 판돌과 같은 박자) */
+    if (slabs.length) { const f0 = frame(P, mid); quad([f0.x, fl + .02, f0.z], [0, 1, 0], [0, 0, -1], 3.4, 3.4, 2, 0); }   /* 판돌이 없으면 바닥 큰 룬도 없음 (사용자 2026-11-12: 판돌 없앰) */   /* 위 판돌과 같은 방향 (화면 위 = 12시) */   /* 바닥 큰 룬 (위 판돌과 같은 박자) */
     for (let k = 3; k < n - 3; k++) {
       /* 뿌리: 2.2칸마다 한 번쯤 · 천장 양옆 틈에서 */
       if (rnd() < .42) { const side = rnd() < .5 ? 1 : -1, th = Math.PI / 2 - side * (.95 + rnd() * .3), w0 = wall(T, k, th, -.2), L = 1.6 + rnd() * 3.4, r0 = .09 + rnd() * .1, tw = rnd() * 6.283;

@@ -9,11 +9,11 @@
    · 판정은 맵 설계도 그림을 그대로 읽음(막힘 1 / 지나감 0) → 화면에 보이는 벽 = 부딪히는 벽
    무게: 기체 한 대 + 불꽃 띠 몇 장 + 꼬리 띠 하나 + 불티 점 묶음 하나 + 그림자 판 하나 */
 import * as THREE from 'three';
-import { buildShip, engineSpots } from '../core/ships/build.js';
+import { buildShip, engineSpots } from '../core/ships/build.js?v=11121901';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { flameMesh } from './sortie.js?v=11120129';
-import { MAP } from './mapfloor.js?v=11120129';
-import { applyShipHeat, heatVis } from './shipheat.js?v=11120129';
+import { flameMesh } from './sortie.js?v=11121901';
+import { MAP } from './mapfloor.js?v=11121901';
+import { applyShipHeat, heatVis } from './shipheat.js?v=11121901';
 
 export const FLY = { LEN: 2, HOVER: .7, R: .8, SPEEDS: [5.25, 7, 8.75, 10.5], TURN: 7, ACC: .22, TURNMAX: 9, /* 빠르기 (사용자 2026-11-11: 너무 빨라 PVP가 재미없음 → 기본 초속 12 → 7 · 네 단계 같은 비율로) */
   BASE: 9, SHIELD: 3, BOOST: 5, BOOSTK: 1.5 };   /* 기지 고리(반지름 9m)를 벗어나는 순간: 보호막 3초 · 가속 5초(1.5배) — 기지 출구 앞 매복에 바로 당하지 않게 */
