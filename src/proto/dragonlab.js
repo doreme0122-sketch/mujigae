@@ -8,8 +8,8 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
 const CFG = { critMs: 200, cd: 2.5, flickPx: 34, flickMs: 200, range: 8, melee: 3.2, rollDist: 4.2, rollTime: .42, atkEvery: .85, speed: 7.5,
-  fireEvery: 1.7, projSpeed: 13, skillEvery: 3.4, tell: 1, reward: 'speed', turret: 1, skill: 1 };
-const SPEC = [['cap', '크리티컬 회피'], ['critMs', '판정 시간(ms)', 60, 400, 10], ['cd', '롤 쿨타임(초)', .5, 6, .1], ['reward', '성공 보상', ['speed', '이동 속도 ↑ (1.5초)'], ['power', '다음 공격 강화 ×1.8']], ['tell', '타이밍 표시', 0, 1, 1],
+  fireEvery: 1.7, camAng: 55, viewH: 18, projSpeed: 13, skillEvery: 3.4, tell: 1, reward: 'speed', turret: 1, skill: 1 };
+const SPEC = [['cap', '카메라'], ['camAng', '내려다보는 각도(°)', 30, 85, 1], ['viewH', '화면 세로 넓이(m)', 10, 34, .5], ['cap', '크리티컬 회피'], ['critMs', '판정 시간(ms)', 60, 400, 10], ['cd', '롤 쿨타임(초)', .5, 6, .1], ['reward', '성공 보상', ['speed', '이동 속도 ↑ (1.5초)'], ['power', '다음 공격 강화 ×1.8']], ['tell', '타이밍 표시', 0, 1, 1],
   ['cap', '배럴 롤 조작'], ['flickPx', '미는 거리(px)', 12, 90, 1], ['flickMs', '미는 시간(ms)', 80, 400, 10], ['rollDist', '롤 거리(m)', 1, 8, .1], ['rollTime', '롤 시간(초)', .2, .8, .01],
   ['cap', '기본 공격'], ['range', '원거리 사거리(m)', 4, 16, .5], ['melee', '근접 사거리(m)', 1.5, 6, .1], ['atkEvery', '공격 간격(초)', .4, 1.6, .05], ['speed', '이동 속도(m/s)', 3, 14, .5],
   ['cap', '적'], ['turret', '수정 눈 기본 공격', 0, 1, 1], ['fireEvery', '쏘는 간격(초)', .6, 4, .1], ['projSpeed', '탄 속도(m/s)', 5, 30, .5], ['skill', '직선 불덩이(스킬)', 0, 1, 1], ['skillEvery', '스킬 간격(초)', 1.5, 8, .1]];
@@ -18,10 +18,10 @@ const FLY = 3.2, $ = s => document.querySelector(s);
 /* ── 화면 ── */
 const R = new THREE.WebGLRenderer({ canvas: $('#cv'), antialias: true }); R.setPixelRatio(Math.min(devicePixelRatio, 2)); R.toneMapping = THREE.ACESFilmicToneMapping; R.toneMappingExposure = 1.05;
 R.shadowMap.enabled = true; R.shadowMap.type = THREE.PCFSoftShadowMap;
-const scene = new THREE.Scene(); scene.fog = new THREE.Fog(0x9fb6d6, 60, 170);
-const cam = new THREE.PerspectiveCamera(20, 1, 1, 900);   /* 실제 게임과 같은 화면: 시야 20° · 45° 내려다봄 · 거리 25 × 보정 (isleview) */
-const CAM_D = 25 * Math.tan(20 * Math.PI / 180) / Math.tan(10 * Math.PI / 180), CAM_A = 45 * Math.PI / 180;
-const resize = () => { R.setSize(innerWidth, innerHeight, false); cam.aspect = innerWidth / innerHeight; cam.updateProjectionMatrix(); }; addEventListener('resize', resize); resize();
+const scene = new THREE.Scene(); scene.fog = new THREE.Fog(0x9fb6d6, 210, 330);   /* 카메라가 150m 떨어진 직교 화면 기준 */
+const cam = new THREE.OrthographicCamera(-1, 1, 1, -1, 1, 900);   /* 롤처럼 원근감 없는 직교 카메라 (사용자 2026-11-12): 어디서나 크기 같음 · 높이 뜬 탄과 사거리 원이 같은 자리에 겹침 */
+const CAM_D = 150; let camA = -1, camH = -1;
+const resize = () => { R.setSize(innerWidth, innerHeight, false); camH = -1; };   /* 직교 카메라 넓이는 매 순간 맞춤 (조절 칸 · 화면 크기) */ addEventListener('resize', resize); resize();
 /* 하늘: 위는 짙은 파랑 · 지평선은 따뜻한 빛 */
 { const g = new THREE.SphereGeometry(400, 32, 16), m = new THREE.ShaderMaterial({ side: THREE.BackSide, depthWrite: false, fog: false,
     vertexShader: `varying vec3 v; void main(){ v = normalize(position); gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.); }`,
@@ -241,8 +241,9 @@ function frame() { requestAnimationFrame(frame); const rdt = Math.min(.05, clock
   /* 효과 */
   for (let i = FX.length - 1; i >= 0; i--) { const f = FX[i]; f.t += dt; const k = Math.min(1, f.t / f.life); f.upd(k, dt); if (k >= 1) { scene.remove(f.o); if (f.o.material) f.o.material.dispose(); FX.splice(i, 1); } }
   /* 카메라 (게임처럼 비스듬히 위에서 · 살짝 늦게 따라옴) */
-  camT.lerp(P.pos, 1 - Math.exp(-rdt * 8)); const want = camT.clone().add(new THREE.Vector3(0, Math.sin(CAM_A) * CAM_D, Math.cos(CAM_A) * CAM_D)).addScaledVector(camNudge, 1); camPos.lerp(want, 1 - Math.exp(-rdt * 8)); cam.position.copy(camPos);
-  if (shake > 0) { shake -= rdt; cam.position.x += (Math.random() - .5) * shake * 2.2; cam.position.y += (Math.random() - .5) * shake * 2.2; }
+  camT.lerp(P.pos, 1 - Math.exp(-rdt * 8)); if (camH !== CFG.viewH || camA !== CFG.camAng) { camH = CFG.viewH; camA = CFG.camAng; const w = camH * innerWidth / innerHeight / 2; cam.left = -w; cam.right = w; cam.top = camH / 2; cam.bottom = -camH / 2; cam.updateProjectionMatrix(); }
+  const CA = camA * Math.PI / 180, want = camT.clone().add(new THREE.Vector3(0, Math.sin(CA) * CAM_D, Math.cos(CA) * CAM_D)).addScaledVector(camNudge, 1); camPos.lerp(want, 1 - Math.exp(-rdt * 8)); cam.position.copy(camPos);
+  if (shake > 0) { shake -= rdt; cam.position.x += (Math.random() - .5) * shake * 1.2; cam.position.y += (Math.random() - .5) * shake * 1.2; }
   cam.lookAt(camT.x + camNudge.x, camT.y - .5, camT.z + camNudge.z); camNudge.multiplyScalar(Math.exp(-rdt * 6));
   sun.position.copy(P.pos).add(new THREE.Vector3(-20, 40, 15)); sun.target.position.copy(P.pos);
   /* 화면 글 */
