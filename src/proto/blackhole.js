@@ -10,7 +10,7 @@
      나오는 곳: 다닐 수 있는 땅 중 남의 태어나는 방 · 벽 속 · 보스 구역은 뺌
    무게: 별빛 먼지 1600알 한 번에 · 원반 한 장 · 검은 가운데 한 장 */
 import * as THREE from 'three';
-import * as A from '../core/audio.js?v=11131300';
+import * as A from '../core/audio.js?v=11132340';
 
 const AB = { transparent: true, depthWrite: false, blending: THREE.AdditiveBlending };
 export const BH = { ZONE: 30, RING: 46, FLOW: 9, CORE: 1.25, GRAB: 7.5, CATCH: 2.8, SC: .57 };   /* 사용자 2026-11-03: 블랙홀이 너무 커서 보스방 주인공 같음 → 생김새·끌어당김 모두 약 0.57배 (SC: 생김새 크기)   /* CATCH: 여기까지 들어오면 못 빠져나가고 감겨 들어감 */

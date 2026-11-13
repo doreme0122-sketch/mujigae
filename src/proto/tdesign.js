@@ -4,9 +4,9 @@
          평소엔 천천히 숨 쉬듯 돌다가, 고정하는 순간에만 딱 떨어지는 무게감(살짝 넘쳤다 돌아옴)
    차례: 자동 조준 → 고정 → 버팀(시야 밖) → 끊김 → 다시 자동 (화면을 톡 하면 직접 고정/풀기) */
 import * as THREE from 'three';
-import { makeBloom } from '../core/hangar/bloom.js?v=11131300';
-import { FLY, mergeShip } from './flight.js?v=11131300';
-import { buildShip } from '../core/ships/build.js?v=11131300';
+import { makeBloom } from '../core/hangar/bloom.js?v=11132340';
+import { FLY, mergeShip } from './flight.js?v=11132340';
+import { buildShip } from '../core/ships/build.js?v=11132340';
 
 const TAU = Math.PI * 2, clamp = (x, a, b) => x < a ? a : x > b ? b : x, sm = x => { x = clamp(x, 0, 1); return x * x * (3 - 2 * x); };
 const eob = x => { x = clamp(x, 0, 1); const c = 1.9; return 1 + (c + 1) * Math.pow(x - 1, 3) + c * Math.pow(x - 1, 2); };

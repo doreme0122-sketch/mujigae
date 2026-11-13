@@ -6,11 +6,11 @@
    무게: 기체 재질에 몇 줄 더함 + 화면 마무리 단계에서 한 번 일렁임 (그리기 횟수 늘지 않음) */
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
-import { makeBloom } from '../core/hangar/bloom.js?v=11131300';
-import { buildShip } from '../core/ships/build.js?v=11131300';
-import { pointPool } from './skilldemo.js?v=11131300';
-import { makePerf } from './perf.js?v=11131300';
-import * as A from '../core/audio.js?v=11131300';
+import { makeBloom } from '../core/hangar/bloom.js?v=11132340';
+import { buildShip } from '../core/ships/build.js?v=11132340';
+import { pointPool } from './skilldemo.js?v=11132340';
+import { makePerf } from './perf.js?v=11132340';
+import * as A from '../core/audio.js?v=11132340';
 
 const $ = s => document.querySelector(s), clamp = THREE.MathUtils.clamp;
 const SHOT = { rate: 7, heat: .0476, cool: .44, wait: .3, lock: .3 };   /* 쉬지 않고 쏘면 약 3초에 과열 */

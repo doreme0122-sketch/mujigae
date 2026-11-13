@@ -4,12 +4,12 @@
    차지 완료 효과 (complete): ① 빛 원이 닫히며 하얀 빛이 한 바퀴 → ② 힘이 위로 치솟음 → ③④ 꼭대기에서 한꺼번에 눈 뜸·불꽃·빛 알갱이 (→ 땅 물결·시야는 맵 쪽에서)
    크기: 지름 약 4.5m, 높이 약 4.7m */
 import * as THREE from 'three';
-import * as A from '../core/audio.js?v=11131300';
-import { makeWardBase } from './wardbase.js?v=11131300';
-import { makeWardCore } from './wardcore.js?v=11131300';
-import { makeWardRing } from './wardring.js?v=11131300';
-import { makeWardSpires } from './wardspire.js?v=11131300';
-import { makeWardEye } from './wardeye.js?v=11131300';
+import * as A from '../core/audio.js?v=11132340';
+import { makeWardBase } from './wardbase.js?v=11132340';
+import { makeWardCore } from './wardcore.js?v=11132340';
+import { makeWardRing } from './wardring.js?v=11132340';
+import { makeWardSpires } from './wardspire.js?v=11132340';
+import { makeWardEye } from './wardeye.js?v=11132340';
 
 export const WCOL = { none: new THREE.Vector3(.35, .85, 1.0), mine: new THREE.Vector3(.62, 1.0, .32), foe: new THREE.Vector3(1.0, .36, .24) };
 function bell(f, vol = .1, dec = 1.4, at = 0) { if (!A.live()) return; const c = A.ctx, t0 = c.currentTime + at;

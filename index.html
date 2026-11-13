@@ -147,14 +147,14 @@ button{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:poin
   <p class="tip">조작은 반사 시험판과 같아요. 왼손 이동, <em>쏘기</em>는 누른 채 끌어 방향, <em>반사</em>는 닿기 직전에 막 눌러야 세게 받아쳐요. 이 판에서 얻은 레벨과 기본탄은 이 판에서만 써요.</p>
   <button class="btn" id="go" type="button">시작</button>
   <a class="sub" href="reflect.html">반사 시험판으로</a>
-  <a class="sub" href="map.html?v=11131300">맵 미리보기</a>
+  <a class="sub" href="map.html?v=11132340">맵 미리보기</a>
   <a class="sub" href="tools/ships.html">기체·도색 보기</a>
-  <a class="sub" href="rocks.html?v=11131300">맵 벽 보기</a>
-  <a class="sub" href="floor.html?v=11131300">지역 바닥 보기</a>
-  <a class="sub" href="base.html?v=11131300">시작 기지 보기</a>
-  <a class="sub" href="padring.html?v=11131300">시작 기지: 태어나는 곳</a>
-  <a class="sub" href="fall.html?v=11131300">유성 시안</a>
-  <a class="sub" href="world.html?v=11131300">맵 만들기</a>
+  <a class="sub" href="rocks.html?v=11132340">맵 벽 보기</a>
+  <a class="sub" href="floor.html?v=11132340">지역 바닥 보기</a>
+  <a class="sub" href="base.html?v=11132340">시작 기지 보기</a>
+  <a class="sub" href="padring.html?v=11132340">시작 기지: 태어나는 곳</a>
+  <a class="sub" href="fall.html?v=11132340">유성 시안</a>
+  <a class="sub" href="world.html?v=11132340">맵 만들기</a>
 </div></section>
 <section class="card ask" id="lvup" hidden><div>
   <span class="en">LEVEL UP</span><h3 style="margin:0;font-weight:500;font-size:20px;color:var(--g)">레벨 2</h3>
@@ -177,7 +177,7 @@ button{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:poin
 <div id="load"><p>경기장을 준비하고 있어요</p><div class="b"><i></i></div></div>
 <div id="rot">기기를 가로로 돌려 주세요</div>
 <script type="module">
-import { start } from './src/proto/field.js?v=11131300';
+import { start } from './src/proto/field.js?v=11132340';
 const bar = document.querySelector('#load i');
 start(document.querySelector('#cv'), p => { bar.style.transform = `scaleX(${p})`; })
   .then(() => setTimeout(() => document.querySelector('#load').classList.add('done'), 200))
@@ -189,4 +189,4 @@ start(document.querySelector('#cv'), p => { bar.style.transform = `scaleX(${p})`
 fetch('ver.json?t=' + Date.now(), { cache: 'no-store' }).then(r => r.json()).then(j => {
   for (const a of document.querySelectorAll('a.sub[href]')) { const [f] = a.getAttribute('href').split('?'); if (j[f]) a.setAttribute('href', f + '?v=' + j[f]); } }).catch(() => {});
 </script>
-<a href="boss.html?v=11131300" hidden></a><a href="skillpick.html?v=11131300" hidden></a><a href="ward.html?v=11131300" hidden></a><a href="jelly.html?v=11131300" hidden></a><a href="heat.html?v=11131300" hidden></a><a href="range.html?v=11131300" hidden></a><a href="floorlab.html?v=11131300" hidden></a><a href="skyarena.html?v=11131300" hidden></a><a href="skypath.html?v=11131300" hidden></a><a href="gates.html?v=11131300" hidden></a><a href="targetlab.html?v=11131300" hidden></a><a href="targetdesign.html?v=11131300" hidden></a><a href="map2.html?v=11131300" hidden></a><a href="isle.html?v=11131300" hidden></a><a href="bush.html?v=11131300" hidden></a><a href="lift.html?v=11131300" hidden></a><a href="meadow.html?v=11131300" hidden></a><a href="cave.html?v=11131300" hidden></a><a href="treasure.html?v=11131300" hidden></a><a href="sound.html?v=11131300" hidden></a><a href="start.html?v=11131300" hidden></a></body></html>
+<a href="boss.html?v=11132340" hidden></a><a href="skillpick.html?v=11132340" hidden></a><a href="ward.html?v=11132340" hidden></a><a href="jelly.html?v=11132340" hidden></a><a href="heat.html?v=11132340" hidden></a><a href="range.html?v=11132340" hidden></a><a href="floorlab.html?v=11132340" hidden></a><a href="skyarena.html?v=11132340" hidden></a><a href="skypath.html?v=11132340" hidden></a><a href="gates.html?v=11132340" hidden></a><a href="targetlab.html?v=11132340" hidden></a><a href="targetdesign.html?v=11132340" hidden></a><a href="map2.html?v=11132340" hidden></a><a href="isle.html?v=11132340" hidden></a><a href="bush.html?v=11132340" hidden></a><a href="lift.html?v=11132340" hidden></a><a href="meadow.html?v=11132340" hidden></a><a href="cave.html?v=11132340" hidden></a><a href="treasure.html?v=11132340" hidden></a><a href="sound.html?v=11132340" hidden></a><a href="start.html?v=11132340" hidden></a></body></html>

@@ -9,8 +9,8 @@
    효과(불길 · 번개 · 구름 · 뒤꼬리)는 아직 안 넣음 — 몸 먼저 (사용자 2026-11-09) */
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { MeshoptSimplifier as MO } from '../../vendor/meshopt_simplifier.module.js?v=11131300';
-import { makeForge } from './forge.js?v=11131300';
+import { MeshoptSimplifier as MO } from '../../vendor/meshopt_simplifier.module.js?v=11132340';
+import { makeForge } from './forge.js?v=11132340';
 
 const ERR_X = .004;   /* 벽 너머 비침(윤곽 빛)만 삼각형을 덜어냄 · 기체 몸은 덜어내지 않음 (줄여 보니 꼬리 갑옷이 일그러짐 → 원본 그대로) */
 const KEYL = [[4, 9, -3, 0xfff4e6, 2.2], [-8, 1, 6, 0x6a8cff, 1.6], [5, -4, 6, 0x9fd8ff, .5]];   /* 작업대 불빛 셋: 위(주 빛) · 왼쪽 옆(푸른 테두리) · 아래(채움) */

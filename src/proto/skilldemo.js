@@ -4,7 +4,7 @@
    · 모든 움직임은 원인 → 결과: 쏘기 전 코끝에 힘이 모임 → 나감 → 닿은 자리에 불꽃/표적 반응
    무게: 점 묶음 3 · 띠 2 · 표적 3 · 바닥 1 · 벽 1 · 유령 기체 3(쓸 때만) */
 import * as THREE from 'three';
-import * as A from '../core/audio.js?v=11131300';
+import * as A from '../core/audio.js?v=11132340';
 
 const AB = { transparent: true, depthWrite: false, blending: THREE.AdditiveBlending };
 const sm01 = x => { x = Math.min(1, Math.max(0, x)); return x * x * (3 - 2 * x); };
