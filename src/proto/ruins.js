@@ -8,7 +8,7 @@
    막힘은 보이는 두께 그대로
    돌려주는 것: geos (깎은 돌 칠 하나로 한 번에 그림) · glow (빛 무늬 세모 [a, b, c, 색, 위상]) · obstacles ([x, y, z, r]) · strands (늘어진 덩굴 점 줄) */
 import * as THREE from 'three';
-import { noise2 } from './islefield.js?v=11121901';
+import { noise2 } from './islefield.js?v=11131300';
 
 const V = (x, y, z) => new THREE.Vector3(x, y, z);
 const rngOf = s => () => (s = (s * 16807) % 2147483647) / 2147483647;
@@ -160,7 +160,7 @@ export function buildRuins({ F, hAt, LAYERS, Y, LO, TUN }) {
     const climb = (s0, y0, yEnd, wob, seed, thick = .09, root = false) => { const pts = []; let s1 = s0, y1 = y0, lastF = faceF(s0, y0); if (lastF == null) return;
       for (let e = 0; y1 > yEnd && e < 90; e++) { const f = faceF(s1, y1); if (f == null) break; pts.push(P(s1, y1, f + (root ? .2 : .1)));
         if (!root) { const dens = 1 - .55 * (y0 - y1) / Math.max(1, y0 - yEnd);   /* 위쪽(시작)은 잎이 빽빽 · 아래로 갈수록 듬성 */
-          for (let q = 0; q < 2; q++) if (r() < dens) { const side = (q ? 1 : -1) * (.12 + r() * .22), pp = P(s1 + side, y1 - r() * .2, f + .14 + r() * .06); leaves.push([pp.x, pp.y, pp.z, fwd.x, fwd.z, sdv.x, sdv.z, .24 + r() * .16 + dens * .1, IVYC[(r() * 3) | 0], (r() - .5) * .9]); } }
+          for (let q = 0; q < 2; q++) if (r() < dens) { const side = (q ? 1 : -1) * (.12 + r() * .22), pp = P(s1 + side, y1 - r() * .2, f + .14 + r() * .06); leaves.push([pp.x, pp.y, pp.z, fwd.x, fwd.z, sdv.x, sdv.z, .24 + r() * .16 + dens * .1, IVYC[(r() * 3) | 0], (r() - .5) * .9, y0]); } }
         s1 += Math.sin(e * .45 + seed) * wob + (r() - .5) * wob * .6; y1 -= .3 + r() * .08; }
       if (pts.length > 2) strands.push({ pts, r: thick, root, sway: 0, tip: root ? thick * .35 : .03 }); };
     for (const sd of [-1, 1]) {
@@ -168,11 +168,11 @@ export function buildRuins({ F, hAt, LAYERS, Y, LO, TUN }) {
       for (let k = 0; k < (LOWG ? 2 : 3); k++) { const s0 = sd * (DW + 6 + r() * (WE - 8)), y0 = TOP - (LOWG ? 4 : 1) + r() * 2.5; climb(s0, y0, base + 1 + r() * 6, .13, k * 7 + sd * 3, .07 + r() * .04); }   /* 양옆 벽 */
       for (let k = 0; k < (LOWG ? 0 : 2); k++) climb(sd * (DW + 8 + k * 7 + r() * 2), TOP + 1.2, base + 2 + r() * 3, .06, k * 11 + sd, .2 + r() * .1, true);   /* 굵은 뿌리: 벽 윗단 바위에서 벽면을 타고 */
       /* 상인방 앞면을 가로로 기어가는 줄기 (덩굴이 퍼진 느낌) */
-      { let s1 = sd * (DW + 4), y1 = TOP + 1 + r() * 2.5; const pts = []; for (let e = 0; e < 14; e++) { const f = faceF(s1, y1); if (f == null) break; pts.push(P(s1, y1, f + .1)); if (r() < .8) { const pp = P(s1, y1 + (r() - .5) * .3, f + .15); leaves.push([pp.x, pp.y, pp.z, fwd.x, fwd.z, sdv.x, sdv.z, .26 + r() * .14, IVYC[(r() * 3) | 0], (r() - .5) * .9]); } s1 -= sd * (.35 + r() * .1); y1 += Math.sin(e * .7 + sd) * .12; }
+      { let s1 = sd * (DW + 4), y1 = TOP + 1 + r() * 2.5; const pts = []; for (let e = 0; e < 14; e++) { const f = faceF(s1, y1); if (f == null) break; pts.push(P(s1, y1, f + .1)); if (r() < .8) { const pp = P(s1, y1 + (r() - .5) * .3, f + .15); leaves.push([pp.x, pp.y, pp.z, fwd.x, fwd.z, sdv.x, sdv.z, .26 + r() * .14, IVYC[(r() * 3) | 0], (r() - .5) * .9, pp.y + 4]); } s1 -= sd * (.35 + r() * .1); y1 += Math.sin(e * .7 + sd) * .12; }
         if (pts.length > 2) strands.push({ pts, r: .07, root: false, sway: 0, tip: .03 }); } }
     /* 상인방 아랫단에서 늘어진 짧은 덩굴 몇 가닥 (끝은 바깥으로 살짝 말림 · 3층 높이엔 안 닿게) */
     for (let k = 0; k < 6; k++) { const s0 = (k / 5 - .5) * 2 * (DW - .8) + (r() - .5) * .8, sag = Math.max(0, 1 - Math.abs(s0) / (DW + 1)) * .55, y0 = TOP - sag - .05, Lh = Math.min(1.2 + r() * 3, y0 - (LAYERS[2] + 1.4)); if (Lh < .8) continue; const pts = [];
-      for (let e = 0; e <= 8; e++) { const t = e / 8, curl = t > .75 ? (t - .75) * 4 : 0; pts.push(P(s0 + Math.sin(t * 2 + k) * .12, y0 - t * Lh + curl * curl * .35, 2.5 + t * .25 + curl * .45)); if (e > 0 && r() < .85) { const pp = pts[pts.length - 1]; leaves.push([pp.x + sdv.x * (r() - .5) * .3, pp.y, pp.z + sdv.z * (r() - .5) * .3, fwd.x, fwd.z, sdv.x, sdv.z, .22 + r() * .12, IVYC[(r() * 3) | 0], (r() - .5) * 1.2]); } }
+      for (let e = 0; e <= 8; e++) { const t = e / 8, curl = t > .75 ? (t - .75) * 4 : 0; pts.push(P(s0 + Math.sin(t * 2 + k) * .12, y0 - t * Lh + curl * curl * .35, 2.5 + t * .25 + curl * .45)); if (e > 0 && r() < .85) { const pp = pts[pts.length - 1]; leaves.push([pp.x + sdv.x * (r() - .5) * .3, pp.y, pp.z + sdv.z * (r() - .5) * .3, fwd.x, fwd.z, sdv.x, sdv.z, .22 + r() * .12, IVYC[(r() * 3) | 0], (r() - .5) * 1.2, y0]); } }
       strands.push({ pts, r: .06, root: false, sway: .6, tip: .025 }); }
     /* 산과 한 몸 (사용자 2026-11-11: 산맥과 입구가 따로 놀아 보임): 처마 위로 자연 바위가 불룩하게 내려앉고 · 양옆 벽 끝은 바위 덩이가 삼킴 — 산을 깎아 만든 사원처럼 */
     const boulder = (c, sx, sy, sz, sd2, keelDown = .6) => { const g = new THREE.IcosahedronGeometry(1, 4); g.deleteAttribute('uv'); const pp = g.attributes.position;

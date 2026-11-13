@@ -168,6 +168,20 @@ export function makeField(L = SPOT) {
         const cs = Math.cos(B.rot || 0), sn = Math.sin(B.rot || 0), u = (dx * cs - dz * sn) / B.e[0], w = (dx * sn + dz * cs) / B.e[1];
         d = (Math.hypot(u, w) - 1) * Math.min(B.e[0], B.e[1]) + (B.rough || 3.2) * fbm(x * .07 + (B.seed || 0), z * .07, 3) + (B.rough || 3.2) * .5 * fbm(x * .2 + 5, z * .2, 2); }
       const kk = 1 - smoothstep(0, B.slope || 13, d); if (kk > k) { k = kk; bayFl = fl; } } return k; };
+  /* 깊은 물길 (L.chasm: { paths: [{ pts: [[x, z, 반폭]…], floor, water }], pools: [[x, z, 반지름, floor, water]] }) — 사용자 2026-11-12
+     물이 오래 깎은 모양: 풀밭이 둥글게 말려 내려가다 끊김 · 벽은 곳마다 가파름이 다르고(무너진 비탈 ~ 깎아지른 절벽) 층층이 바위 턱 · 바닥은 아주 깊음 (나는 높이보다 훨씬 아래라 막지도 가리지도 않음) */
+  const CHP = ((L.chasm && L.chasm.paths) || []).map(p => { const mw = Math.max(...p.pts.map(q => q[2])); return { ...p, bb: [Math.min(...p.pts.map(q => q[0])) - mw - 12, Math.max(...p.pts.map(q => q[0])) + mw + 12, Math.min(...p.pts.map(q => q[1])) - mw - 12, Math.max(...p.pts.map(q => q[1])) + mw + 12] }; });
+  const CHO = (L.chasm && L.chasm.pools) || [];
+  const chasmAt = (x, z) => { let best = -99, fl = 0, wl = 0, km = 4.5, lp = 5.2;
+    for (const p of CHP) { if (x < p.bb[0] || x > p.bb[1] || z < p.bb[2] || z > p.bb[3]) continue;
+      for (let k = 1; k < p.pts.length; k++) { const [ax, az, aw] = p.pts[k - 1], [bx, bz, bw] = p.pts[k], vx = bx - ax, vz = bz - az, t = Math.max(0, Math.min(1, ((x - ax) * vx + (z - az) * vz) / (vx * vx + vz * vz || 1))), d = aw + (bw - aw) * t - Math.hypot(x - ax - vx * t, z - az - vz * t);
+        if (d > best) { best = d; fl = p.floor; wl = p.water; km = p.steep || 4.5; lp = p.lip || 5.2; } } }
+    for (const [cx, cz, r, f2, w2] of CHO) { const an = Math.atan2(z - cz, x - cx), d = r + 2.8 * fbm(an * 2 + cx * .01, 1.7, 3) - Math.hypot(x - cx, z - cz); if (d > best) { best = d; fl = f2; wl = w2; km = 4.5; lp = 5.2; } }
+    return { d: best + 2.2 * fbm(x * .1, z * .1, 3) + 1.1 * fbm(x * .35 + 4, z * .35, 2), floor: fl, water: wl, km, lp }; };
+  const chasmCut = (x, z, h) => { const c = chasmAt(x, z), out = -c.d; if (out > c.lp) return h;
+    if (out > 0) { const t = 1 - out / c.lp; return Math.min(h, h - 3.2 * t * t); }   /* 풀밭이 둥글게 말려 내려감 */
+    const kk = c.km + 7.5 * smoothstep(-.35, .5, fbm(x * .0175, z * .0175 + 5, 2)), Ls = 4.8 + 2.4 * fbm(x * .05, z * .05), dep = -out * kk, q = Math.floor(dep / Ls), fr = dep / Ls - q;   /* 가파름 · 턱 높이가 곳마다 다름 */
+    return Math.min(h, Math.max(c.floor + .6 * fbm(x * .4, z * .4, 2), h - 3.2 - (q + smoothstep(.3, .85, fr)) * Ls - 1.2 * fbm(x * .25, z * .25, 2))); };
   const terraceH = (x, z) => { let best = -99; for (const T of TR) { if (x < T.bb[0] || x > T.bb[1] || z < T.bb[2] || z > T.bb[3]) continue; let m = 1e9, side = 0, endK = 1;
       for (let k = 1; k < T.pts.length; k++) { const [ax, az] = T.pts[k - 1], [bx, bz] = T.pts[k], vx = bx - ax, vz = bz - az, l2 = vx * vx + vz * vz, t = ((x - ax) * vx + (z - az) * vz) / l2, tc = Math.max(0, Math.min(1, t)), d = Math.hypot(x - ax - vx * tc, z - az - vz * tc);
         if (d < m) { m = d; side = (vx * (z - az) - vz * (x - ax)) < 0 ? 1 : -1; endK = (k === 1 && t < 0) || (k === T.pts.length - 1 && t > 1) ? 0 : 1; } }
@@ -203,6 +217,7 @@ export function makeField(L = SPOT) {
           H += (Math.abs(fbm(x * .9, z * .9, 2)) - .25) * 1.8 - 2.4 * smoothstep(.9, .35, da); }   /* 들쭉날쭉한 왕관 · 한쪽이 떨어져 나감 */
         if (soft && t.top) H += .8 * smoothstep(0, t.r, d);   /* 굵은 탑 꼭대기는 둥글게 솟음 */
         h = Math.max(h, g + (H - g) * k); } }
+    if (CHP.length || CHO.length) h = chasmCut(x, z, h);   /* 깊은 물길 */
     const m = mask(x, z), sh = 1 - smoothstep(0, 3.2, m); h -= (1.5 + .6 * fbm(x * .4, z * .4, 2)) * sh * sh;   /* 가장자리 둥근 어깨: 테두리로 갈수록 둥글게 꺾여 내려감 (칼처럼 끊기지 않게) */
     return h; }
   /* 아래 바위 몸통: 가장자리에서 급히 꺾여 가운데로 갈수록 깊이 · 층진 바위 결 */
@@ -250,5 +265,6 @@ export function makeField(L = SPOT) {
   const brushZone = (x, z) => { for (let k = 0; k < L.brush.length; k++) if (brushZ(k, x, z) > 0) return k; return -1; };   /* 몇 번째 부쉬 안인지 (밖이면 −1) */   /* 부쉬 안 + (가장자리가 덤불 뭉치처럼 물결) */
   /* 지금 자리가 어디인지: 동굴 입구 · 골짜기길 · 공터 */
   const where = (x, z) => { if (SEC.length && secretD(x, z) > 0 && (openD(x, z) < 0 || humpK(x, z) > .3 || riseH(x, z) > -1)) return 'secret'; if (!GS.length) return null; const c = gorge(x, z), T = GS[c.i].g.tunnel; if (c.d > 0) return T && c.t <= T.to ? 'tunnel' : 'gorge'; return basinD(x, z) > 0 ? 'basin' : null; };
-  return { mesaH, lidTop: (x, z) => { noGorge = true; try { return top(x, z); } finally { noGorge = false; } }, gorgeI, basinI, gorgeBB: i => GS[i].bb, L, mask, plateau, pond, chan, brush, brushZ, brushZone, spireMoss, top, bottom, blocked, sightBlock, obstacles, archLegs, gorge, gorgeAt, gorgeAtI, basinD, inGorge, where, mountH, floats, floatD, useGorge, gorges: GS.map(q => q.g), secretD, humpK };
+  const chasmWater = (x, z) => { if (!CHP.length && !CHO.length) return null; const c = chasmAt(x, z); return c.d > -3 ? c.water : null; };
+  return { chasmWater, chasmAt, mesaH, lidTop: (x, z) => { noGorge = true; try { return top(x, z); } finally { noGorge = false; } }, gorgeI, basinI, gorgeBB: i => GS[i].bb, L, mask, plateau, pond, chan, brush, brushZ, brushZone, spireMoss, top, bottom, blocked, sightBlock, obstacles, archLegs, gorge, gorgeAt, gorgeAtI, basinD, inGorge, where, mountH, floats, floatD, useGorge, gorges: GS.map(q => q.g), secretD, humpK };
 }

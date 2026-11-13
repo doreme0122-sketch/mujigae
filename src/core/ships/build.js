@@ -3,11 +3,11 @@
    - 지금 보는 기체 파일만 받아 두고(같은 파일은 한 번만), 필요 없어진 건 release()로 비운다. */
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
-import { shipById } from '../../data/ships.js?v=11121901';
-import { diamondMaterial, backMat } from './diamond.js?v=11121901';
-import { filmMaterial } from './film.js?v=11121901';
-import { applyPrismFoil } from './foil.js?v=11121901';
-import { skinSet } from './skinset.js?v=11121901';
+import { shipById } from '../../data/ships.js?v=11131300';
+import { diamondMaterial, backMat } from './diamond.js?v=11131300';
+import { filmMaterial } from './film.js?v=11131300';
+import { applyPrismFoil } from './foil.js?v=11131300';
+import { skinSet } from './skinset.js?v=11131300';
 
 const files = new Map();
 export const UT = { value: 0 };                 /* 무지개 막이 천천히 흐르는 시간 */

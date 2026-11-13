@@ -5,7 +5,7 @@
      모든 비밀길에 똑같은 무늬 → 한 번 배우면 '이게 있으면 밑은 무조건 터널' (사용자)
    · 청록 꽃: 비밀길 입구 부쉬에만 몇 송이 (판돌 빛과 같은 색 · 가까이 가야 보임) — 다른 부쉬엔 절대 없음 */
 import * as THREE from 'three';
-import { noise2, smoothstep } from './islefield.js?v=11121901';
+import { noise2, smoothstep } from './islefield.js?v=11131300';
 
 export const SECRET = { FLOOR: -7.4, TOP: -1.2, WALL: 2.4, TEAL: [.22, .95, .8] };
 

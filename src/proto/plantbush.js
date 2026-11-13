@@ -5,7 +5,7 @@
    C 빛버섯 무리 크고 작은 반투명 갓이 층층이 피어남 · 갓 아래 주름이 청록으로 빛나고 숨 쉬듯 오므렸다 폄 · 사이에 낮은 빛잎 몇 장
    무게: 덤불마다 잎 한 묶음 + 봉오리·버섯 한 묶음 + 늘어진 줄기 한 묶음 (같은 생김새를 한 번에 그림) */
 import * as THREE from 'three';
-import { inRect, sampleRect, ring } from './hidetheme.js?v=11121901';
+import { inRect, sampleRect, ring } from './hidetheme.js?v=11131300';
 
 const LA = { leaf: 'broad', col: [[.42, .06, .75], [.12, .35, 1.]] }, LB = { leaf: 'feather', col: [[.75, .12, .35], [.6, .25, .95]] }, LC = { leaf: 'broad', col: [[.2, .25, .75], [.2, .75, .9]] };
 const V = { A: { leaves: [{ ...LA, n: 48, h: [1.6, 2.8] }], drip: 1, pods: 4, shrooms: 3, sh: [.22, .22], tall: 1 },

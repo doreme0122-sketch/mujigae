@@ -2,22 +2,22 @@
    · 카메라 · 화면 밝기 처리 · 기체 · 조종은 새 맵(map2)과 같은 것 · 섬만 새것 */
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
-import { makeBloom } from '../core/hangar/bloom.js?v=11121901';
-import { makeForgeShip, forgeList } from './forgeship.js?v=11121901';
-import { makePerf } from './perf.js?v=11121901';
-import { makeFlight, FLY, padZone } from './flight.js?v=11121901';
-import { buildIsle } from './isle.js?v=11121901';
-import { makeInputBuffer } from './inbuf.js?v=11121901';
-import { makeLiftFx } from './liftfx.js?v=11121901';
-import { gate4 } from './gates.js?v=11121901';
-import { tunnelSound } from './secret.js?v=11121901';
-import { audio as sfxCtx, unlock as sfxUnlock } from './sfx.js?v=11121901';
+import { makeBloom } from '../core/hangar/bloom.js?v=11131300';
+import { makeForgeShip, forgeList } from './forgeship.js?v=11131300';
+import { makePerf } from './perf.js?v=11131300';
+import { makeFlight, FLY, padZone } from './flight.js?v=11131300';
+import { buildIsle } from './isle.js?v=11131300';
+import { makeInputBuffer } from './inbuf.js?v=11131300';
+import { makeLiftFx } from './liftfx.js?v=11131300';
+import { gate4 } from './gates.js?v=11131300';
+import { tunnelSound } from './secret.js?v=11131300';
+import { audio as sfxCtx, unlock as sfxUnlock } from './sfx.js?v=11131300';
 
 const $ = s => document.querySelector(s);
 export async function start(canvas, onProgress = () => {}, opt = {}) {   /* opt.layout: 섬 배치 (없으면 섬 하나 시험 · 초원 한 조각 체험판 = meadowsector.js) */
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: false, powerPreference: 'high-performance' });
   renderer.toneMapping = THREE.NoToneMapping; renderer.autoClear = false; renderer.setClearColor(0x9fc3e0, 1);
-  const scene = new THREE.Scene(), camera = new THREE.PerspectiveCamera(20, 1, .5, 2000), bloom = makeBloom(renderer, { samples: 0 });
+  const scene = new THREE.Scene(), camera = new THREE.PerspectiveCamera(5, 1, 20, 3000), bloom = makeBloom(renderer, { samples: 0 });
   { const pm = new THREE.PMREMGenerator(renderer); scene.environment = pm.fromScene(new RoomEnvironment(), .04).texture; scene.environmentIntensity = .7; pm.dispose(); }
   onProgress(.1); await new Promise(r => setTimeout(r, 30));
   const K = .5;   /* 섬 크기: 0.5배 (사용자 2026-11-10 · 기체에 비해 땅이 너무 컸음) */
@@ -154,10 +154,12 @@ export async function start(canvas, onProgress = () => {}, opt = {}) {   /* opt.
   if (WV) { const view = $('#view'), b = document.createElement('button'); b.type = 'button'; b.style.cssText = 'font-size:11px;padding:4px 8px;border:1px solid rgba(185,255,74,.4);border-radius:9px;color:#e8ffd0;margin-top:4px';
     const draw = () => { b.textContent = `바람길 ${WV.on ? '켬' : '끔'} (오르내리는 구역 끝까지 빠져나가면 빨라짐)`; }; b.onclick = () => { WV.on = !WV.on; draw(); }; draw(); view?.append(b); }
   const weaveAt = (x, z) => { const dx = WV.b[0] - WV.a[0], dz = WV.b[1] - WV.a[1], l = Math.hypot(dx, dz), u = ((x - WV.a[0]) * dx + (z - WV.a[1]) * dz) / (l * l), w = Math.abs((x - WV.a[0]) * dz - (z - WV.a[1]) * dx) / l; return { u, inside: w < WV.half && u > -.05 && u < 1.05 }; };
-  /* 카메라 (새 맵과 같은 롤 방식: 좁은 시야 · 멀리서) + 둘러보기 */
-  const cfg = { ang: 45, dist: 25 }; const bind = (id, key, fmt) => { const el = $('#' + id), out = $('#' + id + 'v'); if (!el) return; const rd = () => { cfg[key] = +el.value; out.textContent = fmt(+el.value); }; el.addEventListener('input', rd); rd(); };
-  bind('ang', 'ang', v => v + '°'); bind('dist', 'dist', v => v + 'm');
-  const CAMK = Math.tan(20 * Math.PI / 180) / Math.tan(10 * Math.PI / 180); let camD = cfg.dist * CAMK; const cam = { x: START[0], z: START[1] };
+  /* 카메라 (사용자 2026-11-13 · 용 시험판과 같은 황금값): 시야 5°로 아주 멀리서 → 원근이 거의 없는 직교에 가까운 화면 (LoL처럼)
+     각도 56° · 화면 세로 넓이 22m (기체 날개폭 3.9m가 화면 세로의 약 1/8 · 용 시험판 20m와 같은 비율) · 기체는 가운데보다 조금 아래 (앞을 넓게)
+     직교 카메라 대신 좁은 시야를 쓴 까닭: 땅 · 풀 · 불꽃 크기 계산이 원근 카메라 기준이라 그대로 두고 원근만 없앰 (가장자리 차이 3% 안팎) */
+  const cfg = { ang: 56, dist: 22 }; const bind = (id, key, fmt) => { const el = $('#' + id), out = $('#' + id + 'v'); if (!el) return; const rd = () => { cfg[key] = +el.value; out.textContent = fmt(+el.value); }; el.addEventListener('input', rd); rd(); };
+  bind('ang', 'ang', v => v + '°'); bind('dist', 'dist', v => '세로 ' + v + 'm');
+  const CAMK = .5 / Math.tan(2.5 * Math.PI / 180); let camD = cfg.dist * CAMK;   /* 화면 세로 넓이 → 카메라 거리 */ const cam = { x: START[0], z: START[1] };
   const look = { x: 0, z: 0, id: null, px: 0, py: 0 };
   addEventListener('pointerdown', e => { if (look.id !== null || e.target.closest('#ui') || padZone(e.clientX, e.clientY) || inZone(e.clientX, e.clientY)) return; look.id = e.pointerId; look.px = e.clientX; look.py = e.clientY; });
   addEventListener('pointermove', e => { if (e.pointerId !== look.id) return; const r = canvas.getBoundingClientRect(), mpp = 2 * camD * Math.tan(camera.fov * Math.PI / 360) / Math.max(1, r.height), a = cfg.ang * Math.PI / 180;
@@ -194,7 +196,7 @@ export async function start(canvas, onProgress = () => {}, opt = {}) {   /* opt.
     if (look.id === null) { const k = Math.min(1, dt * 3.5); look.x -= look.x * k; look.z -= look.z * k; }
     const sp = fly.children[0].position; { const k = Math.min(1, dt * 4); cam.x += (sp.x + FS.vx * .25 - cam.x) * k; cam.z += (sp.z + FS.vz * .25 - cam.z) * k; }
     { const cf = [.85, 1, 1.3], k = LV.f * LV.f * (3 - 2 * LV.f), f = cf[LV.cur] + (cf[LV.to] - cf[LV.cur]) * k; camD += (cfg.dist * CAMK * f - camD) * Math.min(1, dt * 3); }
-    const a = cfg.ang * Math.PI / 180, vx = cam.x + look.x, vz = cam.z + look.z, cy = LV.y; shake = Math.max(0, shake - dt * 1.6); const sh = shake * shake * .5, jx = (Math.random() - .5) * sh, jy = (Math.random() - .5) * sh; camera.position.set(vx + jx, cy + camD * Math.sin(a) + jy, vz + camD * Math.cos(a)); camera.lookAt(vx + jx, cy + jy, vz); camera.updateMatrixWorld();
+    const a = cfg.ang * Math.PI / 180, vx = cam.x + look.x, vz = cam.z + look.z - camD / CAMK * .15, cy = LV.y;   /* 바라보는 곳을 화면 위쪽(−z)으로 15% 밀어 기체가 가운데보다 아래 */ shake = Math.max(0, shake - dt * 1.6); const sh = shake * shake * .5, jx = (Math.random() - .5) * sh, jy = (Math.random() - .5) * sh; camera.position.set(vx + jx, cy + camD * Math.sin(a) + jy, vz + camD * Math.cos(a)); camera.lookAt(vx + jx, cy + jy, vz); camera.updateMatrixWorld();
     if (TSND) { underK += ((secNow && isle.inGorge(FS.x, FS.z) ? 1 : 0) - underK) * Math.min(1, dt * 2); TSND(secNow, underK); }   /* 터널 소리: 협곡 밑에선 위 싸움 소리가 먹먹하게 */
     isle.sky.position.copy(camera.position); isle.update(t); ext?.update?.(t, dt, { x: FS.x / K, z: FS.z / K, L: LV.cur, cam: camera.position, blk: secNow, cave: caveNow, seen: seenAt });   /* 기체를 가리는 지형을 투명하게 걷던 것은 없앰 (사용자 2026-11-11 밤: 지형이 헷갈림) — 산 뒤에 숨은 내 기체는 빛 테두리(xray)로 보임 */    /* 기체를 가리는 건 투명하게 (사용자 2026-11-11) · 비밀 터널 안: 천장과 카메라 쪽 벽까지 걷도록 기준을 터널 바닥 가까이로 (바닥은 남김) */   /* 기체와 카메라 사이 산 · 동굴 천장을 내 화면에서만 걷어 냄 · 사용자 2026-11-11: 기체가 가려질 때만 · 가리는 부분만 (기체와 카메라 사이 9m 원기둥) · 완전히 투명 */ xrayM.uniforms.uT.value = t;
     /* 바람 고리 (1층이면 땅에 닿아 풀 · 꽃을 밂 · 2 · 3층은 그 높이 공중에서만) · 못 바꾸면 층 막대가 빨갛게 깜빡 */

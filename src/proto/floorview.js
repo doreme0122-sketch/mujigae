@@ -1,14 +1,14 @@
 /* 지역 바닥 보기 — 기체가 구름층 위를 8자로 날며 구름을 가른다 */
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
-import { makeBloom } from '../core/hangar/bloom.js?v=11121901';
-import { makePerf } from './perf.js?v=11121901';
-import { buildShip, engineSpots } from '../core/ships/build.js?v=11121901';
-import { makeGlow } from '../preview/glow.js?v=11121901';
-import { planetShader } from '../core/planet.js?v=11121901';
-import { planetFor } from '../data/planets.js?v=11121901';
-import { makeFloor, FLOORS } from './floor.js?v=11121901';
-import * as OLD from './floor_old.js?v=11121901';
+import { makeBloom } from '../core/hangar/bloom.js?v=11131300';
+import { makePerf } from './perf.js?v=11131300';
+import { buildShip, engineSpots } from '../core/ships/build.js?v=11131300';
+import { makeGlow } from '../preview/glow.js?v=11131300';
+import { planetShader } from '../core/planet.js?v=11131300';
+import { planetFor } from '../data/planets.js?v=11131300';
+import { makeFloor, FLOORS } from './floor.js?v=11131300';
+import * as OLD from './floor_old.js?v=11131300';
 
 const $ = s => document.querySelector(s), clamp = THREE.MathUtils.clamp;
 const TIPS = { dust: '시작 지역의 잔잔한 회색 먼지예요. 띄엄띄엄 작은 반짝임이 있어요.', frost: '얼음 성운 지대의 푸른 서리 안개예요. 얼음 알갱이가 날카롭게 반짝여요.',
