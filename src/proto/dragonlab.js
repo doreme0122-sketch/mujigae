@@ -16,7 +16,7 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
-const CFG = { critGap: 2.5, bodyR: 1.6, showHit: 0, zone: 1, cd: 3, rollDist: 2, rollTime: .35, critDist: 5, critTime: .3, btnTell: 1, range: 14, melee: 3.2, atkEvery: .85, speed: 7.5,
+const CFG = { critGap: 1.5, bodyR: 1.5, showHit: 0, zone: 1, cd: 3, rollDist: 2, rollTime: .35, critDist: 5, critTime: .3, btnTell: 1, range: 14, melee: 3.2, atkEvery: .85, speed: 7.5,
   fireEvery: 1.7, camAng: 56, viewH: 20, camOff: 3, lean: 11, projSpeed: 25, skillEvery: 3.4, aoe: 1, aoeEvery: 4.6, aoeR: 4, aoeTime: 1.2, aoeSig: .8, reward: 'speed', turret: 1, skill: 1 };
 const SPEC = [['cap', '카메라'], ['camAng', '내려다보는 각도(°)', 30, 85, 1], ['viewH', '화면 세로 넓이(m)', 10, 34, .5], ['camOff', '용 위치: 가운데 아래(m)', 0, 6, .1], ['lean', '용 젖힘(°)', 0, 25, 1],
   ['cap', '크리티컬 롤'], ['critGap', '크리티컬 구간 폭(m)', .3, 8, .1], ['bodyR', '맞는 원(반지름 m)', .6, 2.4, .05], ['zone', '크리티컬 원 보기', 0, 1, 1], ['showHit', '판정 보기', 0, 1, 1], ['critDist', '크리티컬 롤 거리(m)', 2, 9, .1], ['critTime', '크리티컬 롤 시간(초)', .15, .6, .01], ['reward', '성공 보상', ['speed', '이동 속도 ↑ (1.5초)'], ['power', '다음 공격 강화 ×1.8']], ['btnTell', '롤 버튼 반짝임', 0, 1, 1],
