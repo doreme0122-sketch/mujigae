@@ -7,10 +7,10 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { MeshoptSimplifier as MO } from '../../vendor/meshopt_simplifier.module.js';
-import { makeField, Y, SPOT, LAYERS, fbm, noise2, smoothstep } from './islefield.js?v=11140005';
-import { reedBush, vegShader } from './flora.js?v=11140005';
-import { buildRuins } from './ruins.js?v=11140005';
-import { buildSecret, SECRET } from './secret.js?v=11140005';
+import { makeField, Y, SPOT, LAYERS, fbm, noise2, smoothstep } from './islefield.js?v=11140030';
+import { reedBush, vegShader } from './flora.js?v=11140030';
+import { buildRuins } from './ruins.js?v=11140030';
+import { buildSecret, SECRET } from './secret.js?v=11140030';
 
 const SUN = new THREE.Vector3(-.45, .78, .44).normalize();   /* 왼쪽 위 앞에서 (카메라 쪽 절벽 면이 비스듬히 빛을 받아 결이 드러남) */
 const rngOf = s => () => (s = (s * 16807) % 2147483647) / 2147483647;
@@ -509,13 +509,20 @@ export async function buildIsle({ K = 1, layout = SPOT } = {}) {   /* layout: �
          위층(산 = 덮개)은 바깥 땅 그대로 · 들어가면 덮개만 통째로 사라지고 이 맵이 보임 */
       { const rb = (arr, x, z) => { const u = Math.min(W - 1.001, Math.max(0, (x - x0) / CS - .5)), w = Math.min(D - 1.001, Math.max(0, (z - z0) / CS - .5)), i = u | 0, j = w | 0, a = u - i, b = w - j;
           return (arr[j * W + i] * (1 - a) + arr[j * W + i + 1] * a) * (1 - b) + (arr[(j + 1) * W + i] * (1 - a) + arr[(j + 1) * W + i + 1] * a) * b; };
+        /* 가장 가까운 바닥 칸의 높이를 벽 칸까지 이어 줌 (벽 밑동 높이 = 바로 앞 바닥) */
+        const FHG = new Float32Array(W * D), BD = new Float32Array(W * D).fill(99); for (let q = 0; q < W * D; q++) if (FLR[q]) { BD[q] = 0; FHG[q] = HH[q]; }
+        for (let it = 0; it < 2; it++) for (const dir of [1, -1]) for (let jj = 0; jj < D; jj++) { const j = dir > 0 ? jj : D - 1 - jj; for (let kk = 0; kk < W; kk++) { const k = dir > 0 ? kk : W - 1 - kk, q = j * W + k;
+          for (const [dk, dj, c] of [[-dir, 0, CS], [0, -dir, CS], [-dir, -dir, CS * 1.414], [dir, -dir, CS * 1.414]]) { const k2 = k + dk, j2 = j + dj; if (k2 < 0 || j2 < 0 || k2 >= W || j2 >= D) continue; const q2 = j2 * W + k2; if (BD[q2] + c < BD[q]) { BD[q] = BD[q2] + c; FHG[q] = FHG[q2]; } } } }
         /* 벽 꼭대기 높이를 한 번 더 넓게 고름 (카메라 쪽 밑동 벽과 높은 벽이 만나는 곳 톱니 없앰 · 바닥 칸은 그대로) */
         let TF2 = TOPF.slice(); for (let pass = 0; pass < 10; pass++) { const T0 = TF2.slice(); for (let j = 2; j < D - 2; j++) for (let k = 2; k < W - 2; k++) { const q = j * W + k; if (!M[q * 4] || FLR[q]) continue; let sm = 0, n = 0;
             for (let dj = -2; dj <= 2; dj++) for (let dk = -2; dk <= 2; dk++) { const qq = (j + dj) * W + k + dk; if (!M[qq * 4]) continue; sm += FLR[qq] ? T0[q] : T0[qq]; n++; } TF2[q] = sm / n; } }
         const ST = .5, NX = Math.floor(W * CS / ST), NZ = Math.floor(D * CS / ST), vid = new Int32Array((NX + 1) * (NZ + 1)).fill(-1), P = [], CVL = [], FL = [], ix = [], KR = 1.6;
         for (let j = 0; j <= NZ; j++) for (let i = 0; i <= NX; i++) { const x = x0 + i * ST, z = z0 + j * ST, k = Math.min(W - 1, Math.floor((x - x0) / CS)), jj = Math.min(D - 1, Math.floor((z - z0) / CS)), id = M[(jj * W + k) * 4]; if (!id) continue;
-          const dd = rb(DIST, x, z); if (dd > 12.6) continue; const h = hAt(x, z), tp = rb(TF2, x, z), t = Math.min(1, Math.max(0, .5 + .5 * (tp - h) / KR)), hc = tp + (h - tp) * t - KR * t * (1 - t);   /* 부드러운 최솟값: 벽이 꼭대기에서 둥글게 꺾여 윗면이 됨 */
-          vid[j * (NX + 1) + i] = P.length / 3; P.push(x, hc, z); CVL.push(id, smoothstep(-.3, .9, h - tp), smoothstep(7, 12, dd)); FL.push(rb(DIST, x, z) < .3 ? 1 : 0); }
+          const dd = rb(DIST, x, z); if (dd > 7.4) continue;
+          /* 벽 = 바깥 산 높이와 상관없이 따로 설계 (사용자 2026-11-14): 바닥 끝에서 곧게 솟아 정한 높이(남는 높이)에서 반듯하게 꺾여 평평한 윗면 → 꼭대기 선이 끝까지 수평 */
+          const fh = dd < .3 ? hAt(x, z) : rb(FHG, x, z), tp = Math.max(fh + 1.2, rb(TF2, x, z)), wob = .5 * (fbm(x * .09, z * .09, 2) - .5) + .18 * (noise2(x * .45, z * .45) - .5);
+          const rise = smoothstep(.3, 2.1, dd + wob * (1 - smoothstep(2.2, 4, dd))), edge = smoothstep(4.2, 7.2, dd), hc = fh + (tp - fh) * rise;   /* 거의 곧은 벽 → 평평한 윗면 (꼭대기 선이 끝까지 수평) → 바깥은 어둠으로 잠김 (가장자리 칸 계단이 안 보이게) */
+          vid[j * (NX + 1) + i] = P.length / 3; P.push(x, hc, z); CVL.push(id, smoothstep(.88, .99, rise), edge); FL.push(dd < .3 ? 1 : 0); }
         /* 벽 높이 고르기: 땅 잡음 때문에 생기는 톱니 · 칸 계단을 이웃 평균으로 3번 다듬음 (바닥은 그대로) */
         for (let pass = 0; pass < 3; pass++) { const H0 = P.slice(); for (let j = 1; j < NZ; j++) for (let i = 1; i < NX; i++) { const v = vid[j * (NX + 1) + i]; if (v < 0 || FL[v]) continue; let sm = 0, n = 0;
             for (let dj = -1; dj <= 1; dj++) for (let di = -1; di <= 1; di++) { const w = vid[(j + dj) * (NX + 1) + i + di]; if (w < 0) continue; const wt = di || dj ? 1 : 2; sm += H0[w * 3 + 1] * wt; n += wt; } P[v * 3 + 1] = sm / n; } }   /* 끝(12m)은 완전히 어둠 → 맵 가장자리 칸 계단이 안 보임 */
