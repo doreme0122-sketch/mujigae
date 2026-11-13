@@ -5,7 +5,7 @@
    · 산 북쪽 면은 45°보다 완만 (그 뒤에 숨는 구덩이 · 그늘이 안 생김 — 사방이 막힌 빈틈은 저절로 메워짐)
    · 보물 동굴 위는 '파기 전의 산'으로 덮음 (밖에선 그냥 산줄기) · 들어가면 그 안만 보이고 밖은 까맣게 · 카메라 쪽 벽은 밑동만
    · 비밀길 입구는 남쪽(카메라 쪽) 절벽 틈 · 판정 = 산이 덮은 관 끝까지 */
-import { makeField } from './islefield.js?v=11132350';
+import { makeField } from './islefield.js?v=11140005';
 
 const R = 480, D2R = Math.PI / 180;
 export const W = (deg, m) => [2 * m * Math.sin(deg * D2R), -2 * m * Math.cos(deg * D2R)];

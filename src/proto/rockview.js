@@ -1,18 +1,18 @@
 /* 벽 보기 (지금은 용암 흑요석) — 맵 미리보기와 같은 하늘(행성 위 궤도), 같은 위에서 본 카메라 */
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
-import { makeBloom } from '../core/hangar/bloom.js?v=11132350';
-import { makePerf } from './perf.js?v=11132350';
-import { buildShip, engineSpots } from '../core/ships/build.js?v=11132350';
-import { makeGlow } from '../preview/glow.js?v=11132350';
-import { planetShader } from '../core/planet.js?v=11132350';
-import { planetFor } from '../data/planets.js?v=11132350';
-import { makeIceRidge } from './ice.js?v=11132350';
-import { makeCrystalRidge } from './crystal.js?v=11132350';
-import { makeRuinRidge, updateRuins } from './ruins.js?v=11132350';
-import { makeCoralRidge } from './coral.js?v=11132350';
-import { makeWalls } from './wallhit.js?v=11132350';
-import { makeRidge, updateRidge, hitWall } from './rocks.js?v=11132350';
+import { makeBloom } from '../core/hangar/bloom.js?v=11140005';
+import { makePerf } from './perf.js?v=11140005';
+import { buildShip, engineSpots } from '../core/ships/build.js?v=11140005';
+import { makeGlow } from '../preview/glow.js?v=11140005';
+import { planetShader } from '../core/planet.js?v=11140005';
+import { planetFor } from '../data/planets.js?v=11140005';
+import { makeIceRidge } from './ice.js?v=11140005';
+import { makeCrystalRidge } from './crystal.js?v=11140005';
+import { makeRuinRidge, updateRuins } from './ruins.js?v=11140005';
+import { makeCoralRidge } from './coral.js?v=11140005';
+import { makeWalls } from './wallhit.js?v=11140005';
+import { makeRidge, updateRidge, hitWall } from './rocks.js?v=11140005';
 
 const $ = s => document.querySelector(s), clamp = THREE.MathUtils.clamp, rnd = (a, b) => a + Math.random() * (b - a);
 const VIEWS = [
