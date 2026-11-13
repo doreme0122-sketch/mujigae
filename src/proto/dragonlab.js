@@ -11,15 +11,16 @@
    · 맞음: 모든 적 공격은 보이는 빛이 맞는 원에 닿는 순간 데미지 (탄 몸 크기 = 보이는 빛 크기 · 날개 끝까지)
      직선 불덩이 = 롤 스킬샷 (바닥 경고 폭 = 불덩이 폭) · 유도 탄 = 롤 평타 (따라옴 · 크리티컬 롤로만 빗나감)
      피한 탄은 사라지지 않고 원래 길을 그대로 뚫고 지나감 · 크리티컬 원은 연습 때 늘 보임 · '판정 보기'는 맞는 원과 탄 몸 크기
-   · 크리티컬 효과는 잔상 · 멈칫 · 느려짐 · 진동 · 오르는 음 · 글자만 (퍼지는 원 · 불꽃 · 번쩍임 없음)
+   · 크리티컬 효과는 잔상 · 멈칫 · 진동 · 오르는 음만 (퍼지는 원 · 불꽃 · 번쩍임 · 글자 · 느려짐 없음)
+     멈칫은 내 화면에서만 (멀티 대비 · 사용자 2026-11-13): 화면을 잠깐 멈췄다가 살짝 빨리 돌려 실제 시간을 따라잡음 → 끝나는 시간은 모두 같음 · 상대에겐 잔상 롤만 보임
    · 카메라: 직교 · 56° · 화면 세로 20m · 용은 가운데보다 조금 아래 · 용은 카메라 쪽으로 11° 젖힘 (4분의 3 시점) · 모든 숫자는 조절 칸 */
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
-const CFG = { critGap: 1.5, bodyR: 1.5, showHit: 0, zone: 1, cd: 3, rollDist: 2, rollTime: .35, critDist: 5, critTime: .3, btnTell: 1, range: 14, melee: 3.2, atkEvery: .85, speed: 7.5,
+const CFG = { stopMs: 80, catchUp: 1.3, critGap: 1.5, bodyR: 1.5, showHit: 0, zone: 1, cd: 3, rollDist: 2, rollTime: .35, critDist: 5, critTime: .3, btnTell: 1, range: 14, melee: 3.2, atkEvery: .85, speed: 7.5,
   fireEvery: 1.7, camAng: 56, viewH: 20, camOff: 3, lean: 11, projSpeed: 25, skillEvery: 3.4, aoe: 1, aoeEvery: 4.6, aoeR: 4, aoeTime: 1.2, aoeSig: .8, reward: 'speed', turret: 1, skill: 1 };
 const SPEC = [['cap', '카메라'], ['camAng', '내려다보는 각도(°)', 30, 85, 1], ['viewH', '화면 세로 넓이(m)', 10, 34, .5], ['camOff', '용 위치: 가운데 아래(m)', 0, 6, .1], ['lean', '용 젖힘(°)', 0, 25, 1],
-  ['cap', '크리티컬 롤'], ['critGap', '크리티컬 구간 폭(m)', .3, 8, .1], ['bodyR', '맞는 원(반지름 m)', .6, 2.4, .05], ['zone', '크리티컬 원 보기', 0, 1, 1], ['showHit', '판정 보기', 0, 1, 1], ['critDist', '크리티컬 롤 거리(m)', 2, 9, .1], ['critTime', '크리티컬 롤 시간(초)', .15, .6, .01], ['reward', '성공 보상', ['speed', '이동 속도 ↑ (1.5초)'], ['power', '다음 공격 강화 ×1.8']], ['btnTell', '롤 버튼 반짝임', 0, 1, 1],
+  ['cap', '크리티컬 롤'], ['stopMs', '멈칫(ms · 내 화면만)', 0, 150, 5], ['catchUp', '따라잡기 빠르기(배)', 1.1, 2, .05], ['critGap', '크리티컬 구간 폭(m)', .3, 8, .1], ['bodyR', '맞는 원(반지름 m)', .6, 2.4, .05], ['zone', '크리티컬 원 보기', 0, 1, 1], ['showHit', '판정 보기', 0, 1, 1], ['critDist', '크리티컬 롤 거리(m)', 2, 9, .1], ['critTime', '크리티컬 롤 시간(초)', .15, .6, .01], ['reward', '성공 보상', ['speed', '이동 속도 ↑ (1.5초)'], ['power', '다음 공격 강화 ×1.8']], ['btnTell', '롤 버튼 반짝임', 0, 1, 1],
   ['cap', '일반 롤'], ['cd', '쿨타임(초)', 1, 4, .1], ['rollDist', '롤 거리(m)', .5, 6, .1], ['rollTime', '롤 시간(초)', .2, .8, .01],
   ['cap', '기본 공격'], ['range', '원거리 사거리(m)', 4, 20, .5], ['melee', '근접 사거리(m)', 1.5, 6, .1], ['atkEvery', '공격 간격(초)', .4, 1.6, .05], ['speed', '이동 속도(m/s)', 3, 14, .5],
   ['cap', '적'], ['turret', '수정 눈 기본 공격', 0, 1, 1], ['fireEvery', '쏘는 간격(초)', .6, 4, .1], ['projSpeed', '탄 속도(m/s)', 15, 40, .5], ['skill', '직선 불덩이(스킬)', 0, 1, 1], ['skillEvery', '스킬 간격(초)', 1.5, 8, .1],
@@ -189,10 +190,12 @@ function playOnce(name, speed = 1) { if (!A[name]) return; const a = A[name]; a.
 let msgT = 0; function showMsg(t, c, ms = 900, size = 34) { const m = $('#msg'); m.textContent = t; m.style.fontSize = size + 'px'; if (c) { m.style.background = c === 'rainbow' ? '' : 'none'; m.style.color = c === 'rainbow' ? 'transparent' : c; m.style.webkitBackgroundClip = c === 'rainbow' ? 'text' : ''; } m.style.opacity = 1; m.style.transform = 'translate(-50%,-50%) scale(1.15)'; clearTimeout(msgT); msgT = setTimeout(() => { m.style.transition = 'opacity .35s, transform .35s'; m.style.opacity = 0; m.style.transform = 'translate(-50%,-50%) scale(1)'; setTimeout(() => m.style.transition = '', 400); }, ms); }
 const v3 = new THREE.Vector3(); function dmgText(pos, txt, col, big) { v3.copy(pos).project(cam); const d = document.createElement('div'); d.className = 'dmg'; d.textContent = txt; d.style.color = col; d.style.fontSize = (big ? 26 : 17) + 'px'; d.style.left = (v3.x * .5 + .5) * innerWidth + 'px'; d.style.top = (-v3.y * .5 + .5) * innerHeight + 'px'; document.body.append(d);
   d.animate([{ transform: 'translate(-50%,-50%) scale(1.3)', opacity: 1 }, { transform: 'translate(-50%,-160%) scale(1)', opacity: 0 }], { duration: 800, easing: 'ease-out' }).onfinish = () => d.remove(); }
-let shake = 0, timeScale = 1, slowT = 0, hitStop = 0;
+let shake = 0, freezeT = 0, debt = 0;
+/* 내 화면만 멈칫: 멈춘 만큼 빚(debt)으로 쌓았다가, 다음 순간들에 조금씩 더 빨리 돌려 갚음 → 다 갚으면 실제 시간과 똑같은 자리 */
+const localStop = sec => { freezeT = Math.max(freezeT, sec); };
 function crit() {   /* 크리티컬 롤 성공: 멈칫 → 느려짐 · 진동 · 오르는 음 · 잔상 (원 · 불꽃 · 번쩍임 없음 · 사용자 2026-11-12) */
-  P.roll.crit = true; P.cdLeft = 0; hitStop = .07; slowT = .4; timeScale = .22; shake = .12; stats.combo++; buzz([28, 35, 50]); SFX.crit(stats.combo - 1); stats.crit++;
-  const cb = stats.combo > 1 ? ` ${stats.combo}연속!` : ''; if (CFG.reward === 'speed') { P.speedT = 1.5; showMsg('크리티컬 회피!' + cb, 'rainbow', 900); } else { P.power = true; showMsg('크리티컬 회피!' + cb, 'rainbow', 900); } }
+  P.roll.crit = true; P.cdLeft = 0; localStop(CFG.stopMs / 1000); shake = .12; stats.combo++; buzz([28, 35, 50]); SFX.crit(stats.combo - 1); stats.crit++;
+  if (CFG.reward === 'speed') P.speedT = 1.5; else P.power = true; }
 const stats = { crit: 0, early: 0, hits: 0, combo: 0 };
 
 /* ── 내가 맞음 ── */
@@ -210,7 +213,7 @@ function attack(dt) {
   P.target = n.e; if (P.atkT > 0) return;
   const melee = n.d < CFG.melee + (P.lastMelee ? .8 : 0); P.lastMelee = melee; P.atkT = CFG.atkEvery; const pw = P.power ? 1.8 : 1; P.power = false;
   const clip = melee ? 'claw' : 'breath', sp = melee ? 1.15 : 1.25, hitAt = (melee ? .24 : .3) / sp, tgt = n.e; P.busy = A[clip] ? A[clip].getClip().duration / sp : .4; playOnce(clip, sp);
-  if (melee) { SFX.claw(); setTimeout(() => { if (tgt.dead) return; const d = Math.hypot(tgt.g.position.x - P.pos.x, tgt.g.position.z - P.pos.z); if (d > CFG.melee + 2) return; hitEnemy(tgt, 34 * pw, null, true); hitStop = .06; shake = .12; slash(tgt.g.position); }, hitAt * 1000); }
+  if (melee) { SFX.claw(); setTimeout(() => { if (tgt.dead) return; const d = Math.hypot(tgt.g.position.x - P.pos.x, tgt.g.position.z - P.pos.z); if (d > CFG.melee + 2) return; hitEnemy(tgt, 34 * pw, null, true); localStop(.06); shake = .12; slash(tgt.g.position); }, hitAt * 1000); }
   else setTimeout(() => { if (!tgt.dead) { myShot(tgt, 13 * pw); SFX.breath(); } }, hitAt * 1000); }
 function slash(pos) { for (let k = 0; k < 3; k++) { const m = new THREE.Mesh(new THREE.RingGeometry(1.2, 1.45, 24, 1, -.9, 1.8), new THREE.MeshBasicMaterial({ color: 0xffd08a, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }));
   m.position.copy(pos); m.rotation.set(-Math.PI / 2 + .3, P.yaw, (k - 1) * .35); m.position.y += (k - 1) * .25; fx(m, .25, q => { m.scale.setScalar(1 + q * .6); m.material.opacity = 1 - q; }); } burst(pos, 0xffc070, 12, 7, .35, .45); }
@@ -234,8 +237,8 @@ new GLTFLoader().load('./_mf/DRAGON.glb?v=11122121', g => { model = g.scene; mod
 
 /* ── 매 순간 ── */
 const camNudge = new THREE.Vector3(); const clock = new THREE.Clock(), camPos = new THREE.Vector3(0, 30, 30), camT = new THREE.Vector3(); let bankA = 0, t = 0;
-function frame() { requestAnimationFrame(frame); const rdt = Math.min(.05, clock.getDelta()); if (slowT > 0) { slowT -= rdt; if (slowT <= 0) timeScale = 1; }
-  let dt = rdt * timeScale; if (hitStop > 0) { hitStop -= rdt; dt *= .05; } t += dt;
+function frame() { requestAnimationFrame(frame); const rdt = Math.min(.05, clock.getDelta());
+  let dt = rdt; if (freezeT > 0) { freezeT -= rdt; debt += rdt; dt = 0; } else if (debt > 0) { const extra = Math.min(debt, rdt * (CFG.catchUp - 1)); debt -= extra; dt += extra; } t += dt;
   /* 이동 */
   let mx = stick.x + ((keys.has('KeyD') || keys.has('ArrowRight')) - (keys.has('KeyA') || keys.has('ArrowLeft'))), mz = stick.y + ((keys.has('KeyS') || keys.has('ArrowDown')) - (keys.has('KeyW') || keys.has('ArrowUp')));
   const ml = Math.hypot(mx, mz); if (ml > 1) { mx /= ml; mz /= ml; } const spd = CFG.speed * (P.speedT > 0 ? 1.6 : 1); P.speedT -= dt;
