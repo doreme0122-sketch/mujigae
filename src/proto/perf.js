@@ -2,7 +2,7 @@
    · 품질: 보통 / 높음 / 최고 (게임과 같은 단계, src/core/quality.js). 처음엔 기기를 재서 추천 단계로 시작.
    · 빛 번짐 · 배경: 얼마나 무거운지 재는 시험용 켜고 끄기
    품질이 무거워도 저절로 바꾸지 않는다. */
-import * as Q from '../core/quality.js?v=11132340';
+import * as Q from '../core/quality.js?v=11132350';
 export function makePerf(onChange = () => {}) {
   const st = { bloom: true, bg: true, get aa() { return Q.tier().aa > 0; }, get tier() { return Q.tier(); } };
   try { const o = JSON.parse(localStorage.getItem('mj-perf-test') || '{}'); if (o.bloom === false) st.bloom = false; if (o.bg === false) st.bg = false; } catch (e) {}

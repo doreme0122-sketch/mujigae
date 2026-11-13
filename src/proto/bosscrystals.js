@@ -9,7 +9,7 @@
    단위 m */
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import * as A from '../core/audio.js?v=11132340';
+import * as A from '../core/audio.js?v=11132350';
 
 const A0 = -Math.PI / 2, MID = Array.from({ length: 10 }, (_, k) => A0 + k * Math.PI / 5 + Math.PI / 10);
 export const CRY = { WALL: 31, T: .95, GATE: .15, HITS: 8 };   /* WALL: 벽 반지름 · T: 벽 두께 절반 · GATE: 문 너비 절반(각도, 약 9m 문) */

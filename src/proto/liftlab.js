@@ -6,11 +6,11 @@
    기체는 1층 → 2층 → 3층 → 2층 → 1층을 쉬어 가며 되풀이 · 카메라는 게임처럼 기체 높이를 따라감 */
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
-import { makeBloom } from '../core/hangar/bloom.js?v=11132340';
-import { makePerf } from './perf.js?v=11132340';
-import { makeForgeShip, forgeList } from './forgeship.js?v=11132340';
-import { SUN, reedBush, vegShader } from './flora.js?v=11132340';
-import { makeLiftFx } from './liftfx.js?v=11132340';
+import { makeBloom } from '../core/hangar/bloom.js?v=11132350';
+import { makePerf } from './perf.js?v=11132350';
+import { makeForgeShip, forgeList } from './forgeship.js?v=11132350';
+import { SUN, reedBush, vegShader } from './flora.js?v=11132350';
+import { makeLiftFx } from './liftfx.js?v=11132350';
 
 const $ = s => document.querySelector(s);
 const hash2 = (i, j) => { let h = (i * 374761393 + j * 668265263) | 0; h = (h ^ (h >>> 13)) * 1274126177 | 0; return ((h ^ (h >>> 16)) >>> 0) / 4294967296; };

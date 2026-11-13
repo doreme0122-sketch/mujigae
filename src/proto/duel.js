@@ -7,9 +7,9 @@
    · 뒤돌기 불이익: ① 천천히 돌기만 (사용자 확정 · flight 기본)
    무게: 상대 기체 한 대 · 탄 머리 한 장 · 꼬리 한 장 · 불티 한 장 · 반사 막 한 장 */
 import * as THREE from 'three';
-import * as A from '../core/audio.js?v=11132340';
-import { buildShip } from '../core/ships/build.js?v=11132340';
-import { FLY } from './flight.js?v=11132340';
+import * as A from '../core/audio.js?v=11132350';
+import { buildShip } from '../core/ships/build.js?v=11132350';
+import { FLY } from './flight.js?v=11132350';
 
 export const DUEL = { WIN: .25, CRIT: .1, CD: .55, ARC: 60 * Math.PI / 180, REACH: 1.6, NORMAL: 1.3, CRITK: 2.5, DMGK: 1.5, MAXR: 3, SPEED: 20, DMG: 8, ORBIT: 14 };
 const NB = 40, NT = 12, NP = 260;
