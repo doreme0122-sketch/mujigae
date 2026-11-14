@@ -24,8 +24,11 @@ const PLATEAU = (() => { const out = []; for (let i = 0; i < PLATEAU0.length; i+
     out.push([ax + (bx - ax) * t + nx * w, az + (bz - az) * t + nz * w]); } } return out; })();   /* 위 평지 가장자리 (남쪽 가운데가 튀어나온 평지 자리) */   /* 위 평지 가장자리 (남쪽 가운데가 튀어나온 평지 자리) */
 const LEDGE_AREA = [[-11, 13.5], [11, 13.5], [12, 22], [6, 28], [-6, 28], [-12, 22]];   /* 튀어나온 평지 (14번 판 윗면) */
 const ARCH = { x: 0, z: 16.5, w: 13 };   /* z = 절벽 앞면 */   /* 보물방 입구 (11번) — 절벽 면에 붙음 · 앞이 남쪽 */
-const MOUNT = [[0, -26, 13], [-13, -18, 9], [13, -20, 9], [-24, -30, 7], [24, -32, 7]];   /* 돌산 막힘 (가운데 x · z · 반지름) */
-const PILLARS = [[-34, 42, 5], [36, 46, 5], [-4, 64, 6], [62, 20, 4], [-64, 24, 4]];
+/* 돌산: 보물방을 품은 산 — 보물방은 입구(남쪽 절벽 아치) 바로 뒤 절벽 속에 있으므로 산도 그 위 (남쪽 가장자리에 붙어 솟음) */
+const MOUNT = [[0, 0, 12], [-12, 5, 8], [12, 4, 8], [-21, -4, 6], [21, -5, 6]];   /* 돌산 막힘 (가운데 x · z · 반지름) */
+/* 길: 생물이 다닌 자국 — 평지 서쪽 들머리 → 돌산 서쪽 비탈 아래 → 남쪽 가장자리 전망 자리(튀어나온 평지 위) / 돌산 동쪽으로 돌아 동쪽 들머리 */
+const PATHS = [[[-56, -14], [-42, -12], [-30, -6], [-24, 4], [-18, 10]], [[-24, 4], [-30, -16], [-12, -22], [8, -20], [26, -16], [40, -8], [56, -6]]];
+const PILLARS = [[-42, 25, 5], [37, 27, 5], [66, 2, 4], [-67, 4, 4], [-22, 31, 3.5], [60, -30, 4]];   /* 기둥 바위: 평지가 깎여 나가고 남은 조각 — 절벽 선 바로 바깥을 따라 섬 */
 export const LAYERS = [LEDGE * SC + 1.2, TOP + 1.2, TOP + 4.5], LNAME = ['절벽 중간 · 1층 (튀어나온 평지)', '평지 높이', '평지 위 하늘'], LCOL = [[.45, 1, .38], [.42, .82, 1], [1, .8, .32]];
 
 const inPoly = (P, x, z) => { let c = false; for (let i = 0, j = P.length - 1; i < P.length; j = i++) { const [xi, zi] = P[i], [xj, zj] = P[j]; if ((zi > z) !== (zj > z) && x < (xj - xi) * (z - zi) / (zj - zi) + xi) c = !c; } return c; };
@@ -57,29 +60,28 @@ export async function buildCliffZone(THREE_, renderer) {
   for (let e = 0; e < ring.length - 1; e++) { const [ax, az] = ring[e], [bx, bz] = ring[e + 1], len = Math.hypot(bx - ax, bz - az), tx = (bx - ax) / len, tz = (bz - az) / len, nx = tz, nz = -tx;   /* 바깥 방향 (시계 반대로 돈 다각형 → 오른쪽이 바깥) */
     const out = inPoly(PLATEAU, (ax + bx) / 2 + nx * 2, (az + bz) / 2 + nz * 2) ? -1 : 1, ox = nx * out, oz = nz * out, yawOut = Math.atan2(ox, oz);
     const nearLedge = (x, z) => Math.abs(x) < 14 && z > 10;
-    for (let s = 0; s < len; s += 3.6 + rnd() * 1.4) {   /* 촘촘히 겹쳐 틈 없게 */ const x = ax + tx * s, z = az + tz * s, jy = yawOut + (rnd() - .5) * .35;
+    for (let s = rnd() * 3; s < len; s += 8.5 + rnd() * 2.5) {   /* 큰 덩어리를 성기게 (반복되는 거품 느낌 없게 · 가볍게) */ const x = ax + tx * s, z = az + tz * s, jy = yawOut + (rnd() - .5) * .35;
       /* A줄(본 벽): 앞면이 가장자리 1m 바깥 · 꼭대기 이끼가 평지와 같은 높이 (평지 풀과 이어짐) */
-      const ia = rnd() < .7 ? 15 : rnd() < .5 ? 13 : 12, sa = ia === 15 ? 10 + rnd() * 2.5 : ia === 13 ? 13 + rnd() * 3 : 11 + rnd() * 2, da = size(ia)[2] * sa, ha = sa;
+      const ia = rnd() < .75 ? 15 : rnd() < .5 ? 13 : 12, sa = ia === 15 ? 15 + rnd() * 3 : ia === 13 ? 18 + rnd() * 3 : 16 + rnd() * 2, da = size(ia)[2] * sa, ha = sa;
       put(ia, x - ox * (da / 2 - 1), TOP - .1 - ha, z - oz * (da / 2 - 1), jy, sa);   /* 꼭대기는 평지 땅 밑 · 가장자리에서만 땅이 내려가 이끼 테두리가 드러남 */
       /* B줄(아래 벽): 같은 앞면 줄 · 꼭대기가 A줄 밑동보다 2.5m 위로 겹침 → 끊김 없이 한 벽 · 밑동은 안개 속 */
-      const ib = rnd() < .6 ? 15 : 13, sb = ib === 15 ? 12 + rnd() * 3 : 16 + rnd() * 4, db = size(ib)[2] * sb, hb = sb;
-      put(ib, x + tx * 2.6 - ox * (db / 2 - 1.6), TOP - .1 - ha + 2.5 - hb, z + tz * 2.6 - oz * (db / 2 - 1.6), yawOut + (rnd() - .5) * .5, sb);
+      const ib = rnd() < .6 ? 15 : 13, sb = ib === 15 ? 15 + rnd() * 3 : 20 + rnd() * 4, db = size(ib)[2] * sb, hb = sb;
+      put(ib, x + tx * 4 - ox * (db / 2 + .5), TOP - .1 - ha + 2.5 - hb, z + tz * 2.6 - oz * (db / 2 - 1.6), yawOut + (rnd() - .5) * .5, sb);
     } }   /* 평지 위 작은 돌 얹기는 뺌 (풀밭에 스티커처럼 떠 보였음) */
 
   /* 튀어나온 평지 (14번 판) · 그 밑을 받치는 바위 · 보물방 입구 (11번) */
-  { const s = 5.6, [w, h, d] = size(14); put(14, 0, LEDGE - s * .82, 13 + d * s * .42, 0, s * 1.05, s); }
+  { const s = 5.6, [w, h, d] = size(14); put(14, 0, LEDGE - s * .82, 13 + d * s * .42, 0, s * 1.05, s); }   /* 튀어나온 평지: 입구 앞 마당 (내려와 들어가는 자리) */
   put(13, -9, LEDGE - 4 - 18, 17, .3, 18); put(12, 8, LEDGE - 3 - 15, 18, -.4, 15); put(10, 0, LEDGE - 6 - 20, 24, .1, 20);   /* 판 밑 받침 (밑동은 안개 속) */
   { const s = ARCH.w / size(11)[0]; put(11, ARCH.x, LEDGE - .2, ARCH.z - size(11)[2] * s * .35, 0, s); }   /* 아치 뒤쪽은 절벽 속 · 앞만 드러남 */
   put(9, -9.5, LEDGE - .6, 24, .6, 3.2); put(9, 10, LEDGE - .6, 21, -1.1, 2.6); put(1, 11, LEDGE - .8, 15.5, -.9, 2.2);   /* 판 가장자리 돌 */
 
-  /* 돌산 (평지 북쪽): 봉우리 3 · 몸통 12 · 4 · 비탈 6 · 무더기 9 · 전망대 7 · 동쪽 절벽 끝 돌길 턱 8 */
-  put(3, 0, TOP - 1, -27, .4, 22); put(12, -12, TOP - 1, -19, 1.9, 14); put(4, 13, TOP - 1, -21, -2.2, 13); put(12, -24, TOP - 1, -31, .9, 10); put(4, 24, TOP - 1, -33, 2.6, 10);
-  put(6, -22, TOP - .5, -12, 2.4, 7); put(6, 20, TOP - .5, -11, -2.3, 6); put(5, 2, TOP - .5, -12, Math.PI, 7);
-  for (const [x, z, s] of [[-6, -13, 3], [9, -12, 2.6], [-17, -24, 3.4], [18, -26, 3], [-30, -24, 2.8], [30, -24, 2.6], [-2, -38, 4], [-38, -6, 2.4], [38, -2, 2.6]]) put(9, x, TOP - .4, z, rnd() * 6, s);
-  put(7, -30, TOP - 1.2, 2, .7, 3); put(8, 56, TOP - 3.5, -4, -Math.PI / 2, 7);
+  /* 돌산 (보물방 위 · 남쪽 가장자리): 봉우리 3이 입구 바로 뒤 · 양옆 몸통 12 · 4 · 뒤로 낮아지는 비탈 6 · 떨어진 돌 9는 산기슭에만 */
+  put(3, 0, TOP - 2, 1, .5, 24); put(12, -12, TOP - 1.5, 5, 1.7, 15); put(4, 12, TOP - 1.5, 4, -2.0, 14);
+  put(6, -21, TOP - 1, -5, 2.6, 9); put(6, 21, TOP - 1, -6, -2.5, 8); put(12, 0, TOP - 2, -9, 3.1, 11);
+  for (const [x, z, s] of [[-27, -9, 3.2], [-17, -12, 2.6], [17, -14, 3], [28, -11, 2.4], [-6, -17, 2.2], [7, -18, 2.8]]) put(9, x, TOP - .5, z, rnd() * 6, s);   /* 산기슭에 굴러 떨어진 돌 */
 
   /* 협곡 기둥 바위 (10번 · 밑동은 안개 속) */
-  for (const [x, z, r] of PILLARS) { const s = 24 + r * 2; put(10, x, TOP - 7 - s + r, z, rnd() * 6, s * .9, s); put(9, x + 1, TOP - 7.5 + r, z - 1, rnd() * 6, r * .8); }
+  for (const [x, z, r] of PILLARS) { const s = 24 + r * 2; put(10, x, TOP - 7 - s + r, z, rnd() * 6, s * .9, s); }
 
   /* 같은 조각은 한 번에 그림 */
   const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), e = new THREE.Euler(), sc = new THREE.Vector3(), pos = new THREE.Vector3(); let tris = 0, draws = 0;
@@ -87,17 +89,34 @@ export async function buildCliffZone(THREE_, renderer) {
     list.forEach(([x, y, z, yaw, s, sy], k) => { e.set(0, yaw, 0); q.setFromEuler(e); m4.compose(pos.set(x, y, z), q, sc.set(s, sy, s)); im.setMatrixAt(k, m4); });
     im.castShadow = im.receiveShadow = true; im.computeBoundingSphere(); G.add(im); tris += m.geometry.index.count / 3 * list.length; draws++; }
 
-  /* 위 평지 땅: 가장자리는 절벽 꼭대기 이끼 속으로 들어감 · 풀색 = 조각 이끼색 · 넓게 얼룩 · 흙길 조금 */
-  { const sh = new THREE.Shape(PLATEAU.map(([x, z]) => new THREE.Vector2(x, -z))), gg = new THREE.ShapeGeometry(sh, 1); gg.rotateX(-Math.PI / 2);
-    const fine = new THREE.PlaneGeometry(120, 100, 120, 100); fine.rotateX(-Math.PI / 2); fine.translate(0, 0, -15);
-    const P = fine.attributes.position, keep = [], col = [];
+  /* 위 평지 땅: 조각(14번 풀밭 판) 윗면 그림을 그대로 떠서 깔아 바위 조각과 칠 · 결이 같게 (위에서 찍어 무늬로) · 절벽 가까이는 돌판 무늬(7번)가 드러남 · 길은 흙 */
+  const grab = (i, frac) => { const m = src[i], b = m.geometry.boundingBox, cx = (b.min.x + b.max.x) / 2, cz = (b.min.z + b.max.z) / 2, h = Math.min(b.max.x - b.min.x, b.max.z - b.min.z) * frac / 2;
+    const sc = new THREE.Scene(), mm = new THREE.Mesh(m.geometry, new THREE.MeshBasicMaterial({ map: m.material.map })); sc.add(mm);
+    const cam = new THREE.OrthographicCamera(cx - h, cx + h, -cz + h, -cz - h, .01, 10); cam.position.set(0, b.max.y + 2, 0); cam.up.set(0, 0, -1); cam.lookAt(0, -1, 0);
+    cam.left = cx - h; cam.right = cx + h; cam.top = -(cz - h); cam.bottom = -(cz + h); cam.updateProjectionMatrix();
+    const rt = new THREE.WebGLRenderTarget(1024, 1024, { colorSpace: THREE.SRGBColorSpace, wrapS: THREE.MirroredRepeatWrapping, wrapT: THREE.MirroredRepeatWrapping, generateMipmaps: true, minFilter: THREE.LinearMipmapLinearFilter });   /* 반복 방식은 만들 때 정해야 먹힘 */ const prev = renderer.getRenderTarget(); renderer.setRenderTarget(rt); renderer.setClearColor(0x000000, 1); renderer.clear(); renderer.render(sc, cam); renderer.setRenderTarget(prev); renderer.setClearColor(0x9fd0ef, 1);
+    const t = rt.texture; t.wrapS = t.wrapT = THREE.MirroredRepeatWrapping; t.colorSpace = THREE.SRGBColorSpace; return t; };
+  const grassTex = grab(1, .42), sandTex = grab(14, .5), stoneTex = grab(7, .45);   /* 풀 = 1번 꼭대기 이끼 · 얼룩 = 14번 풀밭 판 (모래 섞임) · 돌 = 7번 돌판 */
+  { const fine = new THREE.PlaneGeometry(120, 100, 120, 100); fine.rotateX(-Math.PI / 2); fine.translate(0, 0, -15);
+    const P = fine.attributes.position, keep = [], col = [], W2 = [];
     for (let v = 0; v < P.count; v++) { const x = P.getX(v), z = P.getZ(v), d = distPoly(PLATEAU, x, z); P.setY(v, TOP + .15 * fbm(x * .2, z * .2) - 7 * Math.max(0, Math.min(1, (d + 7) / 7)) ** 2.2);   /* 가장자리 7m에서 땅이 둥글게 내려가 절벽 꼭대기 이끼 밑으로 숨음 (땅 끝 계단이 안 보임) */
-      const n = fbm(x * .06, z * .06), dirt = Math.max(0, 1 - Math.abs(fbm(x * .04 + 3, z * .04) - .5) * 9) * .55, k = .82 + .3 * n;
-      const g = [128 / 255, 155 / 255, 24 / 255].map(c => Math.pow(c, 2.2)),   /* 조각 꼭대기 이끼색과 같게 */ dc = [.32, .25, .15];   /* 이끼보다 조금 깊은 풀빛 */
-      col.push(...g.map((c, j) => (c * k * (1 - dirt) + dc[j] * dirt * .55))); }
+      const pd = Math.min(...PATHS.map(L => { let m = 1e9; for (let k = 1; k < L.length; k++) { const [ax, az] = L[k - 1], [bx, bz] = L[k], dx = bx - ax, dz = bz - az, t = Math.max(0, Math.min(1, ((x - ax) * dx + (z - az) * dz) / (dx * dx + dz * dz))); m = Math.min(m, Math.hypot(x - ax - dx * t, z - az - dz * t)); } return m; }));
+      const path = Math.max(0, Math.min(1, (2.6 + 1.2 * (noise(x * .5, z * .5) - .5) - pd) / 1.4)), rocky = Math.max(0, Math.min(1, (d + 4) / 3)) * (.4 + .6 * noise(x * .15, z * .15)) * .7, k = (.78 + .2 * fbm(x * .05, z * .05)), sand = Math.max(0, Math.min(1, (fbm(x * .035 + 11, z * .035) - .45) * 4));
+      col.push(k, k, sand); W2.push(path, rocky); }   /* 색 r=g=밝기 · b=모래 얼룩 정도 (칠에서 꺼내 씀) */
     const ix = []; const W = 121; for (let j = 0; j < 100; j++) for (let i = 0; i < 120; i++) { const a = j * W + i, b = a + 1, c = a + W, d = c + 1, cx = (P.getX(a) + P.getX(d)) / 2, cz = (P.getZ(a) + P.getZ(d)) / 2; if (distPoly(PLATEAU, cx, cz) > -1.5) continue;   /* 땅 끝은 절벽 꼭대기 밑에 숨음 */ ix.push(a, c, b, b, c, d); }
     fine.setIndex(ix); fine.setAttribute('color', new THREE.Float32BufferAttribute(col, 3)); fine.computeVertexNormals();
-    const ground = new THREE.Mesh(fine, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1, metalness: 0 })); ground.receiveShadow = true; ground.name = 'plateau'; G.add(ground); tris += ix.length / 3; draws++; gg.dispose(); }
+    fine.setAttribute('aMix', new THREE.Float32BufferAttribute(W2, 2));
+    { const U = fine.attributes.uv; for (let v = 0; v < P.count; v++) U.setXY(v, P.getX(v) / 9, -P.getZ(v) / 9); U.needsUpdate = true; }   /* 무늬 좌표 = 땅 위치 (9m마다 한 번) */
+    const gm = new THREE.MeshStandardMaterial({ map: grassTex, vertexColors: true, roughness: 1, metalness: 0 });
+    gm.onBeforeCompile = sh => { sh.uniforms.tStone = { value: stoneTex }; sh.uniforms.tSand = { value: sandTex };
+      sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nattribute vec2 aMix; varying vec2 vMix; varying vec2 vW;').replace('#include <uv_vertex>', '#include <uv_vertex>\nvMix = aMix; vW = (modelMatrix * vec4(position, 1.)).xz;');
+      sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nuniform sampler2D tStone, tSand; varying vec2 vMix; varying vec2 vW;')
+        .replace('#include <map_fragment>', `vec2 gu = vMapUv, gr = mat2(.77, -.64, .64, .77) * gu * .41 + .37;   /* 두 번째는 돌리고 크기를 바꿔 겹침 → 거울 무늬 티가 안 남 */
+          vec3 g1 = texture2D(map, gu).rgb, g2 = texture2D(map, gr).rgb, sd = texture2D(tSand, mat2(.5, .87, -.87, .5) * gu * .63 + .29).rgb, st = texture2D(tStone, gu * 1.28).rgb;
+          vec3 grass = mix(g1, g2, .5); grass = mix(grass, sd, vColor.b * .8);
+          vec3 dirt = mix(sd, vec3(.46, .35, .22), .6);   /* 흙길: 모래 무늬에 흙빛 */
+          vec3 c = mix(grass, st, vMix.y); c = mix(c, dirt, vMix.x * .85); diffuseColor.rgb = c * vColor.r;`); };
+    const ground = new THREE.Mesh(fine, gm); ground.receiveShadow = true; ground.name = 'plateau'; G.add(ground); tris += ix.length / 3; draws++; }
 
   /* 보물방 입구 속: 아치 안쪽이 깊은 어둠 (들어가면 보물 맵으로 바뀌니 속은 안 만듦) */
   { const [aw, ah, ad] = size(11).map(v => v * ARCH.w / size(11)[0]), w = aw * .36, h = ah * .5, sh = new THREE.Shape(); sh.moveTo(-w / 2, 0); sh.lineTo(-w / 2, h - w / 2); sh.absarc(0, h - w / 2, w / 2, Math.PI, 0, true); sh.lineTo(w / 2, 0); sh.lineTo(-w / 2, 0);
