@@ -109,6 +109,51 @@ export function buildCaveMap(THREE, isle) {
       fg.setAttribute('aW', new THREE.Float32BufferAttribute(W4, 4)); fg.setAttribute('aL', new THREE.Float32BufferAttribute(L2, 2)); fg.setAttribute('aCv', new THREE.Float32BufferAttribute(C3, 3)); fg.computeBoundingSphere();
       const fl = new THREE.Mesh(fg, mat); fl.name = 'caveMapFloor'; G.add(fl); info.push({ cave: id, wallTris: idx.length / 3, floorTris: ix.length / 3, len: +(S[N - 1] * .5).toFixed(1) }); }
   }
+  /* ── 뚜껑 산 (사용자 2026-11-14 '작업해'): 동굴 전체를 한 장으로 덮는 속 빈 겉면 · 밖에서만 보이고 들어가면 통째로 숨음 ──
+     · 윤곽: 동굴 벽 바깥에서 3m 더 (걸어 다니는 곳에서 6.5m) · 가장자리는 땅속 1m · 유적 문 앞만 열림 (문 바로 뒤에서 땅으로 내려앉음)
+     · 모양: 산등성이가 굽이 길을 따라가고 보물방 위가 가장 높은 봉우리 · 꼭대기는 벽보다 3~5m 위 · 큰 바위 면 몇 장으로 깎은 모양
+     · 칠은 미리 구움 (해 방향 그늘 · 꼭대기 이끼 · 아래로 갈수록 어둡게) → 빛 계산 없음 · 삼각형 수천 개
+     · 예전 땅 산이 뚜껑 밖으로 삐져나오지 않게 뚜껑 겉면은 그 자리 땅보다 늘 위 */
+  const LIDS = [];
+  for (let i = 0; i < F.gorges.length; i++) {
+    const g = regionOf(F, i), b = F.gorgeBB(i), L = isle.layout.gorges ? isle.layout.gorges[i] : isle.layout.gorge, P0 = L.pts[0], site = L.basin;
+    const ST = 3, x0 = b[0] - 24, z0 = b[2] - 24, NX = Math.ceil((b[1] - b[0] + 48) / ST), NZ = Math.ceil((b[3] - b[2] + 48) / ST), EDGE = 13;
+    /* 안 · 밖 거리 (칸 거리 채움) */
+    const IN = new Uint8Array((NX + 1) * (NZ + 1)), DO = new Float32Array((NX + 1) * (NZ + 1)).fill(1e9), DI = new Float32Array((NX + 1) * (NZ + 1)).fill(1e9), at = (k, j) => j * (NX + 1) + k;
+    for (let j = 0; j <= NZ; j++) for (let k = 0; k <= NX; k++) { const v = g(x0 + k * ST, z0 + j * ST) > 0; IN[at(k, j)] = v; if (v) DO[at(k, j)] = 0; else DI[at(k, j)] = 0; }
+    const chamfer = A => { for (let it = 0; it < 2; it++) for (const dir of [1, -1]) for (let jj = 0; jj <= NZ; jj++) { const j = dir > 0 ? jj : NZ - jj; for (let kk = 0; kk <= NX; kk++) { const k = dir > 0 ? kk : NX - kk;
+      for (const [dk, dj, c] of [[-dir, 0, ST], [0, -dir, ST], [-dir, -dir, ST * 1.414], [dir, -dir, ST * 1.414]]) { const a = k + dk, c2 = j + dj; if (a < 0 || c2 < 0 || a > NX || c2 > NZ) continue; if (A[at(a, c2)] + c < A[at(k, j)]) A[at(k, j)] = A[at(a, c2)] + c; } } } };
+    chamfer(DO); chamfer(DI);
+    const PEAK = TOP + 10;
+    /* 유적 문 크기 (문 덩어리 'cave'에서 잼): 문 뒤끝 z · 문 폭 */
+    let GZ = P0[1] - 30, GW = 22, GTOP = TOP + 6; isle.group.traverse(o => { if (o.name === 'cave' && o.geometry) { o.geometry.computeBoundingBox(); const bb = o.geometry.boundingBox; GZ = bb.min.z + 3; GW = Math.max(Math.abs(bb.min.x - P0[0]), Math.abs(bb.max.x - P0[0])) + 1; GTOP = bb.max.y - 4; } });
+    const H = new Float32Array((NX + 1) * (NZ + 1)).fill(NaN);
+    for (let j = 0; j <= NZ; j++) for (let k = 0; k <= NX; k++) { const q = at(k, j), x = x0 + k * ST, z = z0 + j * ST, d = DO[q]; if (d > EDGE + ST * .6) continue;
+      const gy = isle.hAtL(x, z), din = Math.max(0, DI[q] - ST * .5), room = sm(42, 6, Math.hypot(x - site[0], z - site[1]));
+      const crest = TOP + 6 + 4 * sm(0, 9, din) + 6 * room + 2.2 * (fbm(x * .035, z * .035, 2) - .5);   /* 산등성이 · 보물방 봉우리 */
+      let h = d > 0 ? gy - 2 + (crest - gy + 2) * sm(EDGE, 0, d) ** .8 : crest;
+      if (z > GZ && Math.abs(x - P0[0]) < GW) continue;   /* 유적 문 자리(문 복도 뒤끝까지)는 뚜껑 없음 — 문이 그 자리를 덮음 · 뚜껑은 문 뒤에서 절벽으로 시작 */
+      if (d < EDGE - 2) h = Math.max(h, gy + 1.2);   /* 예전 땅 산이 뚫고 나오지 않게 */
+      H[q] = Math.min(h, PEAK + 4); }
+    /* 큰 바위 면: 꼭짓점을 조금씩 흔들어 면이 각지게 (가장자리는 안 흔듦) */
+    const pos = [], col = [], SUN = [-.45, .75, -.48], sl = Math.hypot(...SUN), sun = SUN.map(v => v / sl);
+    const V = (k, j) => { const q = at(k, j), x = x0 + k * ST, z = z0 + j * ST, w = DO[q] < EDGE - 3 ? 1 : 0; return [x + w * (hash(k, j) - .5) * ST * .6, H[q], z + w * (hash(j + 7, k) - .5) * ST * .6]; };
+    const tri = (a, b2, c) => { const ux = b2[0] - a[0], uy = b2[1] - a[1], uz = b2[2] - a[2], vx = c[0] - a[0], vy = c[1] - a[1], vz = c[2] - a[2]; let nx = uy * vz - uz * vy, ny = uz * vx - ux * vz, nz = ux * vy - uy * vx; const l = Math.hypot(nx, ny, nz) || 1; nx /= l; ny /= l; nz /= l;
+      if (ny < 0) { nx = -nx; ny = -ny; nz = -nz; [b2, c] = [c, b2]; }
+      const cx = (a[0] + b2[0] + c[0]) / 3, cy = (a[1] + b2[1] + c[1]) / 3, cz = (a[2] + b2[2] + c[2]) / 3, lam = Math.max(0, nx * sun[0] + ny * sun[1] + nz * sun[2]);
+      const moss = sm(.72, .92, ny) * sm(.35, .65, fbm(cx * .05, cz * .05, 2)) * sm(TOP + 2, TOP + 8, cy), low2 = sm(TOP + 4, -2, cy), tone = .9 + .2 * hash(Math.round(cx / 5), Math.round(cz / 5));
+      const stone = [.74, .68, .56], green = [.42, .55, .24], c3 = stone.map((v, n) => (v * (1 - moss) + green[n] * moss) * tone * (.38 + .72 * lam) * (1 - .45 * low2));
+      for (const p2 of [a, b2, c]) { pos.push(...p2); col.push(...c3); } };
+    for (let j = 0; j < NZ; j++) for (let k = 0; k < NX; k++) { const q = [at(k, j), at(k + 1, j), at(k, j + 1), at(k + 1, j + 1)]; if (q.some(v => Number.isNaN(H[v]))) continue;
+      const A = V(k, j), B = V(k + 1, j), C = V(k, j + 1), D = V(k + 1, j + 1); if ((k + j) & 1) { tri(A, C, B); tri(B, C, D); } else { tri(A, C, D); tri(A, D, B); } }
+    /* 문 뒤 절벽: 뚜껑 앞끝(문 자리와 닿는 곳)에서 문 꼭대기 아래까지 내려오는 벽 → 남쪽에서 봐도 뚜껑 속이 안 보임 */
+    { const SK = []; for (let j = 0; j <= NZ; j++) for (let k = 0; k < NX; k++) { const q = at(k, j), q2 = at(k + 1, j); if (Number.isNaN(H[q]) || Number.isNaN(H[q2])) continue; const z = z0 + j * ST; if (z + ST <= GZ || z > GZ + ST) continue;
+        const xa = x0 + k * ST, xb = xa + ST; if (Math.abs(xa - P0[0]) >= GW && Math.abs(xb - P0[0]) >= GW) continue; SK.push([[xa, H[q], z], [xb, H[q2], z]]); }
+      const shade = [.74, .68, .56].map(v => v * .55);
+      for (const [a, c] of SK) { const a2 = [a[0], GTOP, a[2] + .5], c2 = [c[0], GTOP, c[2] + .5]; for (const p2 of [a, a2, c, c, a2, c2]) { pos.push(...p2); col.push(...shade); } } }
+    const lg = new THREE.BufferGeometry(); lg.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); lg.setAttribute('color', new THREE.Float32BufferAttribute(col, 3)); lg.computeBoundingSphere();
+    const lid = new THREE.Mesh(lg, new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.DoubleSide })); lid.name = 'caveLid'; isle.group.add(lid); LIDS.push(lid); info.push({ lidTris: pos.length / 9 });
+  }
   isle.group.add(G);
-  return { group: G, info, update: () => { if (low.visible) low.visible = false; } };   /* 땅에서 뽑던 예전 아래층은 안 씀 */
+  return { group: G, lids: LIDS, info, update: st => { if (low.visible) low.visible = false; const inCave = !!(st && st.cave); for (const l of LIDS) l.visible = !inCave; } };   /* 땅에서 뽑던 예전 아래층은 안 씀 · 뚜껑은 밖에서만 */
 }
