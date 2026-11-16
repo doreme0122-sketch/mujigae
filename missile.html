@@ -11,7 +11,7 @@
 <meta name="theme-color" content="#b9dcf3">
 <script>
 window.__ver = location.search.includes('nover') ? Promise.resolve() : fetch('ver.json?t=' + Date.now(), { cache: 'no-store' }).then(r => r.json()).then(j => {
-  const f = location.pathname.split('/').pop() || 'index.html', want = j[f], mine = window.__mine = '11161110';
+  const f = location.pathname.split('/').pop() || 'index.html', want = j[f], mine = window.__mine = '11161130';
   if (want && +want > +mine) { location.replace(f + '?v=' + want + '&r=' + Date.now() + location.hash); return new Promise(() => {}); } }).catch(() => {});
 </script>
 </head><body>
@@ -243,7 +243,7 @@ const rollB=mk(btnCss+`right:calc(118px + ${SR});bottom:calc(10px + ${SB});width
 const skB=mk(btnCss+`right:calc(36px + ${SR});bottom:calc(138px + ${SB});width:66px;height:66px;font-size:13px;background:rgba(120,90,255,.55)`,'미사일'),cdV=mk(`position:absolute;right:calc(36px + ${SR});bottom:calc(138px + ${SB});width:66px;height:66px;border-radius:50%;background:rgba(0,0,0,.5);pointer-events:none;display:none`);
 const msgD=mk(`position:absolute;left:50%;top:calc(52px + ${ST});transform:translateX(-50%);padding:5px 12px;border-radius:12px;background:rgba(20,24,40,.55);font-size:12.5px;white-space:nowrap;opacity:0;transition:opacity .2s`);
 const statD=mk(`position:absolute;right:calc(12px + ${SR});top:calc(12px + ${ST});padding:6px 10px;border-radius:10px;background:rgba(20,24,40,.5);font-size:12px;line-height:1.5;text-align:right`);
-const help=mk(`position:absolute;left:calc(12px + ${SL});top:calc(12px + ${ST});padding:7px 10px;border-radius:10px;background:rgba(20,24,40,.5);font-size:12px;line-height:1.55;max-width:270px`,'보이는 적 누르기 = 락온 (거리 무관 · 다시 누르거나 빈 곳 = 풀기)<br>락온 중 화면 끌기 = 둘러보기 · 떼면 락온 화면으로 복귀<br>공격 = 사거리 안 적에게만 나감 (누르고 있기)<br>미사일 짧게 = 자동 · 끌기 = 직접 조준<br>롤 = 조이스틱 방향으로 구르기 · 오른쪽 칸 위아래 밀기 = 층 바꾸기<br>선입력 0.3초 · 노란 적 = 위아래로 움직임 · 보라 적 = 층을 옮겨 다님<br>PC: WASD · Q/E 층 · J 공격 · K 롤 · 스페이스 미사일');
+const help=mk(`position:absolute;left:calc(12px + ${SL});top:calc(12px + ${ST});padding:7px 10px;border-radius:10px;background:rgba(20,24,40,.5);font-size:12px;line-height:1.55;max-width:270px`,'화면 끌기 = 방향 바꾸기 (떼면 기체가 화면 방향을 봄)<br>보이는 적 누르기 = 락온 (거리 무관 · 다시 누르거나 빈 곳 = 풀기)<br>락온 중 화면 끌기 = 둘러보기 · 떼면 락온 화면으로 복귀<br>공격 = 사거리 안 적에게만 나감 (누르고 있기)<br>미사일 짧게 = 자동 · 끌기 = 직접 조준<br>롤 = 조이스틱 방향으로 구르기 · 오른쪽 칸 위아래 밀기 = 층 바꾸기<br>선입력 0.3초 · 노란 적 = 위아래로 움직임 · 보라 적 = 층을 옮겨 다님<br>PC: WASD · Q/E 층 · J 공격 · K 롤 · 스페이스 미사일');
 const tags=EN.map(()=>mk('position:absolute;left:0;top:0;transform:translate(-50%,-100%);font-size:11.5px;padding:2px 6px;border-radius:8px;background:rgba(20,24,40,.5);white-space:nowrap;border:2px solid transparent'));
 const say=m=>{msgT=time;msgD.textContent=m;msgD.style.opacity=1;};
 const zone=mk(`position:absolute;right:calc(14px + ${SR});top:calc(66px + ${ST});width:96px;height:30%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:7px;pointer-events:auto;touch-action:none;border-radius:14px;background:rgba(20,24,40,.25)`);
@@ -288,15 +288,16 @@ const fire=yaw=>{const pa=pathFor(yaw),m=new THREE.Mesh(misGeo,misMat);m.positio
 const inRangeT=()=>{if(L&&d3(L)<=RULE.rangeR&&vis(L))return L;let t=null,bd=1e9;EN.forEach(q=>{const d=d3(q);if(d<=RULE.rangeR&&d<bd&&vis(q)){bd=d;t=q;}});return t;};
 const doAttack=t=>{const d=d3(t);stat.atk++;if(d<=RULE.meleeR){t.flash=1;boom(t.x,t.y,t.z,0xffffff,.7);}else{const m=new THREE.Mesh(boltGeo,boltMat);m.position.set(P.x,P.y,P.z);scene.add(m);BOLT.push({m,t});}};
 const doRoll=()=>{if(roll||rollCdT>0){const left=roll?RULE.rollTime-roll.t:rollCdT;if(left<=BUF)pend.roll={t:time};else say('롤 대기 중');return;}let jx=inp.jx,jy=inp.jy;if(inp.keys.a)jx=-1;if(inp.keys.d)jx=1;if(inp.keys.w)jy=-1;if(inp.keys.s)jy=1;
- const fx=Math.sin(camYaw),fz=Math.cos(camYaw),rx=-Math.cos(camYaw),rz=Math.sin(camYaw);let vx=fx*-jy+rx*jx,vz=fz*-jy+rz*jx,l=Math.hypot(vx,vz);if(l<.2){vx=-Math.cos(P.yaw);vz=Math.sin(P.yaw);l=1;}
+ const mY=freeLook?P.yaw:camYaw,fx=Math.sin(mY),fz=Math.cos(mY),rx=-Math.cos(mY),rz=Math.sin(mY);let vx=fx*-jy+rx*jx,vz=fz*-jy+rz*jx,l=Math.hypot(vx,vz);if(l<.2){vx=-Math.cos(P.yaw);vz=Math.sin(P.yaw);l=1;}
  const side=Math.sign((-Math.cos(P.yaw))*vx+Math.sin(P.yaw)*vz)||1;roll={dx:vx/l,dz:vz/l,t:0,side};rollCdT=RULE.rollCd;};
 const tmpV=new THREE.Vector3(),dm=new THREE.Object3D();
 const step=dt=>{time+=dt;cdT=Math.max(0,cdT-dt);rollCdT=Math.max(0,rollCdT-dt);atkT=Math.max(0,atkT-dt);
  let jx=inp.jx,jy=inp.jy;if(inp.keys.a)jx=-1;if(inp.keys.d)jx=1;if(inp.keys.w)jy=-1;if(inp.keys.s)jy=1;if(inp.keys[' ']){inp.keys[' ']=0;if(cdT<=BUF)requestFire(null);else say('재사용 대기 중');}
- const fx=Math.sin(camYaw),fz=Math.cos(camYaw),rx=-Math.cos(camYaw),rz=Math.sin(camYaw);let vx=(fx*-jy+rx*jx)*RULE.moveSp,vz=(fz*-jy+rz*jx)*RULE.moveSp;
+ const mY=freeLook?P.yaw:camYaw,fx=Math.sin(mY),fz=Math.cos(mY),rx=-Math.cos(mY),rz=Math.sin(mY);let vx=(fx*-jy+rx*jx)*RULE.moveSp,vz=(fz*-jy+rz*jx)*RULE.moveSp;
  if(roll){const sp=RULE.rollDist/RULE.rollTime*1.4*(1-roll.t/RULE.rollTime*.6);vx=roll.dx*sp;vz=roll.dz*sp;roll.t+=dt;shipBody.rotation.z=-roll.side*TAU*Math.min(1,roll.t/RULE.rollTime);if(roll.t>=RULE.rollTime){roll=null;shipBody.rotation.z=0;}}
  const tryMove=(nx,nz)=>gH(nx,nz)+RULE.minAlt<=Math.min(P.y,RULE.layers[LV.to])+.6;
- if(vx||vz){const nx=P.x+vx*dt,nz=P.z+vz*dt;if(tryMove(nx,nz)){P.x=nx;P.z=nz;}else if(tryMove(nx,P.z))P.x=nx;else if(tryMove(P.x,nz))P.z=nz;if(!L&&!roll)P.yaw=P.yaw+angN(Math.atan2(vx,vz)-P.yaw)*Math.min(1,dt*8);}
+ if(vx||vz){const nx=P.x+vx*dt,nz=P.z+vz*dt;if(tryMove(nx,nz)){P.x=nx;P.z=nz;}else if(tryMove(nx,P.z))P.x=nx;else if(tryMove(P.x,nz))P.z=nz;}
+ if(!L&&!roll&&!freeLook)P.yaw+=angN(camYaw-P.yaw)*Math.min(1,dt*10);
  const g=gH(P.x,P.z);if(LV.f<1){LV.f=Math.min(1,LV.f+dt/RULE.layDur);const k=LV.f*LV.f*(3-2*LV.f);P.y=LV.y0+(RULE.layers[LV.to]-LV.y0)*k;if(LV.f>=1){LV.cur=LV.to;if(layQ.length)tryLayer(layQ.shift());}}else P.y=RULE.layers[LV.cur];if(LV.flash>0){LV.flash-=dt;if(LV.flash<=0)drawPips();}
  if(L){const ta=Math.atan2(L.x-P.x,L.z-P.z);P.yaw=P.yaw+angN(ta-P.yaw)*Math.min(1,dt*6);if(!vis(L)){hideT+=dt;if(hideT>RULE.hideLose)release('가려져서 락온 풀림');}else hideT=0;}
  if(L&&!freeLook)camYaw+=angN(Math.atan2(L.x-P.x,L.z-P.z)-camYaw)*Math.min(1,dt*7);lockBlend+=((L&&!freeLook?1:0)-lockBlend)*Math.min(1,dt*6);
@@ -335,7 +336,7 @@ const step=dt=>{time+=dt;cdT=Math.max(0,cdT-dt);rollCdT=Math.max(0,rollCdT-dt);a
  const r=rr.domElement.getBoundingClientRect();EN.forEach((q,i)=>{tmpV.set(q.x,q.y+2.4,q.z).project(cam);const el=tags[i];if(tmpV.z>1||Math.abs(tmpV.x)>1.1||Math.abs(tmpV.y)>1.1){el.style.display='none';return;}el.style.display='block';el.style.left=((tmpV.x+1)/2*r.width)+'px';el.style.top=((1-tmpV.y)/2*r.height)+'px';
   const d=d3(q),dh=Math.round(q.y-P.y),ok=vis(q);el.textContent=`${Math.round(d)}m · 높이 ${dh>=0?'+':''}${dh}`;el.style.borderColor=ok&&d<=RULE.meleeR?'#ff3b30':ok&&d<=RULE.rangeR?'#ffffff':'transparent';el.style.background=L===q?'rgba(200,60,50,.75)':'rgba(20,24,40,.5)';});};
 addEventListener('resize',()=>{rr.setSize(innerWidth,innerHeight);cam.aspect=innerWidth/innerHeight;cam.updateProjectionMatrix();});
-window.__lab={pathFor,step,P,EN,lockOn,fire,get L(){return L},set aiming(v){aiming=v},set aimYaw(v){aimYaw=v},set atkHold(v){atkHold=v},doRoll,stat,autoYaw};
+window.__lab={pathFor,step,P,EN,lockOn,fire,get L(){return L},get camYaw(){return camYaw},set aiming(v){aiming=v},set aimYaw(v){aimYaw=v},set atkHold(v){atkHold=v},doRoll,stat,autoYaw};
 let last=performance.now();const t0=last;(function loop(){const now=performance.now(),dt=Math.min(.05,(now-last)/1000);last=now;step(dt);animate((now-t0)/1000);rr.render(sc0,cam);requestAnimationFrame(loop);})();
 
 document.getElementById('ld').remove();window.__ok='ok';
