@@ -11,7 +11,7 @@
 <meta name="theme-color" content="#b9dcf3">
 <script>
 window.__ver = location.search.includes('nover') ? Promise.resolve() : fetch('ver.json?t=' + Date.now(), { cache: 'no-store' }).then(r => r.json()).then(j => {
-  const f = location.pathname.split('/').pop() || 'index.html', want = j[f], mine = window.__mine = '11161900';
+  const f = location.pathname.split('/').pop() || 'index.html', want = j[f], mine = window.__mine = '11161905';
   if (want && +want > +mine) { location.replace(f + '?v=' + want + '&r=' + Date.now() + location.hash); return new Promise(() => {}); } }).catch(() => {});
 </script>
 </head><body>
@@ -221,10 +221,11 @@ const drPlay=(n,fade,ts)=>{if(!DR.mixer||!DR.acts[n])return;const a=DR.mixer.cli
 const drOnce=(n,ts)=>{if(!DR.acts[n])return;drPlay(n,.1,ts);DR.oneEnd=time+DR.acts[n].duration/(ts||1);};
 const LATER=[],later=(d,fn)=>LATER.push({t:time+d,fn});
 const mouthP=()=>{const v=new THREE.Vector3();if(DR.mouth){DR.mouth.getWorldPosition(v);return v;}return v.set(P.x,P.y,P.z);};
-if(THREE.GLTFLoader)new THREE.GLTFLoader().load('dragon.glb',g=>{const r=g.scene;r.scale.setScalar(.75);r.position.y=-1.1;ship.add(r);shipBody.visible=false;DR.mixer=new THREE.AnimationMixer(r);g.animations.forEach(c=>DR.acts[c.name]=c);
+const onDr=g=>{const r=g.scene;r.scale.setScalar(.75);r.position.y=-1.1;ship.add(r);shipBody.visible=false;DR.mixer=new THREE.AnimationMixer(r);g.animations.forEach(c=>DR.acts[c.name]=c);
  r.traverse(o=>{if(o.isMesh)o.frustumCulled=false;if(o.name==='head')DR.head=o;});scene.updateMatrixWorld(true);
  if(DR.head){DR.mouth=new THREE.Object3D();const mp=r.localToWorld(new THREE.Vector3(0,2.42,2.10));DR.head.worldToLocal(mp);DR.mouth.position.copy(mp);DR.head.add(DR.mouth);}
- drPlay('정지비행',0);window.__dragon='ok';},undefined,e=>{window.__dragon='fail';console.warn('dragon',e);});
+ drPlay('정지비행',0);window.__dragon='ok';},onDrErr=e=>{window.__dragon='fail';console.warn('dragon',e);};
+if(THREE.GLTFLoader){const ld=new THREE.GLTFLoader();if(window.__DRAGON_B64){const bs=atob(window.__DRAGON_B64),u=new Uint8Array(bs.length);for(let i=0;i<bs.length;i++)u[i]=bs.charCodeAt(i);ld.parse(u.buffer,'',onDr,onDrErr);}else ld.load('dragon.glb',onDr,undefined,onDrErr);}
 const shadowM=new THREE.Mesh(new THREE.CircleGeometry(.9,16).rotateX(-Math.PI/2),new THREE.MeshBasicMaterial({color:0x000000,transparent:true,opacity:.25,depthWrite:false}));scene.add(shadowM);
 const EN=[];
 const plyGeo=new THREE.ConeGeometry(1,3.6,3).rotateX(Math.PI/2).scale(2.4,.45,1),monGeo=new THREE.OctahedronGeometry(1.8,0);
