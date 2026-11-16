@@ -11,7 +11,7 @@
 <meta name="theme-color" content="#b9dcf3">
 <script>
 window.__ver = location.search.includes('nover') ? Promise.resolve() : fetch('ver.json?t=' + Date.now(), { cache: 'no-store' }).then(r => r.json()).then(j => {
-  const f = location.pathname.split('/').pop() || 'index.html', want = j[f], mine = window.__mine = '11161310';
+  const f = location.pathname.split('/').pop() || 'index.html', want = j[f], mine = window.__mine = '11161425';
   if (want && +want > +mine) { location.replace(f + '?v=' + want + '&r=' + Date.now() + location.hash); return new Promise(() => {}); } }).catch(() => {});
 </script>
 </head><body>
@@ -206,7 +206,7 @@ var NCH=0;{const rockMat=new THREE.MeshLambertMaterial({vertexColors:true,flatSh
 const animate=t=>{waterTex.offset.y=-t*.4;fallTex.offset.y=t*1.5;mists.forEach(([m,ph,x])=>{m.position.x=x+Math.sin(t*.12+ph)*1.2;});};
 
 const gH=(x,z)=>LH[levelAt(x,z)];
-const RULE={moveSp:14,altSp:8,minAlt:2,maxAlt:25,lockR:24,hideLose:1,skillR:100,skillW:1.2,misSp:100,cd:1.2,enemyR:1.1,meleeR:10,rangeR:100,atkEvery:.85,rollDist:2,rollTime:.35,rollCd:3,magnet:.45,magLat:6,layers:[12,24,37],lname:['1층 · 협곡','2층 · 낮은 고원 위','3층 · 높은 고원 위'],lcol:['#73ff61','#6bd1ff','#ffcc52'],layDur:.45};
+const RULE={moveSp:14,altSp:8,minAlt:2,maxAlt:25,lockR:24,hideLose:1,skillR:100,skillW:1.2,misSp:100,cd:1.2,enemyR:1.1,meleeR:10,rangeR:100,atkEvery:.85,rollDist:2,rollTime:.35,rollCd:3,magnet:.45,magLat:6,layers:[12,24,37],lname:['1층 · 협곡','2층 · 낮은 고원 위','3층 · 높은 고원 위'],lcol:['#73ff61','#6bd1ff','#ffcc52'],layDur:.45,frontDeg:30,hTol:4};
 const LV={cur:0,to:0,f:1,y0:12,flash:0};
 const BUF=.3,pend={skill:null,roll:null,atk:null},layQ=[];
 const P={x:WX(25),y:12.0,z:WZ(44.5),yaw:Math.PI};
@@ -233,7 +233,7 @@ const misGeo=new THREE.SphereGeometry(.45,10,8),misMat=new THREE.MeshBasicMateri
 const MIS=[],BOLT=[],BOOM=[];
 const boom=(x,y,z,col,s)=>{const sp=new THREE.Sprite(new THREE.SpriteMaterial({map:mistTex,color:col,transparent:true,depthWrite:false}));sp.position.set(x,y,z);scene.add(sp);BOOM.push({s:sp,t:0,k:s||1});};
 const cam=new THREE.PerspectiveCamera(58,innerWidth/innerHeight,.3,1200);
-let freeLook=false,lockBlend=0,camYaw=Math.PI,camPitch=.32,camDist=14,L=null,hideT=0,aiming=false,aimYaw=0,cdT=0,atkT=0,atkHold=false,roll=null,rollCdT=0,lineFlash=0,wasIn=false,lineHide=false,stat={atk:0,hit:0,block:0,miss:0},msgT=-9,time=0,curPath=null;
+let freeLook=false,lockBlend=0,camYaw=Math.PI,camPitch=.32,camDist=14,L=null,hideT=0,aiming=false,aimYaw=0,cdT=0,atkT=0,atkHold=false,roll=null,rollCdT=0,lineFlash=0,wasIn=false,lineHide=false,autoT=null,camMode='orb',camTr={t:1,dur:.6,op:V3(0,0,0),ol:V3(0,0,0)},stat={atk:0,hit:0,block:0,miss:0},msgT=-9,time=0,curPath=null;
 const ui=document.createElement('div');ui.style.cssText='position:absolute;inset:0;pointer-events:none;font:500 13px system-ui,sans-serif;color:#fff;-webkit-user-select:none;user-select:none';wrap.appendChild(ui);
 const mk=(css,html)=>{const d=document.createElement('div');d.style.cssText=css;d.innerHTML=html||'';ui.appendChild(d);return d;};
 const SL='env(safe-area-inset-left,0px)',SR='env(safe-area-inset-right,0px)',SB='env(safe-area-inset-bottom,0px)',ST='env(safe-area-inset-top,0px)';
@@ -245,7 +245,8 @@ const skB=mk(btnCss+`right:calc(36px + ${SR});bottom:calc(138px + ${SB});width:6
 const msgD=mk(`position:absolute;left:50%;top:calc(52px + ${ST});transform:translateX(-50%);padding:5px 12px;border-radius:12px;background:rgba(20,24,40,.55);font-size:12.5px;white-space:nowrap;opacity:0;transition:opacity .2s`);
 const statD=mk(`position:absolute;right:calc(12px + ${SR});top:calc(12px + ${ST});padding:6px 10px;border-radius:10px;background:rgba(20,24,40,.5);font-size:12px;line-height:1.5;text-align:right`);
 const d3c=q=>Math.hypot(q.x-cam.position.x,q.y-cam.position.y,q.z-cam.position.z);
-const help=mk(`position:absolute;left:calc(12px + ${SL});top:calc(12px + ${ST});padding:7px 10px;border-radius:10px;background:rgba(20,24,40,.5);font-size:12px;line-height:1.55;max-width:270px`,'화면 끌기 = 방향 바꾸기 (떼면 기체가 화면 방향을 봄)<br>보이는 적 누르기 = 락온 (거리 무관 · 다시 누르거나 빈 곳 = 풀기)<br>락온 중 화면 끌기 = 둘러보기 · 떼면 락온 화면으로 복귀<br>공격 = 사거리 안 적에게만 나감 · 락온 중엔 락온 대상만 (누르고 있기)<br>적 테두리 초록 = 사거리 안 · 회색 = 밖 · 선은 공격하면 숨김<br>미사일 짧게 = 자동 · 끌기 = 직접 조준<br>롤 = 조이스틱 방향으로 구르기 · 오른쪽 칸 위아래 밀기 = 층 바꾸기<br>선입력 0.3초 · 노란 적 = 위아래로 움직임 · 보라 적 = 층을 옮겨 다님<br>PC: WASD · Q/E 층 · J 공격 · K 롤 · 스페이스 미사일');
+const brk=mk('position:absolute;left:0;top:0;width:44px;height:44px;transform:translate(-50%,-50%);display:none;pointer-events:none');brk.innerHTML=['left:0;top:0;border-left:3px solid;border-top:3px solid','right:0;top:0;border-right:3px solid;border-top:3px solid','left:0;bottom:0;border-left:3px solid;border-bottom:3px solid','right:0;bottom:0;border-right:3px solid;border-bottom:3px solid'].map(c=>`<i style="position:absolute;width:30%;height:30%;${c};filter:drop-shadow(0 0 2px rgba(0,0,0,.6))"></i>`).join('');let lockT=9;
+const help=mk(`position:absolute;left:calc(12px + ${SL});top:calc(12px + ${ST});padding:7px 10px;border-radius:10px;background:rgba(20,24,40,.5);font-size:12px;line-height:1.55;max-width:270px`,'화면 끌기 = 방향 바꾸기 (떼면 기체가 화면 방향을 봄)<br>보이는 적 누르기 = 락온 (거리 무관 · 다시 누르거나 빈 곳 = 풀기)<br>락온 중 화면 끌기 = 둘러보기 · 떼면 락온 화면으로 복귀<br>공격 = 사거리 안 적에게만 나감 · 락온 중엔 락온 대상만 (누르고 있기)<br>적 테두리 초록 = 사거리 안 · 회색 = 밖 · 밝은 테두리 = 자동 조준(정면 30° 우선) · 꺾쇠 = 락온<br>미사일 짧게 = 자동 · 끌기 = 직접 조준<br>롤 = 조이스틱 방향으로 구르기 · 오른쪽 칸 위아래 밀기 = 층 바꾸기<br>선입력 0.3초 · 노란 적 = 위아래로 움직임 · 보라 적 = 층을 옮겨 다님<br>PC: WASD · Q/E 층 · J 공격 · K 롤 · 스페이스 미사일');
 const tags=EN.map(()=>mk('position:absolute;left:0;top:0;transform:translate(-50%,-100%);font-size:11.5px;padding:2px 6px;border-radius:8px;background:rgba(20,24,40,.5);white-space:nowrap;border:2px solid transparent'));
 const say=m=>{msgT=time;msgD.textContent=m;msgD.style.opacity=1;};
 const zone=mk(`position:absolute;right:calc(14px + ${SR});top:calc(66px + ${ST});width:96px;height:30%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:7px;pointer-events:auto;touch-action:none;border-radius:14px;background:rgba(20,24,40,.25)`);
@@ -267,27 +268,30 @@ addEventListener('keydown',e=>{const k=e.key.toLowerCase();inp.keys[k]=1;if(k===
 const angN=a=>{while(a>Math.PI)a-=TAU;while(a<-Math.PI)a+=TAU;return a;};
 const los=(ax,ay,az,bx,by,bz)=>{for(let k=1;k<16;k++){const t=k/16,x=ax+(bx-ax)*t,z=az+(bz-az)*t,y=ay+(by-ay)*t;if(gH(x,z)>y+.3)return false;}return true;};
 const dH=e=>Math.hypot(e.x-P.x,e.z-P.z),d3=e=>Math.hypot(e.x-P.x,e.y-P.y,e.z-P.z),vis=e=>los(P.x,P.y,P.z,e.x,e.y,e.z);
-const lockOn=e=>{if(!vis(e)){say('가려져서 락온할 수 없어요');return;}L=e;hideT=0;wasIn=false;lineHide=false;say('락온');};
+const lockOn=e=>{if(!vis(e)){say('가려져서 락온할 수 없어요');return;}L=e;hideT=0;wasIn=false;lineHide=false;lockT=0;say('락온');};
 const release=why=>{if(!L)return;L=null;say(why);};
 let camId=null,c0=null;rr.domElement.style.touchAction='none';
 rr.domElement.addEventListener('pointerdown',e=>{if(camId!==null)return;camId=e.pointerId;c0={x:e.clientX,y:e.clientY,lx:e.clientX,ly:e.clientY,moved:false};rr.domElement.setPointerCapture(e.pointerId);});
 rr.domElement.addEventListener('pointermove',e=>{if(e.pointerId!==camId)return;const dx=e.clientX-c0.lx,dy=e.clientY-c0.ly;c0.lx=e.clientX;c0.ly=e.clientY;if(Math.hypot(e.clientX-c0.x,e.clientY-c0.y)>8)c0.moved=true;if(c0.moved){freeLook=true;camYaw-=dx*.006;camPitch=Math.max(-.15,Math.min(1.2,camPitch+dy*.004));}});
 const ray=new THREE.Raycaster();const inGuard=(x,y)=>[joy,atkB,skB,rollB,zone].some(el=>{const r=el.getBoundingClientRect(),m=56;return x>r.left-m&&x<r.right+m&&y>r.top-m&&y<r.bottom+m;});
 rr.domElement.addEventListener('pointerup',e=>{if(e.pointerId!==camId)return;camId=null;freeLook=false;if(!c0.moved){const r=rr.domElement.getBoundingClientRect();ray.setFromCamera({x:(e.clientX-r.left)/r.width*2-1,y:-(e.clientY-r.top)/r.height*2+1},cam);const h=ray.intersectObjects(EN.map(q=>q.hit));if(h.length){const en=h[0].object.userData.e;if(L===en)release('락온 풀림');else lockOn(en);}else if(L&&!inGuard(e.clientX,e.clientY))release('락온 풀림');}});
-const pathFor=yaw=>{const dx=Math.sin(yaw),dz=Math.cos(yaw),x0=P.x,y0=P.y,z0=P.z;let tg=L;
+const pathFor=yaw=>{const dx=Math.sin(yaw),dz=Math.cos(yaw),x0=P.x,y0=P.y,z0=P.z;let tg=L;const lat=q=>Math.abs((q.x-x0)*dz-(q.z-z0)*dx);if(!tg&&autoT&&lat(autoT)<RULE.magLat)tg=autoT;
  if(!tg){let bs=RULE.magLat;EN.forEach(q=>{const vx=q.x-x0,vz=q.z-z0,t=vx*dx+vz*dz,s=Math.abs(vx*dz-vz*dx);if(t>1&&t<RULE.skillR*2.5&&s<bs){bs=s;tg=q;}});}
  const slope=tg?(tg.y-y0)/Math.max(2,Math.hypot(tg.x-x0,tg.z-z0)):0;
  const pt=t=>[x0+dx*t,y0+slope*t,z0+dz*t];let cut=RULE.skillR;for(let t=.5;t<=RULE.skillR;t+=.5){const p=pt(t);if(gH(p[0],p[2])>p[1]){cut=t-.5;break;}}
- let hitT=-1;EN.forEach(q=>{const vx=q.x-x0,vz=q.z-z0,t=vx*dx+vz*dz,s=Math.abs(vx*dz-vz*dx);if(t>0&&t<cut+RULE.enemyR&&s<RULE.skillW+RULE.enemyR&&(hitT<0||t<hitT))hitT=t;});
+ let hitT=-1;EN.forEach(q=>{const vx=q.x-x0,vz=q.z-z0,t=vx*dx+vz*dz,s=Math.abs(vx*dz-vz*dx);if(t>0&&t<cut+RULE.enemyR&&s<RULE.skillW+RULE.enemyR&&Math.abs(q.y-(y0+slope*t))<RULE.hTol&&(hitT<0||t<hitT))hitT=t;});
  return{pt,cut,hitT,blocked:cut<RULE.skillR};};
 let skId=null,s0=null;
 skB.onpointerdown=e=>{e.stopPropagation();if(cdT>BUF){say('재사용 대기 중');return;}skId=e.pointerId;skB.setPointerCapture(e.pointerId);s0={x:e.clientX,y:e.clientY};};
 skB.onpointermove=e=>{if(e.pointerId!==skId)return;const dx=e.clientX-s0.x,dy=e.clientY-s0.y;if(Math.hypot(dx,dy)>14){aiming=true;aimYaw=camYaw-Math.atan2(dx,-dy);}};
-const autoYaw=()=>{let t=L&&dH(L)<RULE.skillR+4?L:null;if(!t){let bd=1e9;EN.forEach(q=>{const d=dH(q);if(d<RULE.skillR&&d<bd&&vis(q)){bd=d;t=q;}});}return t?Math.atan2(t.x-P.x,t.z-P.z):P.yaw;};
+const autoYaw=()=>{const t=L||autoT;return t?Math.atan2(t.x-P.x,t.z-P.z):camYaw;};
 const requestFire=yaw=>{if(cdT<=0&&!roll)fire(yaw===null?autoYaw():yaw);else pend.skill={yaw,t:time};};
 skB.onpointerup=skB.onpointercancel=e=>{if(e.pointerId!==skId)return;skId=null;const yaw=aiming?aimYaw:null;aiming=false;requestFire(yaw);};
 const fire=yaw=>{const pa=pathFor(yaw),m=new THREE.Mesh(misGeo,misMat);m.position.set(P.x,P.y,P.z);scene.add(m);MIS.push({m,pa,d:0});cdT=RULE.cd;P.yaw=yaw;};
-const inRangeT=()=>{if(L)return d3(L)<=RULE.rangeR&&vis(L)?L:null;let t=null,bd=1e9;EN.forEach(q=>{const d=d3(q);if(d<=RULE.rangeR&&d<bd&&vis(q)){bd=d;t=q;}});return t;};
+const inFront=q=>Math.abs(angN(Math.atan2(q.x-P.x,q.z-P.z)-camYaw))<=RULE.frontDeg*Math.PI/180;
+const pickAuto=()=>{if(L)return null;const ok=EN.filter(q=>d3(q)<=RULE.rangeR&&vis(q));if(!ok.length)return null;const fr=ok.filter(inFront),near=a=>a.reduce((b,q)=>d3(q)<d3(b)?q:b);
+ if(autoT&&ok.includes(autoT)&&(inFront(autoT)||!fr.length))return autoT;return near(fr.length?fr:ok);};
+const inRangeT=()=>{if(L)return d3(L)<=RULE.rangeR&&vis(L)?L:null;return autoT;};
 const doAttack=t=>{if(t===L)lineHide=true;const d=d3(t);stat.atk++;if(d<=RULE.meleeR){t.flash=1;boom(t.x,t.y,t.z,0xffffff,.7);}else{const m=new THREE.Mesh(boltGeo,boltMat);m.position.set(P.x,P.y,P.z);scene.add(m);BOLT.push({m,t});}};
 const doRoll=()=>{if(roll||rollCdT>0){const left=roll?RULE.rollTime-roll.t:rollCdT;if(left<=BUF)pend.roll={t:time};else say('롤 대기 중');return;}let jx=inp.jx,jy=inp.jy;if(inp.keys.a)jx=-1;if(inp.keys.d)jx=1;if(inp.keys.w)jy=-1;if(inp.keys.s)jy=1;
  const mY=freeLook?P.yaw:camYaw,fx=Math.sin(mY),fz=Math.cos(mY),rx=-Math.cos(mY),rz=Math.sin(mY);let vx=fx*-jy+rx*jx,vz=fz*-jy+rz*jx,l=Math.hypot(vx,vz);if(l<.2){vx=-Math.cos(P.yaw);vz=Math.sin(P.yaw);l=1;}
@@ -302,10 +306,10 @@ const step=dt=>{time+=dt;cdT=Math.max(0,cdT-dt);rollCdT=Math.max(0,rollCdT-dt);a
  if(!L&&!roll&&!freeLook)P.yaw+=angN(camYaw-P.yaw)*Math.min(1,dt*10);
  const g=gH(P.x,P.z);if(LV.f<1){LV.f=Math.min(1,LV.f+dt/RULE.layDur);const k=LV.f*LV.f*(3-2*LV.f);P.y=LV.y0+(RULE.layers[LV.to]-LV.y0)*k;if(LV.f>=1){LV.cur=LV.to;if(layQ.length)tryLayer(layQ.shift());}}else P.y=RULE.layers[LV.cur];if(LV.flash>0){LV.flash-=dt;if(LV.flash<=0)drawPips();}
  if(L){const ta=Math.atan2(L.x-P.x,L.z-P.z);P.yaw=P.yaw+angN(ta-P.yaw)*Math.min(1,dt*6);if(!vis(L)){hideT+=dt;if(hideT>RULE.hideLose)release('가려져서 락온 풀림');}else hideT=0;}
- if(L&&!freeLook)camYaw+=angN(Math.atan2(L.x-P.x,L.z-P.z)-camYaw)*Math.min(1,dt*7);lockBlend+=((L&&!freeLook?1:0)-lockBlend)*Math.min(1,dt*6);
+ if(L&&!freeLook)camYaw+=angN(Math.atan2(L.x-P.x,L.z-P.z)-camYaw)*Math.min(1,dt*7);
  ship.position.set(P.x,P.y,P.z);ship.rotation.set(0,P.yaw,0);if(!roll)shipBody.rotation.z=-jx*.25;shadowM.position.set(P.x,g+.08,P.z);
  EN.forEach(q=>{q.ph+=dt*.25;q.x=q.cx+Math.cos(q.ph)*5;q.z=q.cz+Math.sin(q.ph)*5;const gq=gH(q.x,q.z);if(q.mode===1)q.y=Math.max(gq+2,gH(q.cx,q.cz)+q.dy+9*Math.sin(time*.8+q.i));else if(q.mode===2){const h=q.hop;h.t+=dt;if(h.f>=1&&h.t>3.2){h.t=0;const opts=[0,1,2].filter(k=>k!==h.cur&&RULE.layers[k]>=gq+2);if(opts.length){h.to=opts[Math.floor(Math.random()*opts.length)];h.f=0;h.y0=q.y;}}if(h.f<1){h.f=Math.min(1,h.f+dt/.8);const k=h.f*h.f*(3-2*h.f);q.y=h.y0+(RULE.layers[h.to]-h.y0)*k;if(h.f>=1)h.cur=h.to;}else q.y=Math.max(gq+2,RULE.layers[h.cur]);}else q.y=Math.max(gq+2,gH(q.cx,q.cz)+q.dy);q.g.position.set(q.x,q.y,q.z);q.m.rotation.y+=dt;q.sh.position.set(q.x,gH(q.x,q.z)+.07,q.z);q.flash=Math.max(0,q.flash-dt*3);q.m.material.emissive.setRGB(q.flash,q.flash,q.flash);});
- const tgt=inRangeT();atkB.style.background=tgt?'rgba(255,140,60,.8)':'rgba(90,92,104,.45)';atkB.style.boxShadow=tgt?'0 0 18px rgba(255,150,70,.9)':'none';
+ autoT=pickAuto();const tgt=inRangeT();atkB.style.background=tgt?'rgba(255,140,60,.8)':'rgba(90,92,104,.45)';atkB.style.boxShadow=tgt?'0 0 18px rgba(255,150,70,.9)':'none';
  if(inp.keys.j&&pend.atk===null)pend.atk=time;const wantAtk=atkHold||inp.keys.j||(pend.atk!==null&&time-pend.atk<=BUF);if(wantAtk&&tgt&&atkT<=0&&!roll){doAttack(tgt);atkT=RULE.atkEvery;pend.atk=null;}if(pend.atk!==null&&time-pend.atk>BUF&&!atkHold&&!inp.keys.j)pend.atk=null;
  if(pend.skill){if(time-pend.skill.t>.6)pend.skill=null;else if(cdT<=0&&!roll){fire(pend.skill.yaw===null?autoYaw():pend.skill.yaw);pend.skill=null;}}
  if(pend.roll){if(time-pend.roll.t>.6)pend.roll=null;else if(!roll&&rollCdT<=0){pend.roll=null;doRoll();}}
@@ -313,7 +317,7 @@ const step=dt=>{time+=dt;cdT=Math.max(0,cdT-dt);rollCdT=Math.max(0,rollCdT-dt);a
  barM.visible=barR.visible=false;
  if(L){const d=d3(L),inR=d<=RULE.rangeR,inM=d<=RULE.meleeR;if(inR&&!wasIn)lineFlash=1;wasIn=inR;if(!inR)lineHide=false;const showL=!(inR&&lineHide);lineFlash=Math.max(0,lineFlash-dt*1.6);
   const GRN=0x3dff6a,RED=0xff3b30,lc=inR?GRN:RED;
-  ringM.visible=true;ringM.position.set(L.x,L.y,L.z);ringM.quaternion.copy(cam.quaternion);const blink=hideT>0&&Math.sin(time*25)>0;ringMat.color.setHex(hideT>0?(blink?0xffa030:0x7a4a10):lc);ringMat.opacity=1;
+  ringM.visible=false;ringM.position.set(L.x,L.y,L.z);ringM.quaternion.copy(cam.quaternion);const blink=hideT>0&&Math.sin(time*25)>0;ringMat.color.setHex(hideT>0?(blink?0xffa030:0x7a4a10):lc);ringMat.opacity=1;
   const ux=(L.x-P.x)/d,uy=(L.y-P.y)/d,uz=(L.z-P.z)/d,end=d-2.1,hh=Math.hypot(ux,uz)||1,px=-uz/hh,pz=ux/hh;
   dashMat.color.setHex(lc);let n=0;for(let t=1;showL&&t<end&&n<NDASH;t+=1.2,n++){const b2=Math.min(end,t+.6);placeSeg(dm,P.x+ux*t,P.y+uy*t,P.z+uz*t,P.x+ux*b2,P.y+uy*b2,P.z+uz*b2,.035);dm.updateMatrix();dashes.setMatrixAt(n,dm.matrix);}dashes.count=n;dashes.instanceMatrix.needsUpdate=true;dashes.visible=n>0;
   if(lineFlash>0&&showL){lineIn.visible=true;lineInMat.color.setHex(GRN);lineInMat.opacity=lineFlash;placeSeg(lineIn,P.x,P.y,P.z,P.x+ux*end,P.y+uy*end,P.z+uz*end,.04+.1*lineFlash);}
@@ -324,22 +328,29 @@ const step=dt=>{time+=dt;cdT=Math.max(0,cdT-dt);rollCdT=Math.max(0,rollCdT-dt);a
  if(aiming){const pa=pathFor(aimYaw),p0=pa.pt(0),p1=pa.pt(pa.cut);beamA.visible=true;placeSeg(beamA,...p0,...p1,.13);
   if(pa.hitT>=0){const p=pa.pt(pa.hitT);tipM.visible=true;tipM.position.set(p[0],p[1],p[2]);}if(pa.blocked){const p=pa.pt(pa.cut);cutM.visible=true;cutM.position.set(p[0],p[1],p[2]);}}
  for(let i=MIS.length-1;i>=0;i--){const m=MIS[i],pa=m.pa;m.d+=RULE.misSp*dt;const p=pa.pt(Math.min(m.d,RULE.skillR));m.m.position.set(p[0],p[1],p[2]);let done=null;
-  EN.forEach(q=>{if(!done&&Math.hypot(q.x-p[0],q.z-p[2])<RULE.enemyR+RULE.skillW*.6){done='hit';q.flash=1;boom(q.x,q.y,q.z,0xffc070);}});
+  EN.forEach(q=>{if(!done&&Math.hypot(q.x-p[0],q.z-p[2])<RULE.enemyR+RULE.skillW*.6&&Math.abs(q.y-p[1])<RULE.hTol){done='hit';q.flash=1;boom(q.x,q.y,q.z,0xffc070);}});
   if(!done&&gH(p[0],p[2])>p[1]){done='block';boom(p[0],p[1],p[2],0xbbbbbb);}if(!done&&m.d>RULE.skillR)done='miss';
   if(done){stat[done]++;if(done==='block')say('지형에 막혔어요');scene.remove(m.m);MIS.splice(i,1);}}
  for(let i=BOLT.length-1;i>=0;i--){const b=BOLT[i],t=b.t,dx=t.x-b.m.position.x,dy=t.y-b.m.position.y,dz=t.z-b.m.position.z,l=Math.hypot(dx,dy,dz),s=120*dt;if(l<=s+.3){t.flash=1;boom(t.x,t.y,t.z,0x9ff3ff,.6);scene.remove(b.m);BOLT.splice(i,1);continue;}b.m.position.x+=dx/l*s;b.m.position.y+=dy/l*s;b.m.position.z+=dz/l*s;}
  for(let i=BOOM.length-1;i>=0;i--){const b=BOOM[i];b.t+=dt;b.s.scale.setScalar((1+b.t*10)*b.k);b.s.material.opacity=1-b.t/.45;if(b.t>.45){scene.remove(b.s);BOOM.splice(i,1);}}
  camDist+=((aiming?21:14)-camDist)*Math.min(1,dt*6);const cp=camPitch+(aiming?.18:0);
  const look=V3(P.x,P.y+1.2,P.z);
- const orbP=V3(look.x-Math.sin(camYaw)*Math.cos(cp)*camDist,look.y+Math.sin(cp)*camDist,look.z-Math.cos(camYaw)*Math.cos(cp)*camDist),orbL=look.clone();let camP=orbP,camL=orbL;
- if(L){const ly=Math.atan2(L.x-P.x,L.z-P.z),hd=Math.hypot(L.x-P.x,L.z-P.z)||1,ph=Math.atan2(L.y-P.y,hd),phi=Math.max(-.6,Math.min(.6,ph)),fx2=Math.sin(ly)*Math.cos(phi),fy2=Math.sin(phi),fz2=Math.cos(ly)*Math.cos(phi),lift=camDist*.3;
-  const ux2=-fx2*fy2,uy2=1-fy2*fy2,uz2=-fz2*fy2,ul=Math.hypot(ux2,uy2,uz2)||1,lkP=V3(look.x-fx2*camDist+ux2/ul*lift,look.y-fy2*camDist+uy2/ul*lift,look.z-fz2*camDist+uz2/ul*lift),lkL=Math.abs(ph)<=.6?V3(L.x,L.y,L.z):V3(P.x+Math.sin(ly)*hd,P.y+1.2+Math.tan(Math.sign(ph)*.6)*hd,P.z+Math.cos(ly)*hd);camP=orbP.lerp(lkP,lockBlend);camL=orbL.lerp(lkL,lockBlend);}
+ const want=L&&!freeLook?'lock':'orb';
+ if(want!==camMode){const op=cam.position.clone().sub(look),ol=camTr.curL?camTr.curL.clone().sub(look):V3(0,0,0);
+  if(want==='orb'){const v=op.clone();camYaw=Math.atan2(-v.x,-v.z);camPitch=Math.max(-.15,Math.min(1.2,Math.asin(Math.max(-1,Math.min(1,v.y/(v.length()||1))))));}
+  camTr={t:0,dur:want==='orb'?(freeLook?.15:.7):.6,op,ol,curL:camTr.curL};camMode=want;}
+ const cp2=camPitch+(aiming?.18:0),orbP=V3(look.x-Math.sin(camYaw)*Math.cos(cp2)*camDist,look.y+Math.sin(cp2)*camDist,look.z-Math.cos(camYaw)*Math.cos(cp2)*camDist),orbL=look.clone();let camP=orbP,camL=orbL;
+ if(L&&camMode==='lock'){const ly=Math.atan2(L.x-P.x,L.z-P.z),hd=Math.hypot(L.x-P.x,L.z-P.z)||1,ph=Math.atan2(L.y-P.y,hd),phi=Math.max(-.6,Math.min(.6,ph)),fx2=Math.sin(ly)*Math.cos(phi),fy2=Math.sin(phi),fz2=Math.cos(ly)*Math.cos(phi),lift=camDist*.3;
+  const ux2=-fx2*fy2,uy2=1-fy2*fy2,uz2=-fz2*fy2,ul=Math.hypot(ux2,uy2,uz2)||1;camP=V3(look.x-fx2*camDist+ux2/ul*lift,look.y-fy2*camDist+uy2/ul*lift,look.z-fz2*camDist+uz2/ul*lift);camL=Math.abs(ph)<=.6?V3(L.x,L.y,L.z):V3(P.x+Math.sin(ly)*hd,P.y+1.2+Math.tan(Math.sign(ph)*.6)*hd,P.z+Math.cos(ly)*hd);}
+ if(camTr.t<1){camTr.t=Math.min(1,camTr.t+dt/camTr.dur);const k=camTr.t*camTr.t*(3-2*camTr.t),fp=look.clone().add(camTr.op),fl=look.clone().add(camTr.ol);camP=fp.lerp(camP,k);camL=fl.lerp(camL,k);}
+ camTr.curL=camL.clone();
  cam.position.copy(camP);const cg=gH(cam.position.x,cam.position.z)+1;if(cam.position.y<cg)cam.position.y=cg;cam.lookAt(camL);
  if(time-msgT>1.6)msgD.style.opacity=0;cdV.style.display=cdT>0?'block':'none';rollCdV.style.display=rollCdT>0?'block':'none';
  statD.innerHTML=`공격 ${stat.atk} · 미사일 명중 ${stat.hit} · 막힘 ${stat.block} · 빗나감 ${stat.miss}`;
- EN.forEach((q,i)=>{tags[i].style.display='none';const d=d3(q),ok=vis(q);q.ol.visible=ok;q.ol.material.color.setHex(d<=RULE.rangeR?0x3dff6a:0x8a8f9a);q.ol.scale.setScalar(1.12+Math.min(.5,d3c(q)*.006));});};
+ lockT+=dt;if(L){tmpV.set(L.x,L.y,L.z).project(cam);if(tmpV.z>1){brk.style.display='none';}else{const r=rr.domElement.getBoundingClientRect(),sz=44+Math.max(0,1-lockT/.25)*60,blink=hideT>0&&Math.sin(time*25)>0;brk.style.display='block';brk.style.left=((tmpV.x+1)/2*r.width)+'px';brk.style.top=((1-tmpV.y)/2*r.height)+'px';brk.style.width=brk.style.height=sz+'px';brk.style.color=hideT>0?(blink?'#ffa030':'#7a4a10'):d3(L)<=RULE.rangeR?'#3dff6a':'#ff3b30';}}else brk.style.display='none';
+ EN.forEach((q,i)=>{tags[i].style.display='none';const d=d3(q),ok=vis(q),au=q===autoT;q.ol.visible=ok;q.ol.material.color.setHex(au?0xb8ffc8:d<=RULE.rangeR?0x3dff6a:0x8a8f9a);q.ol.scale.setScalar((au?1.22:1.12)+Math.min(.5,d3c(q)*(au?.009:.006)));});};
 addEventListener('resize',()=>{rr.setSize(innerWidth,innerHeight);cam.aspect=innerWidth/innerHeight;cam.updateProjectionMatrix();});
-window.__lab={pathFor,step,P,EN,lockOn,fire,get L(){return L},get camYaw(){return camYaw},set aiming(v){aiming=v},set aimYaw(v){aimYaw=v},set atkHold(v){atkHold=v},doRoll,stat,autoYaw};
+window.__lab={pathFor,step,P,EN,lockOn,fire,get L(){return L},get camYaw(){return camYaw},get autoT(){return autoT},cam,set aiming(v){aiming=v},set aimYaw(v){aimYaw=v},set atkHold(v){atkHold=v},doRoll,stat,autoYaw};
 let last=performance.now();const t0=last;(function loop(){const now=performance.now(),dt=Math.min(.05,(now-last)/1000);last=now;step(dt);animate((now-t0)/1000);rr.render(sc0,cam);requestAnimationFrame(loop);})();
 
 document.getElementById('ld').remove();window.__ok='ok';
