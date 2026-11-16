@@ -11,7 +11,7 @@
 <meta name="theme-color" content="#b9dcf3">
 <script>
 window.__ver = location.search.includes('nover') ? Promise.resolve() : fetch('ver.json?t=' + Date.now(), { cache: 'no-store' }).then(r => r.json()).then(j => {
-  const f = location.pathname.split('/').pop() || 'index.html', want = j[f], mine = window.__mine = '11161425';
+  const f = location.pathname.split('/').pop() || 'index.html', want = j[f], mine = window.__mine = '11161530';
   if (want && +want > +mine) { location.replace(f + '?v=' + want + '&r=' + Date.now() + location.hash); return new Promise(() => {}); } }).catch(() => {});
 </script>
 </head><body>
@@ -233,7 +233,7 @@ const misGeo=new THREE.SphereGeometry(.45,10,8),misMat=new THREE.MeshBasicMateri
 const MIS=[],BOLT=[],BOOM=[];
 const boom=(x,y,z,col,s)=>{const sp=new THREE.Sprite(new THREE.SpriteMaterial({map:mistTex,color:col,transparent:true,depthWrite:false}));sp.position.set(x,y,z);scene.add(sp);BOOM.push({s:sp,t:0,k:s||1});};
 const cam=new THREE.PerspectiveCamera(58,innerWidth/innerHeight,.3,1200);
-let freeLook=false,lockBlend=0,camYaw=Math.PI,camPitch=.32,camDist=14,L=null,hideT=0,aiming=false,aimYaw=0,cdT=0,atkT=0,atkHold=false,roll=null,rollCdT=0,lineFlash=0,wasIn=false,lineHide=false,autoT=null,camMode='orb',camTr={t:1,dur:.6,op:V3(0,0,0),ol:V3(0,0,0)},stat={atk:0,hit:0,block:0,miss:0},msgT=-9,time=0,curPath=null;
+let freeLook=false,lockBlend=0,camYaw=Math.PI,camPitch=.12,lockLy=0,lockPhi=0,camDist=14,L=null,hideT=0,aiming=false,aimYaw=0,cdT=0,atkT=0,atkHold=false,roll=null,rollCdT=0,lineFlash=0,wasIn=false,lineHide=false,autoT=null,camMode='orb',camTr={t:1,dur:.6,op:V3(0,0,0),ol:V3(0,0,0)},stat={atk:0,hit:0,block:0,miss:0},msgT=-9,time=0,curPath=null;
 const ui=document.createElement('div');ui.style.cssText='position:absolute;inset:0;pointer-events:none;font:500 13px system-ui,sans-serif;color:#fff;-webkit-user-select:none;user-select:none';wrap.appendChild(ui);
 const mk=(css,html)=>{const d=document.createElement('div');d.style.cssText=css;d.innerHTML=html||'';ui.appendChild(d);return d;};
 const SL='env(safe-area-inset-left,0px)',SR='env(safe-area-inset-right,0px)',SB='env(safe-area-inset-bottom,0px)',ST='env(safe-area-inset-top,0px)';
@@ -272,7 +272,7 @@ const lockOn=e=>{if(!vis(e)){say('가려져서 락온할 수 없어요');return;
 const release=why=>{if(!L)return;L=null;say(why);};
 let camId=null,c0=null;rr.domElement.style.touchAction='none';
 rr.domElement.addEventListener('pointerdown',e=>{if(camId!==null)return;camId=e.pointerId;c0={x:e.clientX,y:e.clientY,lx:e.clientX,ly:e.clientY,moved:false};rr.domElement.setPointerCapture(e.pointerId);});
-rr.domElement.addEventListener('pointermove',e=>{if(e.pointerId!==camId)return;const dx=e.clientX-c0.lx,dy=e.clientY-c0.ly;c0.lx=e.clientX;c0.ly=e.clientY;if(Math.hypot(e.clientX-c0.x,e.clientY-c0.y)>8)c0.moved=true;if(c0.moved){freeLook=true;camYaw-=dx*.006;camPitch=Math.max(-.15,Math.min(1.2,camPitch+dy*.004));}});
+rr.domElement.addEventListener('pointermove',e=>{if(e.pointerId!==camId)return;const dx=e.clientX-c0.lx,dy=e.clientY-c0.ly;c0.lx=e.clientX;c0.ly=e.clientY;if(Math.hypot(e.clientX-c0.x,e.clientY-c0.y)>8)c0.moved=true;if(c0.moved){freeLook=true;camYaw-=dx*.006;camPitch=Math.max(-.6,Math.min(.9,camPitch+dy*.004));}});
 const ray=new THREE.Raycaster();const inGuard=(x,y)=>[joy,atkB,skB,rollB,zone].some(el=>{const r=el.getBoundingClientRect(),m=56;return x>r.left-m&&x<r.right+m&&y>r.top-m&&y<r.bottom+m;});
 rr.domElement.addEventListener('pointerup',e=>{if(e.pointerId!==camId)return;camId=null;freeLook=false;if(!c0.moved){const r=rr.domElement.getBoundingClientRect();ray.setFromCamera({x:(e.clientX-r.left)/r.width*2-1,y:-(e.clientY-r.top)/r.height*2+1},cam);const h=ray.intersectObjects(EN.map(q=>q.hit));if(h.length){const en=h[0].object.userData.e;if(L===en)release('락온 풀림');else lockOn(en);}else if(L&&!inGuard(e.clientX,e.clientY))release('락온 풀림');}});
 const pathFor=yaw=>{const dx=Math.sin(yaw),dz=Math.cos(yaw),x0=P.x,y0=P.y,z0=P.z;let tg=L;const lat=q=>Math.abs((q.x-x0)*dz-(q.z-z0)*dx);if(!tg&&autoT&&lat(autoT)<RULE.magLat)tg=autoT;
@@ -337,11 +337,12 @@ const step=dt=>{time+=dt;cdT=Math.max(0,cdT-dt);rollCdT=Math.max(0,rollCdT-dt);a
  const look=V3(P.x,P.y+1.2,P.z);
  const want=L&&!freeLook?'lock':'orb';
  if(want!==camMode){const op=cam.position.clone().sub(look),ol=camTr.curL?camTr.curL.clone().sub(look):V3(0,0,0);
-  if(want==='orb'){const v=op.clone();camYaw=Math.atan2(-v.x,-v.z);camPitch=Math.max(-.15,Math.min(1.2,Math.asin(Math.max(-1,Math.min(1,v.y/(v.length()||1))))));}
-  camTr={t:0,dur:want==='orb'?(freeLook?.15:.7):.6,op,ol,curL:camTr.curL};camMode=want;}
- const cp2=camPitch+(aiming?.18:0),orbP=V3(look.x-Math.sin(camYaw)*Math.cos(cp2)*camDist,look.y+Math.sin(cp2)*camDist,look.z-Math.cos(camYaw)*Math.cos(cp2)*camDist),orbL=look.clone();let camP=orbP,camL=orbL;
- if(L&&camMode==='lock'){const ly=Math.atan2(L.x-P.x,L.z-P.z),hd=Math.hypot(L.x-P.x,L.z-P.z)||1,ph=Math.atan2(L.y-P.y,hd),phi=Math.max(-.6,Math.min(.6,ph)),fx2=Math.sin(ly)*Math.cos(phi),fy2=Math.sin(phi),fz2=Math.cos(ly)*Math.cos(phi),lift=camDist*.3;
-  const ux2=-fx2*fy2,uy2=1-fy2*fy2,uz2=-fz2*fy2,ul=Math.hypot(ux2,uy2,uz2)||1;camP=V3(look.x-fx2*camDist+ux2/ul*lift,look.y-fy2*camDist+uy2/ul*lift,look.z-fz2*camDist+uz2/ul*lift);camL=Math.abs(ph)<=.6?V3(L.x,L.y,L.z):V3(P.x+Math.sin(ly)*hd,P.y+1.2+Math.tan(Math.sign(ph)*.6)*hd,P.z+Math.cos(ly)*hd);}
+  if(want==='orb'&&L){camYaw=lockLy;camPitch=Math.max(-.6,Math.min(.9,-lockPhi));}
+  camTr={t:0,dur:want==='orb'?(freeLook?.15:.3):.6,op,ol,curL:camTr.curL};camMode=want;}
+ const pose=(ly,phi,far)=>{const fx2=Math.sin(ly)*Math.cos(phi),fy2=Math.sin(phi),fz2=Math.cos(ly)*Math.cos(phi),lift=camDist*.3,ux2=-fx2*fy2,uy2=1-fy2*fy2,uz2=-fz2*fy2,ul=Math.hypot(ux2,uy2,uz2)||1;return [V3(look.x-fx2*camDist+ux2/ul*lift,look.y-fy2*camDist+uy2/ul*lift,look.z-fz2*camDist+uz2/ul*lift),V3(look.x+fx2*far,look.y+fy2*far,look.z+fz2*far)];};
+ let [camP,camL]=pose(camYaw,-(camPitch+(aiming?.18:0)),60);
+ if(L&&camMode==='lock'){const ly=Math.atan2(L.x-P.x,L.z-P.z),hd=Math.hypot(L.x-P.x,L.z-P.z)||1,ph=Math.atan2(L.y-P.y,hd),phi=Math.max(-.6,Math.min(.6,ph));lockLy=ly;lockPhi=phi;
+  [camP]=pose(ly,phi,60);camL=Math.abs(ph)<=.6?V3(L.x,L.y,L.z):V3(P.x+Math.sin(ly)*hd,P.y+1.2+Math.tan(Math.sign(ph)*.6)*hd,P.z+Math.cos(ly)*hd);}
  if(camTr.t<1){camTr.t=Math.min(1,camTr.t+dt/camTr.dur);const k=camTr.t*camTr.t*(3-2*camTr.t),fp=look.clone().add(camTr.op),fl=look.clone().add(camTr.ol);camP=fp.lerp(camP,k);camL=fl.lerp(camL,k);}
  camTr.curL=camL.clone();
  cam.position.copy(camP);const cg=gH(cam.position.x,cam.position.z)+1;if(cam.position.y<cg)cam.position.y=cg;cam.lookAt(camL);
